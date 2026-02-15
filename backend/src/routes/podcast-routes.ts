@@ -1,0 +1,469 @@
+/**
+ * Podcast Routes
+ *
+ * REST endpoints for podcast management:
+ * - POST   /api/v1/podcasts              — Create podcast
+ * - GET    /api/v1/podcasts/:id          — Fetch podcast
+ * - GET    /api/v1/agents/:agentId/podcasts — Agent's podcasts
+ * - PATCH  /api/v1/podcasts/:id          — Update podcast
+ * - POST   /api/v1/podcasts/:id/episodes — Generate episode
+ * - GET    /api/v1/podcasts/:id/episodes — List episodes
+ * - GET    /api/v1/episodes/:id          — Single episode
+ * - POST   /api/v1/episodes/:id/distribute — Distribute episode
+ * - GET    /api/v1/podcasts/trending     — Trending (cached)
+ *
+ * Part of Week 2: Backend Integration
+ */
+
+import { Router, Request, Response } from "express";
+import type {
+  CreatePodcastRequest,
+  CreateEpisodeRequest,
+  Podcast,
+  PodcastEpisode,
+  PodcastDistribution,
+} from "../services/podcast-service.js";
+import { asyncHandler, requireAuth } from "../middleware/index.js";
+import {
+  validate,
+  CreatePodcastRequestSchema,
+  CreateEpisodeRequestSchema,
+  UpdatePodcastSchema,
+} from "../utils/validators.js";
+import { podcastService, paymentService } from "../services/index.js";
+import { logger } from "../utils/logger.js";
+import { ValidationError, NotFoundError } from "../utils/errors.js";
+
+const router = Router();
+
+// ===================================================================
+// Podcast Management Endpoints
+// ===================================================================
+
+/**
+ * POST /api/v1/podcasts
+ * Create a new podcast series
+ *
+ * Request body:
+ *   - title: string (required)
+ *   - description?: string
+ *   - category: string (required) — tech, finance, creative, dev, research, other
+ *   - coverImageUrl?: string
+ *
+ * Response: 201 Created
+ *   {
+ *     success: true,
+ *     data: { podcast: Podcast }
+ *   }
+ */
+router.post(
+  "/",
+  requireAuth,
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const agent = req.agent!;
+
+    // Validate request
+    const input = validate(
+      CreatePodcastRequestSchema,
+      req.body as CreatePodcastRequest,
+    ) as CreatePodcastRequest;
+
+    // Create podcast
+    const podcast = await podcastService.createPodcast(agent.agentId, input);
+
+    logger.info("Podcast created via API", {
+      podcastId: podcast.id,
+      agentId: agent.agentId,
+      title: podcast.title,
+    });
+
+    res.status(201).json({
+      success: true,
+      data: { podcast },
+    });
+  }),
+);
+
+/**
+ * GET /api/v1/podcasts/:id
+ * Fetch podcast by ID
+ *
+ * Response: 200 OK
+ *   {
+ *     success: true,
+ *     data: { podcast: Podcast }
+ *   }
+ */
+router.get(
+  "/:id",
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const { id } = req.params;
+
+    const podcast = await podcastService.getPodcastById(id);
+
+    res.json({
+      success: true,
+      data: { podcast },
+    });
+  }),
+);
+
+/**
+ * GET /api/v1/agents/:agentId/podcasts
+ * Fetch all podcasts by agent
+ *
+ * Query params:
+ *   - limit?: number (default 50, max 100)
+ *   - offset?: number (default 0)
+ *
+ * Response: 200 OK
+ *   {
+ *     success: true,
+ *     data: {
+ *       podcasts: Podcast[],
+ *       total: number,
+ *       limit: number,
+ *       offset: number
+ *     }
+ *   }
+ */
+router.get(
+  "/agent/:agentId",
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const { agentId } = req.params;
+    const limit = Math.min(parseInt(req.query.limit as string) || 50, 100);
+    const offset = parseInt(req.query.offset as string) || 0;
+
+    const podcasts = await podcastService.getPodcastsByAgent(
+      agentId,
+      limit,
+      offset,
+    );
+
+    res.json({
+      success: true,
+      data: {
+        podcasts,
+        limit,
+        offset,
+      },
+    });
+  }),
+);
+
+/**
+ * PATCH /api/v1/podcasts/:id
+ * Update podcast metadata
+ *
+ * Request body: Partial<Podcast>
+ *   - title?: string
+ *   - description?: string
+ *   - category?: string
+ *   - coverImageUrl?: string
+ *   - status?: 'active' | 'inactive' | 'archived'
+ *
+ * Response: 200 OK
+ *   {
+ *     success: true,
+ *     data: { podcast: Podcast }
+ *   }
+ */
+router.patch(
+  "/:id",
+  requireAuth,
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const agent = req.agent!;
+    const { id } = req.params;
+
+    // Validate request
+    const updates = validate(
+      UpdatePodcastSchema,
+      req.body,
+    ) as Partial<CreatePodcastRequest> & { status?: string };
+
+    // Verify ownership
+    const podcast = await podcastService.getPodcastById(id);
+    if (podcast.agentId !== agent.agentId) {
+      res.status(403).json({
+        success: false,
+        error: {
+          code: "UNAUTHORIZED",
+          message: "Only podcast creator can update",
+          statusCode: 403,
+        },
+      });
+      return;
+    }
+
+    // Update podcast
+    const updated = await podcastService.updatePodcast(id, updates);
+
+    logger.info("Podcast updated via API", {
+      podcastId: id,
+      agentId: agent.agentId,
+      changes: Object.keys(updates),
+    });
+
+    res.json({
+      success: true,
+      data: { podcast: updated },
+    });
+  }),
+);
+
+// ===================================================================
+// Episode Management Endpoints
+// ===================================================================
+
+/**
+ * POST /api/v1/podcasts/:id/episodes
+ * Generate new episode
+ *
+ * Request body:
+ *   - title: string (required)
+ *   - description?: string
+ *   - sourceUrls?: string[]
+ *   - voicePreferences?: { primaryVoiceId?: string; secondaryVoiceId?: string }
+ *
+ * Response: 201 Created
+ *   {
+ *     success: true,
+ *     data: {
+ *       episode: PodcastEpisode,
+ *       cost: { estimatedCostUsdc: number; estimatedTimeSeconds: number }
+ *     }
+ *   }
+ */
+router.post(
+  "/:id/episodes",
+  requireAuth,
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const agent = req.agent!;
+    const { id: podcastId } = req.params;
+
+    // Validate podcast exists and owned by agent
+    const podcast = await podcastService.getPodcastById(podcastId);
+    if (podcast.agentId !== agent.agentId) {
+      res.status(403).json({
+        success: false,
+        error: {
+          code: "UNAUTHORIZED",
+          message: "Only podcast creator can generate episodes",
+          statusCode: 403,
+        },
+      });
+      return;
+    }
+
+    // Validate request
+    const input = validate(
+      CreateEpisodeRequestSchema,
+      req.body as CreateEpisodeRequest,
+    ) as CreateEpisodeRequest;
+
+    // Generate episode (calls orchestrator)
+    // Note: generateEpisode already charges the payment internally
+    const episode = await podcastService.generateEpisode(podcastId, input);
+
+    logger.info("Episode generated and charged", {
+      episodeId: episode.id,
+      podcastId,
+      agentId: agent.agentId,
+    });
+
+    res.status(201).json({
+      success: true,
+      data: {
+        episode,
+        message:
+          "Episode generation initiated. Check status via GET /api/v1/episodes/:id",
+      },
+    });
+  }),
+);
+
+/**
+ * GET /api/v1/podcasts/:id/episodes
+ * List episodes for podcast
+ *
+ * Query params:
+ *   - limit?: number (default 20, max 100)
+ *   - offset?: number (default 0)
+ *   - status?: 'draft' | 'generating' | 'ready' | 'distributed' | 'failed'
+ *
+ * Response: 200 OK
+ *   {
+ *     success: true,
+ *     data: {
+ *       episodes: PodcastEpisode[],
+ *       total: number,
+ *       limit: number,
+ *       offset: number
+ *     }
+ *   }
+ */
+router.get(
+  "/:id/episodes",
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const { id: podcastId } = req.params;
+    const limit = Math.min(parseInt(req.query.limit as string) || 20, 100);
+    const offset = parseInt(req.query.offset as string) || 0;
+    const status = (req.query.status as string) || undefined;
+
+    // Verify podcast exists
+    await podcastService.getPodcastById(podcastId);
+
+    // Get episodes
+    const episodes = await podcastService.getEpisodesByPodcast(
+      podcastId,
+      limit,
+      offset,
+      status as any,
+    );
+
+    res.json({
+      success: true,
+      data: {
+        episodes,
+        limit,
+        offset,
+      },
+    });
+  }),
+);
+
+/**
+ * GET /api/v1/episodes/:id
+ * Fetch single episode
+ *
+ * Response: 200 OK
+ *   {
+ *     success: true,
+ *     data: { episode: PodcastEpisode }
+ *   }
+ */
+router.get(
+  "/episode/:id",
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const { id } = req.params;
+
+    const episode = await podcastService.getEpisodeById(id);
+
+    res.json({
+      success: true,
+      data: { episode },
+    });
+  }),
+);
+
+/**
+ * POST /api/v1/episodes/:id/distribute
+ * Distribute episode to external platforms
+ *
+ * Creates records for: Spotify, Apple Podcasts, YouTube, RSS
+ * Async jobs will update status → 'live' as platforms confirm
+ *
+ * Response: 201 Created
+ *   {
+ *     success: true,
+ *     data: {
+ *       distributions: PodcastDistribution[],
+ *       message: "Distribution queued for 4 platforms"
+ *     }
+ *   }
+ */
+router.post(
+  "/episode/:id/distribute",
+  requireAuth,
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const agent = req.agent!;
+    const { id: episodeId } = req.params;
+
+    // Verify episode exists and agent owns it
+    const episode = await podcastService.getEpisodeById(episodeId);
+    const podcast = await podcastService.getPodcastById(episode.podcastId);
+
+    if (podcast.agentId !== agent.agentId) {
+      res.status(403).json({
+        success: false,
+        error: {
+          code: "UNAUTHORIZED",
+          message: "Only podcast creator can distribute episodes",
+          statusCode: 403,
+        },
+      });
+      return;
+    }
+
+    // Distribute episode
+    const distributions = await podcastService.distributeEpisode(episodeId);
+
+    logger.info("Episode distribution queued", {
+      episodeId,
+      platformCount: distributions.length,
+      agentId: agent.agentId,
+    });
+
+    res.status(201).json({
+      success: true,
+      data: {
+        distributions,
+        message: `Distribution queued for ${distributions.length} platforms`,
+      },
+    });
+  }),
+);
+
+// ===================================================================
+// Discovery Endpoints
+// ===================================================================
+
+/**
+ * GET /api/v1/podcasts/trending
+ * Get trending podcasts (global discovery)
+ *
+ * Cached at Redis level (5 min TTL)
+ *
+ * Query params:
+ *   - limit?: number (default 20, max 100)
+ *   - category?: string — tech, finance, creative, dev, research, other
+ *
+ * Response: 200 OK
+ *   {
+ *     success: true,
+ *     data: {
+ *       podcasts: Podcast[],
+ *       category?: string,
+ *       limit: number
+ *     }
+ *   }
+ */
+router.get(
+  "/trending",
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const limit = Math.min(parseInt(req.query.limit as string) || 20, 100);
+    const category = (req.query.category as string) || undefined;
+
+    // TODO: Check Redis cache first
+    // const cacheKey = `trending:podcasts:${category || 'all'}`;
+    // const cached = await redis.get(cacheKey);
+    // if (cached) return res.json(JSON.parse(cached));
+
+    // Get trending podcasts
+    const podcasts = await podcastService.getTrendingPodcasts(limit, category);
+
+    // TODO: Cache result for 5 minutes
+    // await redis.setex(cacheKey, 300, JSON.stringify({ ... }));
+
+    res.json({
+      success: true,
+      data: {
+        podcasts,
+        category,
+        limit,
+      },
+    });
+  }),
+);
+
+export default router;

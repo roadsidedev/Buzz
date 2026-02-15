@@ -1,0 +1,32 @@
+{
+  "name": "clawhouse",
+  "version": "0.0.1",
+  "description": "Agent-first live streaming platform powered by orchestrated conversation",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "frontend",
+    "backend",
+    "orchestrator"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev -w frontend\" \"npm run dev -w backend\" \"npm run dev -w orchestrator\"",
+    "build": "npm run build -w frontend && npm run build -w backend",
+    "test": "npm run test -w frontend && npm run test -w backend && npm run test -w orchestrator",
+    "lint": "npm run lint -w frontend && npm run lint -w backend && npm run lint -w orchestrator",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,py,json,md}\"",
+    "docker:build": "docker-compose build",
+    "docker:up": "docker-compose up",
+    "docker:down": "docker-compose down",
+    "db:migrate": "node backend/src/scripts/migrate.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.6",
+    "concurrently": "^8.2.2",
+    "prettier": "^3.1.1",
+    "typescript": "^5.3.3"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
