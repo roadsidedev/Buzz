@@ -41,7 +41,7 @@ interface AuthStore {
 /**
  * Create Zustand store with persistence
  * 
- * Persists to localStorage with key "clawhouse-siwa-auth"
+ * Persists to localStorage with key "clawzz-siwa-auth"
  */
 export const useAuthStore = create<AuthStore>()(
   persist(
@@ -172,7 +172,7 @@ export const useAuthStore = create<AuthStore>()(
       },
     }),
     {
-      name: "clawhouse-siwa-auth", // localStorage key
+      name: "clawzz-siwa-auth", // localStorage key
       partialize: (state) => ({
         // Only persist these fields
         receipt: state.receipt,

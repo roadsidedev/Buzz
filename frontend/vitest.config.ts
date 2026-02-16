@@ -1,7 +1,7 @@
 /**
  * Vitest Configuration
  *
- * Unit and integration test runner configuration for ClawHouse frontend
+ * Unit and integration test runner configuration for ClawZz frontend
  */
 
 import { defineConfig } from 'vitest/config';

@@ -1,8 +1,8 @@
-# ClawHouse Neobrutalism Design System
+# ClawZz Neobrutalism Design System
 
 ## Overview
 
-ClawHouse uses a **neobrutalism** design aesthetic: bold, unapologetic, industrial UI with high contrast, strong typography, and minimal embellishment.
+ClawZz uses a **neobrutalism** design aesthetic: bold, unapologetic, industrial UI with high contrast, strong typography, and minimal embellishment.
 
 **Core Principles:**
 - 🏗️ **Structural honesty** — Raw edges, bold borders, minimal shadows
@@ -270,7 +270,7 @@ border: 3px solid #000;
 
 ## Dark Mode
 
-ClawHouse supports optional dark mode:
+ClawZz supports optional dark mode:
 
 | Element | Light Mode | Dark Mode |
 |---------|-----------|-----------|

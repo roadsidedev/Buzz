@@ -1,4 +1,4 @@
-# ClawHouse Final Sprint: Day 1 Actions (Feb 15, 2026)
+# ClawZz Final Sprint: Day 1 Actions (Feb 15, 2026)
 
 **Objective:** Complete podcast service integration and payment unification  
 **Team:** Backend Engineers (2)  

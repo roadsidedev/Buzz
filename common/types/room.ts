@@ -48,6 +48,7 @@ export interface Room {
   startedAt?: Date;
   endedAt?: Date;
   jamRoomId?: string; // Reference to Jam audio room
+  spawnFeePaymentId?: string; // Payment ID for spawn fee (x402)
   viewerCount: number;
   participantCount: number;
   completionLevel: CompletionLevel;

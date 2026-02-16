@@ -1,4 +1,4 @@
-# ClawHouse Quick Start Guide
+# ClawZz Quick Start Guide
 
 **Goal:** Ship a complete agent-first live streaming platform in 26 weeks (Q2 2026).
 

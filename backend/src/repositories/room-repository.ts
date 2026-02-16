@@ -15,6 +15,7 @@ interface RoomRow {
   objective: string;
   spawn_fee: number;
   jam_room_id: string | null;
+  spawn_fee_payment_id: string | null;
   viewer_count: number;
   participant_count: number;
   completion_level: string;
@@ -166,6 +167,105 @@ export class RoomRepository {
   }
 
   /**
+   * Update Jam room details after creation
+   *
+   * @param roomId - ClawZz room ID
+   * @param details - Jam room ID and URL
+   */
+  async updateJamDetails(
+    roomId: string,
+    details: {
+      jam_room_id: string;
+      jam_room_url: string;
+    }
+  ): Promise<void> {
+    const text = `
+      UPDATE room
+      SET jam_room_id = $1, updated_at = NOW()
+      WHERE id = $2
+    `;
+
+    await query(text, [details.jam_room_id, roomId]);
+
+    logger.info("Jam room details updated", {
+      roomId,
+      jamRoomId: details.jam_room_id,
+      url: details.jam_room_url,
+    });
+  }
+
+  /**
+   * Update spawn fee payment ID
+   *
+   * Links a room to its payment record for spawn fee charging
+   *
+   * @param roomId - ClawZz room ID
+   * @param paymentId - Payment ID from x402
+   */
+  async updateSpawnFeePaymentId(roomId: string, paymentId: string): Promise<void> {
+    const text = `
+      UPDATE room
+      SET spawn_fee_payment_id = $1, updated_at = NOW()
+      WHERE id = $2
+    `;
+
+    await query(text, [paymentId, roomId]);
+
+    logger.info("Spawn fee payment ID linked to room", {
+      roomId,
+      paymentId,
+    });
+  }
+
+  /**
+   * Update turn count and completion metrics
+   *
+   * @param roomId - Room ID
+   * @param turnCount - New turn count
+   * @returns Updated room
+   */
+  async updateTurn(roomId: string, turnCount: number): Promise<Room> {
+    const text = `
+      UPDATE room
+      SET turn_count = $1, last_turn_at = NOW(), updated_at = NOW()
+      WHERE id = $2
+      RETURNING id, host_agent_id, type, status, objective, spawn_fee, jam_room_id, spawn_fee_payment_id, viewer_count, participant_count, completion_level, created_at, started_at, ended_at, updated_at
+    `;
+
+    const row = await queryOne<RoomRow>(text, [turnCount, roomId]);
+
+    if (!row) {
+      throw new Error("Failed to update turn count");
+    }
+
+    return this.mapRowToRoom(row);
+  }
+
+  /**
+   * Update room completion percentage
+   *
+   * @param roomId - Room ID
+   * @param completionPercentage - 0-100
+   */
+  async updateCompletionPercentage(
+    roomId: string,
+    completionPercentage: number
+  ): Promise<void> {
+    const text = `
+      UPDATE room
+      SET completion_percentage = $1, updated_at = NOW()
+      WHERE id = $2
+    `;
+
+    await query(text, [completionPercentage, roomId]);
+
+    logger.debug("Room completion updated", {
+      roomId,
+      completionPercentage,
+    });
+  }
+
+  /**
    * Add participant to room
    */
   async addParticipant(
@@ -201,6 +301,7 @@ export class RoomRepository {
       objective: row.objective,
       spawnFee: row.spawn_fee,
       jamRoomId: row.jam_room_id || undefined,
+      spawnFeePaymentId: row.spawn_fee_payment_id || undefined,
       viewerCount: row.viewer_count,
       participantCount: row.participant_count,
       completionLevel: row.completion_level as any,

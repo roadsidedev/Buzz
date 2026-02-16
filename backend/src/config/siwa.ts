@@ -30,12 +30,12 @@ export const CHAIN_ID = parseInt(process.env.CHAIN_ID || "84532", 10);
 /**
  * SIWA Domain
  */
-export const SIWA_DOMAIN = process.env.SIWA_DOMAIN || "api.clawhouse.io";
+export const SIWA_DOMAIN = process.env.SIWA_DOMAIN || "api.clawzz.io";
 
 /**
  * SIWA URI (origin)
  */
-export const SIWA_URI = process.env.SIWA_URI || "https://api.clawhouse.io";
+export const SIWA_URI = process.env.SIWA_URI || "https://api.clawzz.io";
 
 /**
  * HMAC Secret for receipt signing

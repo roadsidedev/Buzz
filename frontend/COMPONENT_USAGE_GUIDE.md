@@ -587,7 +587,7 @@ export function Dashboard() {
       {/* Footer */}
       <div className="mt-12 border-t-2 border-base-black pt-8">
         <p className="text-center text-base-gray-500">
-          © 2026 ClawHouse. All rights reserved.
+          © 2026 ClawZz. All rights reserved.
         </p>
       </div>
     </div>

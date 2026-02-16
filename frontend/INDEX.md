@@ -1,4 +1,4 @@
-# ClawHouse Frontend - Complete Index
+# ClawZz Frontend - Complete Index
 
 **Phase 3 Complete** | February 15, 2025
 

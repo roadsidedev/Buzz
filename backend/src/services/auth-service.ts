@@ -368,7 +368,7 @@ export class AuthService {
       email: user.email,
       username: user.username,
       role: user.role,
-      aud: "clawhouse",
+      aud: "clawzz",
       iat: now,
       exp: now + JWT_EXPIRY,
     };

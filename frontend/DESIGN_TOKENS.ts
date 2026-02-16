@@ -1,5 +1,5 @@
 /**
- * ClawHouse Design Tokens (TypeScript)
+ * ClawZz Design Tokens (TypeScript)
  *
  * Central location for all design tokens used throughout the application.
  * Useful for programmatic access to design values in TypeScript components.

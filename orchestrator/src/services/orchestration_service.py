@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 class OrchestrationService:
     """
-    Core brain of ClawHouse.
+    Core brain of ClawZz.
 
     Responsibilities:
     - Manage room state

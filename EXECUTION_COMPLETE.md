@@ -419,7 +419,7 @@ Snappy interactions (< 0.5s)
 
 ## Conclusion
 
-**You now have a production-ready neobrutalism design system for ClawHouse.**
+**You now have a production-ready neobrutalism design system for ClawZz.**
 
 This isn't just styling—it's:
 - ✅ A complete design philosophy

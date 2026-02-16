@@ -1,5 +1,5 @@
 /**
- * ClawHouse Shared Types
+ * ClawZz Shared Types
  * Exported from common module for use across all services
  */
 export * from "./agent.js";

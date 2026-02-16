@@ -1,6 +1,6 @@
 # Design System Quick Reference Card
 
-**Neobrutalism UI Design System for ClawHouse**
+**Neobrutalism UI Design System for ClawZz**
 
 ---
 

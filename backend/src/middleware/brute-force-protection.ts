@@ -32,12 +32,13 @@ const bruteForceStore = new Map<string, BruteForceEntry>();
 
 /**
  * Configuration for brute force protection
+ * Phase 1 (Day 3): Reduced from 5 to 3 attempts per spec
  */
 export const BRUTE_FORCE_CONFIG = {
-  MAX_ATTEMPTS: 5, // Max failed attempts before lockout
+  MAX_ATTEMPTS: 3, // Max failed attempts before lockout (reduced from 5)
   LOCKOUT_DURATION_MS: 30 * 60 * 1000, // 30 minutes
   RESET_WINDOW_MS: 15 * 60 * 1000, // 15 minutes (reset counter after this)
-  EXPONENTIAL_BACKOFF_MS: 1000, // Start with 1 second delay
+  EXPONENTIAL_BACKOFF_MS: 1000, // Start with 1 second delay (1s → 2s → 4s)
 };
 
 /**

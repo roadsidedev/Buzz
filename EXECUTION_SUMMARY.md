@@ -237,7 +237,7 @@ curl http://localhost:4000/api/v1/discover/live-now
 curl -v http://localhost:4000/api/v1/discover/live-now 2>&1 | grep X-RateLimit
 
 # 6. Verify database
-docker-compose exec postgres psql -U clawhouse -d clawhouse -c "SELECT COUNT(*) FROM agent;"
+docker-compose exec postgres psql -U clawzz -d clawzz -c "SELECT COUNT(*) FROM agent;"
 ```
 
 ---

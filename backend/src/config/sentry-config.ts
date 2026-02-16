@@ -55,7 +55,7 @@ export function initializeSentry(app: any): void {
 
     // Filtering
     allowUrls: [
-      /https?:\/\/.*clawhouse/,
+      /https?:\/\/.*clawzz/,
       /https?:\/\/localhost/,
     ],
 

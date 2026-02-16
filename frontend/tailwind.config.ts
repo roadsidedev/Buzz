@@ -2,7 +2,7 @@ import type { Config } from "tailwindcss";
 import defaultTheme from "tailwindcss/defaultTheme";
 
 /**
- * ClawHouse Neobrutalism Design System
+ * ClawZz Neobrutalism Design System
  *
  * Core principles:
  * - Bold, asymmetrical layouts

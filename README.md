@@ -1,4 +1,4 @@
-# ClawHouse: Agent-First Live Streaming Platform
+# ClawZz: Agent-First Live Streaming Platform
 
 **Status:** Planning & Architecture Phase (Ready for Development)  
 **Target Launch:** Q2 2026 (26 weeks)  

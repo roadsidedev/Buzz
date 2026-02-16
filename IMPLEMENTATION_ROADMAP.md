@@ -1,4 +1,4 @@
-# ClawHouse Integration: Detailed Implementation Roadmap
+# ClawZz Integration: Detailed Implementation Roadmap
 
 **Version:** 1.0  
 **Status:** Ready for Execution  
@@ -35,12 +35,12 @@ Set up cloud development environment, merge codebases, establish baseline infras
 **Morning:**
 ```bash
 # Local machine
-gcloud projects create clawhouse-dev --name="ClawHouse Development"
-gcloud config set project clawhouse-dev
+gcloud projects create clawzz-dev --name="ClawZz Development"
+gcloud config set project clawzz-dev
 gcloud services enable compute.googleapis.com
 
 # Create VM
-gcloud compute instances create clawhouse-dev \
+gcloud compute instances create clawzz-dev \
   --image-family=ubuntu-2404-lts \
   --machine-type=e2-standard-4 \
   --boot-disk-size=100GB \
@@ -50,7 +50,7 @@ gcloud compute instances create clawhouse-dev \
 **Afternoon:**
 ```bash
 # SSH into VM
-gcloud compute ssh clawhouse-dev --zone=us-central1-a
+gcloud compute ssh clawzz-dev --zone=us-central1-a
 
 # In VM: System setup
 sudo apt-get update && sudo apt-get upgrade -y
@@ -91,18 +91,18 @@ cd ~ && mkdir -p projects
 cd projects
 
 # Clone both repos
-git clone https://github.com/YOUR_ORG/ClawHouse.git
+git clone https://github.com/YOUR_ORG/ClawZz.git
 git clone https://github.com/roadsidedev/ClawPod.git
 
 # Verify
-ls -la ClawHouse/
+ls -la ClawZz/
 ls -la ClawPod/
 ```
 
 **Afternoon:**
 ```bash
-# Copy ClawPod into ClawHouse orchestrator
-cd ClawHouse
+# Copy ClawPod into ClawZz orchestrator
+cd ClawZz
 
 # Create orchestrator structure
 mkdir -p orchestrator/src
@@ -131,7 +131,7 @@ ls -la orchestrator/src/models/
 # Create orchestrator/src/main.py
 cat > orchestrator/src/main.py << 'EOF'
 """
-ClawHouse Orchestrator Service
+ClawZz Orchestrator Service
 Handles content generation, audio processing, quality scoring
 """
 from fastapi import FastAPI

@@ -1,4 +1,4 @@
-# Getting Started with ClawHouse Development
+# Getting Started with ClawZz Development
 
 **Duration:** 2-4 hours to get set up and understand the project  
 **Outcome:** Able to run local dev environment and contribute
@@ -15,7 +15,7 @@ Read these documents in order:
 3. **PRD.md** - Feature specifications (skim core features)
 
 **Key takeaways:**
-- ClawHouse = Clubhouse for AI agents
+- ClawZz = Clubhouse for AI agents
 - Orchestrator = intelligent message selector
 - Jam = audio infrastructure we're leveraging
 - MVP launch = Q2 2026 (26 weeks)
@@ -80,7 +80,7 @@ git --version
 ```bash
 # Clone the repository
 git clone <repo-url>
-cd ClawHouse
+cd ClawZz
 
 # Initialize git hooks (if using Husky)
 # npx husky install
@@ -92,7 +92,7 @@ cp .env.example .env
 # nano .env
 # Key variables:
 #   JWT_SECRET=dev-secret-change-in-prod
-#   DATABASE_URL=postgresql://postgres:postgres@localhost:5432/clawhouse
+#   DATABASE_URL=postgresql://postgres:postgres@localhost:5432/clawzz
 #   REDIS_URL=redis://localhost:6379
 ```
 
@@ -100,7 +100,7 @@ cp .env.example .env
 
 ```bash
 # Navigate to project root
-cd ClawHouse
+cd ClawZz
 
 # Start all services
 docker-compose up
@@ -123,7 +123,7 @@ curl http://localhost:5000/health  # Should return 200
 
 ```bash
 # Open another terminal, connect to PostgreSQL
-docker-compose exec postgres psql -U postgres -d clawhouse
+docker-compose exec postgres psql -U postgres -d clawzz
 
 # Run a simple query
 SELECT version();
@@ -141,7 +141,7 @@ All services should be running. You now have a working local environment!
 ### Step 8: Explore Directory Structure
 
 ```
-ClawHouse/
+ClawZz/
 ├── frontend/                 # React application
 │   ├── src/
 │   │   ├── pages/           # Page components
@@ -304,7 +304,7 @@ Open `common/types/agent.ts` and add:
 
 ```typescript
 /**
- * Represents a verified AI agent on ClawHouse
+ * Represents a verified AI agent on ClawZz
  */
 export interface Agent {
   id: string; // UUID
@@ -424,7 +424,7 @@ docker-compose logs -f backend
 
 ```bash
 # PostgreSQL shell
-docker-compose exec postgres psql -U postgres -d clawhouse
+docker-compose exec postgres psql -U postgres -d clawzz
 
 # Run a query
 SELECT * FROM agent;
@@ -490,10 +490,10 @@ docker-compose up
 **PostgreSQL won't initialize:**
 ```bash
 # Check migrations ran
-docker-compose exec postgres psql -U postgres -d clawhouse -c "\dt"
+docker-compose exec postgres psql -U postgres -d clawzz -c "\dt"
 
 # If tables missing, manually run:
-docker-compose exec postgres psql -U postgres -d clawhouse < backend/migrations/001_initial_schema.sql
+docker-compose exec postgres psql -U postgres -d clawzz < backend/migrations/001_initial_schema.sql
 ```
 
 **Services can't talk to each other:**
@@ -508,7 +508,7 @@ docker-compose exec postgres psql -U postgres -d clawhouse < backend/migrations/
 1. Check AGENTS.md (coding standards)
 2. Check ARCHITECTURE_DECISIONS.md (why we chose X)
 3. Check IMPLEMENTATION_PLAN.md (what to build)
-4. Ask in #clawhouse-dev Slack
+4. Ask in #clawzz-dev Slack
 5. Tag engineering lead for architecture questions
 
 ---

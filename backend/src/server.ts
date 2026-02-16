@@ -1,5 +1,5 @@
 /**
- * ClawHouse API Gateway
+ * ClawZz API Gateway
  * Express.js server for all HTTP and WebSocket requests
  * Phase 1: Authentication and Core API Routes
  */
@@ -15,21 +15,47 @@ import dotenv from "dotenv";
 import {
   errorHandler,
   notFoundHandler,
-  requireAuth,
   startRateLimitCleanup,
 } from "./middleware/index.js";
+import {
+  csrfTokenProvider,
+  validateCSRFToken,
+  initializeCSRFToken,
+} from "./middleware/csrf-protection.js";
+import {
+  sentryTransactionMiddleware,
+  sentrySecurityContextMiddleware,
+  sentryAuthTrackingMiddleware,
+} from "./middleware/sentry-middleware.js";
+import { initializeSentry } from "./config/sentry-config.js";
+import { initializeLoginAttemptService } from "./services/login-attempt-service.js";
 import { logger } from "./utils/logger.js";
 import siwaAuthRoutes from "./routes/auth-routes-siwa.js";
 import roomRoutes from "./routes/room-routes.js";
 import discoveryRoutes from "./routes/discovery-routes.js";
 import agentRoutes from "./routes/agent-routes.js";
 import podcastRoutes from "./routes/podcast-routes.js";
+import skillRoutes from "./routes/skill-routes.js";
 
 dotenv.config();
 
 const app: Express = express();
 const port = process.env.API_PORT || 4000;
 const apiVersion = "v1";
+
+// ============================================================================
+// INITIALIZATION
+// ============================================================================
+
+// Phase 1 (Day 3): Initialize Sentry for error tracking and performance monitoring
+initializeSentry(app);
+
+// Phase 1 (Day 3): Initialize Login Attempt Service (Redis-backed brute force protection)
+initializeLoginAttemptService().catch((err) => {
+  logger.warn("Failed to initialize login attempt service", {
+    error: err instanceof Error ? err.message : String(err),
+  });
+});
 
 // ============================================================================
 // MIDDLEWARE SETUP
@@ -42,12 +68,35 @@ app.use(cors());
 // Logging
 app.use(morgan("combined"));
 
+// Phase 1 (Day 3): Sentry transaction tracking
+app.use(sentryTransactionMiddleware);
+app.use(sentrySecurityContextMiddleware);
+app.use(sentryAuthTrackingMiddleware);
+
 // Body parsing
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Rate limiting cleanup
-startRateLimitCleanup();
+// CSRF Protection
+// 1. Provide CSRF tokens on all requests
+// 2. Validate tokens on state-changing requests
+app.use(csrfTokenProvider());
+app.use(validateCSRFToken());
+
+// Initialize rate limiting (async, must happen before route setup)
+let rateLimiterReady = false;
+startRateLimitCleanup()
+  .then(() => {
+    rateLimiterReady = true;
+    logger.info("Rate limiting initialized");
+  })
+  .catch((err) => {
+    logger.warn("Rate limiting initialization failed", {
+      error: err instanceof Error ? err.message : String(err),
+    });
+    // Continue startup even if rate limiting init fails
+    rateLimiterReady = true;
+  });
 
 // ============================================================================
 // HEALTH & VERSION ENDPOINTS
@@ -60,7 +109,7 @@ app.get("/health", (req: Request, res: Response): void => {
   res.json({
     status: "ok",
     timestamp: new Date().toISOString(),
-    service: "clawhouse-api",
+    service: "clawzz-api",
     version: "0.0.1",
     uptime: process.uptime(),
   });
@@ -81,9 +130,34 @@ app.get(`/api/${apiVersion}/version`, (req: Request, res: Response): void => {
   });
 });
 
+/**
+ * CSRF token endpoint
+ * Frontend calls this to get/refresh CSRF token
+ * Token is also in httpOnly cookie
+ */
+app.get(
+  `/api/${apiVersion}/csrf-token`,
+  (req: Request, res: Response): void => {
+    const token = initializeCSRFToken(req, res);
+    res.json({
+      success: true,
+      data: {
+        token,
+        expiresIn: 3600, // 1 hour in seconds
+      },
+    });
+  },
+);
+
 // ============================================================================
 // API ROUTES
 // ============================================================================
+
+/**
+ * Skill documentation (agent onboarding)
+ * Accessible at /skill.md, /skill.json, /heartbeat.md, /rules.md
+ */
+app.use("/", skillRoutes);
 
 /**
  * Authentication routes (SIWA + Privy)
@@ -190,7 +264,7 @@ app.use(errorHandler);
 // ============================================================================
 
 server.listen(port, "0.0.0.0", () => {
-  logger.info(`🚀 ClawHouse API Gateway started`, {
+  logger.info(`🚀 ClawZz API Gateway started`, {
     port,
     environment: process.env.NODE_ENV || "development",
     apiVersion,

@@ -112,6 +112,19 @@ export class PaymentError extends AppError {
 }
 
 /**
+ * Security error (401)
+ */
+export class SecurityError extends AppError {
+  constructor(
+    message: string,
+    context: Record<string, unknown> = {}
+  ) {
+    super("SECURITY_ERROR" as ErrorCode, message, 401, context);
+    this.name = "SecurityError";
+  }
+}
+
+/**
  * Service unavailable error (503)
  */
 export class ServiceUnavailableError extends AppError {

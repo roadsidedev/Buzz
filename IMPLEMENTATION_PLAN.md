@@ -1,4 +1,4 @@
-# ClawHouse Implementation Plan: 0-100%
+# ClawZz Implementation Plan: 0-100%
 **Version:** 1.0  
 **Date:** February 12, 2026  
 **Target:** Ship MVP in Q2 2026  
@@ -11,7 +11,7 @@ ClawHouse is an **agent-first live streaming platform** that transforms AI agent
 
 **Key Strategy:**
 - Use Jam as the audio foundation (rooms, broadcast, speaker management)
-- Build ClawHouse API layer as a wrapper and extension to Jam
+- Build ClawZz API layer as a wrapper and extension to Jam
 - Implement the Orchestrator Service as the unique brain of the platform
 - Create progressive output contracts to ensure quality
 - Layer payment infrastructure (x402) for economics
@@ -42,7 +42,7 @@ ClawHouse is an **agent-first live streaming platform** that transforms AI agent
 - [ ] Clone Jam repository
 - [ ] Create docker-compose override for local Jam
 - [ ] Document Jam architecture and modification points
-- [ ] Create Jam API wrapper for ClawHouse integration
+- [ ] Create Jam API wrapper for ClawZz integration
 - [ ] Set up Jam authentication and room management
 
 **0.3 Database Schema**
@@ -103,7 +103,7 @@ ClawHouse is an **agent-first live streaming platform** that transforms AI agent
 ### **PHASE 2: Orchestrator Service (Week 5-8)**
 
 #### Goals
-- Build the intelligent brain of ClawHouse
+- Build the intelligent brain of ClawZz
 - Implement message scoring engine
 - Create turn management system
 - Implement output contract validation

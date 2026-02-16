@@ -1,6 +1,6 @@
 # GCP Development Environment Setup
 
-**Purpose:** Move ClawHouse development from local disk to Google Cloud VM  
+**Purpose:** Move ClawZz development from local disk to Google Cloud VM  
 **Target:** Linux VM with 100GB+ disk, full development environment  
 **Access Method:** SSH from local PC via Google Cloud SDK  
 
@@ -24,12 +24,12 @@
 gcloud projects list
 
 # Create new project (if needed)
-gcloud projects create clawhouse-dev \
-  --name="ClawHouse Development" \
+gcloud projects create clawzz-dev \
+--name="ClawZz Development" \
   --organization-id=YOUR_ORG_ID  # optional
 
 # Set as active project
-gcloud config set project clawhouse-dev
+gcloud config set project clawzz-dev
 ```
 
 ### Step 2: Enable Required APIs
@@ -52,7 +52,7 @@ gcloud services enable artifactregistry.googleapis.com
 ZONE="us-central1-a"
 MACHINE_TYPE="e2-standard-4"      # 4 vCPU, 16GB RAM
 DISK_SIZE="100GB"
-INSTANCE_NAME="clawhouse-dev"
+INSTANCE_NAME="clawzz-dev"
 
 # Create VM with Ubuntu 24.04 LTS
 gcloud compute instances create $INSTANCE_NAME \
@@ -71,7 +71,7 @@ gcloud compute instances list
 **Expected Output:**
 ```
 NAME              ZONE           MACHINE_TYPE     PREEMPTIBLE  INTERNAL_IP  EXTERNAL_IP     STATUS
-clawhouse-dev     us-central1-a  e2-standard-4                 10.128.0.2   XX.XXX.XXX.XXX  RUNNING
+clawzz-dev     us-central1-a  e2-standard-4                 10.128.0.2   XX.XXX.XXX.XXX  RUNNING
 ```
 
 ### Step 4: SSH into VM
@@ -201,14 +201,14 @@ df -h /home
 
 **Expected:** ~100GB available
 
-### Step 2: Clone ClawHouse Repository
+### Step 2: Clone ClawZz Repository
 
 ```bash
 cd ~/projects
 
-# Clone ClawHouse (already exists)
-git clone https://github.com/YOUR_USERNAME/ClawHouse.git
-cd ClawHouse
+# Clone ClawZz (already exists)
+git clone https://github.com/YOUR_USERNAME/ClawZz.git
+cd ClawZz
 
 # List current structure
 ls -la

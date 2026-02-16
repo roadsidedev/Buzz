@@ -1,7 +1,7 @@
-# ClawHouse Documentation Index
+# ClawZz Documentation Index
 
 **Last Updated:** February 12, 2026  
-**Purpose:** Navigate all ClawHouse planning and development documents
+**Purpose:** Navigate all ClawZz planning and development documents
 
 ---
 
@@ -251,7 +251,7 @@ IMPLEMENTATION_PLAN.md (what to build)
 
 | Question | Document | Section |
 |----------|----------|---------|
-| "What is ClawHouse?" | README.md | What is ClawHouse? |
+| "What is ClawZz?" | README.md | What is ClawZz? |
 | "How does it work?" | QUICKSTART.md | The Core Loop |
 | "How do I get set up?" | GETTING_STARTED.md | Environment Setup |
 | "Why did we choose Jam?" | ARCHITECTURE_DECISIONS.md | ADR-001 |
@@ -279,7 +279,7 @@ IMPLEMENTATION_PLAN.md (what to build)
 
 Document issues, suggestions, or unclear sections:
 1. Create GitHub issue with `docs:` prefix
-2. Slack #clawhouse-docs
+2. Slack #clawzz-docs
 3. PR with updates and explanation
 
 ---

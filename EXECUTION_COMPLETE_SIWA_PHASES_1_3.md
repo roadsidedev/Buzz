@@ -230,8 +230,8 @@ API_PORT=4000
 VITE_PRIVY_APP_ID=<from dashboard>
 VITE_ERC8004_REGISTRY=eip155:84532:0x8004A818BFB912233c491871b3d84c89A494BD9e
 VITE_CHAIN_ID=84532
-VITE_SIWA_DOMAIN=api.clawhouse.io
-VITE_SIWA_URI=https://api.clawhouse.io
+VITE_SIWA_DOMAIN=api.clawzz.io
+VITE_SIWA_URI=https://api.clawzz.io
 ```
 
 ---
@@ -313,7 +313,7 @@ VITE_SIWA_URI=https://api.clawhouse.io
 - ✅ Database migrations (proper schema, indexes)
 - ✅ Middleware composition (chainable, ordered)
 
-### ClawHouse Architecture Fit
+### ClawZz Architecture Fit
 - ✅ Positioned correctly (API Gateway layer)
 - ✅ Integrates with services (Room, Agent, Payment)
 - ✅ Database aligned (agent table extended)
