@@ -12,6 +12,7 @@
  */
 
 import React from "react";
+import { PrivyProvider } from "@privy-io/react-auth";
 import "./styles/globals.css";
 import { AppRouter } from "@/router";
 import { useInitializeAuth } from "@/stores/auth-store";
@@ -80,9 +81,10 @@ class ErrorBoundary extends React.Component<
  *
  * Initializes authentication and renders router.
  * Uses error boundary for fault tolerance.
+ * Wrapped with PrivyProvider for wallet connections.
  */
 function App(): React.ReactElement {
-  // Initialize auth: restore from localStorage, validate token, etc.
+  // Initialize auth: restore from localStorage, validate receipt, etc.
   useInitializeAuth();
 
   return <AppRouter />;
@@ -91,7 +93,9 @@ function App(): React.ReactElement {
 export default function AppWithErrorBoundary() {
   return (
     <ErrorBoundary>
-      <App />
+      <PrivyProvider appId={import.meta.env.VITE_PRIVY_APP_ID || ""}>
+        <App />
+      </PrivyProvider>
     </ErrorBoundary>
   );
 }

@@ -14,6 +14,8 @@ import bcryptjs from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { v4 as uuidv4 } from "uuid";
 import { Database } from "@/config/database";
+import { CacheService } from "./cache-service.js";
+import { RefreshTokenService } from "./refresh-token-service.js";
 import {
   AuthUser,
   RegisterRequest,
@@ -46,7 +48,12 @@ if (!JWT_SECRET || JWT_SECRET.length < 32) {
  * AuthService: Manages all authentication operations
  */
 export class AuthService {
-  constructor(private db: Database) {}
+  private refreshTokenService: RefreshTokenService;
+
+  constructor(private db: Database) {
+    const cache = new CacheService(process.env.REDIS_URL);
+    this.refreshTokenService = new RefreshTokenService(db, cache);
+  }
 
   /**
    * Register a new user
@@ -106,7 +113,7 @@ export class AuthService {
 
     return {
       accessToken,
-      refreshToken,
+      refreshToken: refreshToken.token,
       user,
       expiresIn: JWT_EXPIRY,
     };
@@ -189,81 +196,80 @@ export class AuthService {
 
     return {
       accessToken,
-      refreshToken,
+      refreshToken: refreshToken.token,
       user,
       expiresIn: JWT_EXPIRY,
     };
   }
 
   /**
-   * Refresh access token using refresh token
+   * Refresh access token using refresh token rotation
    * 
    * Process:
-   * 1. Verify refresh token signature
-   * 2. Find refresh token in database
-   * 3. Verify token not revoked
-   * 4. Check expiration
-   * 5. Retrieve user profile
-   * 6. Revoke old refresh token
-   * 7. Issue new token pair
+   * 1. Rotate refresh token (single-use enforcement, token family tracking)
+   * 2. Verify token validity and detect replay attacks
+   * 3. Issue new access token
+   * 4. Return new token pair
    * 
-   * @param refreshToken - Valid refresh token from previous auth
+   * SECURITY: Implements RFC 6749 Section 6 refresh token rotation
+   * - Old token invalidated immediately (single-use)
+   * - Token family tracked to detect replay attacks
+   * - Entire family revoked if reuse detected
+   * 
+   * @param refreshToken - Current valid refresh token
    * @returns AuthResponse with new token pair
    * @throws TokenExpiredError if token expired
-   * @throws InvalidTokenError if token invalid or revoked
+   * @throws InvalidTokenError if token invalid, revoked, or reused
    */
   async refresh(refreshToken: string): Promise<AuthResponse> {
-    // Verify token signature
-    let payload: JWTPayload;
     try {
-      payload = jwt.verify(refreshToken, JWT_SECRET) as JWTPayload;
-    } catch (err) {
-      if (err instanceof jwt.TokenExpiredError) {
-        throw new TokenExpiredError();
+      // Rotate refresh token (handles validation and rotation logic)
+      const newRefreshTokenData = await this.refreshTokenService.rotateToken(
+        refreshToken
+      );
+
+      // Extract user ID from refresh token for profile fetch
+      // Note: We trust refreshTokenService validation has succeeded
+      const tokenIdPart = refreshToken.split(".")[0];
+      const tokenRecord = await this.db.query(
+        "SELECT user_id FROM refresh_token WHERE id = $1 LIMIT 1",
+        [tokenIdPart]
+      );
+
+      if (tokenRecord.length === 0) {
+        throw new InvalidTokenError("User not found");
       }
-      throw new InvalidTokenError("Invalid refresh token");
+
+      const userId = tokenRecord[0].user_id;
+      const user = await this._getUserById(userId);
+      if (!user) throw new InvalidTokenError("User not found");
+
+      // Generate new access token
+      const accessToken = this._generateAccessToken(user);
+
+      logger.info("Token refreshed with rotation", {
+        userId: user.id,
+        tokenFamily: newRefreshTokenData.metadata.tokenFamily,
+        generation: newRefreshTokenData.metadata.generationNumber,
+      });
+
+      return {
+        accessToken,
+        refreshToken: newRefreshTokenData.token,
+        user,
+        expiresIn: JWT_EXPIRY,
+      };
+    } catch (err) {
+      if (err instanceof Error) {
+        if (err.message.includes("already used")) {
+          throw new InvalidTokenError(
+            "Token has been reused. Security incident detected. All tokens revoked."
+          );
+        }
+        throw new InvalidTokenError(err.message);
+      }
+      throw err;
     }
-
-    // Find refresh token in database
-    const result = await this.db.query(
-      `SELECT * FROM refresh_token 
-       WHERE token = $1 AND user_id = $2 AND revoked_at IS NULL`,
-      [refreshToken, payload.sub]
-    );
-
-    if (result.rows.length === 0) {
-      throw new InvalidTokenError("Refresh token not found or revoked");
-    }
-
-    const tokenRow = result.rows[0];
-
-    // Check expiration
-    if (new Date(tokenRow.expires_at) < new Date()) {
-      throw new TokenExpiredError();
-    }
-
-    // Get user
-    const user = await this._getUserById(payload.sub);
-    if (!user) throw new InvalidTokenError("User not found");
-
-    // Revoke old token
-    await this.db.query(
-      "UPDATE refresh_token SET revoked_at = $1 WHERE id = $2",
-      [new Date(), tokenRow.id]
-    );
-
-    // Issue new tokens
-    const { accessToken, refreshToken: newRefreshToken } =
-      await this._generateTokens(user);
-
-    logger.info("Token refreshed", { userId: user.id });
-
-    return {
-      accessToken,
-      refreshToken: newRefreshToken,
-      user,
-      expiresIn: JWT_EXPIRY,
-    };
   }
 
   /**
@@ -348,28 +354,16 @@ export class AuthService {
   }
 
   /**
-   * Generate access and refresh token pair
-   * 
-   * Process:
-   * 1. Create JWT payload with user info
-   * 2. Sign access token (1 hour expiry)
-   * 3. Sign refresh token (30 days expiry)
-   * 4. Store refresh token in database
+   * Generate only access token
    * 
    * @private
    * @param user - User profile
-   * @returns Access and refresh tokens
+   * @returns Access token JWT
    */
-  private async _generateTokens(
-    user: AuthUser
-  ): Promise<{
-    accessToken: string;
-    refreshToken: string;
-  }> {
+  private _generateAccessToken(user: AuthUser): string {
     const now = Math.floor(Date.now() / 1000);
 
-    // Access token payload
-    const accessPayload: JWTPayload = {
+    const payload: JWTPayload = {
       sub: user.id,
       email: user.email,
       username: user.username,
@@ -379,31 +373,32 @@ export class AuthService {
       exp: now + JWT_EXPIRY,
     };
 
-    // Sign access token
-    const accessToken = jwt.sign(accessPayload, JWT_SECRET, {
-      algorithm: "HS256",
-    });
+    return jwt.sign(payload, JWT_SECRET, { algorithm: "HS256" });
+  }
 
-    // Refresh token payload (same as access, but different expiry)
-    const refreshPayload: JWTPayload = {
-      ...accessPayload,
-      exp: now + JWT_REFRESH_EXPIRY,
-    };
+  /**
+   * Generate access and refresh token pair
+   * 
+   * Process:
+   * 1. Create JWT payload with user info
+   * 2. Sign access token (1 hour expiry)
+   * 3. Issue refresh token via RefreshTokenService (with rotation setup)
+   * 
+   * @private
+   * @param user - User profile
+   * @returns Access token and refresh token metadata
+   */
+  private async _generateTokens(
+    user: AuthUser
+  ): Promise<{
+    accessToken: string;
+    refreshToken: { token: string; metadata: any };
+  }> {
+    // Generate access token
+    const accessToken = this._generateAccessToken(user);
 
-    // Sign refresh token
-    const refreshToken = jwt.sign(refreshPayload, JWT_SECRET, {
-      algorithm: "HS256",
-    });
-
-    // Store refresh token in database
-    const tokenId = uuidv4();
-    const expiresAt = new Date(Date.now() + JWT_REFRESH_EXPIRY * 1000);
-
-    await this.db.query(
-      `INSERT INTO refresh_token (id, user_id, token, expires_at)
-       VALUES ($1, $2, $3, $4)`,
-      [tokenId, user.id, refreshToken, expiresAt]
-    );
+    // Issue refresh token (via RefreshTokenService)
+    const refreshToken = await this.refreshTokenService.issueToken(user.id);
 
     return { accessToken, refreshToken };
   }

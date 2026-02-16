@@ -19,7 +19,7 @@ import {
   startRateLimitCleanup,
 } from "./middleware/index.js";
 import { logger } from "./utils/logger.js";
-import authRoutes from "./routes/auth-routes.js";
+import siwaAuthRoutes from "./routes/auth-routes-siwa.js";
 import roomRoutes from "./routes/room-routes.js";
 import discoveryRoutes from "./routes/discovery-routes.js";
 import agentRoutes from "./routes/agent-routes.js";
@@ -86,9 +86,9 @@ app.get(`/api/${apiVersion}/version`, (req: Request, res: Response): void => {
 // ============================================================================
 
 /**
- * Authentication routes
+ * Authentication routes (SIWA + Privy)
  */
-app.use(`/api/${apiVersion}/auth`, authRoutes);
+app.use(`/api/${apiVersion}/auth`, siwaAuthRoutes);
 
 /**
  * Agent routes

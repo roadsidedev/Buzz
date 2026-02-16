@@ -12,6 +12,7 @@ from .scoring_engine import ScoringEngine
 from .moderation_agent import ModerationAgent
 from .turn_management import TurnManager
 from .output_contracts import ContractValidator
+from .room_state_manager import get_room_state_manager
 
 logger = logging.getLogger(__name__)
 
@@ -37,9 +38,12 @@ class OrchestrationService:
         self.turn_manager = TurnManager()
         self.contract_validator = ContractValidator()
         self.api_gateway = get_api_gateway_client()
+        self.room_state_manager = None  # Initialized async in startup
 
-        # In-memory room state (TODO: persist to Redis)
-        self.room_states: dict[str, RoomState] = {}
+    async def initialize(self) -> None:
+        """Initialize Redis-backed room state manager (call on startup)."""
+        self.room_state_manager = await get_room_state_manager()
+        logger.info("OrchestrationService initialized with Redis state manager")
 
     # Room Lifecycle
 
@@ -53,11 +57,14 @@ class OrchestrationService:
         Returns:
             RoomState ready for participation
         """
+        if not self.room_state_manager:
+            raise RuntimeError("OrchestrationService not initialized")
+
         room_state = RoomState(room=room)
-        self.room_states[room.id] = room_state
+        await self.room_state_manager.create_room(room_state)
 
         logger.info(
-            "Room created in orchestrator",
+            "Room created in orchestrator (persisted to Redis)",
             extra={
                 "room_id": room.id,
                 "room_type": room.room_type.value,
@@ -77,12 +84,18 @@ class OrchestrationService:
         Returns:
             Updated room state
         """
-        room_state = self.room_states.get(room_id)
+        if not self.room_state_manager:
+            raise RuntimeError("OrchestrationService not initialized")
+
+        room_state = await self.room_state_manager.get_room(room_id)
         if not room_state:
             raise ValueError(f"Room {room_id} not found")
 
         room_state.room.status = RoomStatus.LIVE
         room_state.room.started_at = datetime.utcnow()
+
+        # Persist updated state
+        await self.room_state_manager.update_room(room_state)
 
         logger.info(
             "Room started",
@@ -102,7 +115,10 @@ class OrchestrationService:
         Returns:
             Final room state
         """
-        room_state = self.room_states.get(room_id)
+        if not self.room_state_manager:
+            raise RuntimeError("OrchestrationService not initialized")
+
+        room_state = await self.room_state_manager.get_room(room_id)
         if not room_state:
             raise ValueError(f"Room {room_id} not found")
 
@@ -113,8 +129,14 @@ class OrchestrationService:
         artifacts = self.contract_validator.generate_artifacts(room_state)
         room_state.room.output_artifacts = artifacts
 
+        # Persist final state
+        await self.room_state_manager.update_room(room_state)
+
+        # Delete from Redis after persistence (optional - could keep for archive)
+        # await self.room_state_manager.delete_room(room_id)
+
         logger.info(
-            "Room closed",
+            "Room closed (persisted to Redis)",
             extra={
                 "room_id": room_id,
                 "reason": reason,
@@ -138,7 +160,10 @@ class OrchestrationService:
         Raises:
             ValueError: If room not found or queue full
         """
-        room_state = self.room_states.get(room_id)
+        if not self.room_state_manager:
+            raise RuntimeError("OrchestrationService not initialized")
+
+        room_state = await self.room_state_manager.get_room(room_id)
         if not room_state:
             raise ValueError(f"Room {room_id} not found")
 
@@ -146,6 +171,23 @@ class OrchestrationService:
             raise ValueError("Message queue full")
 
         room_state.message_queue.append(message.id)
+
+        # Store message in Redis
+        await self.room_state_manager.store_message(
+            room_id, 
+            message.id, 
+            {
+                "id": message.id,
+                "agent_id": message.agent_id,
+                "content": message.content,
+                "status": message.status.value if hasattr(message.status, 'value') else str(message.status),
+                "created_at": datetime.utcnow().isoformat(),
+            }
+        )
+
+        # Persist updated room state
+        await self.room_state_manager.update_room(room_state)
+
         logger.info(
             "Message submitted",
             extra={
@@ -174,7 +216,10 @@ class OrchestrationService:
         Returns:
             Dict with turn result (selected_message, score, reasoning, etc.)
         """
-        room_state = self.room_states.get(room_id)
+        if not self.room_state_manager:
+            raise RuntimeError("OrchestrationService not initialized")
+
+        room_state = await self.room_state_manager.get_room(room_id)
         if not room_state:
             raise ValueError(f"Room {room_id} not found")
 
@@ -258,6 +303,9 @@ class OrchestrationService:
         room_state.room.completion_level = level
         room_state.contract_satisfaction = satisfaction
 
+        # Persist updated state to Redis
+        await self.room_state_manager.update_room(room_state)
+
         should_close = self.contract_validator.should_close_room(room_state)
 
         if should_close:
@@ -285,8 +333,11 @@ class OrchestrationService:
         }
 
     async def get_room_state(self, room_id: str) -> RoomState:
-        """Get current room state."""
-        room_state = self.room_states.get(room_id)
+        """Get current room state from Redis."""
+        if not self.room_state_manager:
+            raise RuntimeError("OrchestrationService not initialized")
+
+        room_state = await self.room_state_manager.get_room(room_id)
         if not room_state:
             raise ValueError(f"Room {room_id} not found")
         return room_state

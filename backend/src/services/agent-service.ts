@@ -1,12 +1,17 @@
 /**
  * Agent Service
- * Business logic for agent management
+ * Business logic for agent management with ERC-8004 identity verification
  */
 
+import crypto from "crypto";
 import type { VerifiedAgent, AgentStats } from "../../common/types/index.js";
 import { ValidationError, NotFoundError } from "../utils/errors.js";
 import { logger } from "../utils/logger.js";
 import { agentRepository } from "../repositories/index.js";
+import {
+  createERC8004VerificationService,
+  type ERC8004VerificationInput,
+} from "./erc8004-verification-service.js";
 
 interface CreateAgentInput {
   name: string;
@@ -14,11 +19,24 @@ interface CreateAgentInput {
   avatarUrl?: string;
 }
 
+interface VerifyAgentInput {
+  agentId: string;
+  walletAddress: string;
+  proof: string;
+  signature: string;
+}
+
 /**
  * Agent Service
  * Handles agent creation, verification, and profile management
  */
 export class AgentService {
+  private erc8004Service = createERC8004VerificationService(
+    process.env.ERC8004_REGISTRY || "0x0000000000000000000000000000000000000000",
+    process.env.ERC8004_RPC_URL || "https://eth-mainnet.g.alchemy.com/v2/demo",
+    parseInt(process.env.ERC8004_CHAIN_ID || "1")
+  );
+
   /**
    * Create a new agent
    */
@@ -107,17 +125,89 @@ export class AgentService {
   }
 
   /**
-   * Verify agent via ERC-8004
+   * Verify agent via ERC-8004 smart contract
+   *
+   * Process:
+   * 1. Validate agent exists
+   * 2. Recover wallet from signature
+   * 3. Call ERC-8004 contract to verify ownership
+   * 4. Update verification status in database
+   * 5. Log audit trail
+   *
+   * @param input - Agent ID, wallet, proof, and signature
+   * @returns true if verification succeeded, false otherwise
    */
-  async verifyAgent(agentId: string): Promise<boolean> {
-    // TODO: Call ERC-8004 smart contract to verify ownership
+  async verifyAgent(input: VerifyAgentInput): Promise<boolean> {
+    // Validate agent exists
+    const agent = await this.getAgentById(input.agentId);
 
-    logger.info("Verifying agent", { agentId });
+    logger.info("Starting ERC-8004 verification", {
+      agentId: input.agentId,
+      walletAddress: input.walletAddress,
+    });
 
-    // Update status in database
-    await agentRepository.updateVerificationStatus(agentId, "verified");
+    try {
+      // Call ERC-8004 verification service
+      const verificationResult = await this.erc8004Service.verifyAgentOwnership({
+        agentId: input.agentId,
+        walletAddress: input.walletAddress,
+        proof: input.proof,
+        signature: input.signature,
+      });
 
-    return true;
+      if (!verificationResult.verified) {
+        logger.warn("ERC-8004 verification failed", {
+          agentId: input.agentId,
+          walletAddress: input.walletAddress,
+          error: verificationResult.error,
+        });
+        return false;
+      }
+
+      // Update verification status in database
+      await agentRepository.updateVerificationStatus(input.agentId, "verified");
+
+      logger.info("ERC-8004 verification succeeded", {
+        agentId: input.agentId,
+        walletAddress: verificationResult.ownerAddress,
+        verifiedAt: verificationResult.verifiedAt.toISOString(),
+      });
+
+      return true;
+    } catch (err) {
+      logger.error("ERC-8004 verification error", {
+        agentId: input.agentId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return false;
+    }
+  }
+
+  /**
+   * Check if wallet owns agent identity (non-cryptographic check)
+   *
+   * @param agentId - Agent ID
+   * @param walletAddress - Wallet address
+   * @returns true if wallet is owner on-chain
+   */
+  async isAgentOwner(agentId: string, walletAddress: string): Promise<boolean> {
+    try {
+      return await this.erc8004Service.isAgentOwner(agentId, walletAddress);
+    } catch (err) {
+      logger.error("Failed to check agent ownership", {
+        agentId,
+        walletAddress,
+        error: err,
+      });
+      return false;
+    }
+  }
+
+  /**
+   * Get ERC-8004 verification service for direct contract interaction
+   */
+  getERC8004Service() {
+    return this.erc8004Service;
   }
 }
 

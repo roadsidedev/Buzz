@@ -1,8 +1,9 @@
 /**
- * Authentication & Authorization Types
- * 
+ * Authentication & Authorization Types (SIWA + Privy)
+ *
  * Shared between frontend and backend for type safety.
- * Used across API contracts, state management, and validation.
+ * Uses SIWA (Sign In With Agent) for wallet-based auth.
+ * Integrated with Privy for managed agent wallets.
  */
 
 // ============================================
@@ -10,37 +11,72 @@
 // ============================================
 
 /**
- * AuthUser: Authenticated user profile
- * 
- * Returned after successful login/registration
+ * Agent Profile: Authenticated agent identity
+ *
+ * Returned after successful SIWA verification
  * and when validating current session
  */
-export interface AuthUser {
+export interface AgentProfile {
   id: string;
-  username: string;
-  email: string;
-  emailVerified: boolean;
-  phone?: string;
-  bio?: string;
-  avatarUrl?: string;
-  role: "agent" | "viewer" | "admin" | "moderator";
+  name: string;
+  avatar?: string;
+  walletAddress: string;
+  erc8004AgentId: number;
+  erc8004Verified: boolean;
+  verificationStatus: "pending" | "verified" | "failed";
+  role: "agent" | "admin" | "moderator";
   status: "active" | "inactive" | "suspended" | "banned";
   createdAt: string;
   updatedAt: string;
-  lastLoginAt?: string;
+  lastVerifiedAt?: string;
 }
 
 /**
- * RefreshToken: Token metadata stored in database
- * 
- * Used internally for token lifecycle management
+ * SIWANonce: Signing challenge stored in database
+ *
+ * Used internally for nonce lifecycle management
  */
-export interface RefreshToken {
+export interface SIWANonce {
   id: string;
-  userId: string;
-  token: string;
+  walletAddress: string;
+  agentId: number;
+  nonce: string;
+  issuedAt: string;
   expiresAt: string;
-  revokedAt?: string;
+  consumed: boolean;
+  consumedAt?: string;
+  createdAt: string;
+}
+
+/**
+ * SIWAReceipt: HMAC-signed stateless token
+ *
+ * Issued after successful SIWA verification
+ * Used for subsequent API calls (included in Authorization header)
+ * Format: base64(payload).base64(hmac)
+ */
+export interface SIWAReceipt {
+  walletAddress: string;
+  agentId: number;
+  signerType?: "eoa" | "sca";
+  issuedAt: string;
+  expiresAt: string;
+}
+
+/**
+ * WalletSession: Privy wallet session tracking
+ *
+ * Used for managed agents with Privy wallet integration
+ */
+export interface WalletSession {
+  id: string;
+  agentId: string;
+  privyUserId: string;
+  walletAddress: string;
+  chainId: number;
+  isActive: boolean;
+  expiresAt: string;
+  lastActivityAt: string;
   createdAt: string;
 }
 
@@ -49,90 +85,114 @@ export interface RefreshToken {
 // ============================================
 
 /**
- * RegisterRequest: User registration input
- * 
- * @param email - User's email address (validated format)
- * @param username - Display name (3-30 chars)
- * @param password - User password (8+ chars)
- * @param confirmPassword - Password confirmation (must match)
+ * ConnectWalletRequest: Register new agent with wallet
+ *
+ * First step in agent registration. Agent provides wallet address
+ * and their ERC-8004 token ID.
+ *
+ * @param walletAddress - Ethereum address (0x...)
+ * @param agentId - ERC-8004 token ID (>= 1)
+ * @param name - Display name (1-255 chars)
+ * @param avatar - Optional avatar URL
  */
-export interface RegisterRequest {
-  email: string;
-  username: string;
-  password: string;
-  confirmPassword: string;
+export interface ConnectWalletRequest {
+  walletAddress: string;
+  agentId: number;
+  name: string;
+  avatar?: string;
 }
 
 /**
- * LoginRequest: User login credentials
- * 
- * @param email - User's email address
- * @param password - User's password
+ * ConnectWalletResponse: Successful wallet connection
+ *
+ * Returns agent profile. Next step is to request nonce for signing.
  */
-export interface LoginRequest {
-  email: string;
-  password: string;
+export interface ConnectWalletResponse {
+  success: boolean;
+  agent: AgentProfile;
 }
 
 /**
- * AuthResponse: Successful authentication response
- * 
- * Returned by register, login, and refresh endpoints
- * Contains tokens and user profile
+ * SIWANonceRequest: Request signing challenge
+ *
+ * Agent provides wallet address and agent ID
+ * Server returns nonce to be included in signed message
+ *
+ * @param walletAddress - Agent's wallet address
+ * @param agentId - Agent's ERC-8004 token ID
  */
-export interface AuthResponse {
-  accessToken: string;
-  refreshToken: string;
-  user: AuthUser;
-  expiresIn: number;
+export interface SIWANonceRequest {
+  walletAddress: string;
+  agentId: number;
 }
 
 /**
- * TokenRefreshRequest: Token refresh request
- * 
- * @param refreshToken - Valid refresh token from previous auth
+ * SIWANonceResponse: Signing challenge returned
+ *
+ * @param nonce - Random string to include in signed message (>= 8 chars)
+ * @param issuedAt - RFC 3339 timestamp when nonce was generated
+ * @param expiresAt - RFC 3339 timestamp when nonce expires (10 minutes)
  */
-export interface TokenRefreshRequest {
-  refreshToken: string;
+export interface SIWANonceResponse {
+  nonce: string;
+  issuedAt: string;
+  expiresAt: string;
 }
 
 /**
- * ValidateTokenResponse: Token validation response
- * 
- * Used by GET /auth/validate endpoint
+ * SIWAVerifyRequest: Submit signed SIWA message
+ *
+ * Agent has signed the SIWA message and submits it to verify ownership.
+ * Server verifies signature and checks onchain registration.
+ *
+ * @param message - Full SIWA message (RFC format)
+ * @param signature - EIP-191 signature hex string (0x...)
+ * @param walletAddress - Signer's wallet address
+ * @param agentId - Agent's ERC-8004 token ID
  */
-export interface ValidateTokenResponse {
+export interface SIWAVerifyRequest {
+  message: string;
+  signature: string;
+  walletAddress: string;
+  agentId: number;
+}
+
+/**
+ * SIWAVerifyResponse: Authentication successful, receipt issued
+ *
+ * @param receipt - HMAC-signed stateless token for API auth
+ * @param agent - Authenticated agent profile
+ * @param expiresAt - When receipt expires (24 hours)
+ */
+export interface SIWAVerifyResponse {
+  receipt: string;
+  agent: AgentProfile;
+  expiresAt: string;
+}
+
+/**
+ * ReceiptVerifyRequest: Verify receipt for API call
+ *
+ * Agent includes receipt in Authorization header
+ * Server verifies signature and checks expiration
+ *
+ * @param receipt - HMAC-signed receipt from /siwa/verify
+ */
+export interface ReceiptVerifyRequest {
+  receipt: string;
+}
+
+/**
+ * ReceiptVerifyResponse: Receipt validation result
+ *
+ * @param valid - Whether receipt is valid
+ * @param agent - Agent profile if valid
+ * @param error - Error message if invalid
+ */
+export interface ReceiptVerifyResponse {
   valid: boolean;
-  user?: AuthUser;
+  agent?: AgentProfile;
   error?: string;
-}
-
-// ============================================
-// JWT & Token Payloads
-// ============================================
-
-/**
- * JWTPayload: Decoded JWT token payload
- * 
- * Verified by validateAccessToken() middleware
- * Contains user identity and permissions
- * 
- * @param sub - Subject (user_id) - used for authorization
- * @param email - User's email (for reference)
- * @param username - User's username (for display)
- * @param role - User's role (for RBAC)
- * @param aud - Audience (must be "clawhouse")
- * @param iat - Issued at (unix timestamp)
- * @param exp - Expiration (unix timestamp)
- */
-export interface JWTPayload {
-  sub: string;
-  email: string;
-  username: string;
-  role: string;
-  aud: "clawhouse";
-  iat: number;
-  exp: number;
 }
 
 // ============================================
@@ -141,7 +201,7 @@ export interface JWTPayload {
 
 /**
  * AuthError: Base authentication error
- * 
+ *
  * All auth-specific errors extend this class
  * Provides error code, message, and HTTP status
  */
@@ -158,46 +218,108 @@ export class AuthError extends Error {
 }
 
 /**
- * InvalidCredentialsError: Login failed (bad email or password)
+ * InvalidSignatureError: Signature verification failed
  */
-export class InvalidCredentialsError extends AuthError {
+export class InvalidSignatureError extends AuthError {
   constructor() {
-    super("INVALID_CREDENTIALS", "Invalid email or password", 401);
-    Object.setPrototypeOf(this, InvalidCredentialsError.prototype);
+    super("INVALID_SIGNATURE", "Signature verification failed", 401);
+    Object.setPrototypeOf(this, InvalidSignatureError.prototype);
   }
 }
 
 /**
- * UserAlreadyExistsError: Registration failed (email taken)
+ * NonceExpiredError: Signing nonce has expired
  */
-export class UserAlreadyExistsError extends AuthError {
-  constructor(email: string) {
-    super("USER_EXISTS", `User with email ${email} already exists`, 409);
-    Object.setPrototypeOf(this, UserAlreadyExistsError.prototype);
-  }
-}
-
-/**
- * TokenExpiredError: Token has expired (need refresh)
- */
-export class TokenExpiredError extends AuthError {
+export class NonceExpiredError extends AuthError {
   constructor() {
-    super("TOKEN_EXPIRED", "Token has expired", 401);
-    Object.setPrototypeOf(this, TokenExpiredError.prototype);
+    super("NONCE_EXPIRED", "Signing nonce has expired", 401);
+    Object.setPrototypeOf(this, NonceExpiredError.prototype);
   }
 }
 
 /**
- * InvalidTokenError: Token is invalid or malformed
+ * NonceUsedError: Nonce already used (replay attack)
  */
-export class InvalidTokenError extends AuthError {
-  constructor(reason?: string) {
+export class NonceUsedError extends AuthError {
+  constructor() {
     super(
-      "INVALID_TOKEN",
-      `Invalid token${reason ? `: ${reason}` : ""}`,
+      "NONCE_USED",
+      "Nonce has already been used (replay attack detected)",
       401
     );
-    Object.setPrototypeOf(this, InvalidTokenError.prototype);
+    Object.setPrototypeOf(this, NonceUsedError.prototype);
+  }
+}
+
+/**
+ * ReceiptExpiredError: Receipt has expired
+ */
+export class ReceiptExpiredError extends AuthError {
+  constructor() {
+    super("RECEIPT_EXPIRED", "Receipt has expired", 401);
+    Object.setPrototypeOf(this, ReceiptExpiredError.prototype);
+  }
+}
+
+/**
+ * ReceiptRevokedError: Receipt has been revoked
+ */
+export class ReceiptRevokedError extends AuthError {
+  constructor() {
+    super("RECEIPT_REVOKED", "Receipt has been revoked", 401);
+    Object.setPrototypeOf(this, ReceiptRevokedError.prototype);
+  }
+}
+
+/**
+ * InvalidReceiptError: Receipt is invalid or tampered
+ */
+export class InvalidReceiptError extends AuthError {
+  constructor(reason?: string) {
+    super(
+      "INVALID_RECEIPT",
+      `Invalid receipt${reason ? `: ${reason}` : ""}`,
+      401
+    );
+    Object.setPrototypeOf(this, InvalidReceiptError.prototype);
+  }
+}
+
+/**
+ * AgentAlreadyExistsError: Wallet or agent ID already registered
+ */
+export class AgentAlreadyExistsError extends AuthError {
+  constructor(field: string, value: string) {
+    super(
+      "AGENT_EXISTS",
+      `Agent with ${field} ${value} already exists`,
+      409
+    );
+    Object.setPrototypeOf(this, AgentAlreadyExistsError.prototype);
+  }
+}
+
+/**
+ * AgentNotFoundError: Agent not found in database
+ */
+export class AgentNotFoundError extends AuthError {
+  constructor(field: string = "ID") {
+    super("AGENT_NOT_FOUND", `Agent not found by ${field}`, 404);
+    Object.setPrototypeOf(this, AgentNotFoundError.prototype);
+  }
+}
+
+/**
+ * ERC8004VerificationError: Onchain ERC-8004 verification failed
+ */
+export class ERC8004VerificationError extends AuthError {
+  constructor(reason?: string) {
+    super(
+      "ERC8004_VERIFICATION_FAILED",
+      `ERC-8004 verification failed${reason ? `: ${reason}` : ""}`,
+      403
+    );
+    Object.setPrototypeOf(this, ERC8004VerificationError.prototype);
   }
 }
 
@@ -219,4 +341,77 @@ export class ValidationError extends AuthError {
     super("VALIDATION_ERROR", message, 400);
     Object.setPrototypeOf(this, ValidationError.prototype);
   }
+}
+
+// ============================================
+// SIWA Message Format (RFC-style)
+// ============================================
+
+/**
+ * SIWA Message Format (per SIWA spec)
+ *
+ * Example:
+ * ```
+ * example.com wants you to sign in with your Agent account:
+ * 0x1234567890123456789012345678901234567890
+ *
+ * URI: https://example.com/siwa
+ * Version: 1
+ * Agent ID: 42
+ * Agent Registry: eip155:84532:0x8004A818BFB912233c491871b3d84c89A494BD9e
+ * Chain ID: 84532
+ * Nonce: a1b2c3d4e5f6g7h8
+ * Issued At: 2026-02-16T10:30:00Z
+ * Expiration Time: 2026-02-16T10:40:00Z
+ * ```
+ *
+ * See: https://siwa.id/docs#protocol-specification
+ */
+export type SIWAMessageFields = {
+  domain: string;
+  address: string;
+  statement?: string;
+  uri: string;
+  agentId: number;
+  agentRegistry: string;
+  chainId: number;
+  nonce: string;
+  issuedAt: string;
+  expirationTime?: string;
+  notBefore?: string;
+  requestId?: string;
+};
+
+// ============================================
+// Deprecated Types (for migration reference only)
+// ============================================
+
+/**
+ * @deprecated Use AgentProfile instead
+ * Legacy email/password auth - no longer used
+ */
+export interface LegacyAuthUser {
+  id: string;
+  username: string;
+  email: string;
+  emailVerified: boolean;
+  phone?: string;
+  bio?: string;
+  avatarUrl?: string;
+  role: "agent" | "viewer" | "admin" | "moderator";
+  status: "active" | "inactive" | "suspended" | "banned";
+  createdAt: string;
+  updatedAt: string;
+  lastLoginAt?: string;
+}
+
+/**
+ * @deprecated Use SIWAVerifyResponse instead
+ * Legacy email/password response
+ */
+export interface LegacyAuthResponse {
+  accessToken: string;
+  refreshToken: string;
+  user: LegacyAuthUser;
+  expiresIn: number;
 }
