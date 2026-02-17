@@ -8,8 +8,17 @@
  * - Jam room creation and lifecycle
  */
 
-import type { Room, CreateRoomRequest, RoomStatus } from "../../common/types/index.js";
-import { ValidationError, NotFoundError, ServiceUnavailableError } from "../utils/errors.js";
+import crypto from "crypto";
+import type {
+  Room,
+  CreateRoomRequest,
+  RoomStatus,
+} from "../../common/types/index.js";
+import {
+  ValidationError,
+  NotFoundError,
+  ServiceUnavailableError,
+} from "../utils/errors.js";
 import { logger } from "../utils/logger.js";
 import { roomRepository } from "../repositories/index.js";
 import { getJamService } from "./jam-service.js";
@@ -192,7 +201,8 @@ export class RoomService {
       } catch (updateErr) {
         logger.error("Failed to mark room as failed after Jam error", {
           roomId,
-          error: updateErr instanceof Error ? updateErr.message : String(updateErr),
+          error:
+            updateErr instanceof Error ? updateErr.message : String(updateErr),
         });
       }
 
@@ -264,11 +274,15 @@ export class RoomService {
    */
   async getTrendingRooms(
     hours: number = 24,
-    limit: number = 10
+    limit: number = 10,
   ): Promise<Room[]> {
     const rooms = await roomRepository.getTrendingRooms(hours, limit);
 
-    logger.debug("Fetching trending rooms", { hours, limit, count: rooms.length });
+    logger.debug("Fetching trending rooms", {
+      hours,
+      limit,
+      count: rooms.length,
+    });
 
     return rooms;
   }
@@ -276,10 +290,7 @@ export class RoomService {
   /**
    * Add participant to room
    */
-  async addParticipant(
-    roomId: string,
-    agentId: string
-  ): Promise<void> {
+  async addParticipant(roomId: string, agentId: string): Promise<void> {
     // Verify room exists
     await this.getRoomById(roomId);
 

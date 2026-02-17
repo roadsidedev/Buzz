@@ -13,6 +13,11 @@ import type {
 } from "../../common/types/discovery.js";
 import { NotFoundError, DatabaseError } from "../utils/errors.js";
 import { logger } from "../utils/logger.js";
+import {
+  sanitizeSearchQuery,
+  buildPaginationParams,
+  SQLInjectionError,
+} from "../utils/sql-injection-prevention.js";
 
 /**
  * DiscoveryService: Fetch and filter rooms for discovery page
@@ -33,7 +38,7 @@ export class DiscoveryService {
    */
   async getLiveNow(
     page: number = 1,
-    limit: number = 20
+    limit: number = 20,
   ): Promise<PaginatedResponse<DiscoveryRoom>> {
     try {
       logger.info("Fetching live rooms", { page, limit });
@@ -73,12 +78,12 @@ export class DiscoveryService {
         ORDER BY rv.viewer_count DESC NULLS LAST, r.started_at DESC
         LIMIT $1 OFFSET $2
         `,
-        [limit, offset]
+        [limit, offset],
       );
 
       // Get total count
       const countResult = await this.db.query(
-        `SELECT COUNT(*) as total_count FROM room WHERE status = 'live' AND visibility = 'public'`
+        `SELECT COUNT(*) as total_count FROM room WHERE status = 'live' AND visibility = 'public'`,
       );
       const totalCount = parseInt(countResult.rows[0].total_count, 10);
 
@@ -144,7 +149,7 @@ export class DiscoveryService {
         ORDER BY COALESCE(re.trending_score, 0) DESC, rv.viewer_count DESC
         LIMIT $1
         `,
-        [limit]
+        [limit],
       );
 
       logger.info("Trending rooms fetched", { count: rooms.length });
@@ -163,7 +168,7 @@ export class DiscoveryService {
   async getByCategory(
     categoryId: string,
     page: number = 1,
-    limit: number = 20
+    limit: number = 20,
   ): Promise<PaginatedResponse<DiscoveryRoom>> {
     try {
       logger.info("Fetching rooms by category", { categoryId, page, limit });
@@ -173,7 +178,7 @@ export class DiscoveryService {
       // Verify category exists
       const categoryResult = await this.db.query(
         `SELECT id FROM category WHERE id = $1`,
-        [categoryId]
+        [categoryId],
       );
 
       if (categoryResult.rows.length === 0) {
@@ -213,13 +218,13 @@ export class DiscoveryService {
         ORDER BY r.started_at DESC NULLS LAST
         LIMIT $2 OFFSET $3
         `,
-        [categoryId, limit, offset]
+        [categoryId, limit, offset],
       );
 
       // Get total count
       const countResult = await this.db.query(
         `SELECT COUNT(*) as total_count FROM room WHERE category_id = $1 AND visibility = 'public'`,
-        [categoryId]
+        [categoryId],
       );
       const totalCount = parseInt(countResult.rows[0].total_count, 10);
 
@@ -252,21 +257,34 @@ export class DiscoveryService {
     query: string,
     filters?: DiscoveryFilters,
     page: number = 1,
-    limit: number = 20
+    limit: number = 20,
   ): Promise<PaginatedResponse<DiscoveryRoom>> {
     try {
-      // Validate query
+      // Validate and sanitize query to prevent SQL injection
       if (!query || query.trim().length === 0) {
         throw new Error("Search query cannot be empty");
       }
 
-      if (query.length > 100) {
-        throw new Error("Search query too long (max 100 characters)");
+      // Sanitize search query to prevent SQL injection in full-text search
+      const sanitizedQuery = sanitizeSearchQuery(query);
+
+      if (!sanitizedQuery) {
+        throw new Error("Search query contains invalid characters");
       }
 
-      logger.info("Searching rooms", { query, filters, page, limit });
+      // Validate pagination parameters
+      const { limit: validLimit, offset } = buildPaginationParams(
+        limit,
+        (page - 1) * limit,
+        100,
+      );
 
-      const offset = (page - 1) * limit;
+      logger.info("Searching rooms", {
+        query: sanitizedQuery,
+        filters,
+        page,
+        limit: validLimit,
+      });
 
       let sql = `
         SELECT
@@ -298,15 +316,26 @@ export class DiscoveryService {
           AND r.visibility = 'public'
       `;
 
-      const params: any[] = [query];
+      const params: any[] = [sanitizedQuery];
 
-      // Apply optional filters
+      // Apply optional filters with validation
       if (filters?.categoryId) {
+        // Validate categoryId is a valid UUID format
+        const uuidPattern =
+          /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        if (!uuidPattern.test(filters.categoryId)) {
+          throw new Error("Invalid category ID format");
+        }
         sql += ` AND r.category_id = $${params.length + 1}`;
         params.push(filters.categoryId);
       }
 
       if (filters?.status) {
+        // Validate status is an allowed value
+        const allowedStatuses = ["live", "completed", "pending", "cancelled"];
+        if (!allowedStatuses.includes(filters.status)) {
+          throw new Error("Invalid status filter");
+        }
         sql += ` AND r.status = $${params.length + 1}`;
         params.push(filters.status);
       }
@@ -318,7 +347,7 @@ export class DiscoveryService {
         LIMIT $${params.length + 1} OFFSET $${params.length + 2}
       `;
 
-      params.push(limit, offset);
+      params.push(validLimit, offset);
 
       const { rows: rooms } = await this.db.query(sql, params);
 
@@ -326,7 +355,7 @@ export class DiscoveryService {
       let countSql =
         `SELECT COUNT(*) as total_count FROM room ` +
         `WHERE search_vector @@ plainto_tsquery('english', $1) AND visibility = 'public'`;
-      const countParams: any[] = [query];
+      const countParams: any[] = [sanitizedQuery];
 
       if (filters?.categoryId) {
         countSql += ` AND category_id = $${countParams.length + 1}`;
@@ -340,12 +369,22 @@ export class DiscoveryService {
         data: rooms.map(this._mapRoomRow),
         pagination: {
           page,
-          limit,
+          limit: validLimit,
           total: totalCount,
-          hasMore: offset + limit < totalCount,
+          hasMore: offset + validLimit < totalCount,
         },
       };
     } catch (err) {
+      // Handle SQL injection errors specifically
+      if (err instanceof SQLInjectionError) {
+        logger.error("SQL injection attempt detected in search", {
+          error: err.message,
+          context: err.context,
+          ip: "req.ip", // Would need access to req object in real implementation
+        });
+        throw new DatabaseError("Invalid search query", { cause: err });
+      }
+
       logger.error("Search failed", { error: err, query, page, limit });
       throw new DatabaseError("Search failed", { cause: err as Error });
     }
@@ -391,7 +430,7 @@ export class DiscoveryService {
         WHERE r.id = $1
         GROUP BY r.id, c.id, a.id, rv.room_id, re.room_id
         `,
-        [roomId]
+        [roomId],
       );
 
       if (roomResult.rows.length === 0) {
@@ -413,7 +452,7 @@ export class DiscoveryService {
         WHERE rp.room_id = $1 AND rp.left_at IS NULL
         ORDER BY rp.joined_at ASC
         `,
-        [roomId]
+        [roomId],
       );
 
       const mappedRoom = this._mapRoomRow(room);
@@ -446,7 +485,7 @@ export class DiscoveryService {
       const { rows: categories } = await this.db.query(
         `SELECT id, name, slug, description, icon_url, color, order_index 
          FROM category 
-         ORDER BY order_index ASC`
+         ORDER BY order_index ASC`,
       );
 
       return categories.map((c: any) => ({

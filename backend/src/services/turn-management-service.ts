@@ -11,6 +11,7 @@
  * Part of Day 7: Orchestrator Integration
  */
 
+import crypto from "crypto";
 import type {
   Room,
   RoomMessage,
@@ -23,6 +24,8 @@ import type {
 } from "./orchestrator-client.js";
 import { orchestratorClient } from "./orchestrator-client.js";
 import { roomRepository, messageRepository } from "../repositories/index.js";
+import { getJamService } from "./jam-service.js";
+import { getTTSService } from "./tts-service.js";
 import { ValidationError, NotFoundError } from "../utils/errors.js";
 import { logger } from "../utils/logger.js";
 
@@ -46,7 +49,10 @@ const MAX_CANDIDATES_PER_TURN = parseInt(
   process.env.MAX_CANDIDATES_PER_TURN || "5",
   10,
 );
-const MIN_SCORE_THRESHOLD = parseInt(process.env.MIN_SCORE_THRESHOLD || "30", 10);
+const MIN_SCORE_THRESHOLD = parseInt(
+  process.env.MIN_SCORE_THRESHOLD || "30",
+  10,
+);
 
 // ===================================================================
 // Type Definitions
@@ -114,12 +120,13 @@ export class TurnManagementService {
 
     // Start interval
     const intervalId = setInterval(
-      () => this._runTurnLoop(roomId).catch((err) => {
-        logger.error("Turn loop error", {
-          roomId,
-          error: err instanceof Error ? err.message : String(err),
-        });
-      }),
+      () =>
+        this._runTurnLoop(roomId).catch((err) => {
+          logger.error("Turn loop error", {
+            roomId,
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }),
       TURN_INTERVAL_SECONDS * 1000,
     );
 
@@ -352,19 +359,170 @@ export class TurnManagementService {
     // 7. UPDATE ROOM STATE
     await roomRepository.updateTurn(roomId, room.turnCount + 1);
 
+    // Get the winning message and agent info
+    const winningMessage = messages.find((m) => m.id === winner.messageId);
+    if (!winningMessage) {
+      throw new Error("Winning message not found");
+    }
+
     logger.info("Turn selected", {
       roomId,
       turnNumber: room.turnCount + 1,
       messageId: winner.messageId,
-      agentId: winner.dimensions.agentId || "unknown",
+      agentId: winningMessage.agentId || "unknown",
       score: winner.score,
     });
 
-    // 8. TODO: EMIT WEBSOCKET EVENT
-    // io.to(roomId).emit("turn:selected", { ... })
+    // 8. SYNTHESIZE AUDIO & STREAM TO JAM
+    try {
+      const ttsService = getTTSService();
 
-    // 9. TODO: SYNTHESIZE AUDIO & PLAY
-    // ttsService.synthesize() + jamService.playAudio()
+      // Get Jam room ID from room data
+      const roomData = await roomRepository.getById(roomId);
+      if (!roomData?.jam_room_id) {
+        throw new Error("Jam room not found for streaming");
+      }
+
+      logger.info("Synthesizing audio for turn", {
+        roomId,
+        messageId: winner.messageId,
+        textLength: winningMessage.text.length,
+      });
+
+      // Synthesize and stream in one operation
+      const { durationMs } = await ttsService.synthesizeAndStream(
+        roomData.jam_room_id,
+        winningMessage.text,
+        winner.messageId
+      );
+
+      // Update message with audio metadata
+      await messageRepository.updateStatus(winner.messageId, "played", {
+        playedAt: new Date(),
+        audioDuration: durationMs,
+      });
+
+      logger.info("Audio streamed successfully", {
+        roomId,
+        messageId: winner.messageId,
+        durationMs,
+      });
+
+      // 9. EMIT WEBSOCKET EVENT TO CLIENTS
+      const { getIO } = await import("../server.js");
+      const io = getIO();
+
+      io.to(`room:${roomId}`).emit("turn:completed", {
+        roomId,
+        turnNumber: room.turnCount + 1,
+        messageId: winner.messageId,
+        agentId: winningMessage.agentId,
+        text: winningMessage.text,
+        score: winner.score,
+        audioDuration: durationMs,
+        timestamp: new Date().toISOString(),
+      });
+
+      logger.debug("WebSocket event emitted", {
+        roomId,
+        event: "turn:completed",
+      });
+
+    } catch (err) {
+      logger.error("Failed to synthesize or stream audio", {
+        roomId,
+        messageId: winner.messageId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+
+      // Still mark message as played even if audio failed
+      await messageRepository.updateStatus(winner.messageId, "played", {
+        playedAt: new Date(),
+        audioError: err instanceof Error ? err.message : String(err),
+      });
+
+      // Emit error event to clients
+      try {
+        const { getIO } = await import("../server.js");
+        const io = getIO();
+        io.to(`room:${roomId}`).emit("turn:error", {
+          roomId,
+          messageId: winner.messageId,
+          error: "Audio streaming failed",
+          timestamp: new Date().toISOString(),
+        });
+      } catch (wsErr) {
+        logger.error("Failed to emit error event", { error: wsErr });
+      }
+    }
+  }
+
+      // Get Jam room ID from room data
+      const roomData = await roomRepository.getById(roomId);
+      if (!roomData?.jam_room_id) {
+        throw new Error("Jam room not found for streaming");
+      }
+
+      logger.info("Synthesizing audio for turn", {
+        roomId,
+        messageId: winner.messageId,
+        textLength: winningMessage.text.length,
+      });
+
+      // Synthesize and stream in one operation
+      const { durationMs } = await ttsService.synthesizeAndStream(
+        roomData.jam_room_id,
+        winningMessage.text,
+        winner.messageId,
+        winner.dimensions.voiceId,
+      );
+
+      // Update message with audio metadata
+      await messageRepository.updateStatus(winner.messageId, "played", {
+        playedAt: new Date(),
+        audioDuration: durationMs,
+      });
+
+      logger.info("Audio streamed successfully", {
+        roomId,
+        messageId: winner.messageId,
+        durationMs,
+      });
+
+      // 9. EMIT WEBSOCKET EVENT TO CLIENTS
+      // Import the WebSocket server from server.ts
+      const { getIO } = await import("../server.js");
+      const io = getIO();
+
+      io.to(`room:${roomId}`).emit("turn:completed", {
+        roomId,
+        turnNumber: room.turnCount + 1,
+        messageId: winner.messageId,
+        agentId: winner.dimensions.agentId,
+        agentName: winner.dimensions.agentName,
+        text: winningMessage.text,
+        score: winner.score,
+        audioDuration: durationMs,
+        timestamp: new Date().toISOString(),
+      });
+
+      logger.debug("WebSocket event emitted", {
+        roomId,
+        event: "turn:completed",
+      });
+    } catch (err) {
+      logger.error("Failed to synthesize or stream audio", {
+        roomId,
+        messageId: winner.messageId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+
+      // Still mark message as played even if audio failed
+      await messageRepository.updateStatus(winner.messageId, "played", {
+        playedAt: new Date(),
+        audioError: err instanceof Error ? err.message : String(err),
+      });
+    }
   }
 
   /**

@@ -11,6 +11,7 @@ import cors from "cors";
 import helmet from "helmet";
 import morgan from "morgan";
 import dotenv from "dotenv";
+import crypto from "crypto";
 
 import {
   errorHandler,
@@ -38,6 +39,67 @@ import podcastRoutes from "./routes/podcast-routes.js";
 import skillRoutes from "./routes/skill-routes.js";
 
 dotenv.config();
+
+// ============================================================================
+// CRITICAL SECURITY VALIDATION (Must run before server starts)
+// ============================================================================
+
+import { validateJWTConfig } from "./services/auth-service.js";
+import { validateCSRFConfig } from "./middleware/csrf-protection.js";
+import { validateX402Config } from "./config/x402-config.js";
+import { validateJamConfig, validateTTSConfig } from "./config/media-config.js";
+import { validateWebSocketConfig } from "./config/websocket-config.js";
+
+try {
+  // Validate all critical security configurations
+  validateJWTConfig();
+  validateCSRFConfig();
+  validateWebSocketConfig();
+
+  // Validate x402 payment configuration (if payments enabled)
+  try {
+    validateX402Config();
+  } catch (x402Error) {
+    // Only fail startup if payments are enabled
+    if (process.env.ENABLE_PAYMENTS !== "false") {
+      throw x402Error;
+    }
+    logger.warn("x402 validation skipped (payments disabled)");
+  }
+
+  // Validate media service configurations (if features enabled)
+  try {
+    validateJamConfig();
+  } catch (jamError) {
+    if (process.env.ENABLE_AUDIO_STREAMING !== "false") {
+      logger.warn("Jam audio streaming configuration issue", {
+        error: jamError instanceof Error ? jamError.message : String(jamError),
+      });
+    }
+  }
+
+  try {
+    validateTTSConfig();
+  } catch (ttsError) {
+    if (process.env.ENABLE_TTS !== "false") {
+      logger.warn("TTS configuration issue", {
+        error: ttsError instanceof Error ? ttsError.message : String(ttsError),
+      });
+    }
+  }
+
+  logger.info("✅ Security configuration validated");
+} catch (error) {
+  logger.error("❌ CRITICAL: Security validation failed", {
+    error: error instanceof Error ? error.message : String(error),
+  });
+  console.error("\n" + "=".repeat(70));
+  console.error("SERVER STARTUP FAILED - SECURITY CONFIGURATION ERROR");
+  console.error("=".repeat(70));
+  console.error(error instanceof Error ? error.message : String(error));
+  console.error("=".repeat(70) + "\n");
+  process.exit(1);
+}
 
 const app: Express = express();
 const port = process.env.API_PORT || 4000;
@@ -76,6 +138,11 @@ app.use(sentryAuthTrackingMiddleware);
 // Body parsing
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// SQL Injection Prevention
+// Validates and sanitizes inputs to prevent SQL injection attacks
+import { sqlInjectionPrevention } from "./utils/sql-injection-prevention.js";
+app.use(sqlInjectionPrevention());
 
 // CSRF Protection
 // 1. Provide CSRF tokens on all requests
@@ -199,6 +266,12 @@ const io = new SocketIOServer(server, {
   transports: ["websocket", "polling"],
 });
 
+// Import WebSocket validation
+import {
+  createValidatedHandler,
+  cleanupSocketRateLimit,
+} from "./middleware/websocket-validation.js";
+
 // Namespace for room connections
 const roomNamespace = io.of(/^\/rooms\/[a-f0-9-]+$/);
 
@@ -209,36 +282,69 @@ roomNamespace.on("connection", (socket) => {
     roomId,
   });
 
-  // Handle join room
-  socket.on("join-room", (data: { agentId: string }) => {
-    logger.debug("Agent joined room socket", {
-      socketId: socket.id,
-      roomId,
-      agentId: data.agentId,
-    });
+  // Handle join room with validation
+  socket.on(
+    "join-room",
+    createValidatedHandler("join-room", (data, sock) => {
+      logger.debug("Agent joined room socket", {
+        socketId: sock.id,
+        roomId,
+        agentId: data.agentId,
+      });
 
-    socket.emit("room:state-change", {
-      roomId,
-      status: "live",
-      participants: [],
-      timestamp: new Date().toISOString(),
-    });
-  });
+      // Join the socket room for broadcasting
+      sock.join(`room:${roomId}`);
 
-  // Handle message submission
-  socket.on("submit-message", (data: { text: string }) => {
-    logger.debug("Message submitted", {
-      socketId: socket.id,
-      roomId,
-      textLength: data.text.length,
-    });
+      sock.emit("room:state-change", {
+        roomId,
+        status: "live",
+        participants: [],
+        timestamp: new Date().toISOString(),
+      });
+    }),
+  );
 
-    socket.emit("message:queued", {
-      messageId: crypto.randomUUID(),
-      status: "candidate",
-      timestamp: new Date().toISOString(),
-    });
-  });
+  // Handle message submission with validation
+  socket.on(
+    "submit-message",
+    createValidatedHandler("submit-message", (data, sock) => {
+      logger.debug("Message submitted", {
+        socketId: sock.id,
+        roomId,
+        textLength: data.text.length,
+      });
+
+      // TODO: Save message to database via message service
+      // const messageService = getMessageService();
+      // messageService.submitMessage(roomId, data.text);
+
+      sock.emit("message:queued", {
+        messageId: crypto.randomUUID(),
+        status: "candidate",
+        timestamp: new Date().toISOString(),
+      });
+    }),
+  );
+
+  // Handle leave room with validation
+  socket.on(
+    "leave-room",
+    createValidatedHandler("leave-room", (data, sock) => {
+      logger.debug("Agent left room", {
+        socketId: sock.id,
+        roomId,
+        agentId: data.agentId,
+        reason: data.reason,
+      });
+
+      sock.leave(`room:${roomId}`);
+
+      sock.emit("room:left", {
+        roomId,
+        timestamp: new Date().toISOString(),
+      });
+    }),
+  );
 
   // Handle disconnect
   socket.on("disconnect", () => {
@@ -246,6 +352,9 @@ roomNamespace.on("connection", (socket) => {
       socketId: socket.id,
       roomId,
     });
+
+    // Clean up rate limiter for this socket
+    cleanupSocketRateLimit(socket.id);
   });
 });
 
@@ -273,5 +382,13 @@ server.listen(port, "0.0.0.0", () => {
     port,
   });
 });
+
+/**
+ * Get Socket.IO instance for emitting events from services
+ * Used by turn management service to broadcast turn completions
+ */
+export function getIO(): SocketIOServer {
+  return io;
+}
 
 export { app, io, server };

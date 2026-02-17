@@ -17,6 +17,7 @@
  * @see https://cheatsheetseries.owasp.org/cheatsheets/Logging_Cheat_Sheet.html
  */
 
+import crypto from "crypto";
 import { logger } from "./logger.js";
 
 /**
@@ -117,7 +118,7 @@ const auditLogs: AuditLogEntry[] = [];
 export function auditLog(
   eventType: AuditEventType,
   data: Record<string, any> = {},
-  context: Partial<AuditLogEntry> = {}
+  context: Partial<AuditLogEntry> = {},
 ): void {
   const entry: AuditLogEntry = {
     eventId: crypto.randomUUID?.() || `${Date.now()}-${Math.random()}`,
@@ -150,7 +151,7 @@ export function auditLog(
  * Determine severity level based on event type
  */
 function getSeverity(
-  eventType: AuditEventType
+  eventType: AuditEventType,
 ): "INFO" | "WARN" | "ERROR" | "CRITICAL" {
   const critical = [
     AuditEventType.BRUTE_FORCE_ATTEMPT,
@@ -179,18 +180,22 @@ export function logLoginSuccess(
   agentId: string,
   email: string,
   ipAddress?: string,
-  userAgent?: string
+  userAgent?: string,
 ): void {
-  auditLog(AuditEventType.LOGIN_SUCCESS, {
-    agentId,
-    email,
-  }, {
-    agentId,
-    email,
-    ipAddress,
-    userAgent,
-    endpoint: "/api/v1/auth/login",
-  });
+  auditLog(
+    AuditEventType.LOGIN_SUCCESS,
+    {
+      agentId,
+      email,
+    },
+    {
+      agentId,
+      email,
+      ipAddress,
+      userAgent,
+      endpoint: "/api/v1/auth/login",
+    },
+  );
 }
 
 /**
@@ -200,34 +205,39 @@ export function logLoginFailed(
   email: string,
   reason: string,
   ipAddress?: string,
-  userAgent?: string
+  userAgent?: string,
 ): void {
-  auditLog(AuditEventType.LOGIN_FAILED, {
-    email,
-    reason,
-    success: false,
-  }, {
-    email,
-    ipAddress,
-    userAgent,
-    endpoint: "/api/v1/auth/login",
-  });
+  auditLog(
+    AuditEventType.LOGIN_FAILED,
+    {
+      email,
+      reason,
+      success: false,
+    },
+    {
+      email,
+      ipAddress,
+      userAgent,
+      endpoint: "/api/v1/auth/login",
+    },
+  );
 }
 
 /**
  * Log logout
  */
-export function logLogout(
-  agentId: string,
-  ipAddress?: string
-): void {
-  auditLog(AuditEventType.LOGOUT, {
-    agentId,
-  }, {
-    agentId,
-    ipAddress,
-    endpoint: "/api/v1/auth/logout",
-  });
+export function logLogout(agentId: string, ipAddress?: string): void {
+  auditLog(
+    AuditEventType.LOGOUT,
+    {
+      agentId,
+    },
+    {
+      agentId,
+      ipAddress,
+      endpoint: "/api/v1/auth/logout",
+    },
+  );
 }
 
 /**
@@ -236,17 +246,21 @@ export function logLogout(
 export function logAccountRegistered(
   agentId: string,
   email: string,
-  ipAddress?: string
+  ipAddress?: string,
 ): void {
-  auditLog(AuditEventType.REGISTER, {
-    agentId,
-    email,
-  }, {
-    agentId,
-    email,
-    ipAddress,
-    endpoint: "/api/v1/auth/register",
-  });
+  auditLog(
+    AuditEventType.REGISTER,
+    {
+      agentId,
+      email,
+    },
+    {
+      agentId,
+      email,
+      ipAddress,
+      endpoint: "/api/v1/auth/register",
+    },
+  );
 }
 
 /**
@@ -255,17 +269,21 @@ export function logAccountRegistered(
 export function logBruteForceAttempt(
   email: string,
   ipAddress?: string,
-  attemptNumber?: number
+  attemptNumber?: number,
 ): void {
-  auditLog(AuditEventType.BRUTE_FORCE_ATTEMPT, {
-    email,
-    attemptNumber,
-    success: false,
-  }, {
-    email,
-    ipAddress,
-    endpoint: "/api/v1/auth/login",
-  });
+  auditLog(
+    AuditEventType.BRUTE_FORCE_ATTEMPT,
+    {
+      email,
+      attemptNumber,
+      success: false,
+    },
+    {
+      email,
+      ipAddress,
+      endpoint: "/api/v1/auth/login",
+    },
+  );
 }
 
 /**
@@ -274,17 +292,21 @@ export function logBruteForceAttempt(
 export function logAccountLocked(
   email: string,
   ipAddress?: string,
-  duration?: number
+  duration?: number,
 ): void {
-  auditLog(AuditEventType.ACCOUNT_LOCKED, {
-    email,
-    lockoutDurationMinutes: duration,
-    success: false,
-  }, {
-    email,
-    ipAddress,
-    endpoint: "/api/v1/auth/login",
-  });
+  auditLog(
+    AuditEventType.ACCOUNT_LOCKED,
+    {
+      email,
+      lockoutDurationMinutes: duration,
+      success: false,
+    },
+    {
+      email,
+      ipAddress,
+      endpoint: "/api/v1/auth/login",
+    },
+  );
 }
 
 /**
@@ -293,17 +315,21 @@ export function logAccountLocked(
 export function logCsrfFailure(
   agentId: string | undefined,
   endpoint: string,
-  ipAddress?: string
+  ipAddress?: string,
 ): void {
-  auditLog(AuditEventType.CSRF_FAILED, {
-    agentId,
-    endpoint,
-    success: false,
-  }, {
-    agentId,
-    ipAddress,
-    endpoint,
-  });
+  auditLog(
+    AuditEventType.CSRF_FAILED,
+    {
+      agentId,
+      endpoint,
+      success: false,
+    },
+    {
+      agentId,
+      ipAddress,
+      endpoint,
+    },
+  );
 }
 
 /**
@@ -312,17 +338,21 @@ export function logCsrfFailure(
 export function logUnauthorizedAccess(
   agentId: string | undefined,
   resource: string,
-  ipAddress?: string
+  ipAddress?: string,
 ): void {
-  auditLog(AuditEventType.UNAUTHORIZED_ACCESS, {
-    agentId,
-    resource,
-    success: false,
-  }, {
-    agentId,
-    ipAddress,
-    endpoint: resource,
-  });
+  auditLog(
+    AuditEventType.UNAUTHORIZED_ACCESS,
+    {
+      agentId,
+      resource,
+      success: false,
+    },
+    {
+      agentId,
+      ipAddress,
+      endpoint: resource,
+    },
+  );
 }
 
 /**
@@ -331,16 +361,20 @@ export function logUnauthorizedAccess(
 export function logXssAttempt(
   field: string,
   payload: string,
-  ipAddress?: string
+  ipAddress?: string,
 ): void {
-  auditLog(AuditEventType.XSS_ATTEMPT, {
-    field,
-    payloadLength: payload.length,
-    success: false,
-  }, {
-    ipAddress,
-    endpoint: "/api/v1/",
-  });
+  auditLog(
+    AuditEventType.XSS_ATTEMPT,
+    {
+      field,
+      payloadLength: payload.length,
+      success: false,
+    },
+    {
+      ipAddress,
+      endpoint: "/api/v1/",
+    },
+  );
 }
 
 /**
@@ -349,10 +383,12 @@ export function logXssAttempt(
 export function logDataAccess(
   agentId: string,
   resource: string,
-  action: "READ" | "WRITE" | "DELETE"
+  action: "READ" | "WRITE" | "DELETE",
 ): void {
   auditLog(
-    action === "READ" ? AuditEventType.ACCESS_GRANTED : AuditEventType.ROOM_CREATED,
+    action === "READ"
+      ? AuditEventType.ACCESS_GRANTED
+      : AuditEventType.ROOM_CREATED,
     {
       agentId,
       resource,
@@ -361,7 +397,7 @@ export function logDataAccess(
     {
       agentId,
       endpoint: `/api/v1/${resource}`,
-    }
+    },
   );
 }
 

@@ -7,10 +7,15 @@
  * - Audio streaming setup
  * - Participant management
  * - Webhook event processing
+ * - Real-time audio streaming via WebSocket
+ *
+ * Phase 2: Full audio streaming integration
  */
 
+import crypto from "crypto";
 import logger from "../utils/logger.js";
 import { ValidationError } from "../utils/errors.js";
+import { X402Error } from "../config/x402-config.js";
 
 export interface JamRoomConfig {
   title: string;
@@ -66,7 +71,10 @@ export class JamService {
    * @returns Jam room details
    * @throws ValidationError if config invalid
    */
-  async createRoom(roomId: string, config: JamRoomConfig): Promise<JamRoomResponse> {
+  async createRoom(
+    roomId: string,
+    config: JamRoomConfig,
+  ): Promise<JamRoomResponse> {
     if (!roomId || !config.title) {
       throw new ValidationError("Missing required room parameters", {
         roomId,
@@ -118,7 +126,7 @@ export class JamService {
         throw new Error(`Jam API error: ${response.status} - ${error}`);
       }
 
-      const data = await response.json() as {
+      const data = (await response.json()) as {
         id: string;
         url: string;
         createdAt: string;
@@ -212,7 +220,7 @@ export class JamService {
         return "unknown";
       }
 
-      const data = await response.json() as { status: string };
+      const data = (await response.json()) as { status: string };
       return data.status;
     } catch (err) {
       logger.error("Error getting room status", {
@@ -226,24 +234,189 @@ export class JamService {
   /**
    * Validate webhook signature from Jam
    *
+   * SECURITY: Prevents forged webhook events
+   * Uses HMAC-SHA256 with shared secret
+   *
    * @param payload - Raw webhook body
    * @param signature - X-Jam-Signature header
    * @returns true if signature valid
+   * @throws X402Error if webhook secret not configured
    */
   validateWebhookSignature(payload: string, signature: string): boolean {
     try {
-      // TODO: Implement HMAC signature verification
-      // For now, accept all (placeholder)
-      logger.debug("Webhook signature validation (placeholder)", {
-        hasPayload: !!payload,
-        hasSignature: !!signature,
-      });
-      return true;
+      const webhookSecret = process.env.JAM_WEBHOOK_SECRET;
+
+      if (!webhookSecret) {
+        logger.error(
+          "Jam webhook validation failed: JAM_WEBHOOK_SECRET not configured",
+        );
+        throw new X402Error(
+          "Webhook secret not configured",
+          "JAM_WEBHOOK_SECRET_MISSING",
+          { action: "configure JAM_WEBHOOK_SECRET environment variable" },
+        );
+      }
+
+      if (!payload) {
+        logger.error("Jam webhook validation failed: empty payload");
+        return false;
+      }
+
+      if (!signature) {
+        logger.error("Jam webhook validation failed: missing signature header");
+        return false;
+      }
+
+      // Compute expected signature
+      const expectedSignature = crypto
+        .createHmac("sha256", webhookSecret)
+        .update(payload, "utf8")
+        .digest("hex");
+
+      // Timing-safe comparison
+      const signatureBuffer = Buffer.from(signature, "hex");
+      const expectedBuffer = Buffer.from(expectedSignature, "hex");
+
+      if (signatureBuffer.length !== expectedBuffer.length) {
+        logger.error(
+          "Jam webhook validation failed: signature length mismatch",
+        );
+        return false;
+      }
+
+      const isValid = crypto.timingSafeEqual(signatureBuffer, expectedBuffer);
+
+      if (!isValid) {
+        logger.error("Jam webhook validation failed: signature mismatch", {
+          signaturePrefix: signature.slice(0, 16) + "...",
+        });
+      } else {
+        logger.debug("Jam webhook signature validated successfully");
+      }
+
+      return isValid;
     } catch (err) {
-      logger.error("Webhook signature validation error", {
+      if (err instanceof X402Error) {
+        throw err;
+      }
+      logger.error("Jam webhook signature validation error", {
         error: err instanceof Error ? err.message : String(err),
       });
       return false;
+    }
+  }
+
+  /**
+   * Stream audio to a Jam room
+   *
+   * Uploads synthesized audio for playback in the room.
+   * Audio is queued and played in order received.
+   *
+   * @param jamRoomId - Jam room ID
+   * @param audioBuffer - Audio data (MP3 format)
+   * @param messageId - Message ID for correlation
+   * @throws Error if upload fails
+   */
+  async streamAudio(
+    jamRoomId: string,
+    audioBuffer: Buffer,
+    messageId: string,
+  ): Promise<void> {
+    if (!jamRoomId) {
+      throw new ValidationError("Jam room ID is required");
+    }
+
+    if (!audioBuffer || audioBuffer.length === 0) {
+      throw new ValidationError("Audio buffer is required");
+    }
+
+    try {
+      logger.info("Streaming audio to Jam room", {
+        jamRoomId,
+        messageId,
+        audioSize: audioBuffer.length,
+      });
+
+      const response = await fetch(`${this.apiUrl}/rooms/${jamRoomId}/audio`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "audio/mpeg",
+          Authorization: `Bearer ${this.apiKey}`,
+          "X-Message-Id": messageId,
+        },
+        body: audioBuffer,
+      });
+
+      if (!response.ok) {
+        const error = await response.text();
+        logger.error("Jam audio streaming failed", {
+          jamRoomId,
+          messageId,
+          status: response.status,
+          error,
+        });
+        throw new Error(
+          `Jam audio streaming failed: ${response.status} - ${error}`,
+        );
+      }
+
+      logger.info("Audio streamed successfully to Jam", {
+        jamRoomId,
+        messageId,
+        audioSize: audioBuffer.length,
+      });
+    } catch (err) {
+      logger.error("Failed to stream audio to Jam", {
+        jamRoomId,
+        messageId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      throw err;
+    }
+  }
+
+  /**
+   * Get audio stream status for a room
+   *
+   * @param jamRoomId - Jam room ID
+   * @returns Audio queue status
+   */
+  async getAudioStatus(jamRoomId: string): Promise<{
+    queueLength: number;
+    currentPlaying?: string;
+    estimatedWaitMs?: number;
+  }> {
+    try {
+      const response = await fetch(
+        `${this.apiUrl}/rooms/${jamRoomId}/audio/status`,
+        {
+          headers: {
+            Authorization: `Bearer ${this.apiKey}`,
+          },
+        },
+      );
+
+      if (!response.ok) {
+        logger.warn("Failed to get Jam audio status", {
+          jamRoomId,
+          status: response.status,
+        });
+        return { queueLength: 0 };
+      }
+
+      const data = (await response.json()) as {
+        queueLength: number;
+        currentPlaying?: string;
+        estimatedWaitMs?: number;
+      };
+
+      return data;
+    } catch (err) {
+      logger.error("Error getting Jam audio status", {
+        jamRoomId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return { queueLength: 0 };
     }
   }
 

@@ -1,6 +1,6 @@
 /**
  * AuthService: Core authentication business logic
- * 
+ *
  * Responsibilities:
  * - User registration with password hashing
  * - User login with credential verification
@@ -31,17 +31,103 @@ import {
 import logger from "@/utils/logger";
 
 const BCRYPT_ROUNDS = parseInt(process.env.BCRYPT_ROUNDS || "10");
-const JWT_SECRET = process.env.JWT_SECRET!;
+
+/**
+ * JWT Secret - Will be set after validation
+ * Access via getJWTSecret() to ensure it's been validated
+ */
+let _JWT_SECRET: string = "";
+
 const JWT_EXPIRY = parseInt(process.env.JWT_EXPIRY || "3600"); // 1 hour
 const JWT_REFRESH_EXPIRY = parseInt(
-  process.env.JWT_REFRESH_EXPIRY || "2592000"
+  process.env.JWT_REFRESH_EXPIRY || "2592000",
 ); // 30 days
 
-// Validate environment setup
-if (!JWT_SECRET || JWT_SECRET.length < 32) {
-  throw new Error(
-    "JWT_SECRET must be set and at least 32 characters long in .env"
-  );
+/**
+ * Get the validated JWT secret
+ * Throws if validateJWTConfig() hasn't been called
+ */
+function getJWTSecret(): string {
+  if (!_JWT_SECRET) {
+    throw new Error(
+      "JWT_SECRET not initialized. Ensure validateJWTConfig() is called before using AuthService.",
+    );
+  }
+  return _JWT_SECRET;
+}
+
+/**
+ * Validates JWT configuration at application startup
+ * Must be called before starting the server to ensure secure configuration
+ *
+ * @throws Error if JWT_SECRET is not properly configured
+ */
+export function validateJWTConfig(): void {
+  const jwtSecret = process.env.JWT_SECRET;
+
+  if (!jwtSecret) {
+    throw new Error(
+      "JWT_SECRET environment variable is required but not set. " +
+        "Please add JWT_SECRET to your .env file with a minimum of 32 characters.",
+    );
+  }
+
+  if (jwtSecret.length < 32) {
+    throw new Error(
+      `JWT_SECRET must be at least 32 characters long (current length: ${jwtSecret.length}). ` +
+        "Please use a cryptographically secure random string.",
+    );
+  }
+
+  // Check for weak/placeholder secrets
+  const weakPatterns = [
+    /^password/i,
+    /^secret/i,
+    /^jwt/i,
+    /^test/i,
+    /^dev/i,
+    /^local/i,
+    /123456/,
+    /abcdef/,
+    /qwerty/i,
+  ];
+
+  for (const pattern of weakPatterns) {
+    if (pattern.test(jwtSecret)) {
+      throw new Error(
+        "JWT_SECRET appears to be a weak or placeholder value. " +
+          "Please use a cryptographically secure random string with at least 32 characters.",
+      );
+    }
+  }
+
+  // Verify secret has sufficient entropy (mix of characters)
+  const hasUpperCase = /[A-Z]/.test(jwtSecret);
+  const hasLowerCase = /[a-z]/.test(jwtSecret);
+  const hasNumbers = /[0-9]/.test(jwtSecret);
+  const hasSpecial = /[^A-Za-z0-9]/.test(jwtSecret);
+
+  const entropyScore = [
+    hasUpperCase,
+    hasLowerCase,
+    hasNumbers,
+    hasSpecial,
+  ].filter(Boolean).length;
+
+  if (entropyScore < 3) {
+    throw new Error(
+      "JWT_SECRET must contain a mix of character types (uppercase, lowercase, numbers, special characters) " +
+        `for sufficient entropy (current score: ${entropyScore}/4).`,
+    );
+  }
+
+  // Store the validated secret
+  _JWT_SECRET = jwtSecret;
+
+  logger.info("JWT configuration validated successfully", {
+    secretLength: jwtSecret.length,
+    entropyScore,
+  });
 }
 
 /**
@@ -57,7 +143,7 @@ export class AuthService {
 
   /**
    * Register a new user
-   * 
+   *
    * Process:
    * 1. Validate input (email format, password strength, match)
    * 2. Check for duplicate email
@@ -65,7 +151,7 @@ export class AuthService {
    * 4. Insert user into database
    * 5. Generate access and refresh tokens
    * 6. Return tokens and user profile
-   * 
+   *
    * @param request - Registration data (email, username, passwords)
    * @returns AuthResponse with tokens and user profile
    * @throws UserAlreadyExistsError if email already registered
@@ -78,7 +164,7 @@ export class AuthService {
     // Check if user already exists
     const existingUser = await this.db.query(
       "SELECT id FROM agent WHERE email = $1",
-      [request.email]
+      [request.email],
     );
 
     if (existingUser.rows.length > 0) {
@@ -95,7 +181,16 @@ export class AuthService {
     await this.db.query(
       `INSERT INTO agent (id, username, email, password_hash, role, status, created_at, updated_at)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-      [userId, request.username, request.email, passwordHash, "agent", "active", now, now]
+      [
+        userId,
+        request.username,
+        request.email,
+        passwordHash,
+        "agent",
+        "active",
+        now,
+        now,
+      ],
     );
 
     // Retrieve created user
@@ -121,7 +216,7 @@ export class AuthService {
 
   /**
    * Login user with email and password
-   * 
+   *
    * Process:
    * 1. Validate input (email and password present)
    * 2. Find user by email
@@ -131,7 +226,7 @@ export class AuthService {
    * 6. Log login attempt (success)
    * 7. Generate tokens
    * 8. Return response
-   * 
+   *
    * @param request - Login credentials (email, password)
    * @returns AuthResponse with tokens and user profile
    * @throws InvalidCredentialsError if email/password incorrect or account inactive
@@ -144,10 +239,9 @@ export class AuthService {
     }
 
     // Find user by email
-    const result = await this.db.query(
-      "SELECT * FROM agent WHERE email = $1",
-      [request.email]
-    );
+    const result = await this.db.query("SELECT * FROM agent WHERE email = $1", [
+      request.email,
+    ]);
 
     if (result.rows.length === 0) {
       // Log failed attempt (security: don't reveal if email exists)
@@ -160,7 +254,7 @@ export class AuthService {
     // Verify password
     const passwordValid = await bcryptjs.compare(
       request.password,
-      userRow.password_hash
+      userRow.password_hash,
     );
 
     if (!passwordValid) {
@@ -176,10 +270,10 @@ export class AuthService {
 
     // Update last login
     const now = new Date();
-    await this.db.query(
-      "UPDATE agent SET last_login_at = $1 WHERE id = $2",
-      [now, userRow.id]
-    );
+    await this.db.query("UPDATE agent SET last_login_at = $1 WHERE id = $2", [
+      now,
+      userRow.id,
+    ]);
 
     // Log successful attempt
     await this._logLoginAttempt(userRow.id, true);
@@ -204,18 +298,18 @@ export class AuthService {
 
   /**
    * Refresh access token using refresh token rotation
-   * 
+   *
    * Process:
    * 1. Rotate refresh token (single-use enforcement, token family tracking)
    * 2. Verify token validity and detect replay attacks
    * 3. Issue new access token
    * 4. Return new token pair
-   * 
+   *
    * SECURITY: Implements RFC 6749 Section 6 refresh token rotation
    * - Old token invalidated immediately (single-use)
    * - Token family tracked to detect replay attacks
    * - Entire family revoked if reuse detected
-   * 
+   *
    * @param refreshToken - Current valid refresh token
    * @returns AuthResponse with new token pair
    * @throws TokenExpiredError if token expired
@@ -224,16 +318,15 @@ export class AuthService {
   async refresh(refreshToken: string): Promise<AuthResponse> {
     try {
       // Rotate refresh token (handles validation and rotation logic)
-      const newRefreshTokenData = await this.refreshTokenService.rotateToken(
-        refreshToken
-      );
+      const newRefreshTokenData =
+        await this.refreshTokenService.rotateToken(refreshToken);
 
       // Extract user ID from refresh token for profile fetch
       // Note: We trust refreshTokenService validation has succeeded
       const tokenIdPart = refreshToken.split(".")[0];
       const tokenRecord = await this.db.query(
         "SELECT user_id FROM refresh_token WHERE id = $1 LIMIT 1",
-        [tokenIdPart]
+        [tokenIdPart],
       );
 
       if (tokenRecord.length === 0) {
@@ -263,7 +356,7 @@ export class AuthService {
       if (err instanceof Error) {
         if (err.message.includes("already used")) {
           throw new InvalidTokenError(
-            "Token has been reused. Security incident detected. All tokens revoked."
+            "Token has been reused. Security incident detected. All tokens revoked.",
           );
         }
         throw new InvalidTokenError(err.message);
@@ -274,9 +367,9 @@ export class AuthService {
 
   /**
    * Validate access token (called by middleware)
-   * 
+   *
    * Verifies JWT signature and returns decoded payload
-   * 
+   *
    * @param token - Access token from Authorization header
    * @returns Decoded JWT payload if valid
    * @throws TokenExpiredError if token expired
@@ -284,7 +377,7 @@ export class AuthService {
    */
   validateAccessToken(token: string): JWTPayload {
     try {
-      return jwt.verify(token, JWT_SECRET) as JWTPayload;
+      return jwt.verify(token, getJWTSecret()) as JWTPayload;
     } catch (err) {
       if (err instanceof jwt.TokenExpiredError) {
         throw new TokenExpiredError();
@@ -295,9 +388,9 @@ export class AuthService {
 
   /**
    * Get user profile by ID
-   * 
+   *
    * Used by GET /auth/profile and GET /auth/validate endpoints
-   * 
+   *
    * @param userId - User ID
    * @returns User profile
    * @throws InvalidTokenError if user not found
@@ -314,16 +407,15 @@ export class AuthService {
 
   /**
    * Get user by ID from database
-   * 
+   *
    * @private
    * @param userId - User ID
    * @returns User profile or null if not found
    */
   private async _getUserById(userId: string): Promise<AuthUser | null> {
-    const result = await this.db.query(
-      "SELECT * FROM agent WHERE id = $1",
-      [userId]
-    );
+    const result = await this.db.query("SELECT * FROM agent WHERE id = $1", [
+      userId,
+    ]);
 
     if (result.rows.length === 0) return null;
     return this._mapToAuthUser(result.rows[0]);
@@ -331,7 +423,7 @@ export class AuthService {
 
   /**
    * Map database row to AuthUser object
-   * 
+   *
    * @private
    * @param row - Database row
    * @returns Formatted AuthUser
@@ -355,7 +447,7 @@ export class AuthService {
 
   /**
    * Generate only access token
-   * 
+   *
    * @private
    * @param user - User profile
    * @returns Access token JWT
@@ -373,24 +465,22 @@ export class AuthService {
       exp: now + JWT_EXPIRY,
     };
 
-    return jwt.sign(payload, JWT_SECRET, { algorithm: "HS256" });
+    return jwt.sign(payload, getJWTSecret(), { algorithm: "HS256" });
   }
 
   /**
    * Generate access and refresh token pair
-   * 
+   *
    * Process:
    * 1. Create JWT payload with user info
    * 2. Sign access token (1 hour expiry)
    * 3. Issue refresh token via RefreshTokenService (with rotation setup)
-   * 
+   *
    * @private
    * @param user - User profile
    * @returns Access token and refresh token metadata
    */
-  private async _generateTokens(
-    user: AuthUser
-  ): Promise<{
+  private async _generateTokens(user: AuthUser): Promise<{
     accessToken: string;
     refreshToken: { token: string; metadata: any };
   }> {
@@ -405,13 +495,13 @@ export class AuthService {
 
   /**
    * Validate registration request
-   * 
+   *
    * Checks:
    * - Email present and valid format
    * - Username present and length (3-30 chars)
    * - Password present, 8+ chars, no spaces
    * - Passwords match
-   * 
+   *
    * @private
    * @param request - Registration request
    * @throws ValidationError if invalid
@@ -457,23 +547,23 @@ export class AuthService {
 
   /**
    * Log login attempt for security auditing
-   * 
+   *
    * Records both successful and failed login attempts
    * Does not throw errors to prevent blocking auth flow
-   * 
+   *
    * @private
    * @param userId - User ID (null if user not found)
    * @param success - Whether login succeeded
    */
   private async _logLoginAttempt(
     userId: string | null,
-    success: boolean
+    success: boolean,
   ): Promise<void> {
     try {
       await this.db.query(
         `INSERT INTO login_audit (user_id, success, created_at)
          VALUES ($1, $2, $3)`,
-        [userId, success, new Date()]
+        [userId, success, new Date()],
       );
     } catch (err) {
       // Don't throw - just log that audit failed

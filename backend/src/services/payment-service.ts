@@ -3,7 +3,12 @@
  * Business logic for spawn fees and revenue distribution
  */
 
-import type { Payment, PaymentStatus, PaymentType } from "../../common/types/index.js";
+import crypto from "crypto";
+import type {
+  Payment,
+  PaymentStatus,
+  PaymentType,
+} from "../../common/types/index.js";
 import { PaymentError, ValidationError } from "../utils/errors.js";
 import { logger } from "../utils/logger.js";
 import { paymentRepository } from "../repositories/index.js";
@@ -69,7 +74,7 @@ export class PaymentService {
     agentId: string,
     roomId: string,
     spawnFee: number,
-    erc8004Address: string
+    erc8004Address: string,
   ): Promise<Payment> {
     return this.processPayment({
       agentId,
@@ -86,7 +91,7 @@ export class PaymentService {
   async distributeRevenue(
     roomId: string,
     hostAgentId: string,
-    participantPayments: Array<{ agentId: string; amount: number }>
+    participantPayments: Array<{ agentId: string; amount: number }>,
   ): Promise<Payment[]> {
     const payments: Payment[] = [];
 
@@ -168,7 +173,7 @@ export class PaymentService {
     agentId: string,
     episodeId: string,
     costUsdc: number,
-    description?: string
+    description?: string,
   ): Promise<Payment> {
     // Validate cost
     if (costUsdc <= 0) {

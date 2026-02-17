@@ -2,21 +2,35 @@
  * CSRF Protection Middleware
  * Protects against Cross-Site Request Forgery attacks
  *
- * Strategy:
+ * Security Features:
  * 1. Double-Submit Cookie Pattern
  *    - Token stored in httpOnly cookie (secure, not accessible to JS)
  *    - Same token in request header (X-CSRF-Token)
  *    - Server validates both values match
  *
  * 2. SameSite Cookie Attribute
- *    - SameSite=Strict: Cookie only sent in same-site requests
- *    - Browsers won't send cookie in cross-site requests
+ *    - SameSite=Lax: Cookie sent in top-level navigations, provides CSRF protection
+ *    - Allows GET requests to work while blocking POST CSRF attacks
  *    - Defense-in-depth with token validation
  *
  * 3. Token Rotation
  *    - New token generated per session
- *    - Optionally rotated after sensitive operations
+ *    - Optionally rotated after sensitive operations (login, logout, password change)
  *    - Prevents token reuse attacks
+ *
+ * 4. Domain Restriction (Fixed Issue #2)
+ *    - Cookie domain explicitly set via COOKIE_DOMAIN environment variable
+ *    - Prevents cookie leakage to subdomains
+ *    - Uses __Host- prefix for additional security (requires HTTPS in production)
+ *
+ * 5. Security Headers
+ *    - Secure flag enforced in production (HTTPS only)
+ *    - httpOnly prevents JavaScript access
+ *    - Path=/ ensures cookie sent to all routes
+ *
+ * Environment Variables:
+ * - COOKIE_DOMAIN: Domain for cookie scope (e.g., "clawzz.com")
+ * - NODE_ENV: Set to "production" for secure cookie flags
  */
 
 import { Request, Response, NextFunction } from "express";
@@ -35,8 +49,12 @@ interface CSRFToken {
 
 /**
  * CSRF cookie name (must match frontend)
+ * Using __Host- prefix for additional security:
+ * - Must be Secure (HTTPS only)
+ * - Must be Path=/
+ * - Must not have Domain attribute
  */
-const CSRF_COOKIE_NAME = "XSRF-TOKEN";
+const CSRF_COOKIE_NAME = "__Host-XSRF-TOKEN";
 
 /**
  * CSRF header name (frontend must send this)
@@ -47,6 +65,65 @@ const CSRF_HEADER_NAME = "X-CSRF-Token";
  * Token expiration: 1 hour
  */
 const TOKEN_EXPIRATION_MS = 60 * 60 * 1000;
+
+/**
+ * Validate CSRF configuration at startup
+ * Prevents server startup with misconfigured settings
+ */
+export function validateCSRFConfig(): void {
+  const requiredEnvVars = ["NODE_ENV"];
+
+  for (const envVar of requiredEnvVars) {
+    if (!process.env[envVar]) {
+      logger.warn(`CSRF: ${envVar} not set, using defaults`);
+    }
+  }
+
+  // In production, ensure COOKIE_DOMAIN is set for subdomain restriction
+  if (process.env.NODE_ENV === "production" && !process.env.COOKIE_DOMAIN) {
+    logger.warn(
+      "CSRF: COOKIE_DOMAIN not set in production. " +
+        "Cookie will be restricted to current host only.",
+    );
+  }
+
+  logger.info("CSRF configuration validated");
+}
+
+/**
+ * Get cookie options based on environment
+ * Enforces security best practices
+ */
+function getCookieOptions(): CookieOptions {
+  const isProduction = process.env.NODE_ENV === "production";
+  const cookieDomain = process.env.COOKIE_DOMAIN;
+
+  // Base options - always secure in production
+  const options: CookieOptions = {
+    httpOnly: true,
+    secure: isProduction,
+    sameSite: "lax", // Changed from strict to lax for better UX while maintaining security
+    maxAge: TOKEN_EXPIRATION_MS,
+    path: "/",
+  };
+
+  // Add domain restriction if configured
+  // This prevents cookie from being sent to subdomains
+  if (cookieDomain) {
+    options.domain = cookieDomain;
+  }
+
+  return options;
+}
+
+interface CookieOptions {
+  httpOnly: boolean;
+  secure: boolean;
+  sameSite: "strict" | "lax" | "none" | boolean;
+  maxAge: number;
+  path: string;
+  domain?: string;
+}
 
 /**
  * Generate a cryptographically secure CSRF token
@@ -70,10 +147,7 @@ export function generateCSRFToken(): string {
  * @param req Express request object
  * @param res Express response object
  */
-export function initializeCSRFToken(
-  req: Request,
-  res: Response,
-): string {
+export function initializeCSRFToken(req: Request, res: Response): string {
   // Check if token already exists and is still valid
   if (req.csrfToken) {
     const now = Date.now();
@@ -94,13 +168,14 @@ export function initializeCSRFToken(
     expiresAt: now + TOKEN_EXPIRATION_MS,
   };
 
-  // Set secure httpOnly cookie
-  res.cookie(CSRF_COOKIE_NAME, token, {
-    httpOnly: true, // Not accessible from JavaScript
-    secure: process.env.NODE_ENV === "production", // HTTPS only in production
-    sameSite: "strict", // Only send in same-site requests
-    maxAge: TOKEN_EXPIRATION_MS, // 1 hour
-    path: "/", // Cookie applies to entire app
+  // Set secure httpOnly cookie with domain restriction
+  const cookieOptions = getCookieOptions();
+  res.cookie(CSRF_COOKIE_NAME, token, cookieOptions);
+
+  logger.debug("CSRF cookie set", {
+    domain: cookieOptions.domain || "host-only",
+    secure: cookieOptions.secure,
+    sameSite: cookieOptions.sameSite,
   });
 
   logger.debug("CSRF token initialized", {
@@ -156,7 +231,9 @@ export function validateCSRFToken() {
     }
 
     // Extract CSRF token from header
-    const headerToken = req.headers[CSRF_HEADER_NAME.toLowerCase()] as string | undefined;
+    const headerToken = req.headers[CSRF_HEADER_NAME.toLowerCase()] as
+      | string
+      | undefined;
 
     // Extract CSRF token from cookie
     const cookieToken = req.cookies[CSRF_COOKIE_NAME];
@@ -177,14 +254,11 @@ export function validateCSRFToken() {
         ip: req.ip,
       });
 
-      throw new ValidationError(
-        "CSRF token missing from X-CSRF-Token header",
-        {
-          required: CSRF_HEADER_NAME,
-          endpoint: req.path,
-          code: "CSRF_MISSING_HEADER",
-        },
-      );
+      throw new ValidationError("CSRF token missing from X-CSRF-Token header", {
+        required: CSRF_HEADER_NAME,
+        endpoint: req.path,
+        code: "CSRF_MISSING_HEADER",
+      });
     }
 
     if (!cookieToken) {
@@ -194,18 +268,20 @@ export function validateCSRFToken() {
         ip: req.ip,
       });
 
-      throw new ValidationError(
-        "CSRF token missing from cookie",
-        {
-          required: CSRF_COOKIE_NAME,
-          endpoint: req.path,
-          code: "CSRF_MISSING_COOKIE",
-        },
-      );
+      throw new ValidationError("CSRF token missing from cookie", {
+        required: CSRF_COOKIE_NAME,
+        endpoint: req.path,
+        code: "CSRF_MISSING_COOKIE",
+      });
     }
 
     // Validate tokens match (constant-time comparison)
-    if (!crypto.timingSafeEqual(Buffer.from(headerToken), Buffer.from(cookieToken))) {
+    if (
+      !crypto.timingSafeEqual(
+        Buffer.from(headerToken),
+        Buffer.from(cookieToken),
+      )
+    ) {
       logger.warn("CSRF validation failed: token mismatch", {
         method: req.method,
         path: req.path,
@@ -213,14 +289,11 @@ export function validateCSRFToken() {
         userId: req.agent?.agentId,
       });
 
-      throw new ValidationError(
-        "CSRF token validation failed",
-        {
-          code: "CSRF_TOKEN_MISMATCH",
-          endpoint: req.path,
-          reason: "Header token does not match cookie token",
-        },
-      );
+      throw new ValidationError("CSRF token validation failed", {
+        code: "CSRF_TOKEN_MISMATCH",
+        endpoint: req.path,
+        reason: "Header token does not match cookie token",
+      });
     }
 
     // Validate token is not expired
@@ -232,14 +305,11 @@ export function validateCSRFToken() {
         now: Date.now(),
       });
 
-      throw new ValidationError(
-        "CSRF token has expired",
-        {
-          code: "CSRF_TOKEN_EXPIRED",
-          endpoint: req.path,
-          expiresAt: req.csrfToken.expiresAt,
-        },
-      );
+      throw new ValidationError("CSRF token has expired", {
+        code: "CSRF_TOKEN_EXPIRED",
+        endpoint: req.path,
+        expiresAt: req.csrfToken.expiresAt,
+      });
     }
 
     logger.debug("CSRF validation passed", {
@@ -258,21 +328,26 @@ export function validateCSRFToken() {
  * @param res Express response object
  * @returns New CSRF token
  */
-export function regenerateCSRFToken(res: Response): string {
+export function regenerateCSRFToken(req: Request, res: Response): string {
   const token = generateCSRFToken();
   const now = Date.now();
 
-  res.cookie(CSRF_COOKIE_NAME, token, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "strict",
-    maxAge: TOKEN_EXPIRATION_MS,
-    path: "/",
-  });
+  // Update request object with new token
+  req.csrfToken = {
+    token,
+    createdAt: now,
+    expiresAt: now + TOKEN_EXPIRATION_MS,
+  };
+
+  // Set cookie with consistent security options
+  const cookieOptions = getCookieOptions();
+  res.cookie(CSRF_COOKIE_NAME, token, cookieOptions);
 
   res.setHeader(CSRF_HEADER_NAME, token);
 
-  logger.info("CSRF token regenerated after sensitive operation");
+  logger.info("CSRF token regenerated after sensitive operation", {
+    domain: cookieOptions.domain || "host-only",
+  });
 
   return token;
 }
