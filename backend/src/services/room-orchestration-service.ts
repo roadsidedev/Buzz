@@ -13,10 +13,14 @@
 
 import type { Room, RoomStatus } from "../../common/types/index.js";
 import { roomRepository, messageRepository } from "../repositories/index.js";
-import { turnManagementService } from "./turn-management-service.js";
+import { turnManagementService, getSocketIO } from "./turn-management-service.js";
 import { outputContractService } from "./output-contract-service.js";
 import { agentStatisticsService } from "./agent-statistics-service.js";
 import { revenueDistributionService } from "./revenue-distribution-service.js";
+import {
+  emitRoomCompletion,
+  emitRoomCompleted,
+} from "./websocket-orchestration-handlers.js";
 import { logger } from "../utils/logger.js";
 
 // ===================================================================
@@ -304,8 +308,16 @@ export class RoomOrchestrationService {
           completion.completionPercentage,
         );
 
-        // TODO: Emit WebSocket event
-        // emitRoomCompletion(io, roomId, completion);
+        // Emit WebSocket event
+        const io = getSocketIO();
+        if (io) {
+          emitRoomCompletion(io, roomId, {
+            roomId,
+            completionPercentage: completion.completionPercentage,
+            completionLevel: completion.completionLevel || "minimum",
+            nextMilestone: completion.nextMilestone,
+          });
+        }
       }
 
       // 5. CHECK IF COMPLETE
@@ -392,15 +404,19 @@ export class RoomOrchestrationService {
       // 4. UPDATE ROOM STATUS
       await roomRepository.updateStatus(roomId, "completed");
 
-      // 5. TODO: EMIT ROOM COMPLETED EVENT
-      // const room = await roomRepository.getById(roomId);
-      // const messages = await messageRepository.getByRoom(roomId);
-      // emitRoomCompleted(io, roomId, {
-      //   roomId,
-      //   completionLevel,
-      //   totalTurns: room?.turnCount || 0,
-      //   transcript: messages.filter(m => m.status === 'played'),
-      // });
+      // 5. EMIT ROOM COMPLETED EVENT
+      const io = getSocketIO();
+      if (io) {
+        const room = await roomRepository.getById(roomId);
+        const messages = await messageRepository.getByRoom(roomId);
+        
+        emitRoomCompleted(io, roomId, {
+          roomId,
+          completionLevel,
+          totalTurns: room?.turnCount || 0,
+          transcript: messages.filter((m) => m.status === "played"),
+        });
+      }
 
       logger.info("Room closed successfully", {
         roomId,
