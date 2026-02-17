@@ -203,23 +203,22 @@ router.post(
       switch (event) {
         case "room_started": {
           logger.info("Jam room started", { roomId, clawzzRoomId });
-          // TODO: Update room status to 'live' in database
-          // await roomService.updateRoomStatus(clawzzRoomId, 'live');
+          await roomService.updateRoomStatus(clawzzRoomId, "live");
           break;
         }
 
         case "room_ended": {
           logger.info("Jam room ended", { roomId, clawzzRoomId });
-          // TODO: Mark room as completed and archive recording
-          // await roomService.endRoom(clawzzRoomId);
+          await roomService.closeRoom(clawzzRoomId);
           break;
         }
 
         case "user_joined": {
           const userId = metadata?.userId;
           logger.info("User joined Jam room", { roomId, userId });
-          // TODO: Add participant to room
-          // await roomService.addParticipant(clawzzRoomId, userId);
+          if (userId) {
+            await roomService.addParticipant(clawzzRoomId, userId);
+          }
           break;
         }
 

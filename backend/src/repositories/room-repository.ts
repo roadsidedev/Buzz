@@ -15,6 +15,7 @@ interface RoomRow {
   objective: string;
   spawn_fee: number;
   jam_room_id: string | null;
+  jam_room_url: string | null;
   spawn_fee_payment_id: string | null;
   viewer_count: number;
   participant_count: number;
@@ -44,7 +45,7 @@ export class RoomRepository {
     const text = `
       INSERT INTO room (id, host_agent_id, type, status, objective, spawn_fee, viewer_count, participant_count, completion_level, created_at, updated_at)
       VALUES ($1, $2, $3, $4, $5, $6, 0, 1, 'minimum', NOW(), NOW())
-      RETURNING id, host_agent_id, type, status, objective, spawn_fee, jam_room_id, viewer_count, participant_count, completion_level, created_at, started_at, ended_at, updated_at
+      RETURNING id, host_agent_id, type, status, objective, spawn_fee, jam_room_id, jam_room_url, spawn_fee_payment_id, viewer_count, participant_count, completion_level, created_at, started_at, ended_at, updated_at
     `;
 
     const row = await queryOne<RoomRow>(text, [
@@ -74,7 +75,7 @@ export class RoomRepository {
    */
   async getById(id: string): Promise<Room | null> {
     const text = `
-      SELECT id, host_agent_id, type, status, objective, spawn_fee, jam_room_id, viewer_count, participant_count, completion_level, created_at, started_at, ended_at, updated_at
+      SELECT id, host_agent_id, type, status, objective, spawn_fee, jam_room_id, jam_room_url, spawn_fee_payment_id, viewer_count, participant_count, completion_level, created_at, started_at, ended_at, updated_at
       FROM room
       WHERE id = $1
     `;
@@ -94,7 +95,7 @@ export class RoomRepository {
    */
   async getLiveRooms(limit: number, offset: number): Promise<Room[]> {
     const text = `
-      SELECT id, host_agent_id, type, status, objective, spawn_fee, jam_room_id, viewer_count, participant_count, completion_level, created_at, started_at, ended_at, updated_at
+      SELECT id, host_agent_id, type, status, objective, spawn_fee, jam_room_id, jam_room_url, spawn_fee_payment_id, viewer_count, participant_count, completion_level, created_at, started_at, ended_at, updated_at
       FROM room
       WHERE status = 'live'
       ORDER BY viewer_count DESC, created_at DESC
@@ -117,7 +118,7 @@ export class RoomRepository {
    */
   async getTrendingRooms(hours: number, limit: number): Promise<Room[]> {
     const text = `
-      SELECT id, host_agent_id, type, status, objective, spawn_fee, jam_room_id, viewer_count, participant_count, completion_level, created_at, started_at, ended_at, updated_at
+      SELECT id, host_agent_id, type, status, objective, spawn_fee, jam_room_id, jam_room_url, spawn_fee_payment_id, viewer_count, participant_count, completion_level, created_at, started_at, ended_at, updated_at
       FROM room
       WHERE status IN ('live', 'completed')
         AND created_at > NOW() - INTERVAL '${hours} hours'
@@ -181,11 +182,11 @@ export class RoomRepository {
   ): Promise<void> {
     const text = `
       UPDATE room
-      SET jam_room_id = $1, updated_at = NOW()
-      WHERE id = $2
+      SET jam_room_id = $1, jam_room_url = $2, updated_at = NOW()
+      WHERE id = $3
     `;
 
-    await query(text, [details.jam_room_id, roomId]);
+    await query(text, [details.jam_room_id, details.jam_room_url, roomId]);
 
     logger.info("Jam room details updated", {
       roomId,
@@ -229,7 +230,7 @@ export class RoomRepository {
       UPDATE room
       SET turn_count = $1, last_turn_at = NOW(), updated_at = NOW()
       WHERE id = $2
-      RETURNING id, host_agent_id, type, status, objective, spawn_fee, jam_room_id, spawn_fee_payment_id, viewer_count, participant_count, completion_level, created_at, started_at, ended_at, updated_at
+      RETURNING id, host_agent_id, type, status, objective, spawn_fee, jam_room_id, jam_room_url, spawn_fee_payment_id, viewer_count, participant_count, completion_level, created_at, started_at, ended_at, updated_at
     `;
 
     const row = await queryOne<RoomRow>(text, [turnCount, roomId]);
@@ -301,6 +302,7 @@ export class RoomRepository {
       objective: row.objective,
       spawnFee: row.spawn_fee,
       jamRoomId: row.jam_room_id || undefined,
+      jamRoomUrl: row.jam_room_url || undefined,
       spawnFeePaymentId: row.spawn_fee_payment_id || undefined,
       viewerCount: row.viewer_count,
       participantCount: row.participant_count,

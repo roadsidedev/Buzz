@@ -9,12 +9,12 @@
  */
 
 import type { Room, CreateRoomRequest, RoomStatus } from "../../common/types/index.js";
-import type { AgentTokenPayload } from "../../common/types/index.js";
-import { ValidationError, NotFoundError } from "../utils/errors.js";
+import { ValidationError, NotFoundError, ServiceUnavailableError } from "../utils/errors.js";
 import { logger } from "../utils/logger.js";
 import { roomRepository } from "../repositories/index.js";
 import { getJamService } from "./jam-service.js";
 import { getX402PaymentService } from "./x402-payment-service.js";
+import { roomOrchestrationService } from "./room-orchestration-service.js";
 import type { ERC8004VerificationService } from "./erc8004-verification-service.js";
 
 const MIN_SPAWN_FEE = 25; // $0.25 in cents
@@ -134,6 +134,8 @@ export class RoomService {
       spawn_fee: input.spawnFee,
     });
 
+    let updatedRoom = room;
+
     logger.info("Room created in database", {
       roomId: room.id,
       hostAgent: input.hostAgentName,
@@ -167,13 +169,37 @@ export class RoomService {
         jamRoomId: jamRoom.roomId,
         url: jamRoom.roomUrl,
       });
+
+      // Activate room once Jam is ready
+      await this.updateRoomStatus(roomId, "live");
+
+      const liveRoom = await roomRepository.getById(roomId);
+      if (!liveRoom) {
+        throw new Error("Failed to load room after Jam activation");
+      }
+
+      updatedRoom = liveRoom;
     } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+
       logger.error("Failed to create Jam room", {
         roomId,
-        error: err instanceof Error ? err.message : String(err),
+        error: errorMessage,
       });
-      // Continue - room exists but without Jam
-      // TODO: Implement retry logic or fallback
+
+      try {
+        await this.updateRoomStatus(roomId, "failed");
+      } catch (updateErr) {
+        logger.error("Failed to mark room as failed after Jam error", {
+          roomId,
+          error: updateErr instanceof Error ? updateErr.message : String(updateErr),
+        });
+      }
+
+      throw new ServiceUnavailableError("Jam", {
+        roomId,
+        error: errorMessage,
+      });
     }
 
     // 6. CHARGE SPAWN FEE VIA x402
@@ -194,8 +220,7 @@ export class RoomService {
         amount: input.spawnFee,
       });
 
-      // Room will remain in 'pending' status until webhook confirms payment
-      // At that time, status will be updated to 'live'
+      // Room is live as soon as Jam is ready; payment confirmation is tracked separately
     } catch (err) {
       logger.error("Failed to charge spawn fee", {
         roomId,
@@ -205,7 +230,7 @@ export class RoomService {
       // TODO: Implement refund logic and room cleanup
     }
 
-    return room;
+    return updatedRoom;
   }
 
   /**
@@ -273,6 +298,33 @@ export class RoomService {
 
     // Update database
     await roomRepository.updateStatus(roomId, status);
+
+    if (status === "live") {
+      try {
+        await roomOrchestrationService.startRoom(roomId);
+      } catch (err) {
+        logger.error("Failed to start room orchestration", {
+          roomId,
+          error: err instanceof Error ? err.message : String(err),
+        });
+
+        await roomRepository.updateStatus(roomId, "failed");
+
+        throw new ServiceUnavailableError("Orchestrator", {
+          roomId,
+          status,
+        });
+      }
+    } else {
+      try {
+        await roomOrchestrationService.stopRoom(roomId);
+      } catch (err) {
+        logger.warn("Failed to stop room orchestration", {
+          roomId,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
 
     logger.info("Room status updated", { roomId, status });
   }
