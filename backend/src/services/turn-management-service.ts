@@ -5,12 +5,14 @@
  * - Fetches candidate messages
  * - Calls orchestrator for scoring
  * - Selects next message to play
+ * - Triggers TTS synthesis and audio playback
  * - Updates room state and message status
  * - Handles timeouts and edge cases
  *
  * Part of Day 7: Orchestrator Integration
  */
 
+import type { Server as SocketIOServer } from "socket.io";
 import type {
   Room,
   RoomMessage,
@@ -22,9 +24,28 @@ import type {
   RoomMessageScore,
 } from "./orchestrator-client.js";
 import { orchestratorClient } from "./orchestrator-client.js";
+import { ttsService } from "./tts-service.js";
+import { getJamService } from "./jam-service.js";
 import { roomRepository, messageRepository } from "../repositories/index.js";
+import {
+  emitTurnSelected,
+  emitMessageSubmitted,
+  emitOrchestratorError,
+  emitTurnStatusUpdate,
+} from "./websocket-orchestration-handlers.js";
 import { ValidationError, NotFoundError } from "../utils/errors.js";
 import { logger } from "../utils/logger.js";
+
+// Import WebSocket emitters - will be set from server.ts
+let _io: SocketIOServer | null = null;
+
+export function setSocketIO(io: SocketIOServer): void {
+  _io = io;
+}
+
+export function getSocketIO(): SocketIOServer | null {
+  return _io;
+}
 
 // ===================================================================
 // Configuration
@@ -221,7 +242,12 @@ export class TurnManagementService {
       textLength: text.length,
     });
 
-    // 5. NOTIFY TURN MANAGER (via event/webhook - async)
+    // 5. EMIT WEBSOCKET EVENT - Message Submitted
+    if (_io) {
+      emitMessageSubmitted(_io, roomId, message);
+    }
+
+    // 6. NOTIFY TURN MANAGER (via event/webhook - async)
     // This will trigger turn selection on next loop
 
     return message;
@@ -352,19 +378,36 @@ export class TurnManagementService {
     // 7. UPDATE ROOM STATE
     await roomRepository.updateTurn(roomId, room.turnCount + 1);
 
-    logger.info("Turn selected", {
-      roomId,
-      turnNumber: room.turnCount + 1,
-      messageId: winner.messageId,
-      agentId: winner.dimensions.agentId || "unknown",
-      score: winner.score,
-    });
+    // 8. EMIT WEBSOCKET EVENT - Turn Selected
+    if (_io) {
+      emitTurnSelected(_io, roomId, {
+        roomId,
+        turnNumber: room.turnCount + 1,
+        messageId: winner.messageId,
+        agentId: winner.dimensions.agentId || "unknown",
+        text: toScore.find(m => m.id === winner.messageId)?.text || "",
+        score: winner.score,
+      });
+    }
 
-    // 8. TODO: EMIT WEBSOCKET EVENT
-    // io.to(roomId).emit("turn:selected", { ... })
-
-    // 9. TODO: SYNTHESIZE AUDIO & PLAY
-    // ttsService.synthesize() + jamService.playAudio()
+    // 9. SYNTHESIZE AUDIO & PLAY
+    try {
+      const selectedMessage = toScore.find(m => m.id === winner.messageId);
+      if (selectedMessage) {
+        await this._synthesizeAndPlayAudio(roomId, selectedMessage, winner);
+      }
+    } catch (audioError) {
+      logger.error("Audio synthesis/playback failed", {
+        roomId,
+        messageId: winner.messageId,
+        error: audioError instanceof Error ? audioError.message : String(audioError),
+      });
+      
+      // Emit error but continue
+      if (_io) {
+        emitOrchestratorError(_io, roomId, "Audio synthesis failed");
+      }
+    }
   }
 
   /**
@@ -419,6 +462,93 @@ export class TurnManagementService {
 
     // No winner
     return null;
+  }
+
+  /**
+   * Synthesize message to audio and trigger playback
+   *
+   * @param roomId - Room ID
+   * @param message - Selected message
+   * @param score - Orchestrator score
+   */
+  private async _synthesizeAndPlayAudio(
+    roomId: string,
+    message: RoomMessage,
+    score: RoomMessageScore,
+  ): Promise<void> {
+    const jamService = getJamService();
+
+    // 1. SYNTHESIZE AUDIO
+    const ttsResult = await ttsService.synthesize({
+      messageId: message.id,
+      text: message.text,
+      agentId: message.agentId,
+    });
+
+    logger.info("Audio synthesized", {
+      roomId,
+      messageId: message.id,
+      duration: ttsResult.duration,
+      voiceId: ttsResult.voiceId,
+    });
+
+    // 2. UPDATE MESSAGE WITH AUDIO URL
+    await messageRepository.updateStatus(message.id, "playing", {
+      audioUrl: ttsResult.audioUrl,
+    });
+
+    // 3. PLAY AUDIO IN JAM ROOM
+    try {
+      // Get room's Jam room ID
+      const room = await roomRepository.getById(roomId);
+      if (!room?.jamRoomId) {
+        logger.warn("Room has no Jam room ID, skipping audio playback", { roomId });
+        return;
+      }
+
+      // TODO: Implement audio playback in Jam
+      // For now, just emit that audio is playing
+      if (_io) {
+        _io.to(roomId).emit("audio:playing", {
+          messageId: message.id,
+          audioUrl: ttsResult.audioUrl,
+          duration: ttsResult.duration,
+          timestamp: new Date(),
+        });
+      }
+
+      // Simulate audio playing (in real implementation, wait for Jam webhook)
+      setTimeout(async () => {
+        await messageRepository.updateStatus(message.id, "played", {
+          playedAt: new Date(),
+        });
+
+        logger.info("Audio playback completed", {
+          roomId,
+          messageId: message.id,
+        });
+
+        // Emit transcript line available
+        if (_io) {
+          _io.to(roomId).emit("transcript:line", {
+            roomId,
+            messageId: message.id,
+            agentId: message.agentId,
+            text: message.text,
+            audioUrl: ttsResult.audioUrl,
+            timestamp: new Date(),
+          });
+        }
+      }, ttsResult.duration * 1000);
+
+    } catch (err) {
+      logger.error("Failed to play audio in Jam room", {
+        roomId,
+        messageId: message.id,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      throw err;
+    }
   }
 }
 

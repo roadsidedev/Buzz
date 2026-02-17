@@ -29,6 +29,7 @@ import {
 } from "./middleware/sentry-middleware.js";
 import { initializeSentry } from "./config/sentry-config.js";
 import { initializeLoginAttemptService } from "./services/login-attempt-service.js";
+import { setSocketIO } from "./services/turn-management-service.js";
 import { logger } from "./utils/logger.js";
 import siwaAuthRoutes from "./routes/auth-routes-siwa.js";
 import roomRoutes from "./routes/room-routes.js";
@@ -36,6 +37,7 @@ import discoveryRoutes from "./routes/discovery-routes.js";
 import agentRoutes from "./routes/agent-routes.js";
 import podcastRoutes from "./routes/podcast-routes.js";
 import skillRoutes from "./routes/skill-routes.js";
+import webhookRoutes from "./routes/webhook-routes.js";
 
 dotenv.config();
 
@@ -184,6 +186,11 @@ app.use(`/api/${apiVersion}/discover`, discoveryRoutes);
  */
 app.use(`/api/${apiVersion}/podcasts`, podcastRoutes);
 
+/**
+ * Webhook routes
+ */
+app.use(`/webhooks`, webhookRoutes);
+
 // ============================================================================
 // WEBSOCKET SETUP
 // ============================================================================
@@ -198,6 +205,11 @@ const io = new SocketIOServer(server, {
   },
   transports: ["websocket", "polling"],
 });
+
+// Initialize Socket.IO for turn management service
+setSocketIO(io);
+
+logger.info("Socket.IO initialized for orchestrator integration");
 
 // Namespace for room connections
 const roomNamespace = io.of(/^\/rooms\/[a-f0-9-]+$/);
@@ -226,18 +238,46 @@ roomNamespace.on("connection", (socket) => {
   });
 
   // Handle message submission
-  socket.on("submit-message", (data: { text: string }) => {
-    logger.debug("Message submitted", {
+  socket.on("submit-message", async (data: { text: string; agentId: string }) => {
+    logger.debug("Message submitted via WebSocket", {
       socketId: socket.id,
       roomId,
       textLength: data.text.length,
+      agentId: data.agentId,
     });
 
-    socket.emit("message:queued", {
-      messageId: crypto.randomUUID(),
-      status: "candidate",
-      timestamp: new Date().toISOString(),
-    });
+    try {
+      // Import turn management service dynamically to avoid circular dependencies
+      const { turnManagementService } = await import("./services/turn-management-service.js");
+      
+      const message = await turnManagementService.submitMessage(
+        roomId,
+        data.agentId,
+        data.text,
+      );
+
+      socket.emit("message:queued", {
+        messageId: message.id,
+        status: message.status,
+        timestamp: new Date().toISOString(),
+      });
+
+      logger.info("Message queued successfully", {
+        roomId,
+        messageId: message.id,
+        agentId: data.agentId,
+      });
+    } catch (err) {
+      logger.error("Failed to queue message", {
+        roomId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+
+      socket.emit("message:error", {
+        error: err instanceof Error ? err.message : "Failed to queue message",
+        timestamp: new Date().toISOString(),
+      });
+    }
   });
 
   // Handle disconnect

@@ -12,6 +12,10 @@ export { PaymentService, paymentService } from "./payment-service.js";
 export { PodcastService, podcastService } from "./podcast-service.js";
 export { OrchestratorClient, orchestratorClient } from "./orchestrator-client.js";
 export { SIWAAuthService, AgentProfile } from "./siwa-auth-service.js";
+export { TurnManagementService, turnManagementService } from "./turn-management-service.js";
+export { RoomOrchestrationService, roomOrchestrationService } from "./room-orchestration-service.js";
+export { TTSService, ttsService } from "./tts-service.js";
+export { JamService, getJamService } from "./jam-service.js";
 
 /**
  * SIWA Authentication Service instance

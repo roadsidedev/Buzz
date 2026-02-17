@@ -12,7 +12,7 @@ import { Router, Request, Response } from "express";
 import { getX402PaymentService } from "../services/x402-payment-service.js";
 import { getJamService } from "../services/jam-service.js";
 import { roomService } from "../services/room-service.js";
-import { paymentRepository } from "../repositories/payment-repository.js";
+import { roomRepository, messageRepository, paymentRepository } from "../repositories/index.js";
 import { logger } from "../utils/logger.js";
 import { asyncHandler } from "../middleware/index.js";
 import { SecurityError } from "../utils/errors.js";
@@ -266,10 +266,16 @@ router.post(
  *
  * Handles orchestration events (message selected, room complete, etc.)
  *
+ * Events:
+ * - message_selected: Message was selected by orchestrator
+ * - contract_fulfilled: Output contract reached minimum
+ * - room_complete: Room finished successfully
+ * - turn_timeout: No messages in interval, nudge needed
+ *
  * Request body:
  * {
  *   "roomId": "uuid",
- *   "event": "message_selected|contract_fulfilled|room_complete",
+ *   "event": "message_selected|contract_fulfilled|room_complete|turn_timeout",
  *   "data": {}
  * }
  */
@@ -292,28 +298,124 @@ router.post(
     logger.info("Orchestrator webhook received", {
       roomId,
       event,
+      data,
     });
 
-    // TODO: Handle orchestrator events
-    // switch (event) {
-    //   case 'message_selected':
-    //     await roomService.updateLastMessage(roomId, data.messageId);
-    //     break;
-    //   case 'contract_fulfilled':
-    //     await roomService.fulfillContract(roomId, data.contractId);
-    //     break;
-    //   case 'room_complete':
-    //     await roomService.completeRoom(roomId, data.summary);
-    //     break;
-    // }
+    try {
+      switch (event) {
+        case "message_selected": {
+          // Message already handled in turn management service
+          // This webhook is for confirmation/metrics
+          logger.debug("Message selection confirmed by orchestrator", {
+            roomId,
+            messageId: data?.messageId,
+          });
+          break;
+        }
 
-    res.json({
-      success: true,
-      data: {
+        case "contract_fulfilled": {
+          // Output contract reached minimum requirements
+          logger.info("Contract fulfillment detected", {
+            roomId,
+            level: data?.level || "minimum",
+            percentage: data?.completionPercentage,
+          });
+
+          // Update room completion percentage using repository directly
+          if (data?.completionPercentage) {
+            await roomRepository.updateCompletionPercentage(
+              roomId,
+              data.completionPercentage,
+            );
+          }
+
+          // Emit WebSocket event
+          const io = (await import("../server.js")).io;
+          if (io) {
+            const { emitRoomCompletion } = await import("../services/websocket-orchestration-handlers.js");
+            emitRoomCompletion(io, roomId, {
+              roomId,
+              completionPercentage: data?.completionPercentage || 0,
+              completionLevel: data?.level || "minimum",
+              nextMilestone: data?.nextMilestone,
+            });
+          }
+          break;
+        }
+
+        case "room_complete": {
+          // Room finished successfully
+          logger.info("Room completion confirmed by orchestrator", {
+            roomId,
+            level: data?.completionLevel,
+            totalTurns: data?.totalTurns,
+          });
+
+          // Close room
+          await roomService.closeRoom(roomId);
+          break;
+        }
+
+        case "turn_timeout": {
+          // No messages received in turn interval
+          logger.warn("Turn timeout detected", {
+            roomId,
+            timeoutSeconds: data?.timeoutSeconds,
+          });
+
+          // TODO: Nudge agents or take other action
+          // emit agent nudge event
+          break;
+        }
+
+        case "orchestrator_error": {
+          // Orchestrator encountered an error
+          logger.error("Orchestrator error reported", {
+            roomId,
+            error: data?.error,
+            details: data?.details,
+          });
+
+          // Emit to room subscribers
+          const io = (await import("../server.js")).io;
+          if (io) {
+            const { emitOrchestratorError } = await import("../services/websocket-orchestration-handlers.js");
+            emitOrchestratorError(io, roomId, data?.error || "Unknown orchestrator error");
+          }
+          break;
+        }
+
+        default: {
+          logger.warn("Unknown orchestrator webhook event", {
+            event,
+            roomId,
+          });
+        }
+      }
+
+      res.json({
+        success: true,
+        data: {
+          roomId,
+          event,
+          acknowledged: true,
+        },
+      });
+    } catch (err) {
+      logger.error("Failed to process orchestrator webhook", {
         roomId,
-        acknowledged: true,
-      },
-    });
+        event,
+        error: err instanceof Error ? err.message : String(err),
+      });
+
+      res.status(500).json({
+        success: false,
+        error: {
+          code: "WEBHOOK_PROCESSING_ERROR",
+          message: "Failed to process orchestrator webhook",
+        },
+      });
+    }
   }),
 );
 
