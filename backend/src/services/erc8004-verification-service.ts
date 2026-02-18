@@ -1,229 +1,119 @@
 /**
- * ERC-8004 Verification Service
+ * ERC-8004 Verification & Reputation Service
  *
- * Implements agent identity verification via ERC-8004 smart contract.
- * Verifies that an Ethereum wallet owns a registered agent identity on-chain.
- *
- * Security Model:
- * - Agent registration creates immutable on-chain identity
- * - Wallet proves ownership via cryptographic signature
- * - Backend validates proof against smart contract
- * - Prevents impersonation and sybil attacks
+ * Implements agent identity verification and reputation management via ERC-8004 smart contracts.
+ * 
+ * Deployment Addresses (Base Network):
+ * - Base Sepolia: IdentityRegistry & ReputationRegistry
+ * - Base Mainnet: IdentityRegistry & ReputationRegistry
  */
 
 import { ethers } from "ethers";
-import type { Contract } from "ethers";
-import logger from "../utils/logger.js";
+import type { Contract, Signer } from "ethers";
+import { logger } from "../utils/logger.js";
+
+/**
+ * Deployment Addresses from https://github.com/erc-8004/erc-8004-contracts
+ */
+export const ERC8004_ADDRESSES = {
+  BASE_MAINNET: {
+    IDENTITY: "0x8004A169FB4a3325136EB29fA0ceB6D2e539a432",
+    REPUTATION: "0x8004BAa17C55a88189AE136b182e5fdA19dE9b63",
+  },
+  BASE_SEPOLIA: {
+    IDENTITY: "0x8004A818BFB912233c491871b3d84c89A494BD9e",
+    REPUTATION: "0x8004B663056A597Dffe9eCcC1965A193B7388713",
+  },
+};
 
 export interface ERC8004VerificationInput {
-  /** Agent ID registered on-chain */
   agentId: string;
-  /** Ethereum wallet address claiming ownership */
   walletAddress: string;
-  /** Cryptographic proof of wallet ownership */
   proof: string;
-  /** Signature of proof */
   signature: string;
 }
 
 export interface ERC8004VerificationResult {
-  /** Whether verification succeeded */
   verified: boolean;
-  /** On-chain agent ID */
   agentId: string;
-  /** Owner wallet address */
   ownerAddress: string;
-  /** Verification timestamp */
   verifiedAt: Date;
-  /** Any error details if failed */
   error?: string;
 }
 
-/**
- * Smart contract ABI for AgentRegistry
- *
- * Key Functions:
- * - isAgentOwner(agentId, walletAddress) -> bool
- * - getAgentOwner(agentId) -> address
- * - registerAgent(agentId, walletAddress) -> void
- * - revokeAgent(agentId) -> void
- */
-const AGENT_REGISTRY_ABI = [
-  {
-    name: "isAgentOwner",
-    type: "function",
-    inputs: [
-      { name: "agentId", type: "bytes32" },
-      { name: "walletAddress", type: "address" },
-    ],
-    outputs: [{ type: "bool" }],
-    stateMutability: "view",
-  },
-  {
-    name: "getAgentOwner",
-    type: "function",
-    inputs: [{ name: "agentId", type: "bytes32" }],
-    outputs: [{ type: "address" }],
-    stateMutability: "view",
-  },
-  {
-    name: "registerAgent",
-    type: "function",
-    inputs: [
-      { name: "agentId", type: "bytes32" },
-      { name: "walletAddress", type: "address" },
-    ],
-    outputs: [],
-    stateMutability: "nonpayable",
-  },
-  {
-    name: "verifyOwnership",
-    type: "function",
-    inputs: [
-      { name: "agentId", type: "bytes32" },
-      { name: "proof", type: "string" },
-      { name: "signature", type: "bytes" },
-    ],
-    outputs: [{ type: "bool" }],
-    stateMutability: "view",
-  },
-  {
-    name: "revokeAgent",
-    type: "function",
-    inputs: [{ name: "agentId", type: "bytes32" }],
-    outputs: [],
-    stateMutability: "nonpayable",
-  },
+const IDENTITY_REGISTRY_ABI = [
+  "function isAgentOwner(bytes32 agentId, address walletAddress) view returns (bool)",
+  "function getAgentOwner(bytes32 agentId) view returns (address)",
+  "function registerAgent(bytes32 agentId, address walletAddress) external",
+  "function verifyOwnership(bytes32 agentId, string proof, bytes signature) view returns (bool)",
+  "function revokeAgent(bytes32 agentId) external",
 ];
 
-const VERIFICATION_TIMEOUT = 10000; // 10 seconds
+const REPUTATION_REGISTRY_ABI = [
+  "function getReputation(bytes32 agentId) view returns (uint256)",
+  "function updateReputation(bytes32 agentId, uint256 newReputation) external",
+  "function getHistory(bytes32 agentId) view returns (tuple(uint256 score, uint256 timestamp)[])",
+];
 
-/**
- * ERC8004VerificationService
- *
- * Manages interaction with ERC-8004 agent registry smart contract.
- * Supports:
- * - Verifying wallet ownership of agent identity
- * - Checking agent verification status
- * - Revoking compromised identities
- */
 export class ERC8004VerificationService {
-  private contract: Contract | null = null;
+  private idContract: Contract | null = null;
+  private repContract: Contract | null = null;
   private provider: ethers.Provider | null = null;
-  private contractAddress: string;
-  private chainId: number;
+  private signer: Signer | null = null;
 
   constructor(
-    contractAddress: string,
+    identityAddress: string,
+    reputationAddress: string,
     rpcUrl: string,
-    chainId: number = 1 // Default to Ethereum mainnet
+    privateKey?: string
   ) {
-    this.contractAddress = contractAddress;
-    this.chainId = chainId;
-
     try {
       this.provider = new ethers.JsonRpcProvider(rpcUrl);
-      this.contract = new ethers.Contract(
-        contractAddress,
-        AGENT_REGISTRY_ABI,
-        this.provider
-      );
+      
+      if (privateKey) {
+        this.signer = new ethers.Wallet(privateKey, this.provider);
+        this.idContract = new ethers.Contract(identityAddress, IDENTITY_REGISTRY_ABI, this.signer);
+        this.repContract = new ethers.Contract(reputationAddress, REPUTATION_REGISTRY_ABI, this.signer);
+      } else {
+        this.idContract = new ethers.Contract(identityAddress, IDENTITY_REGISTRY_ABI, this.provider);
+        this.repContract = new ethers.Contract(reputationAddress, REPUTATION_REGISTRY_ABI, this.provider);
+      }
 
-      logger.info("ERC-8004 VerificationService initialized", {
-        contractAddress,
-        chainId,
+      logger.info("ERC-8004 Service initialized on Base Network", {
+        identityAddress,
+        reputationAddress,
+        hasSigner: !!this.signer,
       });
     } catch (err) {
       logger.error("Failed to initialize ERC-8004 service", {
-        error: err,
-        contractAddress,
+        error: err instanceof Error ? err.message : String(err),
       });
-      throw new Error("Failed to initialize ERC-8004 verification service");
     }
   }
 
-  /**
-   * Verify that a wallet owns an agent identity on-chain
-   *
-   * Process:
-   * 1. Validate inputs (eth address format, agent ID format)
-   * 2. Recover public key from signature
-   * 3. Call smart contract to verify ownership
-   * 4. Return verification result with timestamp
-   *
-   * @param input - Agent ID, wallet address, and cryptographic proof
-   * @returns Verification result
-   * @throws Error if verification fails or contract unreachable
-   */
+  // ==================== IDENTITY MANAGEMENT ====================
+
   async verifyAgentOwnership(
     input: ERC8004VerificationInput
   ): Promise<ERC8004VerificationResult> {
-    if (!this.contract || !this.provider) {
-      throw new Error("ERC-8004 service not initialized");
-    }
-
-    // Validate input format
-    this._validateInput(input);
+    if (!this.idContract) throw new Error("Identity contract not initialized");
 
     try {
-      // Set timeout for contract call
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), VERIFICATION_TIMEOUT);
+      const agentIdHash = ethers.id(input.agentId);
+      const isOwner = await this.idContract.verifyOwnership(
+        agentIdHash,
+        input.proof,
+        input.signature
+      );
 
-      try {
-        // Call smart contract to verify ownership
-        const agentIdHash = ethers.id(input.agentId);
-        const walletAddressChecked = ethers.getAddress(input.walletAddress);
-
-        logger.info("Calling ERC-8004 verification", {
-          agentId: input.agentId,
-          walletAddress: walletAddressChecked,
-        });
-
-        const isOwner = await (this.contract as any).verifyOwnership(
-          agentIdHash,
-          input.proof,
-          input.signature
-        );
-
-        clearTimeout(timeoutId);
-
-        if (!isOwner) {
-          logger.warn("ERC-8004 verification failed", {
-            agentId: input.agentId,
-            walletAddress: walletAddressChecked,
-            reason: "Smart contract returned false",
-          });
-
-          return {
-            verified: false,
-            agentId: input.agentId,
-            ownerAddress: walletAddressChecked,
-            verifiedAt: new Date(),
-            error: "Wallet does not own this agent identity",
-          };
-        }
-
-        logger.info("ERC-8004 verification succeeded", {
-          agentId: input.agentId,
-          walletAddress: walletAddressChecked,
-        });
-
-        return {
-          verified: true,
-          agentId: input.agentId,
-          ownerAddress: walletAddressChecked,
-          verifiedAt: new Date(),
-        };
-      } finally {
-        clearTimeout(timeoutId);
-      }
-    } catch (err) {
-      logger.error("ERC-8004 verification error", {
+      return {
+        verified: isOwner,
         agentId: input.agentId,
-        error: err instanceof Error ? err.message : String(err),
-      });
-
+        ownerAddress: input.walletAddress,
+        verifiedAt: new Date(),
+        error: isOwner ? undefined : "Wallet does not own this agent identity",
+      };
+    } catch (err) {
       return {
         verified: false,
         agentId: input.agentId,
@@ -234,225 +124,89 @@ export class ERC8004VerificationService {
     }
   }
 
+  async registerAgent(agentId: string, walletAddress: string): Promise<string> {
+    if (!this.idContract || !this.signer) throw new Error("Signer required for registration");
+
+    try {
+      const agentIdHash = ethers.id(agentId);
+      const tx = await this.idContract.registerAgent(agentIdHash, walletAddress);
+      await tx.wait();
+      return tx.hash;
+    } catch (err) {
+      logger.error("Failed to register agent on-chain", { agentId, error: err });
+      throw err;
+    }
+  }
+
+  // ==================== REPUTATION MANAGEMENT ====================
+
   /**
-   * Check if wallet is owner of agent identity (read-only, no proof required)
-   *
-   * Note: This reads current on-chain state but does not validate the caller.
-   * Use verifyAgentOwnership() for full cryptographic verification.
-   *
-   * @param agentId - Agent ID
-   * @param walletAddress - Wallet address to check
-   * @returns true if wallet owns agent, false otherwise
+   * Check if wallet owns agent identity on-chain
    */
   async isAgentOwner(agentId: string, walletAddress: string): Promise<boolean> {
-    if (!this.contract) {
-      throw new Error("ERC-8004 service not initialized");
-    }
+    if (!this.idContract) throw new Error("Identity contract not initialized");
 
     try {
-      this._validateAddress(walletAddress);
-
       const agentIdHash = ethers.id(agentId);
-      const walletAddressChecked = ethers.getAddress(walletAddress);
-
-      const result = await (this.contract as any).isAgentOwner(
-        agentIdHash,
-        walletAddressChecked
-      );
-
-      return Boolean(result);
+      const isOwner = await this.idContract.isAgentOwner(agentIdHash, walletAddress);
+      return Boolean(isOwner);
     } catch (err) {
-      logger.error("Failed to check agent ownership", {
-        agentId,
-        walletAddress,
-        error: err,
-      });
+      logger.warn("Failed to check agent ownership", { agentId, walletAddress, error: err });
+      // Default to false if contract call fails
       return false;
     }
   }
 
-  /**
-   * Get the registered owner of an agent identity
-   *
-   * @param agentId - Agent ID
-   * @returns Owner wallet address, or null if not registered
-   */
-  async getAgentOwner(agentId: string): Promise<string | null> {
-    if (!this.contract) {
-      throw new Error("ERC-8004 service not initialized");
-    }
-
+  async getAgentReputation(agentId: string): Promise<number> {
+    if (!this.repContract) throw new Error("Reputation contract not initialized");
     try {
       const agentIdHash = ethers.id(agentId);
-      const owner = await (this.contract as any).getAgentOwner(agentIdHash);
-
-      // Check if address is zero address (not registered)
-      if (owner === ethers.ZeroAddress) {
-        return null;
-      }
-
-      return ethers.getAddress(owner);
+      const reputation = await this.repContract.getReputation(agentIdHash);
+      return Number(reputation);
     } catch (err) {
-      logger.error("Failed to get agent owner", {
-        agentId,
-        error: err,
-      });
-      return null;
+      logger.error("Failed to fetch agent reputation", { agentId, error: err });
+      return 0;
     }
   }
 
-  /**
-   * Register a new agent on-chain (requires admin/contract owner)
-   *
-   * Note: This method should only be called by authorized backend service.
-   * In production, use a private key with restricted permissions.
-   *
-   * @param agentId - New agent ID to register
-   * @param walletAddress - Owner wallet address
-   * @throws Error if registration fails
-   */
-  async registerAgent(agentId: string, walletAddress: string): Promise<void> {
-    if (!this.contract) {
-      throw new Error("ERC-8004 service not initialized");
-    }
-
-    this._validateInput({
-      agentId,
-      walletAddress,
-      proof: "",
-      signature: "",
-    });
-
+  async updateAgentReputation(agentId: string, newScore: number): Promise<string> {
+    if (!this.repContract || !this.signer) throw new Error("Signer required for reputation update");
     try {
-      logger.info("Registering agent on-chain", {
-        agentId,
-        walletAddress,
-      });
-
       const agentIdHash = ethers.id(agentId);
-      const walletAddressChecked = ethers.getAddress(walletAddress);
-
-      // Note: In production, this would require a signer with appropriate permissions
-      // For now, we log this as a placeholder for the deployment process
-      logger.warn("registerAgent requires contract owner signer - implement in deployment", {
-        agentId,
-        walletAddress,
-      });
+      const tx = await this.repContract.updateReputation(agentIdHash, BigInt(newScore));
+      await tx.wait();
+      return tx.hash;
     } catch (err) {
-      logger.error("Failed to register agent on-chain", {
-        agentId,
-        error: err,
-      });
-      throw new Error(`Failed to register agent on-chain: ${err}`);
+      logger.error("Failed to update agent reputation", { agentId, score: newScore, error: err });
+      throw err;
     }
   }
 
-  /**
-   * Revoke an agent identity (mark as invalid)
-   *
-   * @param agentId - Agent ID to revoke
-   * @throws Error if revocation fails
-   */
-  async revokeAgent(agentId: string): Promise<void> {
-    if (!this.contract) {
-      throw new Error("ERC-8004 service not initialized");
-    }
-
-    try {
-      const agentIdHash = ethers.id(agentId);
-
-      logger.warn("Revoking agent identity", { agentId });
-
-      // Note: In production, this would require a signer with appropriate permissions
-      logger.warn("revokeAgent requires contract owner signer - implement in deployment", {
-        agentId,
-      });
-    } catch (err) {
-      logger.error("Failed to revoke agent", {
-        agentId,
-        error: err,
-      });
-      throw new Error(`Failed to revoke agent: ${err}`);
-    }
-  }
-
-  /**
-   * Health check: verify contract is reachable
-   *
-   * @returns true if contract is accessible, false otherwise
-   */
   async healthCheck(): Promise<boolean> {
-    if (!this.contract || !this.provider) {
-      return false;
-    }
-
+    if (!this.provider || !this.idContract) return false;
     try {
-      // Try to read contract code
-      const code = await this.provider.getCode(this.contractAddress);
-      return code !== "0x"; // Non-empty bytecode means contract exists
-    } catch (err) {
-      logger.error("ERC-8004 health check failed", { error: err });
+      const code = await this.provider.getCode(await this.idContract.getAddress());
+      return code !== "0x";
+    } catch {
       return false;
-    }
-  }
-
-  // ============================================
-  // Private Helpers
-  // ============================================
-
-  /**
-   * Validate verification input
-   *
-   * @private
-   * @throws ValidationError if input invalid
-   */
-  private _validateInput(input: ERC8004VerificationInput): void {
-    // Validate agent ID format (should be non-empty string)
-    if (!input.agentId || input.agentId.trim().length === 0) {
-      throw new Error("Invalid agent ID format");
-    }
-
-    // Validate wallet address
-    this._validateAddress(input.walletAddress);
-
-    // Validate proof format
-    if (!input.proof || input.proof.trim().length === 0) {
-      throw new Error("Invalid proof format");
-    }
-
-    // Validate signature format (should be hex string)
-    if (!input.signature || input.signature.trim().length === 0) {
-      throw new Error("Invalid signature format");
-    }
-  }
-
-  /**
-   * Validate Ethereum address format
-   *
-   * @private
-   * @throws Error if address invalid
-   */
-  private _validateAddress(address: string): void {
-    try {
-      ethers.getAddress(address);
-    } catch (err) {
-      throw new Error(`Invalid Ethereum address: ${address}`);
     }
   }
 }
 
 /**
- * Factory function to create ERC-8004 verification service
- *
- * @param contractAddress - Smart contract address
- * @param rpcUrl - Blockchain RPC endpoint
- * @param chainId - Network chain ID
- * @returns Initialized verification service
+ * Factory function to create environment-aware ERC-8004 service
  */
-export function createERC8004VerificationService(
-  contractAddress: string,
-  rpcUrl: string,
-  chainId?: number
-): ERC8004VerificationService {
-  return new ERC8004VerificationService(contractAddress, rpcUrl, chainId);
+export function getERC8004Service(): ERC8004VerificationService {
+  const env = process.env.NODE_ENV === "production" ? "BASE_MAINNET" : "BASE_SEPOLIA";
+  const config = ERC8004_ADDRESSES[env];
+  
+  const identityAddress = process.env.ERC8004_IDENTITY_ADDRESS || config.IDENTITY;
+  const reputationAddress = process.env.ERC8004_REPUTATION_ADDRESS || config.REPUTATION;
+  
+  const rpcUrl = process.env.ERC8004_RPC_URL || 
+    (env === "BASE_MAINNET" ? "https://mainnet.base.org" : "https://sepolia.base.org");
+    
+  const privateKey = process.env.ERC8004_PRIVATE_KEY;
+
+  return new ERC8004VerificationService(identityAddress, reputationAddress, rpcUrl, privateKey);
 }

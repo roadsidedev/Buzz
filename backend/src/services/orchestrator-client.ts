@@ -404,6 +404,77 @@ export class OrchestratorClient {
   }
 
   /**
+   * Generate a summary from podcast transcript
+   *
+   * Calls orchestrator to create a concise summary (max 5 sentences)
+   * from the provided transcript text.
+   *
+   * @param transcript - Full transcript text to summarize
+   * @returns Summary text (up to 500 characters)
+   * @throws Error if orchestrator request fails
+   */
+  async generateSummary(transcript: string): Promise<string> {
+    const url = `${this.url}/api/v1/podcasts/summarize`;
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), this.timeout);
+
+    try {
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${this.token}`,
+        },
+        body: JSON.stringify({
+          transcript,
+          maxSentences: 5,
+          maxChars: 500,
+        }),
+        signal: controller.signal,
+      });
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({
+          message: response.statusText,
+        }));
+        throw new Error(
+          `Orchestrator error (${response.status}): ${error.message || JSON.stringify(error)}`,
+        );
+      }
+
+      const data = (await response.json()) as { summary: string };
+
+      logger.info("Transcript summarized by orchestrator", {
+        transcriptLength: transcript.length,
+        summaryLength: data.summary.length,
+      });
+
+      return data.summary;
+    } catch (err) {
+      if (err instanceof Error && err.name === "AbortError") {
+        logger.error("Orchestrator RPC timeout", {
+          method: "generateSummary",
+          transcriptLength: transcript.length,
+          timeoutSeconds: this.timeout / 1000,
+        });
+        throw new Error(
+          `Orchestrator request timeout (${this.timeout / 1000}s)`,
+        );
+      }
+
+      logger.error("Orchestrator RPC failed", {
+        method: "generateSummary",
+        transcriptLength: transcript.length,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      throw err;
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  }
+
+  /**
    * Health check for orchestrator
    *
    * @returns true if orchestrator is healthy

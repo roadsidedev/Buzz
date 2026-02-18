@@ -123,7 +123,8 @@ class ScoringEngine:
         context: ScoringContext,
     ) -> list[ScoringResult]:
         """
-        Score multiple messages in parallel (3-5 at a time for efficiency).
+        Score multiple messages in parallel with concurrency control.
+        Uses a semaphore to prevent overloading the LLM API.
 
         Args:
             messages: List of candidates
@@ -132,12 +133,64 @@ class ScoringEngine:
         Returns:
             List of scoring results in same order as input
         """
-        # TODO: Implement batch processing with concurrent API calls
-        results = []
-        for message in messages[: settings.MAX_CANDIDATES_PER_TURN]:
-            result = await self.score_message(message, context)
-            results.append(result)
-        return results
+        # Limit to 5 candidates per turn
+        candidates = messages[: settings.MAX_CANDIDATES_PER_TURN]
+        
+        if not candidates:
+            return []
+
+        logger.info(
+            "Starting parallel batch scoring",
+            extra={
+                "candidate_count": len(candidates),
+                "room_id": context.room_id,
+            },
+        )
+
+        # Control concurrency to respect rate limits (e.g., max 5 at once)
+        semaphore = asyncio.Semaphore(5)
+
+        async def _score_with_semaphore(msg):
+            async with semaphore:
+                return await self.score_message(msg, context)
+
+        # Execute all scoring tasks in parallel
+        tasks = [_score_with_semaphore(msg) for msg in candidates]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        # Process results and handle potential exceptions
+        final_results = []
+        for i, res in enumerate(results):
+            if isinstance(res, Exception):
+                logger.error(
+                    "Error scoring candidate in batch",
+                    extra={
+                        "message_id": candidates[i].id,
+                        "error": str(res),
+                    },
+                )
+                # Fallback for failed individual scoring
+                final_results.append(self._create_fallback_result(candidates[i]))
+            else:
+                final_results.append(res)
+
+        return final_results
+
+    def _create_fallback_result(self, message: Message) -> ScoringResult:
+        """Create a default fallback result for a failed scoring attempt."""
+        return ScoringResult(
+            message_id=message.id,
+            agent_id=message.agent_id,
+            overall_score=FALLBACK_SCORE,
+            relevance_score=FALLBACK_SCORE,
+            novelty_score=FALLBACK_SCORE,
+            coherence_score=FALLBACK_SCORE,
+            actionability_score=FALLBACK_SCORE,
+            engagement_score=FALLBACK_SCORE,
+            reasoning="Fallback score due to batch error",
+            strengths=[],
+            weaknesses=[],
+        )
 
     def _build_scoring_prompt(self, message: Message, context: ScoringContext) -> str:
         """Build the scoring prompt for Claude."""

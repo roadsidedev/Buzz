@@ -44,6 +44,8 @@ export interface Room {
     startedAt?: Date;
     endedAt?: Date;
     jamRoomId?: string;
+    jamRoomUrl?: string;
+    spawnFeePaymentId?: string;
     viewerCount: number;
     participantCount: number;
     completionLevel: CompletionLevel;

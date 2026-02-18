@@ -92,45 +92,118 @@ export class RoomRepository {
 
   /**
    * Get live rooms (paginated)
+   *
+   * @param limit - Max results per page
+   * @param offset - Pagination offset
+   * @param type - Optional room type filter
+   * @returns Array of live rooms ordered by viewer count
    */
-  async getLiveRooms(limit: number, offset: number): Promise<Room[]> {
-    const text = `
+  async getLiveRooms(
+    limit: number,
+    offset: number,
+    type?: string,
+  ): Promise<Room[]> {
+    let text = `
       SELECT id, host_agent_id, type, status, objective, spawn_fee, jam_room_id, jam_room_url, spawn_fee_payment_id, viewer_count, participant_count, completion_level, created_at, started_at, ended_at, updated_at
       FROM room
       WHERE status = 'live'
-      ORDER BY viewer_count DESC, created_at DESC
-      LIMIT $1 OFFSET $2
     `;
 
-    const rows = await query<RoomRow>(text, [limit, offset]);
+    const params: any[] = [];
+
+    if (type) {
+      text += ` AND type = $${params.length + 1}`;
+      params.push(type);
+    }
+
+    text += `
+      ORDER BY viewer_count DESC, created_at DESC
+      LIMIT $${params.length + 1} OFFSET $${params.length + 2}
+    `;
+
+    params.push(limit, offset);
+
+    const rows = await query<RoomRow>(text, params);
 
     logger.debug("Fetched live rooms", {
       count: rows.length,
       limit,
       offset,
+      type,
     });
 
     return rows.map((row) => this.mapRowToRoom(row));
   }
 
   /**
-   * Get trending rooms
+   * Get total count of live rooms
+   *
+   * @param type - Optional room type filter for count
+   * @returns Total count of rooms matching criteria
    */
-  async getTrendingRooms(hours: number, limit: number): Promise<Room[]> {
-    const text = `
+  async getLiveRoomCount(type?: string): Promise<number> {
+    let text = `
+      SELECT COUNT(*) as count
+      FROM room
+      WHERE status = 'live'
+    `;
+
+    const params: any[] = [];
+
+    if (type) {
+      text += ` AND type = $${params.length + 1}`;
+      params.push(type);
+    }
+
+    const row = await queryOne<{ count: string }>(text, params);
+
+    const count = row ? parseInt(row.count, 10) : 0;
+
+    logger.debug("Counted live rooms", { count, type });
+
+    return count;
+  }
+
+  /**
+   * Get trending rooms with optional type filtering
+   *
+   * @param hours - Timeframe in hours
+   * @param limit - Max results
+   * @param type - Optional room type filter
+   * @returns Array of trending rooms
+   */
+  async getTrendingRooms(
+    hours: number,
+    limit: number,
+    type?: string,
+  ): Promise<Room[]> {
+    let text = `
       SELECT id, host_agent_id, type, status, objective, spawn_fee, jam_room_id, jam_room_url, spawn_fee_payment_id, viewer_count, participant_count, completion_level, created_at, started_at, ended_at, updated_at
       FROM room
       WHERE status IN ('live', 'completed')
         AND created_at > NOW() - INTERVAL '${hours} hours'
-      ORDER BY viewer_count DESC, created_at DESC
-      LIMIT $1
     `;
 
-    const rows = await query<RoomRow>(text, [limit]);
+    const params: any[] = [];
+
+    if (type) {
+      text += ` AND type = $${params.length + 1}`;
+      params.push(type);
+    }
+
+    text += `
+      ORDER BY viewer_count DESC, created_at DESC
+      LIMIT $${params.length + 1}
+    `;
+
+    params.push(limit);
+
+    const rows = await query<RoomRow>(text, params);
 
     logger.debug("Fetched trending rooms", {
       count: rows.length,
       hours,
+      type,
     });
 
     return rows.map((row) => this.mapRowToRoom(row));
@@ -288,6 +361,69 @@ export class RoomRepository {
       agentId,
       role,
     });
+  }
+
+  /**
+   * Get participant status in room
+   *
+   * Verifies if agent is in room and their status
+   *
+   * @param roomId - Room ID
+   * @param agentId - Agent ID
+   * @returns Participant info or null if not found
+   */
+  async getParticipant(
+    roomId: string,
+    agentId: string,
+  ): Promise<{
+    agentId: string;
+    role: "host" | "speaker" | "listener";
+    status: "joined" | "left" | "idle";
+    joinedAt: Date;
+  } | null> {
+    const text = `
+      SELECT agent_id, role, status, joined_at
+      FROM room_participant
+      WHERE room_id = $1 AND agent_id = $2
+    `;
+
+    const row = await queryOne<{
+      agent_id: string;
+      role: "host" | "speaker" | "listener";
+      status: "joined" | "left" | "idle";
+      joined_at: string;
+    }>(text, [roomId, agentId]);
+
+    if (!row) {
+      return null;
+    }
+
+    return {
+      agentId: row.agent_id,
+      role: row.role,
+      status: row.status,
+      joinedAt: new Date(row.joined_at),
+    };
+  }
+
+  /**
+   * Remove participant from room
+   *
+   * Marks participant as left (soft delete)
+   *
+   * @param roomId - Room ID
+   * @param agentId - Agent ID
+   */
+  async removeParticipant(roomId: string, agentId: string): Promise<void> {
+    const text = `
+      UPDATE room_participant
+      SET status = 'left'
+      WHERE room_id = $1 AND agent_id = $2
+    `;
+
+    await query(text, [roomId, agentId]);
+
+    logger.info("Participant removed from room", { roomId, agentId });
   }
 
   /**

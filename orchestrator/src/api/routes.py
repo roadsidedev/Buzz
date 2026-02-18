@@ -14,8 +14,22 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1", tags=["orchestration"])
 
-# Initialize service (TODO: use dependency injection)
-orchestration_service = OrchestrationService()
+# Singleton service instance - initialized in main.py lifespan
+_orchestration_service: Optional[OrchestrationService] = None
+
+
+def set_orchestration_service(service: OrchestrationService) -> None:
+    """Set the orchestration service singleton."""
+    global _orchestration_service
+    _orchestration_service = service
+
+
+def get_orchestration_service() -> OrchestrationService:
+    """Get the orchestration service singleton."""
+    global _orchestration_service
+    if _orchestration_service is None:
+        _orchestration_service = OrchestrationService()
+    return _orchestration_service
 
 
 # Request/Response Models
@@ -66,7 +80,8 @@ async def create_room(request: CreateRoomRequest) -> dict:
         Room state initialized
     """
     try:
-        room_state = await orchestration_service.create_room(request.room)
+        service = get_orchestration_service()
+        room_state = await service.create_room(request.room)
         return {
             "status": "success",
             "room_id": room_state.room.id,
@@ -89,7 +104,8 @@ async def start_room(room_id: str) -> dict:
         Updated room state
     """
     try:
-        room_state = await orchestration_service.start_room(room_id)
+        service = get_orchestration_service()
+        room_state = await service.start_room(room_id)
         return {
             "status": "success",
             "room_id": room_state.room.id,
@@ -112,7 +128,8 @@ async def close_room(room_id: str, reason: str = "user_request") -> dict:
         Final room state
     """
     try:
-        room_state = await orchestration_service.close_room(room_id, reason)
+        service = get_orchestration_service()
+        room_state = await service.close_room(room_id, reason)
         return {
             "status": "success",
             "room_id": room_state.room.id,
@@ -135,7 +152,8 @@ async def get_room_state(room_id: str) -> dict:
         Room state snapshot
     """
     try:
-        room_state = await orchestration_service.get_room_state(room_id)
+        service = get_orchestration_service()
+        room_state = await service.get_room_state(room_id)
         return {
             "status": "success",
             "room_id": room_state.room.id,
@@ -161,8 +179,9 @@ async def submit_message(room_id: str, request: SubmitMessageRequest) -> dict:
         Queue confirmation
     """
     try:
-        await orchestration_service.submit_message(request.message, room_id)
-        room_state = await orchestration_service.get_room_state(room_id)
+        service = get_orchestration_service()
+        await service.submit_message(request.message, room_id)
+        room_state = await service.get_room_state(room_id)
         return {
             "status": "success",
             "message_id": request.message.id,
@@ -184,7 +203,8 @@ async def process_turn(room_id: str) -> ProcessTurnResponse:
         Turn result with selected message and score
     """
     try:
-        result = await orchestration_service.process_turn(room_id)
+        service = get_orchestration_service()
+        result = await service.process_turn(room_id)
         return ProcessTurnResponse(**result)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))

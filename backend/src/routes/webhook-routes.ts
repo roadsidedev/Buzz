@@ -11,6 +11,7 @@
 import { Router, Request, Response } from "express";
 import { getX402PaymentService } from "../services/x402-payment-service.js";
 import { getJamService } from "../services/jam-service.js";
+import { getJamWebhookHandler } from "../services/jam-webhook-handler.js";
 import { roomService } from "../services/room-service.js";
 import { paymentRepository } from "../repositories/payment-repository.js";
 import { logger } from "../utils/logger.js";
@@ -156,108 +157,17 @@ router.post(
 router.post(
   "/webhooks/jam",
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
-    const { roomId, externalId, event, timestamp, metadata } = req.body;
+    const handler = getJamWebhookHandler();
+    const result = await handler.process(req);
 
-    // Validate webhook payload
-    if (!roomId || !event) {
-      logger.warn("Invalid Jam webhook payload", {
-        hasRoomId: !!roomId,
-        hasEvent: !!event,
-      });
-
-      res.status(400).json({
-        success: false,
-        error: {
-          code: "INVALID_PAYLOAD",
-          message: "Missing roomId or event",
-        },
-      });
-      return;
-    }
-
-    // Validate webhook signature (placeholder)
-    const jamService = getJamService();
-    const signature = req.headers["x-jam-signature"] as string;
-    if (signature && !jamService.validateWebhookSignature(JSON.stringify(req.body), signature)) {
-      logger.warn("Invalid Jam webhook signature", {
-        roomId,
-        ip: req.ip,
-      });
-
-      throw new SecurityError("Invalid Jam webhook signature", {
-        code: "INVALID_SIGNATURE",
-      });
-    }
-
-    logger.info("Jam webhook received", {
-      roomId,
-      externalId,
-      event,
-      timestamp,
+    res.json({
+      success: result.success,
+      data: {
+        roomId: result.roomId,
+        event: result.event,
+        acknowledged: result.acknowledged,
+      },
     });
-
-    try {
-      // Use externalId (ClawZz room ID) if provided, else roomId
-      const clawzzRoomId = externalId || roomId;
-
-      switch (event) {
-        case "room_started": {
-          logger.info("Jam room started", { roomId, clawzzRoomId });
-          await roomService.updateRoomStatus(clawzzRoomId, "live");
-          break;
-        }
-
-        case "room_ended": {
-          logger.info("Jam room ended", { roomId, clawzzRoomId });
-          await roomService.closeRoom(clawzzRoomId);
-          break;
-        }
-
-        case "user_joined": {
-          const userId = metadata?.userId;
-          logger.info("User joined Jam room", { roomId, userId });
-          if (userId) {
-            await roomService.addParticipant(clawzzRoomId, userId);
-          }
-          break;
-        }
-
-        case "user_left": {
-          const userId = metadata?.userId;
-          logger.info("User left Jam room", { roomId, userId });
-          // TODO: Remove participant from room
-          // await roomService.removeParticipant(clawzzRoomId, userId);
-          break;
-        }
-
-        default: {
-          logger.warn("Unknown Jam event", { event });
-        }
-      }
-
-      res.json({
-        success: true,
-        data: {
-          roomId,
-          event,
-          acknowledged: true,
-        },
-      });
-    } catch (err) {
-      logger.error("Failed to process Jam webhook", {
-        roomId,
-        event,
-        error: err instanceof Error ? err.message : String(err),
-      });
-
-      res.status(500).json({
-        success: false,
-        error: {
-          code: "WEBHOOK_PROCESSING_ERROR",
-          message: "Failed to process Jam webhook",
-        },
-      });
-    }
   }),
 );
 

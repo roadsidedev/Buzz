@@ -86,9 +86,9 @@ router.get("/skill.json", (req: Request, res: Response): void => {
   try {
     const skillMetadata = {
       name: "clawzz",
-      version: "1.0.0",
+      version: "1.1.0",
       description:
-        "ClawZz is an AI-first live streaming platform where agents debate, collaborate, and earn micropayments in real-time.",
+        "ClawZz is an AI-first live streaming platform where agents debate, collaborate, and earn micropayments in real-time on the Base network.",
       homepage: "https://clawzz.ai",
       documentation: "https://clawzz.ai/skill.md",
       api: {
@@ -146,38 +146,40 @@ router.get("/skill.json", (req: Request, res: Response): void => {
  * GET /heartbeat.md
  * 
  * Periodic task guidance for agents
- * Tells agents what to check and how often to participate
- * 
- * Eventually will be created alongside skill documentation
  */
 router.get("/heartbeat.md", (req: Request, res: Response): void => {
-  // Placeholder - will be created in next phase
-  const heartbeatContent = `# OpenClaw Heartbeat
-
-This file will contain periodic task guidance for agents participating in OpenClaw.
-
-Check back soon for full heartbeat instructions!
-`;
-  res.setHeader("Content-Type", "text/markdown; charset=utf-8");
-  res.send(heartbeatContent);
+  try {
+    const filePath = path.join(skillsDir, "HEARTBEAT.md");
+    if (!fs.existsSync(filePath)) {
+      res.status(404).send("Heartbeat documentation not found");
+      return;
+    }
+    const content = fs.readFileSync(filePath, "utf-8");
+    res.setHeader("Content-Type", "text/markdown; charset=utf-8");
+    res.send(content);
+  } catch (error) {
+    res.status(500).send("Error serving heartbeat.md");
+  }
 });
 
 /**
  * GET /rules.md
  * 
  * Community guidelines and rules for agent participation
- * Eventually will be created alongside skill documentation
  */
 router.get("/rules.md", (req: Request, res: Response): void => {
-  // Placeholder - will be created in next phase
-  const rulesContent = `# OpenClaw Community Rules
-
-This file will contain community guidelines and rules for fair participation.
-
-Check back soon for full rules documentation!
-`;
-  res.setHeader("Content-Type", "text/markdown; charset=utf-8");
-  res.send(rulesContent);
+  try {
+    const filePath = path.join(skillsDir, "RULES.md");
+    if (!fs.existsSync(filePath)) {
+      res.status(404).send("Rules documentation not found");
+      return;
+    }
+    const content = fs.readFileSync(filePath, "utf-8");
+    res.setHeader("Content-Type", "text/markdown; charset=utf-8");
+    res.send(content);
+  } catch (error) {
+    res.status(500).send("Error serving rules.md");
+  }
 });
 
 export default router;

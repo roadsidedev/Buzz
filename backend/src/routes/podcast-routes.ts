@@ -33,8 +33,10 @@ import {
 import { podcastService, paymentService } from "../services/index.js";
 import { logger } from "../utils/logger.js";
 import { ValidationError, NotFoundError } from "../utils/errors.js";
+import { getCacheService } from "../services/cache-service.js";
 
 const router = Router();
+const cache = getCacheService();
 
 // ===================================================================
 // Podcast Management Endpoints
@@ -414,6 +416,91 @@ router.post(
   }),
 );
 
+/**
+ * POST /api/v1/episodes/:id/summarize
+ * Generate transcript summary for episode
+ *
+ * Calls orchestrator LLM to create concise summary (max 5 sentences)
+ * from the episode transcript. Result is cached in episode record.
+ *
+ * Request body:
+ *   - transcript: string (required) — Full episode transcript
+ *
+ * Response: 200 OK
+ *   {
+ *     success: true,
+ *     data: {
+ *       episode: PodcastEpisode,
+ *       summary: string
+ *     }
+ *   }
+ */
+router.post(
+  "/episode/:id/summarize",
+  requireAuth,
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const agent = req.agent!;
+    const { id: episodeId } = req.params;
+    const { transcript } = req.body;
+
+    // Validate transcript provided
+    if (!transcript || typeof transcript !== "string") {
+      res.status(400).json({
+        success: false,
+        error: {
+          code: "TRANSCRIPT_REQUIRED",
+          message: "Transcript text is required",
+          statusCode: 400,
+        },
+      });
+      return;
+    }
+
+    // Verify episode exists and agent owns it
+    const episode = await podcastService.getEpisodeById(episodeId);
+    const podcast = await podcastService.getPodcastById(episode.podcastId);
+
+    if (podcast.agentId !== agent.agentId) {
+      res.status(403).json({
+        success: false,
+        error: {
+          code: "UNAUTHORIZED",
+          message: "Only podcast creator can generate summaries",
+          statusCode: 403,
+        },
+      });
+      return;
+    }
+
+    // Generate summary via orchestrator
+    const summary = await podcastService.generateTranscriptSummary(
+      episodeId,
+      transcript,
+    );
+
+    // Update episode with summary
+    const updated = await podcastService.updateEpisodeSummary(
+      episodeId,
+      summary,
+    );
+
+    logger.info("Episode summary generated via API", {
+      episodeId,
+      podcastId: podcast.id,
+      agentId: agent.agentId,
+      summaryLength: summary.length,
+    });
+
+    res.json({
+      success: true,
+      data: {
+        episode: updated,
+        summary,
+      },
+    });
+  }),
+);
+
 // ===================================================================
 // Discovery Endpoints
 // ===================================================================
@@ -434,7 +521,8 @@ router.post(
  *     data: {
  *       podcasts: Podcast[],
  *       category?: string,
- *       limit: number
+ *       limit: number,
+ *       cached?: boolean
  *     }
  *   }
  */
@@ -444,16 +532,32 @@ router.get(
     const limit = Math.min(parseInt(req.query.limit as string) || 20, 100);
     const category = (req.query.category as string) || undefined;
 
-    // TODO: Check Redis cache first
-    // const cacheKey = `trending:podcasts:${category || 'all'}`;
-    // const cached = await redis.get(cacheKey);
-    // if (cached) return res.json(JSON.parse(cached));
-
-    // Get trending podcasts
-    const podcasts = await podcastService.getTrendingPodcasts(limit, category);
-
-    // TODO: Cache result for 5 minutes
-    // await redis.setex(cacheKey, 300, JSON.stringify({ ... }));
+    // Initialize cache and check for cached result
+    await cache.initialize();
+    const cacheKey = `trending:podcasts:${category || "all"}:${limit}`;
+    
+    let cached = false;
+    let podcasts: Podcast[] | null = await cache.get<Podcast[]>(cacheKey);
+    
+    if (podcasts) {
+      cached = true;
+      logger.info("Trending podcasts served from cache", {
+        cacheKey,
+        count: podcasts.length,
+      });
+    } else {
+      // Get trending podcasts from database
+      podcasts = await podcastService.getTrendingPodcasts(limit, category);
+      
+      // Cache result for 5 minutes (300 seconds)
+      await cache.set(cacheKey, podcasts, 300);
+      
+      logger.info("Trending podcasts cached", {
+        cacheKey,
+        count: podcasts.length,
+        ttl: 300,
+      });
+    }
 
     res.json({
       success: true,
@@ -461,6 +565,7 @@ router.get(
         podcasts,
         category,
         limit,
+        cached,
       },
     });
   }),

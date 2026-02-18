@@ -6,15 +6,13 @@
  */
 
 import { Request, Response, NextFunction } from "express";
-import { AuthService } from "@/services/auth-service";
-import { JWTPayload, InvalidTokenError } from "@/types/auth";
-import logger from "@/utils/logger";
-import { db } from "@/config/database";
+import { AuthService } from "../services/auth-service.js";
+import { JWTPayload, InvalidTokenError } from "../types/auth.js";
+import { logger } from "../utils/logger.js";
+import { extractToken } from "./http-only-cookies.js";
 
 /**
  * Extend Express Request to include authenticated user
- * 
- * This allows protected routes to access req.user
  */
 declare global {
   namespace Express {
@@ -24,44 +22,16 @@ declare global {
   }
 }
 
-const authService = new AuthService(db);
-
-/**
- * Extract Bearer token from Authorization header
- * 
- * Expected format: "Bearer <token>"
- * 
- * @param req - Express request
- * @returns Token string or null if not present
- */
-function extractBearerToken(req: Request): string | null {
-  const authHeader = req.headers.authorization;
-
-  if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    return null;
-  }
-
-  return authHeader.substring(7); // Remove "Bearer " prefix
-}
+// Injected via factory or singleton
+const authService = new AuthService();
 
 /**
  * Validate JWT token and attach user to request
  * 
  * Middleware that:
- * 1. Extracts Bearer token from Authorization header
+ * 1. Extracts token from __Host-accessToken cookie or Authorization header
  * 2. Validates JWT signature and expiration
  * 3. Attaches decoded payload to req.user
- * 4. Calls next() if valid
- * 5. Returns 401 if invalid/missing
- * 
- * Usage:
- * ```
- * // Protect all routes under /api/v1
- * app.use("/api/v1", validateJWT);
- * 
- * // Protect specific route
- * router.get("/protected", validateJWT, handler);
- * ```
  * 
  * @param req - Express request
  * @param res - Express response
@@ -73,7 +43,7 @@ export const validateJWT = (
   next: NextFunction
 ): void => {
   try {
-    const token = extractBearerToken(req);
+    const token = extractToken(req);
 
     if (!token) {
       logger.warn("Missing authorization token", {
@@ -81,8 +51,12 @@ export const validateJWT = (
         method: req.method,
       });
       res.status(401).json({
-        error: "No authorization token provided",
-        code: "MISSING_TOKEN",
+        success: false,
+        error: {
+          code: "MISSING_TOKEN",
+          message: "No authorization token provided",
+          statusCode: 401,
+        },
       });
       return;
     }
@@ -92,7 +66,7 @@ export const validateJWT = (
     req.user = payload;
 
     logger.debug("Token validated", {
-      userId: payload.sub,
+      userId: payload.agentId,
       path: req.path,
       method: req.method,
     });
@@ -105,92 +79,32 @@ export const validateJWT = (
         path: req.path,
       });
       res.status(401).json({
-        error: err.message,
-        code: err.code,
+        success: false,
+        error: {
+          code: err.code,
+          message: err.message,
+          statusCode: 401,
+        },
       });
     } else {
       logger.error("Auth validation failed", {
-        error: err,
+        error: err instanceof Error ? err.message : String(err),
         path: req.path,
       });
-      res.status(500).json({ error: "Internal server error" });
+      res.status(500).json({
+        success: false,
+        error: {
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Authentication validation failed",
+          statusCode: 500,
+        },
+      });
     }
   }
 };
 
 /**
- * Require specific role(s) for endpoint access
- * 
- * Middleware that restricts access to users with specific roles.
- * Must be used AFTER validateJWT middleware.
- * 
- * Usage:
- * ```
- * // Require admin role
- * router.delete("/users/:id", validateJWT, requireRole(["admin"]), handler);
- * 
- * // Require admin or moderator
- * router.post("/moderate", validateJWT, requireRole(["admin", "moderator"]), handler);
- * ```
- * 
- * @param allowedRoles - Array of roles that are allowed
- * @returns Middleware function
- */
-export const requireRole = (allowedRoles: string[]) => {
-  return (req: Request, res: Response, next: NextFunction): void => {
-    // Check if user is authenticated
-    if (!req.user) {
-      logger.warn("Unauthenticated access attempt", {
-        path: req.path,
-        method: req.method,
-      });
-      res.status(401).json({
-        error: "Not authenticated",
-        code: "UNAUTHENTICATED",
-      });
-      return;
-    }
-
-    // Check if user has required role
-    if (!allowedRoles.includes(req.user.role)) {
-      logger.warn("Unauthorized role access", {
-        userId: req.user.sub,
-        role: req.user.role,
-        requiredRoles: allowedRoles,
-        path: req.path,
-      });
-      res.status(403).json({
-        error: "Insufficient permissions",
-        code: "FORBIDDEN",
-      });
-      return;
-    }
-
-    logger.debug("Role authorized", {
-      userId: req.user.sub,
-      role: req.user.role,
-      path: req.path,
-    });
-
-    next();
-  };
-};
-
-/**
  * Optional authentication middleware
- * 
- * Attaches user to request if token present, but does NOT require it.
- * Useful for endpoints that work both authenticated and unauthenticated.
- * 
- * Usage:
- * ```
- * // Get public data (optionally personalized if authenticated)
- * router.get("/content", optionalAuth, handler);
- * ```
- * 
- * @param req - Express request
- * @param res - Express response
- * @param next - Express next
  */
 export const optionalAuth = (
   req: Request,
@@ -198,25 +112,35 @@ export const optionalAuth = (
   next: NextFunction
 ): void => {
   try {
-    const token = extractBearerToken(req);
+    const token = extractToken(req);
 
     if (token) {
       try {
         req.user = authService.validateAccessToken(token);
         logger.debug("Optional auth: user authenticated", {
-          userId: req.user.sub,
+          userId: req.user.agentId,
         });
       } catch (err) {
         // Token invalid but that's okay - just continue without user
         logger.debug("Optional auth: invalid token ignored", {
-          error: err,
+          error: err instanceof Error ? err.message : String(err),
         });
       }
     }
 
     next();
   } catch (err) {
-    logger.error("Optional auth failed", { error: err });
+    logger.error("Optional auth failed", {
+      error: err instanceof Error ? err.message : String(err)
+    });
     next();
   }
+};
+
+/**
+ * Legacy support/helper for generating tokens
+ * (Move to AuthService in production)
+ */
+export const generateToken = (payload: any): string => {
+  return authService.generateAccessToken(payload);
 };

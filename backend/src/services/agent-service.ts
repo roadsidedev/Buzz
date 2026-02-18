@@ -9,7 +9,7 @@ import { ValidationError, NotFoundError } from "../utils/errors.js";
 import { logger } from "../utils/logger.js";
 import { agentRepository } from "../repositories/index.js";
 import {
-  createERC8004VerificationService,
+  getERC8004Service,
   type ERC8004VerificationInput,
 } from "./erc8004-verification-service.js";
 
@@ -31,11 +31,7 @@ interface VerifyAgentInput {
  * Handles agent creation, verification, and profile management
  */
 export class AgentService {
-  private erc8004Service = createERC8004VerificationService(
-    process.env.ERC8004_REGISTRY || "0x0000000000000000000000000000000000000000",
-    process.env.ERC8004_RPC_URL || "https://eth-mainnet.g.alchemy.com/v2/demo",
-    parseInt(process.env.ERC8004_CHAIN_ID || "1")
-  );
+  private erc8004Service = getERC8004Service();
 
   /**
    * Create a new agent
@@ -62,12 +58,40 @@ export class AgentService {
       erc8004_address: input.erc8004Address,
     });
 
-    logger.info("Agent created", {
+    logger.info("Agent created in database", {
       agentId: agent.id,
       name: agent.name,
     });
 
+    // Attempt on-chain registration if signer is available
+    // This is non-blocking to ensure API responsiveness, but logs errors
+    this.registerAgentOnChain(agent.id, input.erc8004Address).catch((err) => {
+      logger.error("Background on-chain registration failed", {
+        agentId: agent.id,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    });
+
     return agent;
+  }
+
+  /**
+   * Register agent identity on-chain via ERC-8004
+   */
+  async registerAgentOnChain(agentId: string, walletAddress: string): Promise<string | null> {
+    try {
+      const txHash = await this.erc8004Service.registerAgent(agentId, walletAddress);
+      logger.info("Agent registered on-chain", { agentId, txHash });
+      return txHash;
+    } catch (err) {
+      // If service is not initialized with signer (e.g. dev mode without private key),
+      // we log a warning but don't fail the operation.
+      if (err instanceof Error && err.message.includes("signer")) {
+        logger.warn("Skipping on-chain registration: No signer configured", { agentId });
+        return null;
+      }
+      throw err;
+    }
   }
 
   /**

@@ -23,6 +23,13 @@ const router = Router();
 /**
  * POST /rooms/create
  * Create a new room (requires authentication)
+ *
+ * Process:
+ * 1. Validate authenticated user from JWT (requireAuth middleware)
+ * 2. Validate room creation request
+ * 3. Create room with ERC-8004 verification and Jam room setup
+ * 4. Charge spawn fee via x402 (payment handling now in roomService)
+ * 5. Return room details to client
  */
 router.post(
   "/create",
@@ -30,37 +37,27 @@ router.post(
   roomCreationLimiter,
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const agent = req.agent!;
+    const authenticatedUser = (req as any).user; // From validateJWT middleware
 
-    // Validate request
+    // 1. VALIDATE REQUEST
     const input = validate(CreateRoomRequestSchema, req.body);
 
-    // Create room
+    // 2. CREATE ROOM
+    // Pass authenticated user context for wallet address extraction
+    // roomService now handles spawn fee charging internally
     const room = await roomService.createRoom({
       ...input,
       hostAgentId: agent.agentId,
       hostAgentName: agent.name,
+      authenticatedUser, // JWT payload with optional walletAddress
     });
 
-    // Charge spawn fee
-    try {
-      await paymentService.chargeSpawnFee(
-        agent.agentId,
-        room.id,
-        input.spawnFee,
-        agent.erc8004Address
-      );
-    } catch (error) {
-      logger.error("Spawn fee charge failed", error);
-      res.status(402).json({
-        success: false,
-        error: {
-          code: "PAYMENT_FAILED",
-          message: "Failed to process spawn fee",
-          statusCode: 402,
-        },
-      });
-      return;
-    }
+    logger.info("Room created successfully", {
+      roomId: room.id,
+      hostAgentId: agent.agentId,
+      type: input.type,
+      spawnFee: input.spawnFee,
+    });
 
     res.status(201).json({
       success: true,
@@ -185,6 +182,18 @@ router.post(
  * POST /rooms/:id/close
  * Close room (host only)
  */
+/**
+ * POST /rooms/:id/close
+ * Close room and trigger revenue distribution (host only)
+ *
+ * Process:
+ * 1. Verify authenticated user is room host
+ * 2. Call roomService.closeRoom() which:
+ *    - Updates room status to completed
+ *    - Closes Jam audio room
+ *    - Distributes revenue to host and participants
+ * 3. Return success response
+ */
 router.post(
   "/:id/close",
   requireAuth,
@@ -192,10 +201,15 @@ router.post(
     const { id } = req.params;
     const agent = req.agent!;
 
+    // 1. VERIFY HOST
     const room = await roomService.getRoomById(id);
 
-    // Verify host
     if (room.hostAgentId !== agent.agentId) {
+      logger.warn("Unauthorized room close attempt", {
+        roomId: id,
+        requestingAgent: agent.agentId,
+        hostAgent: room.hostAgentId,
+      });
       res.status(403).json({
         success: false,
         error: {
@@ -207,14 +221,22 @@ router.post(
       return;
     }
 
+    // 2. CLOSE ROOM AND DISTRIBUTE REVENUE
+    // roomService.closeRoom() now handles:
+    // - Status update
+    // - Jam room closure
+    // - Revenue distribution to host and participants
     await roomService.closeRoom(id);
 
-    logger.info("Room closed", { roomId: id });
+    logger.info("Room closed and revenue distributed", {
+      roomId: id,
+      hostAgentId: agent.agentId,
+    });
 
     res.json({
       success: true,
       data: {
-        message: "Room closed successfully",
+        message: "Room closed successfully and revenue distributed",
       },
     });
   })

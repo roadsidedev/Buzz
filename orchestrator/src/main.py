@@ -1,13 +1,14 @@
 """FastAPI application entry point."""
 
 import logging
+import sys
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .config.settings import settings
-from .api.routes import router
+from .api.routes import router, get_orchestration_service
 from .clients.api_gateway_client import close_api_gateway_client, get_api_gateway_client
 
 # Configure logging
@@ -18,26 +19,83 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+def validate_environment() -> None:
+    """
+    Validate required environment variables on startup.
+    
+    Raises:
+        RuntimeError: If critical configuration is missing
+    """
+    required_vars = {
+        "ANTHROPIC_API_KEY": "Claude API key for message scoring",
+        "REDIS_URL": "Redis connection for room state",
+    }
+    
+    missing = []
+    for var, description in required_vars.items():
+        value = getattr(settings, var, None)
+        if not value:
+            missing.append(f"  • {var}: {description}")
+    
+    if missing:
+        logger.error("Missing required environment variables:")
+        for msg in missing:
+            logger.error(msg)
+        raise RuntimeError(
+            f"Missing {len(missing)} required environment variables. "
+            "Check logs for details."
+        )
+    
+    logger.info("Environment validation passed")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifecycle management."""
     logger.info("Orchestrator service starting")
+    
+    # 1. VALIDATE ENVIRONMENT
+    try:
+        validate_environment()
+    except RuntimeError as e:
+        logger.error(f"Environment validation failed: {e}")
+        sys.exit(1)
 
-    # Initialize API Gateway client
-    api_gateway = get_api_gateway_client(settings.API_GATEWAY_BASE_URL)
+    # 2. INITIALIZE ORCHESTRATION SERVICE
+    logger.info("Initializing orchestration service...")
+    try:
+        orchestration_service = get_orchestration_service()
+        await orchestration_service.initialize()
+        logger.info("Orchestration service initialized successfully")
+    except Exception as e:
+        logger.error(f"Failed to initialize orchestration service: {e}")
+        sys.exit(1)
 
-    # Check API Gateway health
-    gateway_healthy = await api_gateway.health_check()
-    if gateway_healthy:
-        logger.info("API Gateway is healthy")
-    else:
-        logger.warning("API Gateway health check failed - will retry on next turn")
+    # 3. INITIALIZE API GATEWAY CLIENT
+    logger.info("Initializing API Gateway client...")
+    try:
+        api_gateway = get_api_gateway_client(settings.API_GATEWAY_BASE_URL)
+        gateway_healthy = await api_gateway.health_check()
+        if gateway_healthy:
+            logger.info("API Gateway is healthy")
+        else:
+            logger.warning("API Gateway health check failed - will retry on next turn")
+    except Exception as e:
+        logger.error(f"API Gateway initialization warning: {e}")
+        # Don't exit - gateway may become available during runtime
 
+    logger.info("Orchestrator service startup complete")
     yield
 
-    # Cleanup
-    await close_api_gateway_client()
+    # CLEANUP
     logger.info("Orchestrator service shutting down")
+    try:
+        await close_api_gateway_client()
+        logger.info("API Gateway client closed")
+    except Exception as e:
+        logger.error(f"Error closing API Gateway client: {e}")
+    
+    logger.info("Orchestrator service shutdown complete")
 
 
 # Initialize FastAPI app

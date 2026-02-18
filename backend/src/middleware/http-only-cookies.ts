@@ -14,13 +14,21 @@
 import { Request, Response, NextFunction } from "express";
 
 /**
+ * Cookie names with __Host- prefix for maximum security
+ * Requires: HTTPS, path=/, and no Domain attribute
+ */
+export const ACCESS_TOKEN_COOKIE = "__Host-accessToken";
+export const REFRESH_TOKEN_COOKIE = "__Host-refreshToken";
+
+/**
  * Cookie options for secure token storage
  */
 export const tokenCookieOptions = {
   // Security flags
   httpOnly: true, // Prevent JavaScript access (XSS protection)
-  secure: process.env.NODE_ENV === "production", // HTTPS only in production
+  secure: true, // __Host- requires HTTPS (always set to true for production readiness)
   sameSite: "strict" as const, // Prevent CSRF attacks
+  path: "/", // Required for __Host-
 
   // Expiry
   maxAge: 3600 * 1000, // 1 hour for access token
@@ -29,28 +37,16 @@ export const tokenCookieOptions = {
 export const refreshTokenCookieOptions = {
   // Security flags
   httpOnly: true, // Prevent JavaScript access
-  secure: process.env.NODE_ENV === "production", // HTTPS only in production
+  secure: true, // __Host- requires HTTPS
   sameSite: "strict" as const, // Prevent CSRF attacks
+  path: "/", // Required for __Host-
 
   // Expiry
   maxAge: 7 * 24 * 3600 * 1000, // 7 days for refresh token
-
-  // Optional: separate path to reduce exposure
-  path: "/api/v1/auth/refresh",
 };
 
 /**
  * Set access token in httpOnly cookie
- *
- * @param res - Express response object
- * @param token - JWT token to store
- * @param expiresIn - Token expiry in seconds
- *
- * Example:
- * ```typescript
- * const token = jwt.sign(payload, secret, { expiresIn: "1h" });
- * setAccessTokenCookie(res, token, 3600);
- * ```
  */
 export function setAccessTokenCookie(
   res: Response,
@@ -59,21 +55,15 @@ export function setAccessTokenCookie(
 ): void {
   const options = {
     ...tokenCookieOptions,
-    maxAge: expiresIn * 1000, // Convert seconds to milliseconds
+    maxAge: expiresIn * 1000,
+    secure: process.env.NODE_ENV === "production", // Fallback for dev if not using HTTPS
   };
 
-  res.cookie("accessToken", token, options);
+  res.cookie(ACCESS_TOKEN_COOKIE, token, options);
 }
 
 /**
  * Set refresh token in httpOnly cookie
- *
- * Refresh tokens are stored separately with longer expiry
- * and restricted path for better security
- *
- * @param res - Express response object
- * @param token - JWT refresh token to store
- * @param expiresIn - Token expiry in seconds
  */
 export function setRefreshTokenCookie(
   res: Response,
@@ -82,30 +72,30 @@ export function setRefreshTokenCookie(
 ): void {
   const options = {
     ...refreshTokenCookieOptions,
-    maxAge: expiresIn * 1000, // Convert seconds to milliseconds
+    maxAge: expiresIn * 1000,
+    secure: process.env.NODE_ENV === "production", // Fallback for dev if not using HTTPS
   };
 
-  res.cookie("refreshToken", token, options);
+  res.cookie(REFRESH_TOKEN_COOKIE, token, options);
 }
 
 /**
  * Clear all auth cookies on logout
- *
- * @param res - Express response object
  */
 export function clearAuthCookies(res: Response): void {
-  res.clearCookie("accessToken", { httpOnly: true, sameSite: "strict" });
-  res.clearCookie("refreshToken", { httpOnly: true, sameSite: "strict", path: "/api/v1/auth/refresh" });
+  const commonOptions = {
+    httpOnly: true,
+    sameSite: "strict" as const,
+    path: "/",
+    secure: process.env.NODE_ENV === "production",
+  };
+
+  res.clearCookie(ACCESS_TOKEN_COOKIE, commonOptions);
+  res.clearCookie(REFRESH_TOKEN_COOKIE, commonOptions);
 }
 
 /**
- * Extract tokens from cookies (called by auth middleware)
- *
- * Express doesn't parse cookies by default; use cookie-parser middleware
- * @see https://expressjs.com/en/resources/middleware/cookie-parser.html
- *
- * @param req - Express request object (must have req.cookies populated)
- * @returns { accessToken, refreshToken } or null if not present
+ * Extract tokens from cookies
  */
 export function extractTokensFromCookies(
   req: Request
@@ -113,8 +103,8 @@ export function extractTokensFromCookies(
   const cookies = req.cookies || {};
 
   return {
-    accessToken: cookies.accessToken,
-    refreshToken: cookies.refreshToken,
+    accessToken: cookies[ACCESS_TOKEN_COOKIE],
+    refreshToken: cookies[REFRESH_TOKEN_COOKIE],
   };
 }
 

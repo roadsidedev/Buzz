@@ -36,15 +36,15 @@ function getEncryptionKey(): string {
  */
 export const ENCRYPTED_FIELDS = {
   agent: {
-    wallet_address: true,
+    erc8004_address: true,
     email_address: false, // Optional: encrypt email if needed
   },
   room: {
     // Room fields to encrypt (if any)
   },
   payment: {
-    transaction_hash: true,
-    payer_address: true,
+    blockchain_hash: true,
+    x402_transaction_id: true,
   },
   transcript: {
     // Transcript fields (optional)

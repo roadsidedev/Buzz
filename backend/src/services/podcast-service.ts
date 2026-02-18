@@ -794,6 +794,142 @@ export class PodcastService {
     }
   }
 
+  /**
+   * Generate a summary from episode transcript using orchestrator LLM
+   *
+   * Calls orchestrator service to create a concise summary
+   * of the episode transcript (max 5 sentences).
+   *
+   * @param episodeId - Episode ID
+   * @param transcript - Full episode transcript
+   * @returns Summary text (up to 500 characters)
+   * @throws NotFoundError if episode not found
+   * @throws PaymentError if LLM call fails
+   */
+  async generateTranscriptSummary(
+    episodeId: string,
+    transcript: string,
+  ): Promise<string> {
+    // Validate inputs
+    if (!episodeId || episodeId.trim().length === 0) {
+      throw new ValidationError("Episode ID required", {
+        field: "episodeId",
+        code: "EPISODE_ID_REQUIRED",
+      });
+    }
+
+    if (!transcript || transcript.trim().length === 0) {
+      throw new ValidationError("Transcript required", {
+        field: "transcript",
+        code: "TRANSCRIPT_REQUIRED",
+      });
+    }
+
+    try {
+      // Truncate transcript to ~5000 chars to avoid token explosion
+      const truncatedTranscript = transcript.substring(0, 5000);
+
+      logger.info("Generating transcript summary via orchestrator", {
+        episodeId,
+        transcriptLength: transcript.length,
+        truncatedLength: truncatedTranscript.length,
+      });
+
+      // Call orchestrator to generate summary
+      const summary = await this.orchestrator.generateSummary(
+        truncatedTranscript,
+      );
+
+      logger.info("Transcript summary generated", {
+        episodeId,
+        summaryLength: summary.length,
+      });
+
+      return summary;
+    } catch (err) {
+      logger.error("Failed to generate transcript summary", {
+        episodeId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+
+      // If orchestrator fails, return truncated transcript as fallback
+      if (transcript.length > 500) {
+        const truncated = transcript.substring(0, 500) + "...";
+        logger.warn("Using truncated transcript as summary fallback", {
+          episodeId,
+          fallbackLength: truncated.length,
+        });
+        return truncated;
+      }
+
+      throw new PaymentError(
+        "Failed to generate transcript summary",
+        err,
+      );
+    }
+  }
+
+  /**
+   * Update episode with generated summary
+   *
+   * Stores transcript summary in database after generation.
+   *
+   * @param episodeId - Episode ID
+   * @param summary - Generated summary text
+   * @returns Updated episode
+   */
+  async updateEpisodeSummary(
+    episodeId: string,
+    summary: string,
+  ): Promise<PodcastEpisode> {
+    if (!episodeId || !summary) {
+      throw new ValidationError("Episode ID and summary required", {
+        code: "INVALID_SUMMARY_UPDATE",
+      });
+    }
+
+    const now = new Date();
+
+    try {
+      const query = `
+        UPDATE podcast_episode
+        SET 
+          transcript = $1,
+          updated_at = $2
+        WHERE id = $3
+        RETURNING *;
+      `;
+
+      const result: QueryResult<any> = await this.db.query(query, [
+        summary,
+        now,
+        episodeId,
+      ]);
+
+      if (result.rows.length === 0) {
+        throw new NotFoundError("Episode not found", {
+          episodeId,
+          code: "EPISODE_NOT_FOUND",
+        });
+      }
+
+      const episode = this._rowToPodcastEpisode(result.rows[0]);
+
+      logger.info("Episode summary updated", {
+        episodeId,
+        summaryLength: summary.length,
+      });
+
+      return episode;
+    } catch (err) {
+      logger.error("Failed to update episode summary", {
+        episodeId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      throw err;
+    }
+  }
+
   // ===================================================================
   // Private Helper Methods
   // ===================================================================

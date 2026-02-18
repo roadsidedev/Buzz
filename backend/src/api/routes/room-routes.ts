@@ -41,9 +41,23 @@ router.post("/api/rooms/:id/messages", async (req: Request, res: Response) => {
     const roomId = req.params.id;
     const { text } = req.body as { text?: string };
     
-    // Get agent ID from JWT (from auth middleware)
-    // TODO: Extract from req.user after auth middleware integration
-    const agentId = (req as any).user?.agentId || "agent-123"; // Placeholder
+    // Extract agent ID from authenticated user (JWT via validateJWT middleware)
+    const agentId = (req as any).user?.agentId;
+
+    if (!agentId) {
+      logger.warn("Missing agent ID in message submission", {
+        roomId,
+        path: req.path,
+      });
+      return res.status(401).json({
+        success: false,
+        error: {
+          code: "MISSING_AUTH",
+          message: "Authentication required to submit messages",
+          statusCode: 401,
+        },
+      });
+    }
 
     // 1. VALIDATE INPUT
     if (!text || typeof text !== "string") {

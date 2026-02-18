@@ -6,6 +6,7 @@
 import type { Payment, PaymentStatus, PaymentType } from "../../common/types/index.js";
 import { query, queryOne } from "../config/database.js";
 import { logger } from "../utils/logger.js";
+import { encryptDatabaseField, decryptDatabaseField } from "../config/database-encryption-config.js";
 
 interface PaymentRow {
   id: string;
@@ -132,7 +133,7 @@ export class PaymentRepository {
   }
 
   /**
-   * Update payment status
+   * Update payment status with encrypted transaction info
    */
   async updateStatus(
     paymentId: string,
@@ -140,15 +141,18 @@ export class PaymentRepository {
     x402TransactionId?: string,
     blockchainHash?: string
   ): Promise<void> {
+    const encryptedTxId = encryptDatabaseField("payment", "x402_transaction_id", x402TransactionId);
+    const encryptedHash = encryptDatabaseField("payment", "blockchain_hash", blockchainHash);
+
     const text = `
       UPDATE payment
       SET status = $1, x402_transaction_id = COALESCE($2, x402_transaction_id), blockchain_hash = COALESCE($3, blockchain_hash), confirmed_at = CASE WHEN $1 = 'confirmed' THEN NOW() ELSE confirmed_at END, updated_at = NOW()
       WHERE id = $4
     `;
 
-    await query(text, [status, x402TransactionId || null, blockchainHash || null, paymentId]);
+    await query(text, [status, encryptedTxId || null, encryptedHash || null, paymentId]);
 
-    logger.info("Payment status updated", {
+    logger.info("Payment status updated with encrypted PII", {
       paymentId,
       status,
     });
@@ -173,9 +177,12 @@ export class PaymentRepository {
   }
 
   /**
-   * Map database row to Payment
+   * Map database row to Payment with decryption
    */
   private mapRowToPayment(row: PaymentRow): Payment {
+    const decryptedTxId = decryptDatabaseField("payment", "x402_transaction_id", row.x402_transaction_id);
+    const decryptedHash = decryptDatabaseField("payment", "blockchain_hash", row.blockchain_hash);
+
     return {
       id: row.id,
       agentId: row.agent_id,
@@ -183,7 +190,8 @@ export class PaymentRepository {
       type: row.type as PaymentType,
       amount: row.amount,
       status: row.status as PaymentStatus,
-      x402TransactionId: row.x402_transaction_id || undefined,
+      x402TransactionId: decryptedTxId || row.x402_transaction_id || undefined,
+      blockchainHash: decryptedHash || row.blockchain_hash || undefined,
       createdAt: new Date(row.created_at),
       confirmedAt: row.confirmed_at ? new Date(row.confirmed_at) : undefined,
       completedAt: row.completed_at ? new Date(row.completed_at) : undefined,

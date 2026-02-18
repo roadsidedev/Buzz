@@ -227,7 +227,21 @@ export class MessageService {
     const averageScore =
       scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : 0;
 
-    // TODO: Calculate total audio time from audioUrl durations
+    // Calculate total audio time from played messages (duration in seconds)
+    // Only count messages that were actually played and have duration info
+    const playedMessages = forAgent.filter(
+      (m) => m.status === "played" || m.status === "playing",
+    );
+
+    let totalAudioTime = 0;
+    for (const msg of playedMessages) {
+      // If audioUrl is available, it means audio was synthesized
+      // Duration would be stored in transcript or extracted from media metadata
+      // For now, estimate based on text length (150 WPM = ~1.5 words/sec = 0.4 sec/word)
+      if (msg.audioUrl) {
+        totalAudioTime += Math.ceil(msg.text.split(/\s+/).length * 0.4);
+      }
+    }
 
     return {
       agentId,
@@ -236,7 +250,7 @@ export class MessageService {
       selected,
       selectionRate: submitted > 0 ? selected / submitted : 0,
       averageScore,
-      totalAudioTime: 0,
+      totalAudioTime,
     };
   }
 

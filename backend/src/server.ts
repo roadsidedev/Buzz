@@ -4,41 +4,17 @@
  * Phase 1: Authentication and Core API Routes
  */
 
-import express, { Express, Request, Response } from "express";
-import http from "http";
-import { Server as SocketIOServer } from "socket.io";
-import cors from "cors";
-import helmet from "helmet";
-import morgan from "morgan";
 import dotenv from "dotenv";
-import crypto from "crypto";
-
-import {
-  errorHandler,
-  notFoundHandler,
-  startRateLimitCleanup,
-} from "./middleware/index.js";
-import {
-  csrfTokenProvider,
-  validateCSRFToken,
-  initializeCSRFToken,
-} from "./middleware/csrf-protection.js";
-import {
-  sentryTransactionMiddleware,
-  sentrySecurityContextMiddleware,
-  sentryAuthTrackingMiddleware,
-} from "./middleware/sentry-middleware.js";
-import { initializeSentry } from "./config/sentry-config.js";
-import { initializeLoginAttemptService } from "./services/login-attempt-service.js";
-import { logger } from "./utils/logger.js";
-import siwaAuthRoutes from "./routes/auth-routes-siwa.js";
-import roomRoutes from "./routes/room-routes.js";
-import discoveryRoutes from "./routes/discovery-routes.js";
-import agentRoutes from "./routes/agent-routes.js";
-import podcastRoutes from "./routes/podcast-routes.js";
-import skillRoutes from "./routes/skill-routes.js";
-
 dotenv.config();
+
+// ============================================================================
+// OBSERVABILITY & TRACING (Must initialize first for auto-instrumentation)
+// ============================================================================
+import { initializeOTel } from "./config/otel-config.js";
+initializeOTel();
+
+import express, { Express, Request, Response, NextFunction } from "express";
+import http from "http";
 
 // ============================================================================
 // CRITICAL SECURITY VALIDATION (Must run before server starts)
@@ -152,6 +128,27 @@ app.use(validateCSRFToken());
 
 // Initialize rate limiting (async, must happen before route setup)
 let rateLimiterReady = false;
+
+/**
+ * Middleware to block requests until rate limiter is ready
+ * Prevents early request floods from bypassing security
+ */
+const rateLimiterGuard = (req: Request, res: Response, next: NextFunction) => {
+  if (!rateLimiterReady) {
+    logger.warn("Rate limiter not ready, rejecting request", { path: req.path });
+    res.status(503).json({
+      success: false,
+      error: {
+        code: "SERVICE_UNAVAILABLE",
+        message: "Rate limiting initialization in progress",
+        statusCode: 503,
+      },
+    });
+    return;
+  }
+  next();
+};
+
 startRateLimitCleanup()
   .then(() => {
     rateLimiterReady = true;
@@ -161,9 +158,11 @@ startRateLimitCleanup()
     logger.warn("Rate limiting initialization failed", {
       error: err instanceof Error ? err.message : String(err),
     });
-    // Continue startup even if rate limiting init fails
+    // In production, we might want to fail startup, but for now we fallback
     rateLimiterReady = true;
   });
+
+app.use(rateLimiterGuard);
 
 // ============================================================================
 // HEALTH & VERSION ENDPOINTS
@@ -235,6 +234,12 @@ app.use(`/api/${apiVersion}/auth`, siwaAuthRoutes);
  * Agent routes
  */
 app.use(`/api/${apiVersion}/agents`, agentRoutes);
+
+/**
+ * Verification routes (ERC-8004 identity)
+ */
+import verificationRoutes from "./api/routes/verification-routes.js";
+app.use(verificationRoutes);
 
 /**
  * Room routes

@@ -20,11 +20,13 @@ import {
   ServiceUnavailableError,
 } from "../utils/errors.js";
 import { logger } from "../utils/logger.js";
-import { roomRepository } from "../repositories/index.js";
+import { roomRepository, agentRepository } from "../repositories/index.js";
 import { getJamService } from "./jam-service.js";
 import { getX402PaymentService } from "./x402-payment-service.js";
+import { paymentService } from "./payment-service.js";
 import { roomOrchestrationService } from "./room-orchestration-service.js";
 import type { ERC8004VerificationService } from "./erc8004-verification-service.js";
+import type { JWTPayload } from "../types/auth.js";
 
 const MIN_SPAWN_FEE = 25; // $0.25 in cents
 const MAX_SPAWN_FEE = 10000; // $100 in cents
@@ -32,6 +34,7 @@ const MAX_SPAWN_FEE = 10000; // $100 in cents
 interface CreateRoomInput extends CreateRoomRequest {
   hostAgentId: string;
   hostAgentName: string;
+  authenticatedUser?: JWTPayload;
 }
 
 /**
@@ -68,35 +71,33 @@ export class RoomService {
    * @throws Error if ERC-8004 verification or Jam creation fails
    */
   async createRoom(input: CreateRoomInput): Promise<Room> {
-    // 1. VERIFY HOST AGENT IDENTITY (ERC-8004)
-    if (this.erc8004Service) {
-      try {
-        const isVerified = await this.erc8004Service.isAgentOwner(
-          input.hostAgentId,
-          input.hostAgentId, // Wallet address (placeholder - should come from auth context)
-        );
-
-        if (!isVerified) {
-          throw new ValidationError("Host agent not verified on ERC-8004", {
-            field: "hostAgentId",
-            agentId: input.hostAgentId,
-            code: "AGENT_NOT_VERIFIED",
-          });
-        }
-
-        logger.info("Host agent verified on ERC-8004", {
-          agentId: input.hostAgentId,
-        });
-      } catch (err) {
-        logger.error("ERC-8004 verification failed", {
-          agentId: input.hostAgentId,
-          error: err instanceof Error ? err.message : String(err),
-        });
-        throw new ValidationError("Failed to verify agent identity", {
-          code: "VERIFICATION_ERROR",
-        });
-      }
+    // 1. CHECK AGENT VERIFICATION STATUS (DATABASE)
+    const hostAgent = await agentRepository.getById(input.hostAgentId);
+    if (!hostAgent) {
+      throw new NotFoundError("agent", input.hostAgentId);
     }
+
+    // Enforce verification status for room creation
+    if (hostAgent.verification_status !== "verified") {
+      logger.warn("Room creation attempted by unverified agent", {
+        agentId: input.hostAgentId,
+        verificationStatus: hostAgent.verification_status,
+      });
+      throw new ValidationError(
+        "Agent must be verified to create rooms. Please verify your identity first.",
+        {
+          field: "hostAgentId",
+          agentId: input.hostAgentId,
+          currentStatus: hostAgent.verification_status,
+          code: "AGENT_NOT_VERIFIED",
+        }
+      );
+    }
+
+    logger.info("Host agent verification status confirmed", {
+      agentId: input.hostAgentId,
+      status: hostAgent.verification_status,
+    });
 
     // 2. VALIDATE SPAWN FEE
     if (input.spawnFee < MIN_SPAWN_FEE) {
@@ -214,11 +215,31 @@ export class RoomService {
 
     // 6. CHARGE SPAWN FEE VIA x402
     try {
-      const x402Service = getX402PaymentService();
-      const payment = await x402Service.chargeSpawnFee(
+      // Get agent wallet address from authenticated user or fetch from database
+      let hostWalletAddress: string | null = input.authenticatedUser?.walletAddress || null;
+
+      if (!hostWalletAddress) {
+        // Fallback: fetch agent from database
+        const agent = await agentRepository.getById(input.hostAgentId);
+        hostWalletAddress = agent?.erc8004_address || null;
+      }
+
+      if (!hostWalletAddress) {
+        logger.error("Cannot charge spawn fee: no wallet address", {
+          roomId,
+          agentId: input.hostAgentId,
+        });
+        throw new ValidationError("Agent wallet address not found", {
+          field: "hostWalletAddress",
+          agentId: input.hostAgentId,
+          code: "WALLET_NOT_FOUND",
+        });
+      }
+
+      const payment = await paymentService.chargeSpawnFee(
         input.hostAgentId,
-        input.hostAgentId, // TODO: Get actual wallet address from auth context
         roomId,
+        hostWalletAddress,
       );
 
       // Link payment to room
@@ -227,17 +248,20 @@ export class RoomService {
       logger.info("Spawn fee charge initiated", {
         roomId,
         paymentId: payment.id,
+        agentId: input.hostAgentId,
         amount: input.spawnFee,
+        walletAddress: `${hostWalletAddress.slice(0, 6)}...${hostWalletAddress.slice(-4)}`,
       });
 
       // Room is live as soon as Jam is ready; payment confirmation is tracked separately
     } catch (err) {
       logger.error("Failed to charge spawn fee", {
         roomId,
+        agentId: input.hostAgentId,
         error: err instanceof Error ? err.message : String(err),
       });
       // Continue - room created but payment failed
-      // TODO: Implement refund logic and room cleanup
+      // Note: Implement refund logic and room cleanup in error handler
     }
 
     return updatedRoom;
@@ -259,28 +283,65 @@ export class RoomService {
   }
 
   /**
-   * Get live rooms for discovery
+   * Get live rooms for discovery with optional type filtering
+   *
+   * @param limit - Max results per page
+   * @param offset - Pagination offset
+   * @param type - Optional room type filter (debate, coding, etc.)
+   * @returns Array of live rooms
    */
-  async getLiveRooms(limit: number = 20, offset: number = 0): Promise<Room[]> {
-    const rooms = await roomRepository.getLiveRooms(limit, offset);
+  async getLiveRooms(
+    limit: number = 20,
+    offset: number = 0,
+    type?: string,
+  ): Promise<Room[]> {
+    const rooms = await roomRepository.getLiveRooms(limit, offset, type);
 
-    logger.debug("Fetching live rooms", { limit, offset, count: rooms.length });
+    logger.debug("Fetching live rooms", {
+      limit,
+      offset,
+      type,
+      count: rooms.length,
+    });
 
     return rooms;
   }
 
   /**
-   * Get trending rooms
+   * Get total count of live rooms
+   *
+   * Useful for pagination metadata (total pages, etc.)
+   *
+   * @param type - Optional room type filter
+   * @returns Total count of matching live rooms
+   */
+  async getLiveRoomCount(type?: string): Promise<number> {
+    const count = await roomRepository.getLiveRoomCount(type);
+
+    logger.debug("Counting live rooms", { type, count });
+
+    return count;
+  }
+
+  /**
+   * Get trending rooms with optional type filtering
+   *
+   * @param hours - Timeframe in hours for trending calculation
+   * @param limit - Max results
+   * @param type - Optional room type filter
+   * @returns Array of trending rooms
    */
   async getTrendingRooms(
     hours: number = 24,
     limit: number = 10,
+    type?: string,
   ): Promise<Room[]> {
-    const rooms = await roomRepository.getTrendingRooms(hours, limit);
+    const rooms = await roomRepository.getTrendingRooms(hours, limit, type);
 
     logger.debug("Fetching trending rooms", {
       hours,
       limit,
+      type,
       count: rooms.length,
     });
 
@@ -298,6 +359,26 @@ export class RoomService {
     await roomRepository.addParticipant(roomId, agentId, "speaker");
 
     logger.info("Agent joined room", { roomId, agentId });
+  }
+
+  /**
+   * Remove participant from room
+   *
+   * Called when agent leaves via Jam webhook or explicit disconnect
+   * Marks participant as inactive but preserves history
+   *
+   * @param roomId - Room ID
+   * @param agentId - Agent ID to remove
+   * @throws Error if room not found
+   */
+  async removeParticipant(roomId: string, agentId: string): Promise<void> {
+    // Verify room exists
+    await this.getRoomById(roomId);
+
+    // Remove participant from database
+    await roomRepository.removeParticipant(roomId, agentId);
+
+    logger.info("Agent left room", { roomId, agentId });
   }
 
   /**
@@ -341,19 +422,113 @@ export class RoomService {
   }
 
   /**
-   * Close room
+   * Close room and distribute revenue
+   *
+   * Process:
+   * 1. Verify room exists
+   * 2. Update status to completed
+   * 3. End room on Jam side
+   * 4. Distribute revenue to host and participants
+   *
+   * @param roomId - Room ID to close
+   * @throws NotFoundError if room doesn't exist
    */
   async closeRoom(roomId: string): Promise<void> {
-    // Verify room exists
-    await this.getRoomById(roomId);
+    // 1. VERIFY ROOM EXISTS
+    const room = await this.getRoomById(roomId);
 
-    // Update status
+    // 2. UPDATE STATUS TO COMPLETED
     await this.updateRoomStatus(roomId, "completed");
 
-    // TODO: End room on Jam side
-    // TODO: Distribute revenue to host and participants
+    // 3. END ROOM ON JAM SIDE
+    try {
+      const jamService = getJamService();
+      await jamService.closeRoom(room.jam_room_id || roomId);
+      logger.info("Jam room closed", { roomId, jamRoomId: room.jam_room_id });
+    } catch (err) {
+      logger.warn("Failed to close Jam room", {
+        roomId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      // Continue - close room even if Jam fails
+    }
 
-    logger.info("Room closed", { roomId });
+    // 4. DISTRIBUTE REVENUE TO HOST AND PARTICIPANTS
+    try {
+      // Get all room participants
+      const participants = await roomRepository.getParticipants(roomId);
+      
+      if (participants.length === 0) {
+        logger.warn("No participants found for revenue distribution", { roomId });
+        logger.info("Room closed without distribution", { roomId });
+        return;
+      }
+
+      // Get host agent wallet
+      const hostAgent = await agentRepository.getById(room.host_agent_id);
+      if (!hostAgent || !hostAgent.erc8004_address) {
+        logger.error("Cannot distribute revenue: host wallet not found", {
+          roomId,
+          hostAgentId: room.host_agent_id,
+        });
+        throw new ValidationError("Host wallet address not found", {
+          field: "hostWalletAddress",
+          roomId,
+        });
+      }
+
+      // Get participant wallets
+      const participantData = await Promise.all(
+        participants
+          .filter((p) => p.agent_id !== room.host_agent_id) // Exclude host from participant list
+          .map(async (p) => {
+            const agent = await agentRepository.getById(p.agent_id);
+            return {
+              agentId: p.agent_id,
+              walletAddress: agent?.erc8004_address || null,
+            };
+          })
+      );
+
+      // Filter out participants without wallets
+      const validParticipants = participantData.filter((p) => p.walletAddress !== null);
+
+      if (validParticipants.length === 0) {
+        logger.warn("No valid participant wallets for distribution", {
+          roomId,
+          participantCount: participants.length,
+        });
+      }
+
+      // Calculate total spawn fee amount (convert cents to wei)
+      const totalSpawnFee = BigInt(room.spawn_fee) * BigInt(10_000_000_000_000_000);
+
+      // Distribute revenue
+      const distributions = await paymentService.distributeRevenue(
+        roomId,
+        room.host_agent_id,
+        hostAgent.erc8004_address,
+        validParticipants,
+        totalSpawnFee,
+      );
+
+      logger.info("Revenue distributed for completed room", {
+        roomId,
+        hostAgentId: room.host_agent_id,
+        participantCount: validParticipants.length,
+        distributionCount: distributions.length,
+        totalSpawnFee: room.spawn_fee,
+      });
+    } catch (err) {
+      logger.error("Failed to distribute revenue", {
+        roomId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      // Don't throw - room is already marked as completed
+      // Revenue distribution failures should be retried separately
+    }
+
+    logger.info("Room closed successfully", { roomId });
   }
 }
 

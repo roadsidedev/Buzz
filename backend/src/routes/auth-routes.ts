@@ -12,6 +12,7 @@ import { generateToken } from "../middleware/auth.js";
 import { validate, RegisterRequestSchema } from "../utils/validators.js";
 import { agentService } from "../services/index.js";
 import { logger } from "../utils/logger.js";
+import { setAccessTokenCookie, setRefreshTokenCookie, clearAuthCookies } from "../middleware/http-only-cookies.js";
 
 const router = Router();
 
@@ -66,10 +67,13 @@ router.post(
       expiresIn: 7 * 24 * 60 * 60, // 7 days in seconds
     };
 
+    // Set tokens in httpOnly cookies
+    setAccessTokenCookie(res, response.token, 3600); // 1 hour access
+    setRefreshTokenCookie(res, response.refreshToken, response.expiresIn); // 7 days refresh
+
     res.status(201).json({
       success: true,
       data: {
-        token: response.token,
         agent: {
           id: agent.id,
           name: agent.name,
@@ -83,48 +87,17 @@ router.post(
 );
 
 /**
- * POST /auth/verify
- * Verify agent via ERC-8004 smart contract
+ * POST /auth/logout
+ * Clear authentication cookies
  */
 router.post(
-  "/verify",
-  authLimiter,
+  "/logout",
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
-    const { erc8004Address } = req.body;
-
-    if (!erc8004Address) {
-      res.status(400).json({
-        success: false,
-        error: {
-          code: "VALIDATION_ERROR",
-          message: "Missing erc8004Address",
-          statusCode: 400,
-        },
-      });
-      return;
-    }
-
-    // TODO: Call ERC-8004 smart contract to verify
-    const verified = await agentService.verifyAgent(erc8004Address);
-
-    if (!verified) {
-      res.status(403).json({
-        success: false,
-        error: {
-          code: "VERIFICATION_FAILED",
-          message: "Address verification failed",
-          statusCode: 403,
-        },
-      });
-      return;
-    }
-
+    clearAuthCookies(res);
+    logger.info("Agent logged out (cookies cleared)");
     res.json({
       success: true,
-      data: {
-        verified: true,
-        message: "Address verified",
-      },
+      message: "Logged out successfully",
     });
   })
 );
@@ -136,7 +109,9 @@ router.post(
 router.post(
   "/refresh",
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
-    const { token } = req.body;
+    const { token: bodyToken } = req.body;
+    const cookieToken = req.cookies["__Host-refreshToken"];
+    const token = bodyToken || cookieToken;
 
     if (!token) {
       res.status(400).json({
@@ -150,8 +125,10 @@ router.post(
       return;
     }
 
-    // TODO: Validate refresh token
-    // TODO: Issue new token
+    // TODO: Validate refresh token and issue new ones
+    // For now, re-issuing same token for development (as in original stub)
+    setAccessTokenCookie(res, token, 3600);
+    setRefreshTokenCookie(res, token, 7 * 24 * 60 * 60);
 
     res.json({
       success: true,

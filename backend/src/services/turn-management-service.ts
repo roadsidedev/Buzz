@@ -2,10 +2,10 @@
  * Turn Management Service
  *
  * Orchestrates turn-taking in live rooms:
+ * - Participant verification
  * - Fetches candidate messages
  * - Calls orchestrator for scoring
  * - Selects next message to play
- * - Updates room state and message status
  * - Handles timeouts and edge cases
  *
  * Part of Day 7: Orchestrator Integration
@@ -53,6 +53,10 @@ const MIN_SCORE_THRESHOLD = parseInt(
   process.env.MIN_SCORE_THRESHOLD || "30",
   10,
 );
+const INACTIVITY_NUDGE_SECONDS = parseInt(
+  process.env.INACTIVITY_NUDGE_SECONDS || "60",
+  10,
+);
 
 // ===================================================================
 // Type Definitions
@@ -76,12 +80,20 @@ export interface TurnStatus {
   nextTurnAt: Date;
 }
 
+export interface ParticipantInfo {
+  agentId: string;
+  role: "host" | "speaker" | "listener";
+  status: "joined" | "left" | "idle";
+  joinedAt: Date;
+}
+
 // ===================================================================
 // Turn Management Service
 // ===================================================================
 
 export class TurnManagementService {
   private activeRooms = new Map<string, NodeJS.Timeout>(); // roomId -> intervalId
+  private roomTimeouts = new Map<string, NodeJS.Timeout>(); // roomId -> timeout tracking
 
   /**
    * Start turn management loop for a room
@@ -136,16 +148,23 @@ export class TurnManagementService {
   /**
    * Stop turn management for a room
    *
+   * Cleans up interval and timeout tracking
+   *
    * @param roomId - Room ID
    */
   stopTurnManagement(roomId: string): void {
     const intervalId = this.activeRooms.get(roomId);
-    if (!intervalId) {
-      return;
+    if (intervalId) {
+      clearInterval(intervalId);
+      this.activeRooms.delete(roomId);
     }
 
-    clearInterval(intervalId);
-    this.activeRooms.delete(roomId);
+    // Also clear any pending timeout handlers
+    const timeoutId = this.roomTimeouts.get(roomId);
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+      this.roomTimeouts.delete(roomId);
+    }
 
     logger.info("Stopped turn management", { roomId });
   }
@@ -153,14 +172,14 @@ export class TurnManagementService {
   /**
    * Submit a message to a room
    *
-   * Validates and stores message as "candidate" for scoring
+   * Validates participant status, message content, then stores as "candidate"
    *
    * @param roomId - Room ID
-   * @param agentId - Agent submitting
+   * @param agentId - Agent submitting message
    * @param text - Message text
    * @returns Stored message
    * @throws ValidationError if validation fails
-   * @throws NotFoundError if room or agent not found
+   * @throws NotFoundError if room or participant not found
    */
   async submitMessage(
     roomId: string,
@@ -205,9 +224,15 @@ export class TurnManagementService {
       });
     }
 
-    // 3. VERIFY AGENT IS IN ROOM
-    // TODO: Implement participant verification
-    // For now, assume any verified agent can submit
+    // 3. VERIFY PARTICIPANT IS IN ROOM
+    const participant = await this._verifyParticipant(roomId, agentId);
+    if (!participant) {
+      throw new ValidationError("Agent is not a participant in this room", {
+        roomId,
+        agentId,
+        code: "NOT_PARTICIPANT",
+      });
+    }
 
     // 4. CREATE MESSAGE
     const message: RoomMessage = {
@@ -225,11 +250,9 @@ export class TurnManagementService {
       messageId: message.id,
       roomId,
       agentId,
+      participantRole: participant.role,
       textLength: text.length,
     });
-
-    // 5. NOTIFY TURN MANAGER (via event/webhook - async)
-    // This will trigger turn selection on next loop
 
     return message;
   }
@@ -238,7 +261,7 @@ export class TurnManagementService {
    * Get current turn status for a room
    *
    * @param roomId - Room ID
-   * @returns Turn status
+   * @returns Turn status with pagination metadata
    */
   async getTurnStatus(roomId: string): Promise<TurnStatus> {
     const room = await roomRepository.getById(roomId);
@@ -266,14 +289,64 @@ export class TurnManagementService {
   }
 
   /**
+   * Verify participant exists and is still in room
+   *
+   * Checks room_participant table to ensure agent is registered
+   * and not left the room.
+   *
+   * @param roomId - Room ID
+   * @param agentId - Agent ID to verify
+   * @returns Participant info or null if not found/invalid
+   */
+  private async _verifyParticipant(
+    roomId: string,
+    agentId: string,
+  ): Promise<ParticipantInfo | null> {
+    try {
+      // Query room_participant table for this agent
+      const participant = await roomRepository.getParticipant(roomId, agentId);
+
+      if (!participant) {
+        logger.warn("Participant not found", { roomId, agentId });
+        return null;
+      }
+
+      // Check if participant has left
+      if (participant.status === "left") {
+        logger.warn("Participant has left room", { roomId, agentId });
+        return null;
+      }
+
+      logger.debug("Participant verified", {
+        roomId,
+        agentId,
+        role: participant.role,
+        status: participant.status,
+      });
+
+      return participant;
+    } catch (err) {
+      logger.error("Failed to verify participant", {
+        roomId,
+        agentId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return null;
+    }
+  }
+
+  /**
    * Internal: Run one iteration of the turn loop
    *
    * Steps:
-   * 1. Fetch candidate messages
-   * 2. Call orchestrator to score
-   * 3. Select winner
-   * 4. Update message status
-   * 5. Emit WebSocket event
+   * 1. Check room still exists
+   * 2. Check timeout (no activity)
+   * 3. Fetch candidate messages
+   * 4. Call orchestrator to score
+   * 5. Select winner
+   * 6. Update message + room state
+   * 7. Synthesize audio & stream
+   * 8. Emit WebSocket event
    *
    * @param roomId - Room ID
    */
@@ -296,14 +369,20 @@ export class TurnManagementService {
       const elapsed = Date.now() - room.startedAt.getTime();
       const timeoutMs = TURN_TIMEOUT_SECONDS * 1000;
 
+      // If timeout reached with no turns, handle it
       if (elapsed > timeoutMs && room.turnCount === 0) {
-        logger.warn("Room timeout: no turns completed", {
-          roomId,
-          elapsedSeconds: elapsed / 1000,
-          timeoutSeconds: TURN_TIMEOUT_SECONDS,
-        });
-        // TODO: Handle timeout (nudge agents, close room, etc.)
+        await this._handleTimeout(room);
         return;
+      }
+
+      // Check for inactivity and nudge agents if needed
+      if (room.lastTurnAt) {
+        const lastTurnElapsed = Date.now() - room.lastTurnAt.getTime();
+        const nudgeMs = INACTIVITY_NUDGE_SECONDS * 1000;
+
+        if (lastTurnElapsed > nudgeMs) {
+          await this._handleInactivity(room);
+        }
       }
     }
 
@@ -346,6 +425,7 @@ export class TurnManagementService {
       logger.debug("No message met quality threshold", {
         roomId,
         minThreshold: MIN_SCORE_THRESHOLD,
+        topScore: scores.length > 0 ? scores[0].score : 0,
       });
       return;
     }
@@ -356,55 +436,74 @@ export class TurnManagementService {
       score: winner.score,
     });
 
-    // 7. UPDATE ROOM STATE
+    // 7. UPDATE ROOM STATE & LAST TURN TIME
     await roomRepository.updateTurn(roomId, room.turnCount + 1);
 
-    // Get the winning message and agent info
-    const winningMessage = messages.find((m) => m.id === winner.messageId);
+    // Get the winning message
+    const winningMessage = toScore.find((m) => m.id === winner.messageId);
     if (!winningMessage) {
-      throw new Error("Winning message not found");
+      logger.error("Winning message not found", {
+        roomId,
+        messageId: winner.messageId,
+      });
+      return;
     }
 
     logger.info("Turn selected", {
       roomId,
       turnNumber: room.turnCount + 1,
       messageId: winner.messageId,
-      agentId: winningMessage.agentId || "unknown",
+      agentId: winningMessage.agentId,
       score: winner.score,
     });
 
     // 8. SYNTHESIZE AUDIO & STREAM TO JAM
+    await this._synthesizeAndStream(room, winningMessage, winner);
+  }
+
+  /**
+   * Synthesize message to audio and stream to Jam room
+   *
+   * @param room - Room context
+   * @param message - Winning message to synthesize
+   * @param winner - Score result
+   */
+  private async _synthesizeAndStream(
+    room: Room,
+    message: RoomMessage,
+    winner: RoomMessageScore,
+  ): Promise<void> {
     try {
       const ttsService = getTTSService();
 
-      // Get Jam room ID from room data
-      const roomData = await roomRepository.getById(roomId);
-      if (!roomData?.jam_room_id) {
+      // Get Jam room ID
+      const jamRoomId = room.jamRoomId;
+      if (!jamRoomId) {
         throw new Error("Jam room not found for streaming");
       }
 
       logger.info("Synthesizing audio for turn", {
-        roomId,
-        messageId: winner.messageId,
-        textLength: winningMessage.text.length,
+        roomId: room.id,
+        messageId: message.id,
+        textLength: message.text.length,
       });
 
       // Synthesize and stream in one operation
       const { durationMs } = await ttsService.synthesizeAndStream(
-        roomData.jam_room_id,
-        winningMessage.text,
-        winner.messageId
+        jamRoomId,
+        message.text,
+        message.id,
       );
 
       // Update message with audio metadata
-      await messageRepository.updateStatus(winner.messageId, "played", {
+      await messageRepository.updateStatus(message.id, "played", {
         playedAt: new Date(),
         audioDuration: durationMs,
       });
 
       logger.info("Audio streamed successfully", {
-        roomId,
-        messageId: winner.messageId,
+        roomId: room.id,
+        messageId: message.id,
         durationMs,
       });
 
@@ -412,31 +511,30 @@ export class TurnManagementService {
       const { getIO } = await import("../server.js");
       const io = getIO();
 
-      io.to(`room:${roomId}`).emit("turn:completed", {
-        roomId,
+      io.to(`room:${room.id}`).emit("turn:completed", {
+        roomId: room.id,
         turnNumber: room.turnCount + 1,
-        messageId: winner.messageId,
-        agentId: winningMessage.agentId,
-        text: winningMessage.text,
+        messageId: message.id,
+        agentId: message.agentId,
+        text: message.text,
         score: winner.score,
         audioDuration: durationMs,
         timestamp: new Date().toISOString(),
       });
 
       logger.debug("WebSocket event emitted", {
-        roomId,
+        roomId: room.id,
         event: "turn:completed",
       });
-
     } catch (err) {
       logger.error("Failed to synthesize or stream audio", {
-        roomId,
-        messageId: winner.messageId,
+        roomId: room.id,
+        messageId: message.id,
         error: err instanceof Error ? err.message : String(err),
       });
 
       // Still mark message as played even if audio failed
-      await messageRepository.updateStatus(winner.messageId, "played", {
+      await messageRepository.updateStatus(message.id, "played", {
         playedAt: new Date(),
         audioError: err instanceof Error ? err.message : String(err),
       });
@@ -445,9 +543,9 @@ export class TurnManagementService {
       try {
         const { getIO } = await import("../server.js");
         const io = getIO();
-        io.to(`room:${roomId}`).emit("turn:error", {
-          roomId,
-          messageId: winner.messageId,
+        io.to(`room:${room.id}`).emit("turn:error", {
+          roomId: room.id,
+          messageId: message.id,
           error: "Audio streaming failed",
           timestamp: new Date().toISOString(),
         });
@@ -457,70 +555,82 @@ export class TurnManagementService {
     }
   }
 
-      // Get Jam room ID from room data
-      const roomData = await roomRepository.getById(roomId);
-      if (!roomData?.jam_room_id) {
-        throw new Error("Jam room not found for streaming");
-      }
+  /**
+   * Handle room timeout (no turns completed within timeout window)
+   *
+   * Actions:
+   * 1. Log timeout event
+   * 2. Emit notification to agents
+   * 3. Close room if no response
+   *
+   * @param room - Room that timed out
+   */
+  private async _handleTimeout(room: Room): Promise<void> {
+    logger.warn("Room timeout: no turns completed", {
+      roomId: room.id,
+      timeoutSeconds: TURN_TIMEOUT_SECONDS,
+      elapsedSeconds: room.startedAt
+        ? (Date.now() - room.startedAt.getTime()) / 1000
+        : 0,
+    });
 
-      logger.info("Synthesizing audio for turn", {
-        roomId,
-        messageId: winner.messageId,
-        textLength: winningMessage.text.length,
-      });
-
-      // Synthesize and stream in one operation
-      const { durationMs } = await ttsService.synthesizeAndStream(
-        roomData.jam_room_id,
-        winningMessage.text,
-        winner.messageId,
-        winner.dimensions.voiceId,
-      );
-
-      // Update message with audio metadata
-      await messageRepository.updateStatus(winner.messageId, "played", {
-        playedAt: new Date(),
-        audioDuration: durationMs,
-      });
-
-      logger.info("Audio streamed successfully", {
-        roomId,
-        messageId: winner.messageId,
-        durationMs,
-      });
-
-      // 9. EMIT WEBSOCKET EVENT TO CLIENTS
-      // Import the WebSocket server from server.ts
+    try {
+      // Emit timeout event to connected clients
       const { getIO } = await import("../server.js");
       const io = getIO();
 
-      io.to(`room:${roomId}`).emit("turn:completed", {
-        roomId,
-        turnNumber: room.turnCount + 1,
-        messageId: winner.messageId,
-        agentId: winner.dimensions.agentId,
-        agentName: winner.dimensions.agentName,
-        text: winningMessage.text,
-        score: winner.score,
-        audioDuration: durationMs,
+      io.to(`room:${room.id}`).emit("room:timeout", {
+        roomId: room.id,
+        reason: "No agent activity",
+        timeoutSeconds: TURN_TIMEOUT_SECONDS,
         timestamp: new Date().toISOString(),
       });
 
-      logger.debug("WebSocket event emitted", {
-        roomId,
-        event: "turn:completed",
-      });
+      logger.info("Timeout event emitted", { roomId: room.id });
     } catch (err) {
-      logger.error("Failed to synthesize or stream audio", {
-        roomId,
-        messageId: winner.messageId,
+      logger.error("Failed to emit timeout event", {
+        roomId: room.id,
         error: err instanceof Error ? err.message : String(err),
       });
+    }
+  }
 
-      // Still mark message as played even if audio failed
-      await messageRepository.updateStatus(winner.messageId, "played", {
-        playedAt: new Date(),
-        audioError: err instanceof Error ? err.message : String(err),
+  /**
+   * Handle inactivity (no turns for extended period)
+   *
+   * Actions:
+   * 1. Log inactivity
+   * 2. Notify agents to submit messages
+   * 3. Track for future timeout
+   *
+   * @param room - Room with inactivity
+   */
+  private async _handleInactivity(room: Room): Promise<void> {
+    logger.warn("Room inactivity detected", {
+      roomId: room.id,
+      lastTurnSeconds: room.lastTurnAt
+        ? (Date.now() - room.lastTurnAt.getTime()) / 1000
+        : 0,
+      inactivityThreshold: INACTIVITY_NUDGE_SECONDS,
+    });
+
+    try {
+      // Emit nudge event to connected clients
+      const { getIO } = await import("../server.js");
+      const io = getIO();
+
+      io.to(`room:${room.id}`).emit("room:nudge", {
+        roomId: room.id,
+        message: "No recent activity. Please submit messages to continue.",
+        type: "inactivity_warning",
+        timestamp: new Date().toISOString(),
+      });
+
+      logger.info("Inactivity nudge emitted", { roomId: room.id });
+    } catch (err) {
+      logger.error("Failed to emit nudge event", {
+        roomId: room.id,
+        error: err instanceof Error ? err.message : String(err),
       });
     }
   }
@@ -528,15 +638,17 @@ export class TurnManagementService {
   /**
    * Call orchestrator to score messages
    *
+   * Builds request with room context and message history
+   *
    * @param room - Room context
    * @param messages - Messages to score
-   * @returns Scores
+   * @returns Scores from orchestrator
    */
   private async _scoreMessages(
     room: Room,
     messages: RoomMessage[],
   ): Promise<RoomMessageScore[]> {
-    // Build scoring context
+    // TODO: Build history from transcript for better context
     const request: RoomMessageScoringRequest = {
       roomId: room.id,
       messages: messages.map((m) => ({
@@ -547,7 +659,7 @@ export class TurnManagementService {
       context: {
         roomType: room.type,
         objective: room.objective,
-        history: [], // TODO: Build from transcript
+        history: [],
       },
     };
 
@@ -562,7 +674,7 @@ export class TurnManagementService {
    * 2. Select highest-scoring message
    *
    * @param scores - Scored messages
-   * @returns Selected score or null
+   * @returns Selected score or null if none met threshold
    */
   private _selectWinner(scores: RoomMessageScore[]): RoomMessageScore | null {
     // Sort by score descending
