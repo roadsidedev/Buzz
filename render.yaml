@@ -1,0 +1,109 @@
+# Render Blueprint for ClawZz Platform
+# Deploy with: https://render.com/blueprints
+# Documentation: https://render.com/docs/blueprint-spec
+
+services:
+  # Backend API Gateway Service
+  - type: web
+    name: clawzz-backend
+    runtime: node
+    repo: https://github.com/your-org/clawzz
+    branch: main
+    buildCommand: |
+      cd backend && npm ci && npm run build
+    startCommand: |
+      cd backend && npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+      - key: DATABASE_URL
+        sync: false # Set manually in dashboard
+      - key: REDIS_URL
+        sync: false # Set manually in dashboard
+      - key: JWT_SECRET
+        generateValue: true # Auto-generate secret
+      - key: R2_ACCESS_KEY_ID
+        sync: false
+      - key: R2_SECRET_ACCESS_KEY
+        sync: false
+      - key: R2_ENDPOINT
+        sync: false
+      - key: R2_BUCKET_NAME
+        value: clawzz-audio-storage
+      - key: ORCHESTRATOR_URL
+        fromService:
+          name: clawzz-orchestrator
+          type: web
+          property: host
+      - key: ORCHESTRATOR_API_KEY
+        generateValue: true
+    healthCheckPath: /health
+    autoDeploy: true
+    plan: starter # Upgrade to 'standard' for production
+
+  # Orchestrator Service (Python/FastAPI)
+  - type: web
+    name: clawzz-orchestrator
+    runtime: python
+    repo: https://github.com/your-org/clawzz
+    branch: main
+    buildCommand: |
+      cd orchestrator && pip install -r requirements.txt
+    startCommand: |
+      cd orchestrator && uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_ENV
+        value: production
+      - key: PORT
+        value: 8000
+      - key: DATABASE_URL
+        sync: false # Set manually in dashboard
+      - key: REDIS_URL
+        sync: false # Set manually in dashboard
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: ELEVENLABS_API_KEY
+        sync: false
+      - key: BACKEND_URL
+        fromService:
+          name: clawzz-backend
+          type: web
+          property: host
+      - key: BACKEND_API_KEY
+        fromService:
+          name: clawzz-backend
+          type: web
+          envVarKey: ORCHESTRATOR_API_KEY
+    healthCheckPath: /health
+    autoDeploy: true
+    plan: starter
+
+  # Background Job Worker (Optional - for async tasks)
+  - type: worker
+    name: clawzz-worker
+    runtime: node
+    repo: https://github.com/your-org/clawzz
+    branch: main
+    buildCommand: |
+      cd backend && npm ci && npm run build
+    startCommand: |
+      cd backend && npm run worker:start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromService:
+          name: clawzz-backend
+          type: web
+          envVarKey: DATABASE_URL
+      - key: REDIS_URL
+        fromService:
+          name: clawzz-backend
+          type: web
+          envVarKey: REDIS_URL
+    autoDeploy: true
+    plan: starter

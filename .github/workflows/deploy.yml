@@ -1,0 +1,248 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  NODE_VERSION: "20"
+  PYTHON_VERSION: "3.11"
+
+jobs:
+  # ==========================================
+  # TEST JOBS
+  # ==========================================
+  test-backend:
+    name: Test Backend
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run linter
+        run: npm run lint
+
+      - name: Run type check
+        run: npm run typecheck
+
+      - name: Run tests
+        run: npm test
+        env:
+          NODE_ENV: test
+
+  test-frontend:
+    name: Test Frontend
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run linter
+        run: npm run lint
+
+      - name: Run type check
+        run: npm run typecheck
+
+      - name: Run tests
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+  test-orchestrator:
+    name: Test Orchestrator
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: orchestrator
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-cov black flake8 mypy
+
+      - name: Run linter
+        run: flake8 src/
+
+      - name: Run type check
+        run: mypy src/
+
+      - name: Run formatter check
+        run: black --check src/
+
+      - name: Run tests
+        run: pytest --cov=src --cov-report=xml
+
+  # ==========================================
+  # DEPLOY JOBS
+  # ==========================================
+  deploy-backend:
+    name: Deploy Backend
+    needs: [test-backend]
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Option 1: Deploy to Render
+      - name: Deploy to Render
+        if: env.DEPLOY_TARGET == 'render'
+        uses: johnbeynon/render-deploy-action@v0.0.8
+        with:
+          service-id: ${{ secrets.RENDER_BACKEND_SERVICE_ID }}
+          api-key: ${{ secrets.RENDER_API_KEY }}
+        env:
+          DEPLOY_TARGET: ${{ vars.DEPLOY_TARGET }}
+
+      # Option 2: Deploy to Railway
+      - name: Install Railway CLI
+        if: env.DEPLOY_TARGET == 'railway'
+        run: npm install -g @railway/cli
+        env:
+          DEPLOY_TARGET: ${{ vars.DEPLOY_TARGET }}
+
+      - name: Deploy to Railway
+        if: env.DEPLOY_TARGET == 'railway'
+        run: railway up --service clawzz-backend
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          DEPLOY_TARGET: ${{ vars.DEPLOY_TARGET }}
+        working-directory: backend
+
+  deploy-orchestrator:
+    name: Deploy Orchestrator
+    needs: [test-orchestrator, deploy-backend]
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Option 1: Deploy to Render
+      - name: Deploy to Render
+        if: env.DEPLOY_TARGET == 'render'
+        uses: johnbeynon/render-deploy-action@v0.0.8
+        with:
+          service-id: ${{ secrets.RENDER_ORCHESTRATOR_SERVICE_ID }}
+          api-key: ${{ secrets.RENDER_API_KEY }}
+        env:
+          DEPLOY_TARGET: ${{ vars.DEPLOY_TARGET }}
+
+      # Option 2: Deploy to Railway
+      - name: Install Railway CLI
+        if: env.DEPLOY_TARGET == 'railway'
+        run: npm install -g @railway/cli
+        env:
+          DEPLOY_TARGET: ${{ vars.DEPLOY_TARGET }}
+
+      - name: Deploy to Railway
+        if: env.DEPLOY_TARGET == 'railway'
+        run: railway up --service clawzz-orchestrator
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          DEPLOY_TARGET: ${{ vars.DEPLOY_TARGET }}
+        working-directory: orchestrator
+
+  deploy-frontend:
+    name: Deploy Frontend
+    needs: [test-frontend, deploy-backend]
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: frontend
+
+      - name: Build
+        run: npm run build
+        working-directory: frontend
+        env:
+          VITE_API_URL: ${{ vars.VITE_API_URL }}
+          VITE_WEBSOCKET_URL: ${{ vars.VITE_WEBSOCKET_URL }}
+          VITE_ORCHESTRATOR_URL: ${{ vars.VITE_ORCHESTRATOR_URL }}
+
+      - name: Deploy to Vercel
+        uses: vercel/action-deploy@v1
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          working-directory: frontend
+
+  # ==========================================
+  # NOTIFICATION
+  # ==========================================
+  notify:
+    name: Notify Deployment
+    needs: [deploy-backend, deploy-orchestrator, deploy-frontend]
+    if: always() && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deployment Success
+        if: needs.deploy-backend.result == 'success' && needs.deploy-orchestrator.result == 'success' && needs.deploy-frontend.result == 'success'
+        run: |
+          echo "✅ All services deployed successfully!"
+          echo "Backend: ${{ vars.BACKEND_URL }}"
+          echo "Orchestrator: ${{ vars.ORCHESTRATOR_URL }}"
+          echo "Frontend: ${{ vars.FRONTEND_URL }}"
+
+      - name: Deployment Failed
+        if: needs.deploy-backend.result == 'failure' || needs.deploy-orchestrator.result == 'failure' || needs.deploy-frontend.result == 'failure'
+        run: |
+          echo "❌ Deployment failed!"
+          exit 1
