@@ -3,8 +3,8 @@ builder = "DOCKERFILE"
 dockerfilePath = "backend/Dockerfile"
 
 [deploy]
-# The Dockerfile CMD is already set to node backend/dist/server.js
-startCommand = "node backend/dist/server.js"
+# Use tsx to handle path aliases at runtime for @common/* imports
+startCommand = "node --import tsx backend/dist/server.js"
 healthcheckPath = "/health"
 healthcheckTimeout = 10
 healthcheckInterval = 10

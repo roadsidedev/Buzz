@@ -29,7 +29,8 @@ EXPOSE 5000
 
 # Healthcheck with curl
 # Railway will also use the healthcheckPath in railway.toml
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+# Increased start-period to allow for environment validation and service initialization
+HEALTHCHECK --interval=10s --timeout=5s --start-period=30s --retries=5 \
   CMD curl -f http://localhost:5000/health || exit 1
 
 # Start the uvicorn server
