@@ -27,8 +27,13 @@ class Settings(BaseSettings):
     REDIS_URL: str = "redis://localhost:6379/0"
     CACHE_TTL_SECONDS: int = 3600
 
-    # Anthropic API
-    ANTHROPIC_API_KEY: str = ""
+    # LLM Provider configuration (provider-agnostic)
+    # Example providers: "anthropic", "openai", "none"
+    LLM_PROVIDER: str = "anthropic"
+    LLM_API_KEY: str = ""
+    # Optional: explicit API URL for providers that expose HTTP endpoints
+    LLM_API_URL: str = ""
+    # Backwards-compatible: keep Anthropic-specific model names as defaults
     SCORING_MODEL: str = "claude-3-5-sonnet-20241022"
     MODERATION_MODEL: str = "claude-3-5-haiku-20241022"
 

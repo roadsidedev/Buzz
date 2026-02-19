@@ -7,3 +7,19 @@ psycopg[binary]==3.2.3
 redis==5.0.1
 anthropic==0.7.6
 pydantic-settings==2.1.0
+
+# Optional provider SDKs (install only as needed):
+# - openai: Official OpenAI SDK (for OpenAI / compatible endpoints)
+# - openrouter: OpenRouter client (if using OpenRouter)
+# - nvidia: Hypothetical NVIDIA SDK placeholder (install vendor package if required)
+# - kimi: Kimi/Moonshot SDK placeholder
+#
+# To keep the base image small, install optional SDKs per deployment, e.g.:
+#
+# pip install -r requirements.txt
+# pip install openai    # for OpenAI provider
+# pip install openrouter-client  # for OpenRouter
+#
+# Alternatively create provider-specific requirement files:
+# requirements-anthropic.txt (current file)
+# requirements-openai.txt

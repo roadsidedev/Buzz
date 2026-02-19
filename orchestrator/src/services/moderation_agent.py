@@ -4,9 +4,10 @@ import logging
 from enum import Enum
 from typing import Optional
 
-from anthropic import Anthropic
+import asyncio
 
 from ..config.settings import settings
+from .llm_provider import get_provider
 from ..models.message import Message, ScoringResult
 
 logger = logging.getLogger(__name__)
@@ -28,7 +29,11 @@ class ModerationAgent:
 
     def __init__(self):
         """Initialize moderation agent."""
-        self.client = Anthropic(api_key=settings.ANTHROPIC_API_KEY)
+        try:
+            self.client = get_provider()
+        except Exception as e:
+            # Provider failed to initialize — keep client None and let methods handle fallback
+            self.client = None
         self.moderation_model = settings.MODERATION_MODEL
 
     async def scan_message(self, message: Message) -> tuple[bool, Optional[ViolationType], str]:
@@ -65,7 +70,11 @@ RESPONSE (JSON):
 Respond ONLY with valid JSON."""
 
         try:
-            response = self.client.messages.create(
+            if not self.client:
+                raise RuntimeError("LLM provider not configured for moderation")
+
+            response = await asyncio.to_thread(
+                self.client.messages_create,
                 model=self.moderation_model,
                 max_tokens=256,
                 messages=[{"role": "user", "content": prompt}],

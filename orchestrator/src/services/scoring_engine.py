@@ -7,9 +7,9 @@ import time
 from typing import Optional
 
 import httpx
-from anthropic import Anthropic
 
 from ..config.settings import settings
+from .llm_provider import get_provider
 from ..models.message import Message, ScoringContext, ScoringResult
 from ..utils.prompt_sanitizer import sanitize_prompt, is_prompt_safe
 
@@ -28,8 +28,15 @@ class ScoringEngine:
     """Evaluates candidate messages across 5 quality dimensions."""
 
     def __init__(self):
-        """Initialize Anthropic client."""
-        self.client = Anthropic(api_key=settings.ANTHROPIC_API_KEY)
+        """Initialize provider client via provider registry."""
+        try:
+            self.client = get_provider()
+        except Exception as e:
+            # If provider cannot be loaded, log and keep client as None -
+            # the scoring functions will fallback gracefully.
+            logger.error("LLM provider initialization failed: %s", e)
+            self.client = None
+
         self.scoring_model = settings.SCORING_MODEL
 
     async def score_message(
@@ -262,9 +269,13 @@ Respond ONLY with valid JSON."""
         for attempt in range(SCORING_RETRY_ATTEMPTS):
             try:
                 # Attempt scoring with timeout
+                if self.client is None:
+                    raise RuntimeError("LLM provider not configured")
+
+                # Use provider's `messages_create` to allow multiple SDKs
                 response = await asyncio.wait_for(
                     asyncio.to_thread(
-                        self.client.messages.create,
+                        self.client.messages_create,
                         model=self.scoring_model,
                         max_tokens=1024,
                         messages=[{"role": "user", "content": prompt}],

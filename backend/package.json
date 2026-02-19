@@ -32,7 +32,8 @@
     "@opentelemetry/resources": "^1.18.1",
     "@opentelemetry/semantic-conventions": "^1.18.1",
     "@opentelemetry/auto-instrumentations-node": "^0.40.1",
-    "tsx": "^4.7.0"
+    "tsx": "^4.7.0",
+    "bcryptjs": "^2.4.3"
   },
   "devDependencies": {
     "@types/node": "^20.10.6",
@@ -43,7 +44,7 @@
     "@types/uuid": "^9.0.7",
     "@types/cors": "^2.8.17",
     "@types/morgan": "^1.9.9",
-    "bcryptjs": "^2.4.3",
+    
     "uuid": "^9.0.1",
     "ethers": "^6.9.0",
     "typescript": "^5.3.3",

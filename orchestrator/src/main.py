@@ -8,7 +8,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .config.settings import settings
-from .api.routes import router, get_orchestration_service
+from .api.routes import router, get_orchestration_service, set_orchestration_service
+from .services.llm_provider import get_provider
 from .clients.api_gateway_client import close_api_gateway_client, get_api_gateway_client
 
 # Configure logging
@@ -26,26 +27,27 @@ def validate_environment() -> None:
     Raises:
         RuntimeError: If critical configuration is missing
     """
-    required_vars = {
-        "ANTHROPIC_API_KEY": "Claude API key for message scoring",
-        "REDIS_URL": "Redis connection for room state",
-    }
-    
+    # Redis is required for orchestrator state
     missing = []
-    for var, description in required_vars.items():
-        value = getattr(settings, var, None)
-        if not value:
-            missing.append(f"  • {var}: {description}")
-    
+    if not settings.REDIS_URL:
+        missing.append("  • REDIS_URL: Redis connection for room state")
+
+    # LLM provider validation: allow `none` for degraded mode, otherwise require a key
+    provider = (settings.LLM_PROVIDER or "").lower()
+    if provider and provider != "none":
+        if not (settings.LLM_API_KEY or settings.ANTHROPIC_API_KEY):
+            missing.append(
+                "  • LLM_API_KEY or ANTHROPIC_API_KEY: API key for selected LLM provider"
+            )
+
     if missing:
         logger.error("Missing required environment variables:")
         for msg in missing:
             logger.error(msg)
         raise RuntimeError(
-            f"Missing {len(missing)} required environment variables. "
-            "Check logs for details."
+            f"Missing {len(missing)} required environment variables. Check logs for details."
         )
-    
+
     logger.info("Environment validation passed")
 
 
@@ -54,17 +56,44 @@ async def lifespan(app: FastAPI):
     """Application lifecycle management."""
     logger.info("Orchestrator service starting")
     
-    # 1. VALIDATE ENVIRONMENT
+    # 1. VALIDATE ENVIRONMENT (now provider-agnostic)
     try:
+        # Validate basic environment first - this will log missing configurable
+        # values but we allow starting in degraded mode when provider=none.
         validate_environment()
     except RuntimeError as e:
         logger.error(f"Environment validation failed: {e}")
         sys.exit(1)
 
+    # 1b. Initialize LLM provider (if configured)
+    try:
+        provider = None
+        if settings.LLM_PROVIDER and settings.LLM_PROVIDER.lower() != "none":
+            provider = get_provider(settings.LLM_PROVIDER, settings.LLM_API_KEY)
+            logger.info("LLM provider set: %s", settings.LLM_PROVIDER)
+        else:
+            logger.info("LLM provider disabled (LLM_PROVIDER=none)")
+    except Exception as e:
+        logger.error("Failed to initialize LLM provider: %s", e)
+        sys.exit(1)
+
     # 2. INITIALIZE ORCHESTRATION SERVICE
     logger.info("Initializing orchestration service...")
     try:
-        orchestration_service = get_orchestration_service()
+        # Inject provider into ScoringEngine by creating OrchestrationService
+        # and setting it in routes so request handlers pick it up.
+        from .services.scoring_engine import ScoringEngine
+        from .services.orchestration_service import OrchestrationService
+
+        scoring_engine = ScoringEngine()
+        orchestration_service = OrchestrationService()
+        # If the scoring engine was able to initialize a provider client,
+        # attach it to the orchestration service's scoring_engine.
+        orchestration_service.scoring_engine = scoring_engine
+
+        # Register singleton for routes
+        set_orchestration_service(orchestration_service)
+
         await orchestration_service.initialize()
         logger.info("Orchestration service initialized successfully")
     except Exception as e:
