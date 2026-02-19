@@ -4,7 +4,7 @@ dockerfilePath = "backend/Dockerfile"
 
 [deploy]
 # Use tsx to handle path aliases at runtime for @common/* imports
-startCommand = "node --import tsx backend/dist/server.js"
+startCommand = "node --import tsx backend/dist/backend/src/server.js"
 healthcheckPath = "/health"
 healthcheckTimeout = 10
 healthcheckInterval = 10

@@ -53,4 +53,4 @@ HEALTHCHECK --interval=10s --timeout=5s --retries=5 \
   CMD node -e "require('http').get('http://localhost:4000/health', (r) => {if (r.statusCode !== 200) throw new Error(r.statusCode)})"
 
 # Start the server using tsx to handle path aliases at runtime
-CMD ["node", "--import", "tsx", "backend/dist/server.js"]
+CMD ["node", "--import", "tsx", "backend/dist/backend/src/server.js"]

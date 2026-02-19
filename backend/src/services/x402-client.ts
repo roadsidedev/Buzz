@@ -300,36 +300,6 @@ export class X402Facilitator {
 }
 
 /**
- * x402 Payment Facilitator
- * Handles payment settlement and escrow
- */
-export class X402Facilitator {
-  private client: X402Client;
-
-  constructor(client: X402Client) {
-    this.client = client;
-  }
-
-  /**
-   * Settle a payment from escrow
-   */
-  async settlePayment(paymentId: string): Promise<boolean> {
-    logger.info("Settling x402 payment", { paymentId });
-    // In real implementation, this would release funds from escrow
-    return true;
-  }
-
-  /**
-   * Refund a payment
-   */
-  async refundPayment(paymentId: string): Promise<boolean> {
-    logger.info("Refunding x402 payment", { paymentId });
-    // In real implementation, this would return funds to payer
-    return true;
-  }
-}
-
-/**
  * Utility functions
  */
 export function formatTokenAmount(
