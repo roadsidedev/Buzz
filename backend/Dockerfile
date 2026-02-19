@@ -35,12 +35,19 @@ COPY backend/package*.json ./backend/
 
 RUN npm ci --omit=dev && npm ci --omit=dev -w backend
 
-COPY --from=builder /app/backend/dist ./dist
+# Copy the built files from the builder stage
+# The builder stage runs 'npm run build -w backend' which outputs to /app/backend/dist
+COPY --from=builder /app/backend/dist ./backend/dist
 COPY common ./common
 
 EXPOSE 4000
 
+# Set environment variables to bypass strict security checks during healthcheck if needed
+# Or ensure they are provided in Railway
+ENV NODE_ENV=production
+
 HEALTHCHECK --interval=10s --timeout=5s --retries=5 \
   CMD node -e "require('http').get('http://localhost:4000/health', (r) => {if (r.statusCode !== 200) throw new Error(r.statusCode)})"
 
-CMD ["node", "dist/backend/src/server.js"]
+# Start from the backend directory where dist is located
+CMD ["node", "backend/dist/server.js"]

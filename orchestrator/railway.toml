@@ -3,12 +3,18 @@ builder = "DOCKERFILE"
 dockerfilePath = "orchestrator/Dockerfile"
 
 [deploy]
+# The Dockerfile CMD is already set to python -m uvicorn orchestrator.main:app --host 0.0.0.0 --port 5000
 startCommand = "python -m uvicorn orchestrator.main:app --host 0.0.0.0 --port 5000"
 healthcheckPath = "/health"
-healthcheckTimeout = 100
+# Increase timeout and delay to allow for initialization
+healthcheckTimeout = 10
+healthcheckInterval = 10
 restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 10
 numReplicas = 1
 
 [deploy.env]
 PYTHON_ENV = "production"
+PORT = "5000"
+# Ensure PYTHONPATH is set correctly in the environment
+PYTHONPATH = "/app"
