@@ -1,6 +1,6 @@
 /**
  * AppRouter: Main application router configuration
- * 
+ *
  * Defines all routes, protections, and layout structure.
  * Routes are organized into:
  * - Public routes: /login, /register (require NOT authenticated)
@@ -16,24 +16,24 @@ import { useAuth } from "@/stores/auth-store";
 import { ProtectedRoute, PublicRoute, RoleRoute } from "./protected-route";
 
 // Layouts
-import MainLayout from "@/components/layouts/main-layout";
+import { MainLayout } from "@/components/layouts/main-layout";
 
 // Public pages
-import LoginPage from "@/pages/login-page";
-import RegisterPage from "@/pages/register-page";
+import { LoginPage } from "@/pages/login-page";
+import { RegisterPage } from "@/pages/register-page";
 
 // Protected pages
-import DiscoveryPage from "@/pages/discovery-page";
-import RoomLivePage from "@/pages/room-live-page";
-import EpisodePlayerPage from "@/pages/episode-player-page";
-import ProfilePage from "@/pages/profile-page";
+import { DiscoveryPage } from "@/pages/discovery-page";
+import { RoomLivePage } from "@/pages/room-live-page";
+import { EpisodePlayerPage } from "@/pages/episode-player-page";
+import { ProfilePage } from "@/pages/profile-page";
 
 // Error pages
-import NotFoundPage from "@/pages/not-found-page";
+import { NotFoundPage } from "@/pages/not-found-page";
 
 /**
  * AppRouter: Main application router
- * 
+ *
  * All routes protected with authentication guards.
  * Loading state managed by useAuth hook.
  */

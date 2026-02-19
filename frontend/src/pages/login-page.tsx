@@ -1,6 +1,6 @@
 /**
  * LoginPage: User login form
- * 
+ *
  * Allows existing users to authenticate with email and password.
  * Includes form validation, error handling, and loading states.
  */
@@ -11,7 +11,7 @@ import { useAuth } from "@/stores/auth-store";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import logger from "@/utils/logger";
+import { logger } from "@/utils/logger";
 
 /**
  * Validation errors for form fields
@@ -31,11 +31,13 @@ const LoginPage: React.FC = () => {
   // Form state
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [validationErrors, setValidationErrors] = useState<ValidationErrors>({});
+  const [validationErrors, setValidationErrors] = useState<ValidationErrors>(
+    {},
+  );
 
   /**
    * Validate form inputs
-   * 
+   *
    * Checks:
    * - Email present and valid format
    * - Password present and 8+ chars
@@ -63,7 +65,7 @@ const LoginPage: React.FC = () => {
 
   /**
    * Handle form submission
-   * 
+   *
    * 1. Validate form
    * 2. Call login action
    * 3. Navigate to discover on success
@@ -187,7 +189,10 @@ const LoginPage: React.FC = () => {
           {/* Register Link */}
           <p className="text-slate-300 text-sm mt-6 text-center">
             Don't have an account?{" "}
-            <Link to="/register" className="text-cyan-400 hover:underline font-medium">
+            <Link
+              to="/register"
+              className="text-cyan-400 hover:underline font-medium"
+            >
               Register here
             </Link>
           </p>
@@ -197,4 +202,4 @@ const LoginPage: React.FC = () => {
   );
 };
 
-export default LoginPage;
+export { LoginPage };

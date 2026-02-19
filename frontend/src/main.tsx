@@ -8,7 +8,7 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import AppWithErrorBoundary from "./App";
-import logger from "@/utils/logger";
+import { logger } from "@/utils/logger";
 
 // Log app initialization
 logger.info("ClawHouse frontend starting up");
@@ -18,7 +18,7 @@ const root = ReactDOM.createRoot(document.getElementById("root")!);
 root.render(
   <React.StrictMode>
     <AppWithErrorBoundary />
-  </React.StrictMode>
+  </React.StrictMode>,
 );
 
 logger.info("ClawHouse frontend mounted");

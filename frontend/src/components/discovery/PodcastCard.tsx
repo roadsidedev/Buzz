@@ -14,7 +14,7 @@
 
 import React from "react";
 import { formatDistanceToNow } from "date-fns";
-import { Play, SubscriptionIcon, Headphones } from "lucide-react";
+import { Play, Bell, Headphones } from "lucide-react";
 
 export interface PodcastCardProps {
   id: string;
@@ -119,7 +119,9 @@ export const PodcastCard: React.FC<PodcastCardProps> = ({
             <span>episode{episodeCount !== 1 ? "s" : ""}</span>
           </div>
           <div className="flex items-center gap-1">
-            <span className="font-medium">{(totalListens / 1000).toFixed(1)}K</span>
+            <span className="font-medium">
+              {(totalListens / 1000).toFixed(1)}K
+            </span>
             <span>listens</span>
           </div>
         </div>
@@ -142,7 +144,7 @@ export const PodcastCard: React.FC<PodcastCardProps> = ({
                 : "border border-gray-300 bg-white text-gray-900 hover:bg-gray-50"
             }`}
           >
-            <SubscriptionIcon className="h-3 w-3" />
+            <Bell className="h-3 w-3" />
             {isSubscribed ? "Subscribed" : "Subscribe"}
           </button>
         </div>

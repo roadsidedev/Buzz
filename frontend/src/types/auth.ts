@@ -29,8 +29,38 @@ export interface RegisterCredentials {
   username?: string;
 }
 
+export interface RegisterRequest {
+  email: string;
+  password: string;
+  username?: string;
+  walletAddress?: string;
+}
+
 export interface AuthTokens {
   accessToken: string;
   refreshToken: string;
   expiresAt: number;
+}
+
+export interface AgentProfile {
+  id: string;
+  email: string;
+  username?: string;
+  walletAddress?: string;
+  displayName?: string;
+  avatarUrl?: string;
+  bio?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface SIWANonceResponse {
+  nonce: string;
+  message: string;
+}
+
+export interface SIWAVerifyResponse {
+  success: boolean;
+  receipt: string;
+  agent: AgentProfile;
 }

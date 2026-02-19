@@ -1,6 +1,6 @@
 /**
  * AuthStore: Global authentication state management (SIWA + Privy)
- * 
+ *
  * Manages:
  * - SIWA receipt storage and validation
  * - Wallet address and agent ID
@@ -8,6 +8,7 @@
  * - Agent profile information
  */
 
+import { useEffect } from "react";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { AgentProfile } from "@/types/auth";
@@ -40,7 +41,7 @@ interface AuthStore {
 
 /**
  * Create Zustand store with persistence
- * 
+ *
  * Persists to localStorage with key "clawzz-siwa-auth"
  */
 export const useAuthStore = create<AuthStore>()(
@@ -101,7 +102,7 @@ export const useAuthStore = create<AuthStore>()(
             await fetch("/api/v1/auth/logout", {
               method: "POST",
               headers: {
-                "Authorization": `Bearer ${receipt}`,
+                Authorization: `Bearer ${receipt}`,
               },
             });
           }
@@ -136,7 +137,7 @@ export const useAuthStore = create<AuthStore>()(
           // Verify receipt with server
           const response = await fetch("/api/v1/auth/profile", {
             headers: {
-              "Authorization": `Bearer ${receipt}`,
+              Authorization: `Bearer ${receipt}`,
             },
           });
 
@@ -180,16 +181,110 @@ export const useAuthStore = create<AuthStore>()(
         agentId: state.agentId,
         agent: state.agent,
       }),
-    }
-  )
+    },
+  ),
 );
 
 /**
+ * Hook to get auth state and actions
+ */
+export const useAuth = () => {
+  const store = useAuthStore();
+
+  return {
+    isAuthenticated: store.authenticated,
+    user: store.agent,
+    walletAddress: store.walletAddress,
+    isLoading: store.isLoading,
+    error: store.error,
+
+    // Actions
+    login: async (email: string, password: string) => {
+      try {
+        store.setLoading(true);
+        store.setError(null);
+
+        const response = await fetch("/api/v1/auth/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, password }),
+        });
+
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.message || "Login failed");
+        }
+
+        const data = await response.json();
+        store.setReceipt(data.data.receipt);
+        store.setAgent(data.data.agent);
+        store.setWalletAddress(data.data.agent.walletAddress);
+        store.setAgentId(data.data.agent.id);
+        store.setAuthenticated(true);
+
+        return { success: true };
+      } catch (err: any) {
+        store.setError(err.message || "Login failed");
+        return { success: false, error: err.message };
+      } finally {
+        store.setLoading(false);
+      }
+    },
+
+    register: async (data: {
+      email: string;
+      password: string;
+      username?: string;
+      confirmPassword?: string;
+    }) => {
+      try {
+        store.setLoading(true);
+        store.setError(null);
+
+        // Remove confirmPassword before sending to API
+        const { confirmPassword, ...registerData } = data;
+
+        const response = await fetch("/api/v1/auth/register", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(registerData),
+        });
+
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.message || "Registration failed");
+        }
+
+        const result = await response.json();
+        store.setReceipt(result.data.receipt);
+        store.setAgent(result.data.agent);
+        store.setWalletAddress(result.data.agent.walletAddress);
+        store.setAgentId(result.data.agent.id);
+        store.setAuthenticated(true);
+
+        return { success: true };
+      } catch (err: any) {
+        store.setError(err.message || "Registration failed");
+        return { success: false, error: err.message };
+      } finally {
+        store.setLoading(false);
+      }
+    },
+
+    clearError: () => {
+      store.setError(null);
+    },
+
+    logout: store.logout,
+  };
+};
+
+/**
  * Hook to initialize auth on app load
- * 
+ *
  * Call this once in App.tsx useEffect to validate receipt
  * and recover session from localStorage.
- * 
+ *
  * Usage:
  * ```tsx
  * function App() {
@@ -201,9 +296,7 @@ export const useAuthStore = create<AuthStore>()(
 export const useInitializeAuth = () => {
   const initialize = useAuthStore((state) => state.initialize);
 
-  React.useEffect(() => {
+  useEffect(() => {
     initialize();
   }, [initialize]);
 };
-
-import React from "react";

@@ -16,7 +16,7 @@ import { PrivyProvider } from "@privy-io/react-auth";
 import "./styles/globals.css";
 import { AppRouter } from "@/router";
 import { useInitializeAuth } from "@/stores/auth-store";
-import logger from "@/utils/logger";
+import { logger } from "@/utils/logger";
 
 /**
  * Error Boundary Component

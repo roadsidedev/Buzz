@@ -1,6 +1,6 @@
 /**
  * RegisterPage: User registration form
- * 
+ *
  * Allows new users to create an account with email, username, and password.
  * Includes comprehensive form validation and error handling.
  */
@@ -12,7 +12,7 @@ import { RegisterRequest } from "@/types/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import logger from "@/utils/logger";
+import { logger } from "@/utils/logger";
 
 /**
  * Validation errors for form fields
@@ -39,11 +39,13 @@ const RegisterPage: React.FC = () => {
     confirmPassword: "",
   });
 
-  const [validationErrors, setValidationErrors] = useState<ValidationErrors>({});
+  const [validationErrors, setValidationErrors] = useState<ValidationErrors>(
+    {},
+  );
 
   /**
    * Validate form inputs
-   * 
+   *
    * Checks:
    * - Email valid format and unique (server checks uniqueness)
    * - Username 3-30 characters
@@ -98,7 +100,7 @@ const RegisterPage: React.FC = () => {
 
   /**
    * Handle form submission
-   * 
+   *
    * 1. Validate form
    * 2. Call register action
    * 3. Navigate to discover on success
@@ -283,7 +285,10 @@ const RegisterPage: React.FC = () => {
           {/* Login Link */}
           <p className="text-slate-300 text-sm mt-6 text-center">
             Already have an account?{" "}
-            <Link to="/login" className="text-cyan-400 hover:underline font-medium">
+            <Link
+              to="/login"
+              className="text-cyan-400 hover:underline font-medium"
+            >
               Login here
             </Link>
           </p>
@@ -293,4 +298,4 @@ const RegisterPage: React.FC = () => {
   );
 };
 
-export default RegisterPage;
+export { RegisterPage };
