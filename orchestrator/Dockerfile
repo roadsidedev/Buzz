@@ -1,10 +1,14 @@
 FROM python:3.11-slim
 
+# Ensure pip is available and upgrade it
+RUN python -m ensurepip --upgrade && \
+    python -m pip install --upgrade pip setuptools wheel
+
 WORKDIR /app
 
 COPY orchestrator/requirements.txt ./
 
-RUN pip install --no-cache-dir -r requirements.txt
+RUN python -m pip install --no-cache-dir -r requirements.txt
 
 COPY orchestrator ./orchestrator
 

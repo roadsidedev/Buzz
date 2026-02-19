@@ -2,6 +2,9 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
+# Configure npm to avoid cache conflicts with Railway
+RUN npm config set cache /tmp/.npm-cache --global
+
 COPY package*.json ./
 COPY backend/package*.json ./backend/
 
@@ -18,10 +21,13 @@ FROM node:20-alpine
 
 WORKDIR /app
 
+# Configure npm to avoid cache conflicts with Railway
+RUN npm config set cache /tmp/.npm-cache --global
+
 COPY package*.json ./
 COPY backend/package*.json ./backend/
 
-RUN npm ci --only=production && npm ci --only=production -w backend
+RUN npm ci --omit=dev && npm ci --omit=dev -w backend
 
 COPY --from=builder /app/backend/dist ./backend/dist
 COPY common ./common

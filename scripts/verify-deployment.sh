@@ -12,8 +12,8 @@ YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
 # Configuration
-BACKEND_URL=${BACKEND_URL:-"https://clawzz-backend.onrender.com"}
-ORCHESTRATOR_URL=${ORCHESTRATOR_URL:-"https://clawzz-orchestrator.onrender.com"}
+BACKEND_URL=${BACKEND_URL:-"https://clawzz-backend.up.railway.app"}
+ORCHESTRATOR_URL=${ORCHESTRATOR_URL:-"https://clawzz-orchestrator.up.railway.app"}
 FRONTEND_URL=${FRONTEND_URL:-"https://clawzz.vercel.app"}
 
 echo "🔍 ClawZz Deployment Verification"
