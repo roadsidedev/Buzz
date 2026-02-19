@@ -4,7 +4,7 @@
  */
 
 import { Pool, PoolClient } from "pg";
-import { logger } from "../utils/logger.js";
+import { logger } from "../utils/logger";
 
 const DATABASE_URL = process.env.DATABASE_URL;
 
@@ -33,13 +33,31 @@ export { pool };
  */
 export class Database {
   private pool: typeof pool;
-  
+
   constructor() {
     this.pool = pool;
   }
-  
+
   getPool() {
     return this.pool;
+  }
+
+  /**
+   * Execute query with connection from pool
+   */
+  async query<T extends Record<string, unknown>>(
+    text: string,
+    values?: unknown[],
+  ): Promise<T[]> {
+    try {
+      const result = await this.pool.query<T>(text, values);
+      return result.rows;
+    } catch (error) {
+      logger.error("Database query failed", error, {
+        query: text.substring(0, 100),
+      });
+      throw error;
+    }
   }
 }
 
@@ -89,7 +107,7 @@ export async function closePool(): Promise<void> {
  */
 export async function query<T extends Record<string, unknown>>(
   text: string,
-  values?: unknown[]
+  values?: unknown[],
 ): Promise<T[]> {
   try {
     const result = await pool.query<T>(text, values);
@@ -107,7 +125,7 @@ export async function query<T extends Record<string, unknown>>(
  */
 export async function queryOne<T extends Record<string, unknown>>(
   text: string,
-  values?: unknown[]
+  values?: unknown[],
 ): Promise<T | null> {
   const results = await query<T>(text, values);
   return results.length > 0 ? results[0] : null;

@@ -209,7 +209,7 @@ export class AuthError extends Error {
   constructor(
     public code: string,
     message: string,
-    public statusCode: number = 401
+    public statusCode: number = 401,
   ) {
     super(message);
     this.name = "AuthError";
@@ -245,7 +245,7 @@ export class NonceUsedError extends AuthError {
     super(
       "NONCE_USED",
       "Nonce has already been used (replay attack detected)",
-      401
+      401,
     );
     Object.setPrototypeOf(this, NonceUsedError.prototype);
   }
@@ -279,7 +279,7 @@ export class InvalidReceiptError extends AuthError {
     super(
       "INVALID_RECEIPT",
       `Invalid receipt${reason ? `: ${reason}` : ""}`,
-      401
+      401,
     );
     Object.setPrototypeOf(this, InvalidReceiptError.prototype);
   }
@@ -290,11 +290,7 @@ export class InvalidReceiptError extends AuthError {
  */
 export class AgentAlreadyExistsError extends AuthError {
   constructor(field: string, value: string) {
-    super(
-      "AGENT_EXISTS",
-      `Agent with ${field} ${value} already exists`,
-      409
-    );
+    super("AGENT_EXISTS", `Agent with ${field} ${value} already exists`, 409);
     Object.setPrototypeOf(this, AgentAlreadyExistsError.prototype);
   }
 }
@@ -317,7 +313,7 @@ export class ERC8004VerificationError extends AuthError {
     super(
       "ERC8004_VERIFICATION_FAILED",
       `ERC-8004 verification failed${reason ? `: ${reason}` : ""}`,
-      403
+      403,
     );
     Object.setPrototypeOf(this, ERC8004VerificationError.prototype);
   }
@@ -337,7 +333,10 @@ export class UnauthorizedError extends AuthError {
  * ValidationError: Input validation failed
  */
 export class ValidationError extends AuthError {
-  constructor(message: string, public context?: Record<string, unknown>) {
+  constructor(
+    message: string,
+    public context?: Record<string, unknown>,
+  ) {
     super("VALIDATION_ERROR", message, 400);
     Object.setPrototypeOf(this, ValidationError.prototype);
   }
@@ -414,4 +413,76 @@ export interface LegacyAuthResponse {
   refreshToken: string;
   user: LegacyAuthUser;
   expiresIn: number;
+}
+
+// ============================================
+// Backward Compatibility Aliases
+// ============================================
+
+/**
+ * @deprecated Use AuthAgentProfile instead
+ * Alias for backward compatibility
+ */
+export type AgentProfile = AuthAgentProfile;
+
+/**
+ * @deprecated Use ConnectWalletRequest instead
+ * Alias for backward compatibility
+ */
+export type RegisterRequest = ConnectWalletRequest;
+
+/**
+ * @deprecated Use SIWAVerifyRequest instead
+ * Alias for backward compatibility
+ */
+export type LoginRequest = SIWAVerifyRequest;
+
+/**
+ * @deprecated Use SIWAVerifyResponse instead
+ * Alias for backward compatibility
+ */
+export type AuthResponse = SIWAVerifyResponse;
+
+/**
+ * @deprecated Use SIWAReceipt instead
+ * Alias for backward compatibility
+ */
+export type JWTPayload = SIWAReceipt;
+
+/**
+ * @deprecated Use InvalidReceiptError instead
+ * Alias for backward compatibility
+ */
+export class InvalidTokenError extends InvalidReceiptError {
+  constructor(reason?: string) {
+    super(reason || "Invalid token");
+    this.code = "INVALID_TOKEN";
+  }
+}
+
+/**
+ * @deprecated Use ReceiptExpiredError instead
+ * Alias for backward compatibility
+ */
+export class TokenExpiredError extends ReceiptExpiredError {}
+
+/**
+ * @deprecated Use AgentAlreadyExistsError instead
+ * Alias for backward compatibility
+ */
+export class UserAlreadyExistsError extends AgentAlreadyExistsError {
+  constructor(field: string = "identifier", value: string = "unknown") {
+    super(field, value);
+  }
+}
+
+/**
+ * @deprecated Use ValidationError instead
+ * Alias for backward compatibility
+ */
+export class InvalidCredentialsError extends ValidationError {
+  constructor() {
+    super("Invalid credentials");
+    this.code = "INVALID_CREDENTIALS";
+  }
 }

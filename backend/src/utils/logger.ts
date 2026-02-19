@@ -24,14 +24,19 @@ class Logger {
   }
 
   private shouldLog(level: LogLevel): boolean {
-    const levels = [LogLevel.DEBUG, LogLevel.INFO, LogLevel.WARN, LogLevel.ERROR];
+    const levels = [
+      LogLevel.DEBUG,
+      LogLevel.INFO,
+      LogLevel.WARN,
+      LogLevel.ERROR,
+    ];
     return levels.indexOf(level) >= levels.indexOf(this.level);
   }
 
   private formatMessage(
     level: LogLevel,
     message: string,
-    context?: LogContext
+    context?: LogContext,
   ): string {
     const timestamp = new Date().toISOString();
     const contextStr = context ? ` ${JSON.stringify(context)}` : "";
@@ -56,16 +61,48 @@ class Logger {
     }
   }
 
-  error(message: string, error?: Error | unknown, context?: LogContext): void {
+  error(message: string, error?: Error | unknown, context?: LogContext): void;
+  error(message: string, context?: LogContext): void;
+  error(
+    message: string,
+    errorOrContext?: Error | unknown | LogContext,
+    context?: LogContext,
+  ): void {
     if (this.shouldLog(LogLevel.ERROR)) {
-      const errorContext = {
-        ...context,
-        error: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : undefined,
-      };
+      let errorContext: LogContext = {};
+
+      if (errorOrContext) {
+        if (
+          errorOrContext instanceof Error ||
+          typeof errorOrContext === "string"
+        ) {
+          // errorOrContext is an error
+          errorContext = {
+            ...context,
+            error:
+              errorOrContext instanceof Error
+                ? errorOrContext.message
+                : String(errorOrContext),
+            stack:
+              errorOrContext instanceof Error
+                ? errorOrContext.stack
+                : undefined,
+          };
+        } else {
+          // errorOrContext is context
+          errorContext = errorOrContext as LogContext;
+        }
+      }
+
       console.error(this.formatMessage(LogLevel.ERROR, message, errorContext));
     }
   }
 }
 
 export const logger = new Logger();
+
+/**
+ * @deprecated Use named export { logger } instead
+ * Default export for backward compatibility
+ */
+export default logger;
