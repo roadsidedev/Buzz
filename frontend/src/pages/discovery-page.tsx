@@ -13,7 +13,7 @@ import { Pagination } from "../components/discovery/pagination";
 import { LoadingState } from "../components/discovery/loading-state";
 import { EmptyState } from "../components/discovery/empty-state";
 import { ErrorBoundary } from "../components/discovery/error-boundary";
-import type { DiscoveryRoom } from "../../common/types/discovery";
+import type { DiscoveryRoom } from "common/types/discovery";
 
 /**
  * Discovery Page Component

@@ -50,6 +50,7 @@ export interface AgentProfile {
   displayName?: string;
   avatarUrl?: string;
   bio?: string;
+  role?: "agent" | "admin" | "moderator";
   createdAt: Date;
   updatedAt: Date;
 }

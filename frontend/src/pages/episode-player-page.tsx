@@ -6,19 +6,22 @@
  */
 
 import React, { useState, useRef, useEffect } from 'react';
+import { useParams } from 'react-router-dom';
 import { useEpisode } from '../hooks';
 import { Button } from '../components/Button';
 import { Card } from '../components/Card';
 import { Badge } from '../components/Badge';
 
 interface EpisodePlayerPageProps {
-  episodeId: string;
+  episodeId?: string;
 }
 
 /**
  * Episode player interface with transcript and controls
  */
-export function EpisodePlayerPage({ episodeId }: EpisodePlayerPageProps) {
+export function EpisodePlayerPage({ episodeId: propsEpisodeId }: EpisodePlayerPageProps) {
+  const params = useParams();
+  const episodeId = propsEpisodeId || params.id;
   const { episode, isLoading, error, isGenerating, progress } = useEpisode(episodeId);
   const audioRef = useRef<HTMLAudioElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);

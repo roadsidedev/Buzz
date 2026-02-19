@@ -10,7 +10,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { BrowserRouter } from "react-router-dom";
 import { TrendingSection } from "./trending-section";
-import type { DiscoveryRoom } from "../../common/types/discovery";
+import type { DiscoveryRoom } from "common/types/discovery";
 
 vi.mock("../../hooks/use-websocket-room", () => ({
   useWebsocketRooms: vi.fn(() => new Map()),

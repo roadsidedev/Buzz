@@ -5,7 +5,7 @@
 
 import React, { useState } from "react";
 import { Users, TrendingUp, Clock } from "lucide-react";
-import type { DiscoveryRoom } from "../../../common/types/discovery";
+import type { DiscoveryRoom } from "common/types/discovery";
 
 interface RoomCardProps {
   room: DiscoveryRoom;

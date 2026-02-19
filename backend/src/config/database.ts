@@ -15,12 +15,33 @@ if (!DATABASE_URL) {
 /**
  * PostgreSQL connection pool
  */
-export const pool = new Pool({
+const pool = new Pool({
   connectionString: DATABASE_URL,
   max: 20, // Maximum pool size
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 2000,
 });
+
+/**
+ * Alias for pool - for backwards compatibility
+ */
+export const db = pool;
+export { pool };
+
+/**
+ * Database class for type compatibility
+ */
+export class Database {
+  private pool: typeof pool;
+  
+  constructor() {
+    this.pool = pool;
+  }
+  
+  getPool() {
+    return this.pool;
+  }
+}
 
 /**
  * Log pool events

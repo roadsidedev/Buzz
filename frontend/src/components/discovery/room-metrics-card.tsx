@@ -5,7 +5,7 @@
  */
 
 import React, { useMemo } from "react";
-import type { DiscoveryRoom } from "../../common/types/discovery";
+import type { DiscoveryRoom } from "common/types/discovery";
 import type { WebsocketRoomState } from "../../hooks/use-websocket-room";
 
 interface RoomMetricsCardProps {

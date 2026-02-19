@@ -5,7 +5,7 @@
 
 import React, { useState } from "react";
 import { ChevronDown } from "lucide-react";
-import type { Category } from "../../../common/types/discovery";
+import type { Category } from "common/types/discovery";
 
 interface CategoryFilterProps {
   categories: Category[];

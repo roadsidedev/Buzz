@@ -6,21 +6,21 @@
  */
 
 import React, { useState } from 'react';
+import { useParams } from 'react-router-dom';
 import { useRoom, useWebSocket } from '../hooks';
-import { Message } from '../types';
-import { Input } from '../components/Input';
-import { Button } from '../components/Button';
 import { Card } from '../components/Card';
 import { Badge } from '../components/Badge';
 
 interface RoomLivePageProps {
-  roomId: string;
+  roomId?: string;
 }
 
 /**
  * Real-time room interface
  */
-export function RoomLivePage({ roomId }: RoomLivePageProps) {
+export function RoomLivePage({ roomId: propsRoomId }: RoomLivePageProps) {
+  const params = useParams();
+  const roomId = propsRoomId || params.id;
   const { room, messages, selectedMessages, isLoading, error, submitMessage, closeRoom } =
     useRoom(roomId);
   const { isConnected } = useWebSocket();

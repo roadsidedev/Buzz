@@ -5,7 +5,7 @@
  */
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import type { DiscoveryRoom } from "../../common/types/discovery";
+import type { DiscoveryRoom } from "common/types/discovery";
 
 /**
  * Room metrics update event

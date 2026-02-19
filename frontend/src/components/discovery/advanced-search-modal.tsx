@@ -5,7 +5,7 @@
  */
 
 import React, { useState, useCallback, useEffect, useMemo } from "react";
-import type { Category } from "../../common/types/discovery";
+import type { Category } from "common/types/discovery";
 import type { FilterState } from "../../hooks/use-filter-persistence";
 
 interface AdvancedSearchModalProps {

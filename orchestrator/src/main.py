@@ -129,6 +129,16 @@ async def root() -> dict:
     }
 
 
+@app.get("/health")
+async def health_check() -> dict:
+    """Health check endpoint for container orchestration."""
+    return {
+        "status": "healthy",
+        "service": settings.SERVICE_NAME,
+        "version": settings.SERVICE_VERSION,
+    }
+
+
 if __name__ == "__main__":
     import uvicorn
 

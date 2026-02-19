@@ -8,7 +8,7 @@
 import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { RoomMetricsCard } from "./room-metrics-card";
-import type { DiscoveryRoom } from "../../common/types/discovery";
+import type { DiscoveryRoom } from "common/types/discovery";
 import type { WebsocketRoomState } from "../../hooks/use-websocket-room";
 
 describe("RoomMetricsCard", () => {
