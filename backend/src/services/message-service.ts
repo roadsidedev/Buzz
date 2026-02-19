@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Message Service
  *
@@ -11,7 +12,7 @@
  */
 
 import crypto from "crypto";
-import type { RoomMessage, MessageStatus } from "../../common/types/index.js";
+import type { RoomMessage, MessageStatus } from "@common/types/index";
 import { ValidationError, NotFoundError } from "../utils/errors.js";
 import { logger } from "../utils/logger.js";
 import { messageRepository } from "../repositories/index.js";

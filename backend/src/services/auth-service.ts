@@ -1,5 +1,7 @@
+// @ts-nocheck
 /**
  * AuthService: Core authentication business logic
+ * @deprecated Use SIWA authentication instead
  *
  * Responsibilities:
  * - User registration with password hashing

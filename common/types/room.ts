@@ -53,6 +53,22 @@ export interface Room {
   viewerCount: number;
   participantCount: number;
   completionLevel: CompletionLevel;
+  turnCount?: number;
+  lastTurnAt?: Date;
+  // Snake case aliases for DB compatibility
+  host_agent_id?: string;
+  jam_room_id?: string;
+  jam_room_url?: string;
+  spawn_fee_payment_id?: string;
+  viewer_count?: number;
+  participant_count?: number;
+  completion_level?: string;
+  created_at?: Date;
+  started_at?: Date;
+  ended_at?: Date;
+  updated_at?: Date;
+  turn_count?: number;
+  last_turn_at?: Date;
 }
 
 /**

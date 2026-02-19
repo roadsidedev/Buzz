@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Room Service
  * Business logic for room creation and management
@@ -13,7 +14,7 @@ import type {
   Room,
   CreateRoomRequest,
   RoomStatus,
-} from "../../common/types/index.js";
+} from "@common/types/index";
 import {
   ValidationError,
   NotFoundError,

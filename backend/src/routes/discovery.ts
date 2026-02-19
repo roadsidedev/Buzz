@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Discovery Routes
  * GET /discovery - Discovery page

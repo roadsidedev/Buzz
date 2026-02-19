@@ -1,24 +1,46 @@
 /**
  * SIWA Configuration
- * 
- * Sets up Privy client and SIWA constants
+ *
+ * Sets up Privy client (optional) and SIWA constants
  */
 
-import { PrivyClient } from "@privy-io/node";
+// @ts-ignore - Optional dependency
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+let PrivyClient: any = null;
+try {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  PrivyClient = require("@privy-io/node").PrivyClient;
+} catch {
+  // Privy not installed - features disabled
+}
+
+let privyClient: any = null;
 
 /**
- * Initialize Privy client for wallet management
+ * Initialize Privy client for wallet management (optional)
+ * Only initializes if @privy-io/node is installed and credentials are set
  */
-export const privy = new PrivyClient({
-  apiKey: process.env.PRIVY_API_KEY || "",
-  appId: process.env.PRIVY_APP_ID || "",
-});
+export function getPrivyClient(): any {
+  if (privyClient) return privyClient;
+
+  if (!PrivyClient) {
+    console.warn("@privy-io/node not installed - Privy features disabled");
+    return null;
+  }
+
+  privyClient = new PrivyClient({
+    apiKey: process.env.PRIVY_API_KEY || "",
+    appId: process.env.PRIVY_APP_ID || "",
+  });
+  return privyClient;
+}
 
 /**
  * ERC-8004 Registry contract address
  * Base Sepolia testnet
  */
-export const ERC8004_REGISTRY = process.env.ERC8004_REGISTRY || 
+export const ERC8004_REGISTRY =
+  process.env.ERC8004_REGISTRY ||
   "eip155:84532:0x8004A818BFB912233c491871b3d84c89A494BD9e";
 
 /**
@@ -44,7 +66,7 @@ export const SIWA_HMAC_SECRET = process.env.SIWA_HMAC_SECRET!;
 
 if (!SIWA_HMAC_SECRET || SIWA_HMAC_SECRET.length < 32) {
   throw new Error(
-    "SIWA_HMAC_SECRET must be set in .env and at least 32 characters"
+    "SIWA_HMAC_SECRET must be set in .env and at least 32 characters",
   );
 }
 

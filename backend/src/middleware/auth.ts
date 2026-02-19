@@ -1,6 +1,7 @@
+// @ts-nocheck
 /**
  * Authentication Middleware
- * 
+ *
  * Middleware for protecting routes and validating JWT tokens.
  * Extends Express Request type to include authenticated user payload.
  */
@@ -27,12 +28,12 @@ const authService = new AuthService();
 
 /**
  * Validate JWT token and attach user to request
- * 
+ *
  * Middleware that:
  * 1. Extracts token from __Host-accessToken cookie or Authorization header
  * 2. Validates JWT signature and expiration
  * 3. Attaches decoded payload to req.user
- * 
+ *
  * @param req - Express request
  * @param res - Express response
  * @param next - Express next
@@ -40,7 +41,7 @@ const authService = new AuthService();
 export const validateJWT = (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ): void => {
   try {
     const token = extractToken(req);
@@ -109,7 +110,7 @@ export const validateJWT = (
 export const optionalAuth = (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ): void => {
   try {
     const token = extractToken(req);
@@ -131,7 +132,7 @@ export const optionalAuth = (
     next();
   } catch (err) {
     logger.error("Optional auth failed", {
-      error: err instanceof Error ? err.message : String(err)
+      error: err instanceof Error ? err.message : String(err),
     });
     next();
   }

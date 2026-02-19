@@ -3,10 +3,13 @@
  * Data access layer for agent queries
  */
 
-import type { VerifiedAgent } from "../../common/types/index.js";
+import type { VerifiedAgent } from "@common/types/index";
 import { query, queryOne } from "../config/database.js";
 import { logger } from "../utils/logger.js";
-import { encryptDatabaseField, decryptDatabaseField } from "../config/database-encryption-config.js";
+import {
+  encryptDatabaseField,
+  decryptDatabaseField,
+} from "../config/database-encryption-config.js";
 
 interface AgentRow {
   id: string;
@@ -17,6 +20,7 @@ interface AgentRow {
   verified_at: string | null;
   created_at: string;
   updated_at: string;
+  [key: string]: unknown;
 }
 
 /**
@@ -34,7 +38,11 @@ export class AgentRepository {
     erc8004_address: string;
   }): Promise<VerifiedAgent> {
     // Encrypt sensitive PII before storage
-    const encryptedAddress = encryptDatabaseField("agent", "erc8004_address", agent.erc8004_address);
+    const encryptedAddress = encryptDatabaseField(
+      "agent",
+      "erc8004_address",
+      agent.erc8004_address,
+    );
 
     const text = `
       INSERT INTO agent (id, name, avatar, erc8004_address, verification_status, created_at, updated_at)
@@ -87,23 +95,27 @@ export class AgentRepository {
    */
   async getByAddress(erc8004Address: string): Promise<VerifiedAgent | null> {
     // To find an encrypted field, we must encrypt the search term with the same IV (not possible with random IV)
-    // or use a deterministic hash (blind index). 
+    // or use a deterministic hash (blind index).
     // For now, we search by the encrypted value (only works if encryption is deterministic, which GCM is not).
     // CORRECT APPROACH: Use a blind index (hash) for lookups.
-    
+
     // Fallback: If we can't search, we might need a separate hashed_address column.
     // For this fix, we'll try to find it by decrypting all or using the encrypted string if it matches.
     // However, GCM is non-deterministic. Let's check if we have a hashed_address column.
-    
+
     const text = `
       SELECT id, name, avatar, erc8004_address, verified_at, created_at, updated_at
       FROM agent
     `;
-    
+
     const rows = await query<AgentRow>(text);
-    
+
     for (const row of rows) {
-      const decrypted = decryptDatabaseField("agent", "erc8004_address", row.erc8004_address);
+      const decrypted = decryptDatabaseField(
+        "agent",
+        "erc8004_address",
+        row.erc8004_address,
+      );
       if (decrypted === erc8004Address) {
         return this.mapRowToAgent(row);
       }
@@ -130,7 +142,7 @@ export class AgentRepository {
    */
   async updateVerificationStatus(
     agentId: string,
-    status: "verified" | "unverified" | "pending" | "suspended" | "banned"
+    status: "verified" | "unverified" | "pending" | "suspended" | "banned",
   ): Promise<void> {
     const text = `
       UPDATE agent
@@ -150,7 +162,11 @@ export class AgentRepository {
    * Map database row to VerifiedAgent with decryption
    */
   private mapRowToAgent(row: AgentRow): VerifiedAgent {
-    const decryptedAddress = decryptDatabaseField("agent", "erc8004_address", row.erc8004_address);
+    const decryptedAddress = decryptDatabaseField(
+      "agent",
+      "erc8004_address",
+      row.erc8004_address,
+    );
 
     return {
       id: row.id,

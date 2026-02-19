@@ -54,6 +54,19 @@ export class AuthorizationError extends AppError {
 }
 
 /**
+ * Unauthorized error (403) - alias for AuthorizationError
+ */
+export class UnauthorizedError extends AuthorizationError {
+  constructor(
+    message: string = "Unauthorized",
+    context: Record<string, unknown> = {},
+  ) {
+    super(message, context);
+    this.name = "UnauthorizedError";
+  }
+}
+
+/**
  * Not found error (404)
  */
 export class NotFoundError extends AppError {

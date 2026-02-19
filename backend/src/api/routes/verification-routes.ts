@@ -9,12 +9,16 @@
  */
 
 import { Router, Request, Response } from "express";
-import { validateJWT } from "../middleware/auth.js";
-import { agentService } from "../services/agent-service.js";
-import { agentRepository } from "../repositories/index.js";
-import { ValidationError, NotFoundError, UnauthorizedError } from "../utils/errors.js";
-import { logger } from "../utils/logger.js";
-import type { VerifiedAgent } from "../../common/types/index.js";
+import { validateJWT } from "../../middleware/auth.js";
+import { agentService } from "../../services/agent-service.js";
+import { agentRepository } from "../../repositories/index.js";
+import {
+  ValidationError,
+  NotFoundError,
+  UnauthorizedError,
+} from "../../utils/errors.js";
+import { logger } from "../../utils/logger.js";
+import type { VerifiedAgent } from "@common/types/index";
 
 const router = Router();
 
@@ -119,7 +123,8 @@ router.post(
       });
 
       // Fetch updated agent status
-      const updatedAgent: VerifiedAgent = await agentService.getAgentById(agentId);
+      const updatedAgent: VerifiedAgent =
+        await agentService.getAgentById(agentId);
 
       logger.info("Agent identity verification completed", {
         agentId,
@@ -183,7 +188,7 @@ router.post(
         },
       });
     }
-  }
+  },
 );
 
 /**
@@ -201,62 +206,65 @@ router.post(
  * }
  * Status: 200 OK | 404 Not Found | 500 Error
  */
-router.get("/api/v1/agents/:id/verification-status", async (req: Request, res: Response) => {
-  try {
-    const agentId = req.params.id;
+router.get(
+  "/api/v1/agents/:id/verification-status",
+  async (req: Request, res: Response) => {
+    try {
+      const agentId = req.params.id;
 
-    const agent: VerifiedAgent = await agentService.getAgentById(agentId);
-    if (!agent) {
-      return res.status(404).json({
+      const agent: VerifiedAgent = await agentService.getAgentById(agentId);
+      if (!agent) {
+        return res.status(404).json({
+          success: false,
+          error: {
+            code: "NOT_FOUND",
+            message: "Agent not found",
+            statusCode: 404,
+          },
+        });
+      }
+
+      logger.debug("Verification status retrieved", {
+        agentId,
+        status: agent.verification_status,
+      });
+
+      return res.status(200).json({
+        success: true,
+        agentId: agent.id,
+        name: agent.name,
+        verificationStatus: agent.verification_status,
+        verifiedAt: agent.verified_at ? agent.verified_at.toISOString() : null,
+        badge: agent.badge || null,
+        avatar: agent.avatar || null,
+      });
+    } catch (err) {
+      if (err instanceof NotFoundError) {
+        return res.status(404).json({
+          success: false,
+          error: {
+            code: "NOT_FOUND",
+            message: "Agent not found",
+            statusCode: 404,
+          },
+        });
+      }
+
+      logger.error("Failed to retrieve verification status", {
+        agentId: req.params.id,
+        error: err instanceof Error ? err.message : String(err),
+      });
+
+      return res.status(500).json({
         success: false,
         error: {
-          code: "NOT_FOUND",
-          message: "Agent not found",
-          statusCode: 404,
+          code: "INTERNAL_ERROR",
+          message: "Failed to retrieve verification status",
+          statusCode: 500,
         },
       });
     }
-
-    logger.debug("Verification status retrieved", {
-      agentId,
-      status: agent.verification_status,
-    });
-
-    return res.status(200).json({
-      success: true,
-      agentId: agent.id,
-      name: agent.name,
-      verificationStatus: agent.verification_status,
-      verifiedAt: agent.verified_at ? agent.verified_at.toISOString() : null,
-      badge: agent.badge || null,
-      avatar: agent.avatar || null,
-    });
-  } catch (err) {
-    if (err instanceof NotFoundError) {
-      return res.status(404).json({
-        success: false,
-        error: {
-          code: "NOT_FOUND",
-          message: "Agent not found",
-          statusCode: 404,
-        },
-      });
-    }
-
-    logger.error("Failed to retrieve verification status", {
-      agentId: req.params.id,
-      error: err instanceof Error ? err.message : String(err),
-    });
-
-    return res.status(500).json({
-      success: false,
-      error: {
-        code: "INTERNAL_ERROR",
-        message: "Failed to retrieve verification status",
-        statusCode: 500,
-      },
-    });
-  }
-});
+  },
+);
 
 export default router;

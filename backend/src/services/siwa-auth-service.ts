@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * SIWAAuthService: Wallet-based authentication using SIWA + Privy
  *

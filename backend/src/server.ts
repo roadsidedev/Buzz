@@ -15,16 +15,48 @@ initializeOTel();
 
 import express, { Express, Request, Response, NextFunction } from "express";
 import http from "http";
+import { Server as SocketIOServer } from "socket.io";
+import helmet from "helmet";
+import cors from "cors";
+import morgan from "morgan";
+
+// ============================================================================
+// Utils & Config
+// ============================================================================
+import { logger } from "./utils/logger.js";
+import { initializeSentry } from "./config/sentry-config.js";
+import { validateJWTConfig } from "./services/auth-service.js";
+import {
+  validateCSRFConfig,
+  csrfTokenProvider,
+  validateCSRFToken,
+  initializeCSRFToken,
+} from "./middleware/csrf-protection.js";
+import { validateX402Config } from "./config/x402-config.js";
+import { validateJamConfig, validateTTSConfig } from "./config/media-config.js";
+import { validateWebSocketConfig } from "./config/websocket-config.js";
+import { startRateLimitCleanup } from "./middleware/rate-limit.js";
+import { notFoundHandler, errorHandler } from "./middleware/error-handler.js";
+import { initializeLoginAttemptService } from "./services/login-attempt-service.js";
+import {
+  sentryTransactionMiddleware,
+  sentrySecurityContextMiddleware,
+  sentryAuthTrackingMiddleware,
+} from "./middleware/sentry-middleware.js";
+
+// ============================================================================
+// Routes
+// ============================================================================
+import skillRoutes from "./routes/skill-routes.js";
+import siwaAuthRoutes from "./routes/auth-routes-siwa.js";
+import agentRoutes from "./routes/agent-routes.js";
+import roomRoutes from "./routes/room-routes.js";
+import discoveryRoutes from "./routes/discovery-routes.js";
+import podcastRoutes from "./routes/podcast-routes.js";
 
 // ============================================================================
 // CRITICAL SECURITY VALIDATION (Must run before server starts)
 // ============================================================================
-
-import { validateJWTConfig } from "./services/auth-service.js";
-import { validateCSRFConfig } from "./middleware/csrf-protection.js";
-import { validateX402Config } from "./config/x402-config.js";
-import { validateJamConfig, validateTTSConfig } from "./config/media-config.js";
-import { validateWebSocketConfig } from "./config/websocket-config.js";
 
 try {
   // Validate all critical security configurations
@@ -78,7 +110,7 @@ try {
 }
 
 const app: Express = express();
-const port = process.env.API_PORT || 4000;
+const port = parseInt(process.env.API_PORT || "4000", 10);
 const apiVersion = "v1";
 
 // ============================================================================
@@ -135,7 +167,9 @@ let rateLimiterReady = false;
  */
 const rateLimiterGuard = (req: Request, res: Response, next: NextFunction) => {
   if (!rateLimiterReady) {
-    logger.warn("Rate limiter not ready, rejecting request", { path: req.path });
+    logger.warn("Rate limiter not ready, rejecting request", {
+      path: req.path,
+    });
     res.status(503).json({
       success: false,
       error: {

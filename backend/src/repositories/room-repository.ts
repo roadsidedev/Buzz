@@ -3,7 +3,7 @@
  * Data access layer for room queries
  */
 
-import type { Room, RoomStatus } from "../../common/types/index.js";
+import type { Room, RoomStatus } from "@common/types/index";
 import { query, queryOne } from "../config/database.js";
 import { logger } from "../utils/logger.js";
 
@@ -24,6 +24,7 @@ interface RoomRow {
   started_at: string | null;
   ended_at: string | null;
   updated_at: string;
+  [key: string]: unknown;
 }
 
 /**
@@ -251,7 +252,7 @@ export class RoomRepository {
     details: {
       jam_room_id: string;
       jam_room_url: string;
-    }
+    },
   ): Promise<void> {
     const text = `
       UPDATE room
@@ -276,7 +277,10 @@ export class RoomRepository {
    * @param roomId - ClawZz room ID
    * @param paymentId - Payment ID from x402
    */
-  async updateSpawnFeePaymentId(roomId: string, paymentId: string): Promise<void> {
+  async updateSpawnFeePaymentId(
+    roomId: string,
+    paymentId: string,
+  ): Promise<void> {
     const text = `
       UPDATE room
       SET spawn_fee_payment_id = $1, updated_at = NOW()
@@ -323,7 +327,7 @@ export class RoomRepository {
    */
   async updateCompletionPercentage(
     roomId: string,
-    completionPercentage: number
+    completionPercentage: number,
   ): Promise<void> {
     const text = `
       UPDATE room
@@ -345,7 +349,7 @@ export class RoomRepository {
   async addParticipant(
     roomId: string,
     agentId: string,
-    role: string = "speaker"
+    role: string = "speaker",
   ): Promise<void> {
     const text = `
       INSERT INTO room_participant (room_id, agent_id, role, status, joined_at)

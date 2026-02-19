@@ -6,8 +6,8 @@
  */
 
 import { Request, Response, NextFunction } from "express";
-import { agentRepository } from "../repositories/index";
-import { logger } from "../utils/logger";
+import { agentRepository } from "../../repositories/index.js";
+import { logger } from "../../utils/logger.js";
 
 /**
  * Enforce agent verification status
@@ -22,7 +22,11 @@ import { logger } from "../utils/logger";
  *   router.post("/create-room", verifyAgentStatus(["verified"]), createRoomHandler)
  */
 export function verifyAgentStatus(allowedStatuses: string[] = ["verified"]) {
-  return async (req: Request, res: Response, next: NextFunction) => {
+  return async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
     try {
       const agentId = (req as any).user?.agentId;
 
@@ -30,7 +34,7 @@ export function verifyAgentStatus(allowedStatuses: string[] = ["verified"]) {
         logger.warn("Verification check: Missing agent ID", {
           path: req.path,
         });
-        return res.status(401).json({
+        res.status(401).json({
           success: false,
           error: {
             code: "MISSING_AUTH",
@@ -38,16 +42,16 @@ export function verifyAgentStatus(allowedStatuses: string[] = ["verified"]) {
             statusCode: 401,
           },
         });
+        return;
       }
 
-      // Get agent from database
       const agent = await agentRepository.getById(agentId);
       if (!agent) {
         logger.warn("Verification check: Agent not found", {
           agentId,
           path: req.path,
         });
-        return res.status(404).json({
+        res.status(404).json({
           success: false,
           error: {
             code: "AGENT_NOT_FOUND",
@@ -55,38 +59,39 @@ export function verifyAgentStatus(allowedStatuses: string[] = ["verified"]) {
             statusCode: 404,
           },
         });
+        return;
       }
 
-      // Check if agent status is allowed
-      if (!allowedStatuses.includes(agent.verification_status)) {
+      const status = agent.verification_status || "unverified";
+      if (!allowedStatuses.includes(status)) {
         logger.warn("Verification check failed", {
           agentId,
-          currentStatus: agent.verification_status,
+          currentStatus: status,
           allowedStatuses,
           path: req.path,
         });
 
-        return res.status(403).json({
+        res.status(403).json({
           success: false,
           error: {
             code: "AGENT_NOT_VERIFIED",
-            message: `Agent verification required. Current status: ${agent.verification_status}. This operation requires one of: ${allowedStatuses.join(", ")}`,
+            message: `Agent verification required. Current status: ${status}. This operation requires one of: ${allowedStatuses.join(", ")}`,
             statusCode: 403,
             context: {
-              currentStatus: agent.verification_status,
+              currentStatus: status,
               allowedStatuses,
               action: "Verify your agent identity to perform this action",
             },
           },
         });
+        return;
       }
 
       logger.debug("Verification check passed", {
         agentId,
-        status: agent.verification_status,
+        status,
       });
 
-      // Attach agent to request for use in handler
       (req as any).agent = agent;
 
       next();
@@ -96,7 +101,7 @@ export function verifyAgentStatus(allowedStatuses: string[] = ["verified"]) {
         path: req.path,
       });
 
-      return res.status(500).json({
+      res.status(500).json({
         success: false,
         error: {
           code: "VERIFICATION_ERROR",
@@ -114,18 +119,24 @@ export function verifyAgentStatus(allowedStatuses: string[] = ["verified"]) {
  * Attaches verification info to request but doesn't block
  */
 export function attachVerificationStatus() {
-  return async (req: Request, res: Response, next: NextFunction) => {
+  return async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
     try {
       const agentId = (req as any).user?.agentId;
 
       if (!agentId) {
-        return next();
+        next();
+        return;
       }
 
       const agent = await agentRepository.getById(agentId);
       if (agent) {
-        (req as any).verificationStatus = agent.verification_status;
-        (req as any).isVerified = agent.verification_status === "verified";
+        const status = agent.verification_status || "unverified";
+        (req as any).verificationStatus = status;
+        (req as any).isVerified = status === "verified";
       }
 
       next();

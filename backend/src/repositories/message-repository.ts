@@ -10,7 +10,7 @@
  * Part of Day 7
  */
 
-import type { RoomMessage, MessageStatus } from "../../common/types/index.js";
+import type { RoomMessage, MessageStatus } from "@common/types/index";
 import { query, queryOne } from "../config/database.js";
 import { logger } from "../utils/logger.js";
 
@@ -30,6 +30,7 @@ interface MessageRow {
   played_at: string | null;
   created_at: string;
   updated_at: string;
+  [key: string]: unknown;
 }
 
 // ===================================================================

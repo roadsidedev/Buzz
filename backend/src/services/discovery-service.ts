@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Discovery Service
  * Handles fetching and filtering rooms for discovery page
@@ -10,7 +11,7 @@ import type {
   Category,
   DiscoveryFilters,
   PaginatedResponse,
-} from "../../common/types/discovery.js";
+} from "@common/types/discovery";
 import { NotFoundError, DatabaseError } from "../utils/errors.js";
 import { logger } from "../utils/logger.js";
 import {

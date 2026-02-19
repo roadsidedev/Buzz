@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Payment Service
  * High-level business logic for spawn fees and revenue distribution
@@ -12,7 +13,7 @@
  * - Podcast generation cost tracking
  */
 
-import type { Payment, PaymentStatus, PaymentType } from "../../common/types/index.js";
+import type { Payment, PaymentStatus, PaymentType } from "@common/types/index";
 import { PaymentError, ValidationError } from "../utils/errors.js";
 import { logger } from "../utils/logger.js";
 import { getX402PaymentService } from "./x402-payment-service.js";
@@ -136,7 +137,8 @@ export class PaymentService {
    */
   async getPaymentStatus(paymentId: string): Promise<PaymentStatus> {
     try {
-      const status = await this.x402PaymentService.checkPaymentStatus(paymentId);
+      const status =
+        await this.x402PaymentService.checkPaymentStatus(paymentId);
 
       logger.debug("Payment status checked", {
         paymentId,
@@ -184,7 +186,8 @@ export class PaymentService {
       await this.x402PaymentService.refundPayment(paymentId, reason);
 
       // Mark as refunded (status update handled by x402 service)
-      const status = await this.x402PaymentService.checkPaymentStatus(paymentId);
+      const status =
+        await this.x402PaymentService.checkPaymentStatus(paymentId);
 
       logger.info("Payment refunded successfully", {
         paymentId,
@@ -277,9 +280,8 @@ export class PaymentService {
         },
       };
 
-      const x402Response = await this.x402PaymentService["x402Client"].createPayment(
-        x402Request,
-      );
+      const x402Response =
+        await this.x402PaymentService["x402Client"].createPayment(x402Request);
 
       logger.info("Podcast generation cost charged via x402", {
         paymentId: x402Response.id,

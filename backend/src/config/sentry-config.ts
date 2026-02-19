@@ -54,12 +54,9 @@ export function initializeSentry(app: any): void {
     ],
 
     // Filtering
-    allowUrls: [
-      /https?:\/\/.*clawzz/,
-      /https?:\/\/localhost/,
-    ],
+    allowUrls: [/https?:\/\/.*clawzz/, /https?:\/\/localhost/],
 
-    beforeSend(event, hint) {
+    beforeSend(event: any, _hint: any) {
       // Don't send development errors to Sentry
       if (environment === "development") {
         return null;
@@ -68,15 +65,14 @@ export function initializeSentry(app: any): void {
       // Filter sensitive data
       if (event.request) {
         // Remove auth headers
-        event.request.headers = {
-          ...event.request.headers,
-          Authorization: "[REDACTED]",
-          "X-API-Key": "[REDACTED]",
-        };
+        if (event.request.headers) {
+          event.request.headers.Authorization = "[REDACTED]";
+          event.request.headers["X-API-Key"] = "[REDACTED]";
+        }
 
         // Remove sensitive cookies
         if (event.request.cookies) {
-          event.request.cookies = "[REDACTED]";
+          event.request.cookies = { redacted: true };
         }
       }
 
@@ -114,7 +110,7 @@ export function initializeSentry(app: any): void {
  */
 export function captureSecurityEvent(
   eventType: string,
-  data: Record<string, any>
+  data: Record<string, any>,
 ): void {
   Sentry.captureMessage(`Security Event: ${eventType}`, {
     level: "warning",
@@ -136,7 +132,7 @@ export function captureSecurityEvent(
 export function captureBruteForceAttempt(
   identifier: string,
   ip: string | undefined,
-  attempts: number
+  attempts: number,
 ): void {
   captureSecurityEvent("brute_force_attempt", {
     identifier,
@@ -152,7 +148,7 @@ export function captureBruteForceAttempt(
 export function captureAccountLockout(
   identifier: string,
   ip: string | undefined,
-  reason: string
+  reason: string,
 ): void {
   captureSecurityEvent("account_lockout", {
     identifier,
@@ -167,7 +163,7 @@ export function captureAccountLockout(
  */
 export function captureCsrfMismatch(
   sessionId: string,
-  ip: string | undefined
+  ip: string | undefined,
 ): void {
   captureSecurityEvent("csrf_validation_failed", {
     sessionId,
@@ -182,7 +178,7 @@ export function captureCsrfMismatch(
 export function captureXssAttempt(
   payload: string,
   field: string,
-  ip: string | undefined
+  ip: string | undefined,
 ): void {
   captureSecurityEvent("xss_attempt_detected", {
     field,
@@ -198,7 +194,7 @@ export function captureXssAttempt(
  */
 export function captureSqlInjectionAttempt(
   query: string,
-  ip: string | undefined
+  ip: string | undefined,
 ): void {
   captureSecurityEvent("potential_sql_injection", {
     queryLength: query.length,
@@ -213,7 +209,7 @@ export function captureSqlInjectionAttempt(
 export function captureApiAbuse(
   agentId: string,
   endpoint: string,
-  requestsPerSecond: number
+  requestsPerSecond: number,
 ): void {
   captureSecurityEvent("api_abuse_detected", {
     agentId,
@@ -229,7 +225,7 @@ export function captureApiAbuse(
 export function captureUnauthorizedAccess(
   agentId: string | undefined,
   resource: string,
-  ip: string | undefined
+  ip: string | undefined,
 ): void {
   captureSecurityEvent("unauthorized_access_attempt", {
     agentId,
@@ -245,7 +241,7 @@ export function captureUnauthorizedAccess(
 export function captureSuspiciousLogin(
   agentId: string,
   reason: string,
-  data: Record<string, any>
+  data: Record<string, any>,
 ): void {
   captureSecurityEvent("suspicious_login", {
     agentId,
@@ -260,7 +256,7 @@ export function captureSuspiciousLogin(
  */
 export function captureError(
   error: Error,
-  context: Record<string, any> = {}
+  context: Record<string, any> = {},
 ): void {
   Sentry.captureException(error, {
     contexts: {
@@ -277,7 +273,7 @@ export function captureError(
 export function addBreadcrumb(
   message: string,
   data: Record<string, any> = {},
-  level: "debug" | "info" | "warning" | "error" = "info"
+  level: "debug" | "info" | "warning" | "error" = "info",
 ): void {
   Sentry.addBreadcrumb({
     message,

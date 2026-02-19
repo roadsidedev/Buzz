@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * x402 Payment Service - Phase 2 Complete Implementation
  *

@@ -49,16 +49,19 @@ export async function initializeRateLimitStore(): Promise<void> {
       return;
     }
   } catch (error) {
-    logger.warn("Redis rate limit store initialization failed, using memory store", {
-      error: error instanceof Error ? error.message : String(error),
-    });
+    logger.warn(
+      "Redis rate limit store initialization failed, using memory store",
+      {
+        error: error instanceof Error ? error.message : String(error),
+      },
+    );
   }
 
   // Fall back to in-memory store
   rateLimitStore = new MemoryRateLimitStore();
   logger.warn(
     "Using in-memory rate limit store. This will not work correctly in clustered environments. " +
-    "Set REDIS_URL environment variable for production.",
+      "Set REDIS_URL environment variable for production.",
   );
 }
 
@@ -73,7 +76,9 @@ export function createRateLimiter(config: RateLimitConfig) {
     config.keyGenerator ||
     ((req: Request) => {
       // Rate limit by agent ID if authenticated, otherwise by IP
-      return req.agent?.agentId || req.ip || "unknown";
+      const agentId = (req as any).agent?.agentId || (req as any).user?.agentId;
+      if (agentId) return String(agentId);
+      return req.ip || "unknown";
     });
 
   return async (

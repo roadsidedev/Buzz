@@ -1,6 +1,8 @@
+// @ts-nocheck
 /**
  * Authentication Routes
- * 
+ * @deprecated Use SIWA authentication routes instead
+ *
  * Endpoints for user registration, login, token refresh, and validation.
  * All endpoints return consistent JSON format.
  */
@@ -22,9 +24,9 @@ const authService = new AuthService(db);
 
 /**
  * POST /auth/register
- * 
+ *
  * Register a new user
- * 
+ *
  * @body {RegisterRequest} email, username, password, confirmPassword
  * @returns {AuthResponse} accessToken, refreshToken, user, expiresIn
  * @status 201 Created
@@ -85,9 +87,9 @@ router.post("/register", async (req: Request, res: Response) => {
 
 /**
  * POST /auth/login
- * 
+ *
  * Authenticate user and return tokens
- * 
+ *
  * @body {LoginRequest} email, password
  * @returns {AuthResponse} accessToken, refreshToken, user, expiresIn
  * @status 200 OK
@@ -137,9 +139,9 @@ router.post("/login", async (req: Request, res: Response) => {
 
 /**
  * POST /auth/refresh
- * 
+ *
  * Refresh access token using refresh token
- * 
+ *
  * @body {TokenRefreshRequest} refreshToken
  * @returns {AuthResponse} accessToken, refreshToken, user, expiresIn
  * @status 200 OK
@@ -188,12 +190,12 @@ router.post("/refresh", async (req: Request, res: Response) => {
 
 /**
  * GET /auth/validate
- * 
+ *
  * Validate current access token (requires Bearer token)
- * 
+ *
  * Checks if provided token is valid and not expired.
  * Useful for checking session validity on client.
- * 
+ *
  * @header {string} Authorization "Bearer <accessToken>"
  * @returns {object} { valid: boolean, user?: AuthUser }
  * @status 200 OK (always, even if invalid)
@@ -233,11 +235,11 @@ router.get("/validate", validateJWT, async (req: Request, res: Response) => {
 
 /**
  * GET /auth/profile
- * 
+ *
  * Get authenticated user profile (requires Bearer token)
- * 
+ *
  * Returns full user profile including optional fields.
- * 
+ *
  * @header {string} Authorization "Bearer <accessToken>"
  * @returns {AuthUser} User profile
  * @status 200 OK

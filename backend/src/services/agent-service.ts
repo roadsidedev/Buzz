@@ -4,7 +4,7 @@
  */
 
 import crypto from "crypto";
-import type { VerifiedAgent, AgentStats } from "../../common/types/index.js";
+import type { VerifiedAgent, AgentStats } from "@common/types/index";
 import { ValidationError, NotFoundError } from "../utils/errors.js";
 import { logger } from "../utils/logger.js";
 import { agentRepository } from "../repositories/index.js";
@@ -78,16 +78,24 @@ export class AgentService {
   /**
    * Register agent identity on-chain via ERC-8004
    */
-  async registerAgentOnChain(agentId: string, walletAddress: string): Promise<string | null> {
+  async registerAgentOnChain(
+    agentId: string,
+    walletAddress: string,
+  ): Promise<string | null> {
     try {
-      const txHash = await this.erc8004Service.registerAgent(agentId, walletAddress);
+      const txHash = await this.erc8004Service.registerAgent(
+        agentId,
+        walletAddress,
+      );
       logger.info("Agent registered on-chain", { agentId, txHash });
       return txHash;
     } catch (err) {
       // If service is not initialized with signer (e.g. dev mode without private key),
       // we log a warning but don't fail the operation.
       if (err instanceof Error && err.message.includes("signer")) {
-        logger.warn("Skipping on-chain registration: No signer configured", { agentId });
+        logger.warn("Skipping on-chain registration: No signer configured", {
+          agentId,
+        });
         return null;
       }
       throw err;
@@ -113,7 +121,7 @@ export class AgentService {
    * Get agent by Ethereum address
    */
   async getAgentByAddress(
-    erc8004Address: string
+    erc8004Address: string,
   ): Promise<VerifiedAgent | null> {
     const agent = await agentRepository.getByAddress(erc8004Address);
 
@@ -172,12 +180,14 @@ export class AgentService {
 
     try {
       // Call ERC-8004 verification service
-      const verificationResult = await this.erc8004Service.verifyAgentOwnership({
-        agentId: input.agentId,
-        walletAddress: input.walletAddress,
-        proof: input.proof,
-        signature: input.signature,
-      });
+      const verificationResult = await this.erc8004Service.verifyAgentOwnership(
+        {
+          agentId: input.agentId,
+          walletAddress: input.walletAddress,
+          proof: input.proof,
+          signature: input.signature,
+        },
+      );
 
       if (!verificationResult.verified) {
         logger.warn("ERC-8004 verification failed", {

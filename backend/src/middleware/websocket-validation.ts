@@ -14,7 +14,7 @@
 
 import { z } from "zod";
 import type { Socket } from "socket.io";
-import { logger } from "./logger.js";
+import { logger } from "../utils/logger.js";
 
 /**
  * Maximum payload sizes (in bytes)

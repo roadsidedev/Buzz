@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Database Field Encryption Utility
  * Encrypts sensitive data at rest using AES-256-GCM

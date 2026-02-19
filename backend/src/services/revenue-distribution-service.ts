@@ -12,7 +12,7 @@
  */
 
 import { v4 as uuidv4 } from "uuid";
-import type { Room } from "../../common/types/index.js";
+import type { Room } from "@common/types/index";
 import {
   roomRepository,
   messageRepository,

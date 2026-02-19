@@ -14,6 +14,13 @@ export interface VerifiedAgent {
   verifiedAt: Date;
   createdAt: Date;
   updatedAt: Date;
+  verification_status?: string; // Snake case for DB compatibility
+  badge?: AgentBadge;
+  // Snake case aliases for DB compatibility
+  erc8004_address?: string;
+  verified_at?: Date;
+  created_at?: Date;
+  updated_at?: Date;
 }
 
 /**
@@ -28,7 +35,7 @@ export interface CreateAgentRequest {
 /**
  * Agent profile with statistics
  */
-export interface AgentProfile extends VerifiedAgent {
+export interface AgentProfileWithStats extends VerifiedAgent {
   roomsHosted: number;
   totalParticipations: number;
   averageScore: number; // Average message score
@@ -89,7 +96,7 @@ export interface AgentTokenPayload {
 /**
  * Agent authentication response
  */
-export interface AuthResponse {
+export interface AgentAuthResponse {
   token: string;
   agent: VerifiedAgent;
   expiresIn: number;

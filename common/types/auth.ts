@@ -61,6 +61,7 @@ export interface SIWAReceipt {
   signerType?: "eoa" | "sca";
   issuedAt: string;
   expiresAt: string;
+  sub?: string;
 }
 
 /**
@@ -94,12 +95,20 @@ export interface WalletSession {
  * @param agentId - ERC-8004 token ID (>= 1)
  * @param name - Display name (1-255 chars)
  * @param avatar - Optional avatar URL
+ * @param email - Optional email for legacy auth flows
+ * @param username - Optional username for legacy auth flows
+ * @param password - Optional password for legacy auth flows
+ * @param confirmPassword - Optional confirm password for legacy auth flows
  */
 export interface ConnectWalletRequest {
   walletAddress: string;
   agentId: number;
   name: string;
   avatar?: string;
+  email?: string;
+  username?: string;
+  password?: string;
+  confirmPassword?: string;
 }
 
 /**
@@ -149,12 +158,16 @@ export interface SIWANonceResponse {
  * @param signature - EIP-191 signature hex string (0x...)
  * @param walletAddress - Signer's wallet address
  * @param agentId - Agent's ERC-8004 token ID
+ * @param email - Optional email for legacy auth flows
+ * @param password - Optional password for legacy auth flows
  */
 export interface SIWAVerifyRequest {
   message: string;
   signature: string;
   walletAddress: string;
   agentId: number;
+  email?: string;
+  password?: string;
 }
 
 /**
@@ -163,11 +176,15 @@ export interface SIWAVerifyRequest {
  * @param receipt - HMAC-signed stateless token for API auth
  * @param agent - Authenticated agent profile
  * @param expiresAt - When receipt expires (24 hours)
+ * @param accessToken - Optional access token for legacy auth flows
+ * @param user - Optional user profile for legacy auth flows
  */
 export interface SIWAVerifyResponse {
   receipt: string;
   agent: AuthAgentProfile;
   expiresAt: string;
+  accessToken?: string;
+  user?: AuthAgentProfile;
 }
 
 /**
@@ -448,6 +465,12 @@ export type AuthResponse = SIWAVerifyResponse;
  * Alias for backward compatibility
  */
 export type JWTPayload = SIWAReceipt;
+
+/**
+ * @deprecated Use AuthAgentProfile instead
+ * Alias for backward compatibility
+ */
+export type AuthUser = AuthAgentProfile;
 
 /**
  * @deprecated Use InvalidReceiptError instead

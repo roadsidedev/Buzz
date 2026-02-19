@@ -12,13 +12,14 @@
  */
 
 import { Router, Request, Response } from "express";
-import type { RoomMessage, RoomStatus } from "../../common/types/index.js";
-import { roomRepository, messageRepository } from "../repositories/index.js";
-import { turnManagementService } from "../services/turn-management-service.js";
-import { messageService } from "../services/message-service.js";
-import { outputContractService } from "../services/output-contract-service.js";
-import { ValidationError, NotFoundError } from "../utils/errors.js";
-import { logger } from "../utils/logger.js";
+import type { RoomMessage } from "@common/types/index";
+import { RoomStatus } from "@common/types/index";
+import { roomRepository, messageRepository } from "../../repositories/index.js";
+import { turnManagementService } from "../../services/turn-management-service.js";
+import { messageService } from "../../services/message-service.js";
+import { outputContractService } from "../../services/output-contract-service.js";
+import { ValidationError, NotFoundError } from "../../utils/errors.js";
+import { logger } from "../../utils/logger.js";
 
 const router = Router();
 
@@ -40,7 +41,7 @@ router.post("/api/rooms/:id/messages", async (req: Request, res: Response) => {
   try {
     const roomId = req.params.id;
     const { text } = req.body as { text?: string };
-    
+
     // Extract agent ID from authenticated user (JWT via validateJWT middleware)
     const agentId = (req as any).user?.agentId;
 
@@ -209,42 +210,45 @@ router.get("/api/rooms/:id/messages", async (req: Request, res: Response) => {
  * }
  * Status: 200 OK | 404 Not Found | 500 Error
  */
-router.get("/api/rooms/:id/turn-status", async (req: Request, res: Response) => {
-  try {
-    const roomId = req.params.id;
+router.get(
+  "/api/rooms/:id/turn-status",
+  async (req: Request, res: Response) => {
+    try {
+      const roomId = req.params.id;
 
-    // 1. GET TURN STATUS
-    const turnStatus = await turnManagementService.getTurnStatus(roomId);
+      // 1. GET TURN STATUS
+      const turnStatus = await turnManagementService.getTurnStatus(roomId);
 
-    logger.debug("Turn status retrieved", {
-      roomId,
-      turn: turnStatus.currentTurn,
-      candidates: turnStatus.candidateCount,
-    });
+      logger.debug("Turn status retrieved", {
+        roomId,
+        turn: turnStatus.currentTurn,
+        candidates: turnStatus.candidateCount,
+      });
 
-    return res.status(200).json({
-      success: true,
-      data: turnStatus,
-    });
-  } catch (err) {
-    if (err instanceof NotFoundError) {
-      return res.status(404).json({
-        error: "Room not found",
-        code: "ROOM_NOT_FOUND",
+      return res.status(200).json({
+        success: true,
+        data: turnStatus,
+      });
+    } catch (err) {
+      if (err instanceof NotFoundError) {
+        return res.status(404).json({
+          error: "Room not found",
+          code: "ROOM_NOT_FOUND",
+        });
+      }
+
+      logger.error("Failed to get turn status", {
+        roomId: req.params.id,
+        error: err instanceof Error ? err.message : String(err),
+      });
+
+      return res.status(500).json({
+        error: "Failed to get turn status",
+        code: "STATUS_FAILED",
       });
     }
-
-    logger.error("Failed to get turn status", {
-      roomId: req.params.id,
-      error: err instanceof Error ? err.message : String(err),
-    });
-
-    return res.status(500).json({
-      error: "Failed to get turn status",
-      code: "STATUS_FAILED",
-    });
-  }
-});
+  },
+);
 
 // ===================================================================
 // GET COMPLETION STATUS ENDPOINT
@@ -344,7 +348,7 @@ router.post("/api/rooms/:id/close", async (req: Request, res: Response) => {
     turnManagementService.stopTurnManagement(roomId);
 
     // 4. UPDATE ROOM STATUS
-    await roomRepository.updateStatus(roomId, "completed");
+    await roomRepository.updateStatus(roomId, RoomStatus.COMPLETED);
 
     logger.info("Room closed", {
       roomId,
