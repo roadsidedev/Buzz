@@ -10,7 +10,7 @@ import type {
   DiscoveryRoom,
   Category,
   PaginatedResponse,
-} from "../../common/types/discovery";
+} from "common/types/discovery";
 
 /**
  * Discovery data state

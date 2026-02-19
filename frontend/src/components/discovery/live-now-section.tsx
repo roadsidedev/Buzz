@@ -7,7 +7,7 @@
 
 import React, { useState, useRef, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import type { DiscoveryRoom } from "../../common/types/discovery";
+import type { DiscoveryRoom } from "common/types/discovery";
 import { useWebsocketRooms } from "../../hooks/use-websocket-room";
 import { RoomMetricsCard } from "./room-metrics-card";
 

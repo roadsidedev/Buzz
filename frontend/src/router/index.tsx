@@ -13,7 +13,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { useAuth } from "@/stores/auth-store";
 
 // Route guards
-import { ProtectedRoute, PublicRoute, RoleRoute } from "./protected-route";
+import { ProtectedRoute, PublicRoute } from "./protected-route";
 
 // Layouts
 import { MainLayout } from "@/components/layouts/main-layout";

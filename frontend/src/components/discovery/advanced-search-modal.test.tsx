@@ -9,7 +9,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { AdvancedSearchModal } from "./advanced-search-modal";
-import type { Category } from "../../common/types/discovery";
+import type { Category } from "common/types/discovery";
 
 describe("AdvancedSearchModal", () => {
   const mockCategories: Category[] = [

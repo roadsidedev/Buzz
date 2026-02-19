@@ -6,7 +6,7 @@
  */
 
 import React, { useMemo, useCallback } from "react";
-import type { DiscoveryRoom } from "../../common/types/discovery";
+import type { DiscoveryRoom } from "common/types/discovery";
 
 interface VirtualRoomGridProps {
   rooms: DiscoveryRoom[];
