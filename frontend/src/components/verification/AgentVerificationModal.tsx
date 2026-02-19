@@ -391,6 +391,4 @@ export const AgentVerificationModal: React.FC<AgentVerificationModalProps> = ({
   );
 };
 
-};
-
 export default AgentVerificationModal;

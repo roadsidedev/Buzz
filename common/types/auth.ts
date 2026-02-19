@@ -16,7 +16,7 @@
  * Returned after successful SIWA verification
  * and when validating current session
  */
-export interface AgentProfile {
+export interface AuthAgentProfile {
   id: string;
   name: string;
   avatar?: string;
@@ -109,7 +109,7 @@ export interface ConnectWalletRequest {
  */
 export interface ConnectWalletResponse {
   success: boolean;
-  agent: AgentProfile;
+  agent: AuthAgentProfile;
 }
 
 /**
@@ -166,7 +166,7 @@ export interface SIWAVerifyRequest {
  */
 export interface SIWAVerifyResponse {
   receipt: string;
-  agent: AgentProfile;
+  agent: AuthAgentProfile;
   expiresAt: string;
 }
 
@@ -191,7 +191,7 @@ export interface ReceiptVerifyRequest {
  */
 export interface ReceiptVerifyResponse {
   valid: boolean;
-  agent?: AgentProfile;
+  agent?: AuthAgentProfile;
   error?: string;
 }
 
@@ -387,7 +387,7 @@ export type SIWAMessageFields = {
 // ============================================
 
 /**
- * @deprecated Use AgentProfile instead
+ * @deprecated Use AuthAgentProfile instead
  * Legacy email/password auth - no longer used
  */
 export interface LegacyAuthUser {

@@ -9,7 +9,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { renderHook, act, waitFor } from "@testing-library/react";
 import { useWebsocketRoom, useWebsocketRooms } from "./use-websocket-room";
-import type { DiscoveryRoom } from "../../common/types/discovery";
+import type { DiscoveryRoom } from "../../../common/types/discovery";
 
 // Mock WebSocket
 class MockWebSocket {
@@ -34,7 +34,9 @@ class MockWebSocket {
 
   removeEventListener(event: string, handler: Function) {
     if (this.listeners[event]) {
-      this.listeners[event] = this.listeners[event].filter((h) => h !== handler);
+      this.listeners[event] = this.listeners[event].filter(
+        (h) => h !== handler,
+      );
     }
   }
 
@@ -74,13 +76,17 @@ describe("useWebsocketRoom Hook", () => {
     id: "room-1",
     objective: "Test Room",
     status: "live" as const,
+    visibility: "public" as const,
     hostAgent: { id: "agent-1", name: "Host" },
     viewerCount: 100,
-    trendingScore: 75,
-    startedAt: new Date().toISOString(),
-    category: "Test",
-    participantCount: 3,
+    totalMessages: 50,
     messageCount: 50,
+    engagementRate: 0.8,
+    trendingScore: 75,
+    growthRate: 0.15,
+    startedAt: new Date().toISOString(),
+    category: { id: "cat-1", name: "Test", color: "#3B82F6" },
+    participantCount: 3,
   };
 
   beforeEach(() => {
@@ -92,9 +98,7 @@ describe("useWebsocketRoom Hook", () => {
   });
 
   it("initializes with correct state", () => {
-    const { result } = renderHook(() =>
-      useWebsocketRoom("room-1", mockRoom)
-    );
+    const { result } = renderHook(() => useWebsocketRoom("room-1", mockRoom));
 
     expect(result.current.viewerCount).toBe(100);
     expect(result.current.trendingScore).toBe(75);
@@ -110,9 +114,7 @@ describe("useWebsocketRoom Hook", () => {
   });
 
   it("connects to WebSocket when roomId is provided", async () => {
-    const { result } = renderHook(() =>
-      useWebsocketRoom("room-1", mockRoom)
-    );
+    const { result } = renderHook(() => useWebsocketRoom("room-1", mockRoom));
 
     await waitFor(() => {
       // WebSocket should attempt to connect
@@ -121,9 +123,7 @@ describe("useWebsocketRoom Hook", () => {
   });
 
   it("updates viewer count from WebSocket message", async () => {
-    const { result } = renderHook(() =>
-      useWebsocketRoom("room-1", mockRoom)
-    );
+    const { result } = renderHook(() => useWebsocketRoom("room-1", mockRoom));
 
     // Simulate WebSocket message
     await act(async () => {
@@ -135,9 +135,7 @@ describe("useWebsocketRoom Hook", () => {
   });
 
   it("updates trending score from metrics update", async () => {
-    const { result } = renderHook(() =>
-      useWebsocketRoom("room-1", mockRoom)
-    );
+    const { result } = renderHook(() => useWebsocketRoom("room-1", mockRoom));
 
     expect(result.current.trendingScore).toBe(75);
 
@@ -146,9 +144,7 @@ describe("useWebsocketRoom Hook", () => {
   });
 
   it("updates status on status change message", async () => {
-    const { result } = renderHook(() =>
-      useWebsocketRoom("room-1", mockRoom)
-    );
+    const { result } = renderHook(() => useWebsocketRoom("room-1", mockRoom));
 
     expect(result.current.status).toBe("live");
 
@@ -157,9 +153,7 @@ describe("useWebsocketRoom Hook", () => {
   });
 
   it("sets connected state to true on open", async () => {
-    const { result } = renderHook(() =>
-      useWebsocketRoom("room-1", mockRoom)
-    );
+    const { result } = renderHook(() => useWebsocketRoom("room-1", mockRoom));
 
     await waitFor(() => {
       // After connection opens
@@ -168,9 +162,7 @@ describe("useWebsocketRoom Hook", () => {
   });
 
   it("clears error on successful connection", async () => {
-    const { result } = renderHook(() =>
-      useWebsocketRoom("room-1", mockRoom)
-    );
+    const { result } = renderHook(() => useWebsocketRoom("room-1", mockRoom));
 
     await waitFor(() => {
       // Error should be cleared on connection
@@ -179,9 +171,7 @@ describe("useWebsocketRoom Hook", () => {
   });
 
   it("sets error on connection failure", async () => {
-    const { result } = renderHook(() =>
-      useWebsocketRoom("room-1", mockRoom)
-    );
+    const { result } = renderHook(() => useWebsocketRoom("room-1", mockRoom));
 
     await waitFor(() => {
       // After error event
@@ -191,18 +181,14 @@ describe("useWebsocketRoom Hook", () => {
   });
 
   it("batches metrics updates", async () => {
-    const { result } = renderHook(() =>
-      useWebsocketRoom("room-1", mockRoom)
-    );
+    const { result } = renderHook(() => useWebsocketRoom("room-1", mockRoom));
 
     // Multiple rapid updates should be batched
     // expect(result.current.lastUpdated).toBeNull();
   });
 
   it("disconnects on unmount", () => {
-    const { unmount } = renderHook(() =>
-      useWebsocketRoom("room-1", mockRoom)
-    );
+    const { unmount } = renderHook(() => useWebsocketRoom("room-1", mockRoom));
 
     unmount();
 
@@ -211,9 +197,7 @@ describe("useWebsocketRoom Hook", () => {
   });
 
   it("attempts reconnection on close", async () => {
-    const { result } = renderHook(() =>
-      useWebsocketRoom("room-1", mockRoom)
-    );
+    const { result } = renderHook(() => useWebsocketRoom("room-1", mockRoom));
 
     await waitFor(() => {
       // Should attempt to reconnect
@@ -222,18 +206,14 @@ describe("useWebsocketRoom Hook", () => {
   });
 
   it("respects max reconnection attempts", async () => {
-    const { result } = renderHook(() =>
-      useWebsocketRoom("room-1", mockRoom)
-    );
+    const { result } = renderHook(() => useWebsocketRoom("room-1", mockRoom));
 
     // After max attempts, should stop trying
     // expect reconnection to stop
   });
 
   it("handles malformed WebSocket messages gracefully", async () => {
-    const { result } = renderHook(() =>
-      useWebsocketRoom("room-1", mockRoom)
-    );
+    const { result } = renderHook(() => useWebsocketRoom("room-1", mockRoom));
 
     // Should not throw on malformed JSON
     expect(() => {
@@ -242,9 +222,7 @@ describe("useWebsocketRoom Hook", () => {
   });
 
   it("subscribes to correct channel on connect", async () => {
-    const { result } = renderHook(() =>
-      useWebsocketRoom("room-123", mockRoom)
-    );
+    const { result } = renderHook(() => useWebsocketRoom("room-123", mockRoom));
 
     // Should send subscribe message for room:123:metrics
     // expect(ws.send).toHaveBeenCalledWith(
@@ -256,9 +234,7 @@ describe("useWebsocketRoom Hook", () => {
   });
 
   it("updates lastUpdated timestamp", async () => {
-    const { result } = renderHook(() =>
-      useWebsocketRoom("room-1", mockRoom)
-    );
+    const { result } = renderHook(() => useWebsocketRoom("room-1", mockRoom));
 
     expect(result.current.lastUpdated).toBeNull();
 
@@ -310,7 +286,7 @@ describe("useWebsocketRooms Hook", () => {
       ({ roomIds }) => useWebsocketRooms(roomIds),
       {
         initialProps: { roomIds: ["room-1", "room-2"] },
-      }
+      },
     );
 
     rerender({ roomIds: ["room-1"] });

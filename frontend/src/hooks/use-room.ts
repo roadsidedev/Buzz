@@ -5,10 +5,10 @@
  * Integrates with WebSocket for real-time updates.
  */
 
-import { useState, useCallback, useEffect } from 'react';
-import { apiClient } from '../services/api';
-import { wsService } from '../services/websocket';
-import { Room, Message, CreateRoomRequest } from '../types';
+import { useState, useCallback, useEffect } from "react";
+import { apiClient } from "../services/api";
+import { wsService } from "../services/websocket";
+import { Room, Message, CreateRoomRequest, WsEvents } from "../types";
 
 interface UseRoomState {
   room: Room | null;
@@ -42,7 +42,8 @@ export function useRoom(roomId?: string) {
       setState((prev) => ({ ...prev, room, isLoading: false }));
       return room;
     } catch (error) {
-      const err = error instanceof Error ? error : new Error('Failed to fetch room');
+      const err =
+        error instanceof Error ? error : new Error("Failed to fetch room");
       setState((prev) => ({ ...prev, error: err, isLoading: false }));
       throw error;
     }
@@ -58,7 +59,8 @@ export function useRoom(roomId?: string) {
       setState((prev) => ({ ...prev, room, isLoading: false }));
       return room;
     } catch (error) {
-      const err = error instanceof Error ? error : new Error('Failed to create room');
+      const err =
+        error instanceof Error ? error : new Error("Failed to create room");
       setState((prev) => ({ ...prev, error: err, isLoading: false }));
       throw error;
     }
@@ -70,7 +72,7 @@ export function useRoom(roomId?: string) {
   const submitMessage = useCallback(
     async (text: string) => {
       if (!state.room) {
-        throw new Error('No active room');
+        throw new Error("No active room");
       }
 
       try {
@@ -82,7 +84,7 @@ export function useRoom(roomId?: string) {
         const message: Message = {
           id: result.messageId,
           roomId: state.room.id,
-          agentId: '', // Will be populated by backend
+          agentId: "", // Will be populated by backend
           text,
           score: result.score,
           selected: result.selected,
@@ -96,12 +98,15 @@ export function useRoom(roomId?: string) {
 
         return result;
       } catch (error) {
-        const err = error instanceof Error ? error : new Error('Failed to submit message');
+        const err =
+          error instanceof Error
+            ? error
+            : new Error("Failed to submit message");
         setState((prev) => ({ ...prev, error: err }));
         throw error;
       }
     },
-    [state.room]
+    [state.room],
   );
 
   /**
@@ -109,7 +114,7 @@ export function useRoom(roomId?: string) {
    */
   const closeRoom = useCallback(async () => {
     if (!state.room) {
-      throw new Error('No active room');
+      throw new Error("No active room");
     }
 
     try {
@@ -117,7 +122,8 @@ export function useRoom(roomId?: string) {
       setState((prev) => ({ ...prev, room: closed }));
       return closed;
     } catch (error) {
-      const err = error instanceof Error ? error : new Error('Failed to close room');
+      const err =
+        error instanceof Error ? error : new Error("Failed to close room");
       setState((prev) => ({ ...prev, error: err }));
       throw error;
     }
@@ -132,7 +138,7 @@ export function useRoom(roomId?: string) {
     // Connect WebSocket if not already
     if (!wsService.isConnectedStatus()) {
       wsService.connect(apiClient.getToken() || undefined).catch((err) => {
-        console.error('Failed to connect WebSocket:', err);
+        console.error("Failed to connect WebSocket:", err);
       });
     }
 
@@ -152,7 +158,7 @@ export function useRoom(roomId?: string) {
                 id: data.messageId,
                 roomId: data.roomId,
                 agentId: data.agentId,
-                text: '', // Text not provided in event
+                text: "", // Text not provided in event
                 score: data.score,
                 selected: true,
                 createdAt: new Date(),
@@ -160,15 +166,17 @@ export function useRoom(roomId?: string) {
             ],
           }));
         }
-      }
+      },
     );
 
     // Listen for audio playing
-    const unsubAudioPlaying = wsService.onAudioPlaying((data: WsEvents.AudioPlaying) => {
-      if (data.roomId === roomId) {
-        console.log('Audio playing:', data);
-      }
-    });
+    const unsubAudioPlaying = wsService.onAudioPlaying(
+      (data: WsEvents.AudioPlaying) => {
+        if (data.roomId === roomId) {
+          console.log("Audio playing:", data);
+        }
+      },
+    );
 
     return () => {
       unsubMessageSelected();

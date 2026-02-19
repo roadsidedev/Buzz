@@ -5,15 +5,22 @@
 
 import React, { useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { useDiscovery, useSearch, useCategoryRooms } from "../hooks/use-discovery";
+import {
+  useDiscovery,
+  useSearch,
+  useCategoryRooms,
+} from "../hooks/use-discovery";
 import { RoomCardGrid } from "../components/discovery/room-card";
-import { SearchBar, SearchBarWithFilters, type SearchFilters } from "../components/discovery/search-bar";
+import {
+  SearchBarWithFilters,
+  type SearchFilters,
+} from "../components/discovery/search-bar";
 import { CategoryFilter } from "../components/discovery/category-filter";
 import { Pagination } from "../components/discovery/pagination";
 import { LoadingState } from "../components/discovery/loading-state";
 import { EmptyState } from "../components/discovery/empty-state";
 import { ErrorBoundary } from "../components/discovery/error-boundary";
-import type { DiscoveryRoom } from "common/types/discovery";
+// Note: DiscoveryRoom type imported when needed
 
 /**
  * Discovery Page Component
@@ -29,12 +36,13 @@ export const DiscoveryPage: React.FC = () => {
 
   // State management
   const [mode, setMode] = useState<"discovery" | "search" | "category">(
-    "discovery"
+    "discovery",
   );
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(
-    null
+    null,
   );
-  const [searchPage, setSearchPage] = useState(1);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [_searchPage, setSearchPage] = useState(1);
 
   // Data hooks
   const discovery = useDiscovery();
@@ -66,8 +74,7 @@ export const DiscoveryPage: React.FC = () => {
   const totalPages =
     mode === "search" ? search.totalPages : categoryRooms.totalPages;
 
-  const currentPage =
-    mode === "search" ? search.page : categoryRooms.page;
+  const currentPage = mode === "search" ? search.page : categoryRooms.page;
 
   // Handle search
   const handleSearch = useCallback(
@@ -76,7 +83,7 @@ export const DiscoveryPage: React.FC = () => {
       setSearchPage(1);
       search.search(query, 1, filters?.categoryId);
     },
-    [search]
+    [search],
   );
 
   // Handle category selection
@@ -96,7 +103,7 @@ export const DiscoveryPage: React.FC = () => {
     (roomId: string) => {
       navigate(`/room/${roomId}`);
     },
-    [navigate]
+    [navigate],
   );
 
   // Handle room click (view details)
@@ -104,7 +111,7 @@ export const DiscoveryPage: React.FC = () => {
     (roomId: string) => {
       navigate(`/room/${roomId}`);
     },
-    [navigate]
+    [navigate],
   );
 
   // Handle page change
@@ -118,7 +125,7 @@ export const DiscoveryPage: React.FC = () => {
         categoryRooms.changePage(page);
       }
     },
-    [mode, search, categoryRooms]
+    [mode, search, categoryRooms],
   );
 
   // Handle clear search
@@ -319,7 +326,9 @@ export const DiscoveryPage: React.FC = () => {
                 </div>
                 <div>
                   <p className="text-3xl font-bold text-blue-600">
-                    {discovery.liveNow.reduce((sum, r) => sum + r.viewerCount, 0).toLocaleString()}
+                    {discovery.liveNow
+                      .reduce((sum, r) => sum + r.viewerCount, 0)
+                      .toLocaleString()}
                   </p>
                   <p className="text-sm text-gray-600">Active Viewers</p>
                 </div>

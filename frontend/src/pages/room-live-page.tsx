@@ -5,11 +5,12 @@
  * and audio player. Displays orchestrator scores and selected messages.
  */
 
-import React, { useState } from 'react';
-import { useParams } from 'react-router-dom';
-import { useRoom, useWebSocket } from '../hooks';
-import { Card } from '../components/Card';
-import { Badge } from '../components/Badge';
+import React, { useState } from "react";
+import { useParams } from "react-router-dom";
+import { useRoom, useWebSocket } from "../hooks";
+import { Card } from "../components/Card";
+import { Badge } from "../components/Badge";
+import { Button } from "../components/Button";
 
 interface RoomLivePageProps {
   roomId?: string;
@@ -21,10 +22,17 @@ interface RoomLivePageProps {
 export function RoomLivePage({ roomId: propsRoomId }: RoomLivePageProps) {
   const params = useParams();
   const roomId = propsRoomId || params.id;
-  const { room, messages, selectedMessages, isLoading, error, submitMessage, closeRoom } =
-    useRoom(roomId);
+  const {
+    room,
+    messages,
+    selectedMessages,
+    isLoading,
+    error,
+    submitMessage,
+    closeRoom,
+  } = useRoom(roomId);
   const { isConnected } = useWebSocket();
-  const [messageInput, setMessageInput] = useState('');
+  const [messageInput, setMessageInput] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   /**
@@ -40,9 +48,9 @@ export function RoomLivePage({ roomId: propsRoomId }: RoomLivePageProps) {
     setIsSubmitting(true);
     try {
       await submitMessage(messageInput);
-      setMessageInput('');
+      setMessageInput("");
     } catch (err) {
-      console.error('Failed to submit message:', err);
+      console.error("Failed to submit message:", err);
     } finally {
       setIsSubmitting(false);
     }
@@ -52,11 +60,11 @@ export function RoomLivePage({ roomId: propsRoomId }: RoomLivePageProps) {
    * Handle close room
    */
   const handleCloseRoom = async () => {
-    if (window.confirm('Close this room? This action cannot be undone.')) {
+    if (window.confirm("Close this room? This action cannot be undone.")) {
       try {
         await closeRoom();
       } catch (err) {
-        console.error('Failed to close room:', err);
+        console.error("Failed to close room:", err);
       }
     }
   };
@@ -93,15 +101,21 @@ export function RoomLivePage({ roomId: propsRoomId }: RoomLivePageProps) {
           <div className="flex items-center gap-4">
             <div className="text-right">
               <p className="text-sm text-gray-600">Status</p>
-              <Badge variant={room.status === 'active' ? 'success' : 'default'} isLive={true}>
+              <Badge
+                variant={room.status === "active" ? "success" : "default"}
+                isLive={true}
+              >
                 {room.status}
               </Badge>
             </div>
             <div className="w-px h-12 bg-black"></div>
             <div className="text-right">
               <p className="text-sm text-gray-600">WebSocket</p>
-              <Badge variant={isConnected ? 'success' : 'error'} isLive={isConnected}>
-                {isConnected ? 'Connected' : 'Disconnected'}
+              <Badge
+                variant={isConnected ? "success" : "error"}
+                isLive={isConnected}
+              >
+                {isConnected ? "Connected" : "Disconnected"}
               </Badge>
             </div>
           </div>
@@ -129,11 +143,15 @@ export function RoomLivePage({ roomId: propsRoomId }: RoomLivePageProps) {
                 <div
                   key={msg.id}
                   className={`p-3 border-l-4 ${
-                    msg.selected ? 'border-cyan-500 bg-cyan-50' : 'border-gray-300 bg-gray-50'
+                    msg.selected
+                      ? "border-cyan-500 bg-cyan-50"
+                      : "border-gray-300 bg-gray-50"
                   }`}
                 >
                   <div className="flex items-start justify-between gap-2">
-                    <p className="text-xs text-gray-600 font-semibold">{msg.agentId}</p>
+                    <p className="text-xs text-gray-600 font-semibold">
+                      {msg.agentId}
+                    </p>
                     {msg.score !== undefined && (
                       <span className="text-xs font-bold bg-black text-white px-2 py-1">
                         {msg.score.toFixed(0)}
@@ -147,22 +165,29 @@ export function RoomLivePage({ roomId: propsRoomId }: RoomLivePageProps) {
           </div>
 
           {/* Message Input */}
-          <form onSubmit={handleSubmitMessage} className="border-t-2 border-black p-4">
+          <form
+            onSubmit={handleSubmitMessage}
+            className="border-t-2 border-black p-4"
+          >
             <div className="flex gap-2">
               <input
                 type="text"
                 value={messageInput}
                 onChange={(e) => setMessageInput(e.target.value)}
                 placeholder="Type your message..."
-                disabled={isSubmitting || room.status !== 'active'}
+                disabled={isSubmitting || room.status !== "active"}
                 className="flex-1 px-3 py-2 border-2 border-black font-inter focus:outline-none focus:ring-2 focus:ring-cyan-500"
               />
               <Button
                 type="submit"
                 variant="primary"
-                disabled={isSubmitting || !messageInput.trim() || room.status !== 'active'}
+                disabled={
+                  isSubmitting ||
+                  !messageInput.trim() ||
+                  room.status !== "active"
+                }
               >
-                {isSubmitting ? '...' : 'Send'}
+                {isSubmitting ? "..." : "Send"}
               </Button>
             </div>
           </form>
@@ -184,20 +209,27 @@ export function RoomLivePage({ roomId: propsRoomId }: RoomLivePageProps) {
               </div>
               <div className="flex justify-between">
                 <span>Duration:</span>
-                <span className="font-bold">{Math.floor(room.duration / 60)}m</span>
+                <span className="font-bold">
+                  {Math.floor(room.duration / 60)}m
+                </span>
               </div>
             </div>
           </Card>
 
           {/* Selected Messages */}
           <Card variant="default" className="p-4 flex-1 overflow-y-auto">
-            <h3 className="font-bold uppercase text-sm mb-3">Selected Messages</h3>
+            <h3 className="font-bold uppercase text-sm mb-3">
+              Selected Messages
+            </h3>
             {selectedMessages.length === 0 ? (
               <p className="text-xs text-gray-600">No selected messages yet</p>
             ) : (
               <div className="space-y-2">
                 {selectedMessages.map((msg) => (
-                  <div key={msg.id} className="p-2 bg-cyan-50 border-l-2 border-cyan-500">
+                  <div
+                    key={msg.id}
+                    className="p-2 bg-cyan-50 border-l-2 border-cyan-500"
+                  >
                     <p className="text-xs font-semibold">{msg.agentId}</p>
                     <p className="text-xs mt-1 line-clamp-2">{msg.text}</p>
                   </div>
@@ -210,7 +242,7 @@ export function RoomLivePage({ roomId: propsRoomId }: RoomLivePageProps) {
           <Button
             variant="secondary"
             onClick={handleCloseRoom}
-            disabled={room.status !== 'active'}
+            disabled={room.status !== "active"}
             className="w-full"
           >
             Close Room

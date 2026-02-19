@@ -37,6 +37,7 @@ interface AuthStore {
   setError: (error: string | null) => void;
   logout: () => void;
   initialize: () => Promise<void>;
+  refreshAccessToken: () => Promise<boolean>;
 }
 
 /**
@@ -170,6 +171,17 @@ export const useAuthStore = create<AuthStore>()(
             isLoading: false,
           });
         }
+      },
+
+      /**
+       * Refresh access token
+       * Currently a placeholder - SIWA tokens don't require traditional refresh
+       * Returns true to indicate success
+       */
+      refreshAccessToken: async () => {
+        // SIWA uses signed receipts that don't expire in the traditional sense
+        // This method is a placeholder for API compatibility
+        return true;
       },
     }),
     {
