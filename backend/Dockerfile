@@ -35,7 +35,7 @@ COPY backend/package*.json ./backend/
 
 RUN npm ci --omit=dev && npm ci --omit=dev -w backend
 
-COPY --from=builder /app/backend/dist ./backend/dist
+COPY --from=builder /app/backend/dist ./dist
 COPY common ./common
 
 EXPOSE 4000
@@ -43,4 +43,4 @@ EXPOSE 4000
 HEALTHCHECK --interval=10s --timeout=5s --retries=5 \
   CMD node -e "require('http').get('http://localhost:4000/health', (r) => {if (r.statusCode !== 200) throw new Error(r.statusCode)})"
 
-CMD ["node", "backend/dist/server.js"]
+CMD ["node", "dist/backend/src/server.js"]

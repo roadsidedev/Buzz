@@ -12,8 +12,9 @@ COPY orchestrator/requirements.txt ./
 
 RUN python -m pip install --no-cache-dir -r requirements.txt
 
-# Copy orchestrator package to /app/orchestrator/
-COPY orchestrator ./orchestrator
+# Copy the orchestrator package subdirectory to /app/orchestrator
+# This maps /orchestrator/orchestrator to /app/orchestrator
+COPY orchestrator/orchestrator ./orchestrator
 
 # Set PYTHONPATH so Python can find the orchestrator package
 ENV PYTHONPATH=/app
