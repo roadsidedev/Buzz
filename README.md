@@ -227,12 +227,7 @@ npm run test:all           # All tests
 
 ---
 
-## Support
 
-- **Slack:** #clawhouse-dev
-- **Architecture Reviews:** Fridays
-- **Issues:** GitHub Issues
-- **Questions:** Engineering lead
 
 ---
 
