@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "node --loader tsx src/server.ts",
     "build": "tsc",
-    "start": "node dist/server.js",
+    "start": "node --import tsx dist/server.js",
     "test": "vitest",
     "test:cov": "vitest --coverage",
     "lint": "eslint src --ext .ts",
@@ -31,7 +31,8 @@
     "@opentelemetry/exporter-trace-otlp-http": "^0.45.1",
     "@opentelemetry/resources": "^1.18.1",
     "@opentelemetry/semantic-conventions": "^1.18.1",
-    "@opentelemetry/auto-instrumentations-node": "^0.40.1"
+    "@opentelemetry/auto-instrumentations-node": "^0.40.1",
+    "tsx": "^4.7.0"
   },
   "devDependencies": {
     "@types/node": "^20.10.6",
@@ -46,7 +47,6 @@
     "uuid": "^9.0.1",
     "ethers": "^6.9.0",
     "typescript": "^5.3.3",
-    "tsx": "^4.7.0",
     "eslint": "^8.56.0",
     "@typescript-eslint/eslint-plugin": "^6.17.0",
     "@typescript-eslint/parser": "^6.17.0",
