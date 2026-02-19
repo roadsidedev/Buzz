@@ -6,8 +6,8 @@
  */
 
 import { Request, Response, NextFunction } from "express";
-import { agentRepository } from "../repositories/index.js";
-import { logger } from "../utils/logger.js";
+import { agentRepository } from "../repositories/index";
+import { logger } from "../utils/logger";
 
 /**
  * Enforce agent verification status
