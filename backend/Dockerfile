@@ -10,13 +10,15 @@ RUN npm config set cache /tmp/.npm-cache --global
 
 COPY package*.json ./
 COPY backend/package*.json ./backend/
+COPY common ./common
 
-RUN npm ci && npm ci -w backend
+# Install dependencies for the whole workspace
+RUN npm ci
 
 COPY backend ./backend
-COPY common ./common
 COPY tsconfig.json ./
 
+# Build the backend
 RUN npm run build -w backend
 
 # Production image
@@ -32,22 +34,23 @@ RUN npm config set cache /tmp/.npm-cache --global
 
 COPY package*.json ./
 COPY backend/package*.json ./backend/
+COPY common ./common
 
-RUN npm ci --omit=dev && npm ci --omit=dev -w backend
+# Install production dependencies
+RUN npm ci --omit=dev
 
 # Copy the built files from the builder stage
 # The builder stage runs 'npm run build -w backend' which outputs to /app/backend/dist
+# We need to preserve the directory structure so that imports work
 COPY --from=builder /app/backend/dist ./backend/dist
-COPY common ./common
 
 EXPOSE 4000
 
-# Set environment variables to bypass strict security checks during healthcheck if needed
-# Or ensure they are provided in Railway
 ENV NODE_ENV=production
 
+# Healthcheck using node to check the /health endpoint
 HEALTHCHECK --interval=10s --timeout=5s --retries=5 \
   CMD node -e "require('http').get('http://localhost:4000/health', (r) => {if (r.statusCode !== 200) throw new Error(r.statusCode)})"
 
-# Start from the backend directory where dist is located
+# Start the server from the root directory to maintain relative paths
 CMD ["node", "backend/dist/server.js"]

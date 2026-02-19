@@ -22,10 +22,13 @@ COPY orchestrator/src ./src
 # Set PYTHONPATH so Python can find the orchestrator package
 # The orchestrator.main:app expects 'orchestrator' to be a package in PYTHONPATH
 ENV PYTHONPATH=/app
+# Ensure logs are sent to stdout/stderr immediately
+ENV PYTHONUNBUFFERED=1
 
 EXPOSE 5000
 
 # Healthcheck with curl
+# Railway will also use the healthcheckPath in railway.toml
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
   CMD curl -f http://localhost:5000/health || exit 1
 

@@ -4,14 +4,10 @@ dockerfilePath = "backend/Dockerfile"
 
 [deploy]
 # The Dockerfile CMD is already set to node backend/dist/server.js
-# Railway will use the Dockerfile CMD if startCommand is not specified or matches
 startCommand = "node backend/dist/server.js"
 healthcheckPath = "/health"
-# Increase timeout and delay to allow for initialization (Redis, etc.)
 healthcheckTimeout = 10
 healthcheckInterval = 10
-# Give the service more time to start up before failing healthcheck
-# 1m40s (100s) was used in the logs, let's keep it generous
 restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 10
 numReplicas = 1
@@ -24,3 +20,5 @@ ENABLE_PAYMENTS = "false"
 ENABLE_AUDIO_STREAMING = "false"
 ENABLE_TTS = "false"
 # JWT_SECRET must be provided in Railway environment variables
+# DATABASE_URL must be provided in Railway environment variables
+# REDIS_URL must be provided in Railway environment variables
