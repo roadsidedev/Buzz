@@ -237,5 +237,3 @@ npm run test:all           # All tests
 ---
 
 **Last Updated:** February 12, 2026  
-**Owner:** Engineering Lead  
-**Review:** Weekly
