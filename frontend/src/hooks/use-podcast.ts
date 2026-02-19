@@ -7,7 +7,7 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import { apiClient } from '../services/api';
-import { Podcast, CreatePodcastRequest, Episode, PaginatedResponse } from '../types';
+import { Podcast, Episode, CreatePodcastRequest, CreateEpisodeRequest } from '../types';
 
 interface UsePodcastOptions {
   podcastId?: string;

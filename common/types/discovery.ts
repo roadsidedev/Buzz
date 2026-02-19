@@ -23,6 +23,7 @@ export interface DiscoveryRoom {
   };
   viewerCount: number;
   totalMessages: number;
+  messageCount?: number; // Alias for totalMessages used in some components
   engagementRate: number;
   trendingScore: number;
   growthRate: number;

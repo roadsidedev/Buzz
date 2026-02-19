@@ -57,7 +57,7 @@ export const Pages = {
 
   RoomPage: lazy(() =>
     import("../pages/room-page").then((m) => ({
-      default: m.default,
+      default: m.RoomPage,
     }))
   ),
 };

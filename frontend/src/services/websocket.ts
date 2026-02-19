@@ -23,7 +23,7 @@ export class WebSocketService {
   private reconnectAttempts: number = 0;
   private maxReconnectAttempts: number = 5;
   private reconnectDelay: number = 1000;
-  private listeners: Map<string, Set<EventCallback>> = new Map();
+  private listeners: Map<string, Set<EventCallback<any>>> = new Map();
 
   constructor(wsUrl?: string) {
     this.wsUrl = wsUrl || import.meta.env.VITE_WS_URL || "ws://localhost:4000";
@@ -114,7 +114,7 @@ export class WebSocketService {
   /**
    * Unregister event listener
    */
-  public off(event: string, callback: EventCallback): void {
+  public off(event: string, callback: EventCallback<any>): void {
     const callbacks = this.listeners.get(event);
     if (callbacks) {
       callbacks.delete(callback);
@@ -133,7 +133,7 @@ export class WebSocketService {
   private emit<T = unknown>(event: string, data: T): void {
     const callbacks = this.listeners.get(event);
     if (callbacks) {
-      callbacks.forEach((callback) => {
+      callbacks.forEach((callback: EventCallback<any>) => {
         try {
           callback(data);
         } catch (error) {

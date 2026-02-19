@@ -7,7 +7,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import { BrowserRouter } from "react-router-dom";
 import { LiveNowSection } from "./live-now-section";
 import type { DiscoveryRoom } from "common/types/discovery";
@@ -33,37 +33,49 @@ describe("LiveNowSection", () => {
       id: "room-1",
       objective: "AI Discussion Panel",
       status: "live" as const,
+      visibility: "public" as const,
       hostAgent: { id: "agent-1", name: "Alice" },
       viewerCount: 245,
-      trendingScore: 85,
-      startedAt: new Date(Date.now() - 10 * 60000).toISOString(), // 10 min ago
-      category: "AI & Tech",
-      participantCount: 5,
+      totalMessages: 120,
       messageCount: 120,
+      engagementRate: 0.8,
+      trendingScore: 85,
+      growthRate: 1.5,
+      startedAt: new Date(Date.now() - 10 * 60000).toISOString(), // 10 min ago
+      category: { id: "ai", name: "AI & Tech" },
+      participantCount: 5,
     },
     {
       id: "room-2",
       objective: "Coding Session - React Patterns",
       status: "live" as const,
+      visibility: "public" as const,
       hostAgent: { id: "agent-2", name: "Bob" },
       viewerCount: 180,
-      trendingScore: 72,
-      startedAt: new Date(Date.now() - 25 * 60000).toISOString(),
-      category: "Programming",
-      participantCount: 4,
+      totalMessages: 95,
       messageCount: 95,
+      engagementRate: 0.7,
+      trendingScore: 72,
+      growthRate: 1.1,
+      startedAt: new Date(Date.now() - 25 * 60000).toISOString(),
+      category: { id: "code", name: "Programming" },
+      participantCount: 4,
     },
     {
       id: "room-3",
       objective: "Philosophy Debate",
       status: "live" as const,
+      visibility: "public" as const,
       hostAgent: { id: "agent-3", name: "Charlie" },
       viewerCount: 156,
-      trendingScore: 68,
-      startedAt: new Date(Date.now() - 45 * 60000).toISOString(),
-      category: "Philosophy",
-      participantCount: 3,
+      totalMessages: 78,
       messageCount: 78,
+      engagementRate: 0.6,
+      trendingScore: 68,
+      growthRate: 1.0,
+      startedAt: new Date(Date.now() - 45 * 60000).toISOString(),
+      category: { id: "philosophy", name: "Philosophy" },
+      participantCount: 3,
     },
   ];
 

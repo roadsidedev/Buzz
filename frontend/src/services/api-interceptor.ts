@@ -11,8 +11,8 @@
  * Integration with Zustand auth store for state management.
  */
 
-import { useAuth } from "@/stores/auth-store";
-import logger from "@/utils/logger";
+import { useAuthStore } from "@/stores/auth-store";
+import { logger } from "@/utils/logger";
 
 /**
  * Token expiry buffer (refresh 2 minutes before expiry)
@@ -66,7 +66,7 @@ export async function handleApiResponse(
   // Prevent multiple simultaneous refresh attempts
   // If another request is already refreshing, wait for it
   if (!refreshPromise) {
-    const { refreshAccessToken } = useAuth.getState();
+    const { refreshAccessToken } = useAuthStore.getState();
     refreshPromise = refreshAccessToken();
   }
 
@@ -80,7 +80,7 @@ export async function handleApiResponse(
   } else {
     // Refresh failed - clear auth state and redirect to login
     logger.error("Token refresh failed, logging out and redirecting to login");
-    const { logout } = useAuth.getState();
+    const { logout } = useAuthStore.getState();
     logout();
 
     // Redirect to login page (will happen on next component render)
@@ -127,7 +127,7 @@ export function scheduleTokenRefresh(expiresIn: number): () => void {
     });
 
     // Refresh immediately
-    const { refreshAccessToken } = useAuth.getState();
+    const { refreshAccessToken } = useAuthStore.getState();
     refreshAccessToken();
 
     return () => {}; // No timer to cancel
@@ -142,7 +142,7 @@ export function scheduleTokenRefresh(expiresIn: number): () => void {
   refreshTimeoutId = setTimeout(async () => {
     logger.info("Token refresh timer triggered");
 
-    const { refreshAccessToken } = useAuth.getState();
+    const { refreshAccessToken } = useAuthStore.getState();
     const success = await refreshAccessToken();
 
     if (success) {

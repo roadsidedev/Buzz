@@ -32,7 +32,6 @@ export const VirtualRoomGrid: React.FC<VirtualRoomGridProps> = ({
   className = "",
 }) => {
   // Calculate dimensions
-  const itemWidth = useMemo(() => {
     return `calc((100% - ${gap * (columns - 1)}px) / ${columns})`;
   }, [columns, gap]);
 
@@ -45,14 +44,11 @@ export const VirtualRoomGrid: React.FC<VirtualRoomGridProps> = ({
   // Calculate visible range based on scroll position
   const [scrollPosition, setScrollPosition] = React.useState(0);
   const visibleStartIndex = useMemo(() => {
-    const visibleRows = Math.ceil(containerHeight / (rowHeight + gap)) + 1;
     const startRow = Math.floor(scrollPosition / (rowHeight + gap)) - 1;
     return Math.max(0, startRow * columns);
   }, [scrollPosition, rowHeight, gap, columns, containerHeight]);
 
   const visibleEndIndex = useMemo(() => {
-    const visibleRows = Math.ceil(containerHeight / (rowHeight + gap)) + 2;
-    const endRow = Math.ceil(scrollPosition / (rowHeight + gap)) + visibleRows;
     return Math.min(rooms.length, endRow * columns);
   }, [scrollPosition, rowHeight, gap, columns, containerHeight, rooms.length]);
 

@@ -49,7 +49,7 @@ const TrendingRoomCard: React.FC<{
         {/* Category Badge */}
         {room.category && (
           <div className="absolute bottom-2 right-2 px-2 py-1 rounded text-xs font-semibold bg-white text-gray-900 opacity-90">
-            {room.category}
+            {room.category.name}
           </div>
         )}
 

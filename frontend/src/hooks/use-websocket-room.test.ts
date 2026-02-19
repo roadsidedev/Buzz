@@ -9,7 +9,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { renderHook, act, waitFor } from "@testing-library/react";
 import { useWebsocketRoom, useWebsocketRooms } from "./use-websocket-room";
-import type { DiscoveryRoom } from "../types/discovery";
+import type { DiscoveryRoom } from "../../common/types/discovery";
 
 // Mock WebSocket
 class MockWebSocket {

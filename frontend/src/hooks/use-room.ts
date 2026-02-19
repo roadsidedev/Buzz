@@ -8,7 +8,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { apiClient } from '../services/api';
 import { wsService } from '../services/websocket';
-import { Room, CreateRoomRequest, Message, ScoringResult, WsEvents } from '../types';
+import { Room, Message, CreateRoomRequest } from '../types';
 
 interface UseRoomState {
   room: Room | null;

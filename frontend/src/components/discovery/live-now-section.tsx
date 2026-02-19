@@ -53,7 +53,7 @@ const LiveNowCard: React.FC<{
         {/* Category Tag */}
         {room.category && (
           <div className="absolute bottom-3 left-3 px-2 py-1 rounded text-xs font-medium bg-white text-gray-900 opacity-90">
-            {room.category}
+            {room.category.name}
           </div>
         )}
       </div>

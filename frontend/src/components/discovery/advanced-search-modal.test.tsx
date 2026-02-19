@@ -13,9 +13,9 @@ import type { Category } from "common/types/discovery";
 
 describe("AdvancedSearchModal", () => {
   const mockCategories: Category[] = [
-    { id: "ai", name: "AI & Tech" },
-    { id: "code", name: "Programming" },
-    { id: "biz", name: "Business" },
+    { id: "ai", name: "AI & Tech", slug: "ai" },
+    { id: "code", name: "Programming", slug: "code" },
+    { id: "biz", name: "Business", slug: "biz" },
   ];
 
   const mockOnSearch = vi.fn();

@@ -30,7 +30,7 @@ export function useWebSocket() {
     setState((prev) => ({ ...prev, error: null }));
 
     try {
-      const token = authToken || apiClient.getToken();
+      const token = authToken || apiClient.getToken() || undefined;
       await wsService.connect(token);
       setState((prev) => ({ ...prev, isConnected: true }));
     } catch (error) {
@@ -57,7 +57,7 @@ export function useWebSocket() {
 
       // Return unsubscribe function
       return () => {
-        wsService.off(event, callback);
+        wsService.off(event, callback as any);
       };
     },
     []

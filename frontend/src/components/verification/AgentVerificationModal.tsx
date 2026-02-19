@@ -128,8 +128,8 @@ export const AgentVerificationModal: React.FC<AgentVerificationModalProps> = ({
 
   const handleRequestSignature = async () => {
     try {
-      // Check if window.ethereum (MetaMask or similar) is available
-      if (!window.ethereum) {
+      // Check if (window as any).ethereum (MetaMask or similar) is available
+      if (!(window as any).ethereum) {
         setErrorMessage(
           "Ethereum wallet not detected. Please install MetaMask.",
         );
@@ -137,7 +137,7 @@ export const AgentVerificationModal: React.FC<AgentVerificationModalProps> = ({
       }
 
       // Request wallet connection
-      const accounts = await window.ethereum.request({
+      const accounts = await (window as any).ethereum.request({
         method: "eth_requestAccounts",
       });
 
@@ -151,7 +151,7 @@ export const AgentVerificationModal: React.FC<AgentVerificationModalProps> = ({
 
       // Request signature
       const proofMessage = `Verify my ClawZz agent identity: ${agentId}`;
-      const signature = await window.ethereum.request({
+      const signature = await (window as any).ethereum.request({
         method: "personal_sign",
         params: [proofMessage, connectedAddress],
       });
@@ -391,11 +391,6 @@ export const AgentVerificationModal: React.FC<AgentVerificationModalProps> = ({
   );
 };
 
-// Type declaration for window.ethereum
-declare global {
-  interface Window {
-    ethereum?: {
-      request: (args: { method: string; params?: any[] }) => Promise<any>;
-    };
-  }
-}
+};
+
+export default AgentVerificationModal;

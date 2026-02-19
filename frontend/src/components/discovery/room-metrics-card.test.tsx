@@ -16,13 +16,17 @@ describe("RoomMetricsCard", () => {
     id: "room-1",
     objective: "Test Room",
     status: "live" as const,
+    visibility: "public" as const,
     hostAgent: { id: "agent-1", name: "Host" },
     viewerCount: 100,
-    trendingScore: 75,
-    startedAt: new Date(Date.now() - 20 * 60000).toISOString(),
-    category: "Test",
-    participantCount: 3,
+    totalMessages: 50,
     messageCount: 50,
+    engagementRate: 0.5,
+    trendingScore: 75,
+    growthRate: 1.2,
+    startedAt: new Date(Date.now() - 20 * 60000).toISOString(),
+    category: { id: "test", name: "Test" },
+    participantCount: 3,
   };
 
   const mockMetrics: WebsocketRoomState = {
