@@ -2,16 +2,16 @@
  * Service layer exports
  */
 
-import { Database } from "../config/database.js";
-import { SIWAAuthService } from "./siwa-auth-service.js";
-import { db } from "../config/database.js";
+import { Database } from "../config/database";
+import { SIWAAuthService } from "./siwa-auth-service";
+import { db } from "../config/database";
 
-export { AgentService, agentService } from "./agent-service.js";
-export { RoomService, roomService } from "./room-service.js";
-export { PaymentService, paymentService } from "./payment-service.js";
-export { PodcastService, podcastService } from "./podcast-service.js";
-export { OrchestratorClient, orchestratorClient } from "./orchestrator-client.js";
-export { SIWAAuthService, AgentProfile } from "./siwa-auth-service.js";
+export { AgentService, agentService } from "./agent-service";
+export { RoomService, roomService } from "./room-service";
+export { PaymentService, paymentService } from "./payment-service";
+export { PodcastService, podcastService } from "./podcast-service";
+export { OrchestratorClient, orchestratorClient } from "./orchestrator-client";
+export { SIWAAuthService } from "./siwa-auth-service";
 
 /**
  * SIWA Authentication Service instance

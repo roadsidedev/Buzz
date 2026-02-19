@@ -2,7 +2,7 @@
  * Error classes for structured error handling
  */
 
-import type { ErrorCode } from "../types/api.js";
+import type { ErrorCode } from "../types/api";
 
 /**
  * Base application error
@@ -12,7 +12,7 @@ export class AppError extends Error {
     public code: ErrorCode,
     message: string,
     public statusCode: number = 500,
-    public context: Record<string, unknown> = {}
+    public context: Record<string, unknown> = {},
   ) {
     super(message);
     this.name = "AppError";
@@ -23,10 +23,7 @@ export class AppError extends Error {
  * Validation error (400)
  */
 export class ValidationError extends AppError {
-  constructor(
-    message: string,
-    context: Record<string, unknown> = {}
-  ) {
+  constructor(message: string, context: Record<string, unknown> = {}) {
     super("VALIDATION_ERROR" as ErrorCode, message, 400, context);
     this.name = "ValidationError";
   }
@@ -39,7 +36,7 @@ export class AuthenticationError extends AppError {
   constructor(
     message: string,
     code: ErrorCode = "INVALID_CREDENTIALS" as ErrorCode,
-    context: Record<string, unknown> = {}
+    context: Record<string, unknown> = {},
   ) {
     super(code, message, 401, context);
     this.name = "AuthenticationError";
@@ -50,10 +47,7 @@ export class AuthenticationError extends AppError {
  * Authorization error (403)
  */
 export class AuthorizationError extends AppError {
-  constructor(
-    message: string,
-    context: Record<string, unknown> = {}
-  ) {
+  constructor(message: string, context: Record<string, unknown> = {}) {
     super("UNAUTHORIZED" as ErrorCode, message, 403, context);
     this.name = "AuthorizationError";
   }
@@ -66,13 +60,13 @@ export class NotFoundError extends AppError {
   constructor(
     resource: string,
     id: string,
-    context: Record<string, unknown> = {}
+    context: Record<string, unknown> = {},
   ) {
     super(
       `${resource.toUpperCase()}_NOT_FOUND` as ErrorCode,
       `${resource} with id ${id} not found`,
       404,
-      { resource, id, ...context }
+      { resource, id, ...context },
     );
     this.name = "NotFoundError";
   }
@@ -85,14 +79,12 @@ export class RateLimitError extends AppError {
   constructor(
     message: string,
     retryAfter: number,
-    context: Record<string, unknown> = {}
+    context: Record<string, unknown> = {},
   ) {
-    super(
-      "RATE_LIMIT_EXCEEDED" as ErrorCode,
-      message,
-      429,
-      { retryAfter, ...context }
-    );
+    super("RATE_LIMIT_EXCEEDED" as ErrorCode, message, 429, {
+      retryAfter,
+      ...context,
+    });
     this.name = "RateLimitError";
   }
 }
@@ -104,7 +96,7 @@ export class PaymentError extends AppError {
   constructor(
     message: string,
     public x402Error: unknown,
-    context: Record<string, unknown> = {}
+    context: Record<string, unknown> = {},
   ) {
     super("PAYMENT_FAILED" as ErrorCode, message, 402, context);
     this.name = "PaymentError";
@@ -115,10 +107,7 @@ export class PaymentError extends AppError {
  * Security error (401)
  */
 export class SecurityError extends AppError {
-  constructor(
-    message: string,
-    context: Record<string, unknown> = {}
-  ) {
+  constructor(message: string, context: Record<string, unknown> = {}) {
     super("SECURITY_ERROR" as ErrorCode, message, 401, context);
     this.name = "SecurityError";
   }
@@ -128,17 +117,24 @@ export class SecurityError extends AppError {
  * Service unavailable error (503)
  */
 export class ServiceUnavailableError extends AppError {
-  constructor(
-    service: string,
-    context: Record<string, unknown> = {}
-  ) {
+  constructor(service: string, context: Record<string, unknown> = {}) {
     super(
       "SERVICE_UNAVAILABLE" as ErrorCode,
       `${service} service is unavailable`,
       503,
-      { service, ...context }
+      { service, ...context },
     );
     this.name = "ServiceUnavailableError";
+  }
+}
+
+/**
+ * Database error (500)
+ */
+export class DatabaseError extends AppError {
+  constructor(message: string, context: Record<string, unknown> = {}) {
+    super("DATABASE_ERROR" as ErrorCode, message, 500, context);
+    this.name = "DatabaseError";
   }
 }
 

@@ -2,7 +2,7 @@
  * Middleware exports
  */
 
-export * from "./auth.js";
-export * from "./siwa-auth.js";
-export * from "./rate-limit.js";
-export * from "./error-handler.js";
+export * from "./auth";
+export * from "./siwa-auth";
+export * from "./rate-limit";
+export * from "./error-handler";
