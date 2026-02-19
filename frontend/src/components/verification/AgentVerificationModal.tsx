@@ -7,7 +7,7 @@
  * - Shows verification history and badge
  */
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { X, AlertCircle, CheckCircle, Loader } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiClient } from "@/services/api";
@@ -16,7 +16,12 @@ import { useAuthStore } from "@/stores/auth-store";
 interface VerificationStatus {
   agentId: string;
   name: string;
-  verificationStatus: "verified" | "unverified" | "pending" | "suspended" | "banned";
+  verificationStatus:
+    | "verified"
+    | "unverified"
+    | "pending"
+    | "suspended"
+    | "banned";
   verifiedAt: string | null;
   badge: string | null;
   avatar: string | null;
@@ -45,14 +50,15 @@ export const AgentVerificationModal: React.FC<AgentVerificationModalProps> = ({
   const [proof, setProof] = useState("");
   const [signature, setSignature] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
-  const authStore = useAuthStore();
+  // Auth store for verification context
+  useAuthStore();
 
   // Fetch current verification status
   const { data: status, isLoading: statusLoading } = useQuery({
     queryKey: ["verification-status", agentId],
     queryFn: async () => {
       const response = await apiClient.get<VerificationStatus>(
-        `/api/v1/agents/${agentId}/verification-status`
+        `/api/v1/agents/${agentId}/verification-status`,
       );
       return response.data;
     },
@@ -70,12 +76,19 @@ export const AgentVerificationModal: React.FC<AgentVerificationModalProps> = ({
       }>(`/api/v1/agents/${agentId}/verify-identity`, input);
       return response.data;
     },
-    onSuccess: (data) => {
+    onSuccess: (data: {
+      success: boolean;
+      verified: boolean;
+      message: string;
+      verificationStatus: string;
+    }) => {
       if (data.verified) {
         onVerificationSuccess?.();
         setTimeout(() => onClose(), 2000); // Close after 2 seconds to show success
       } else {
-        setErrorMessage(data.message || "Verification failed. Please try again.");
+        setErrorMessage(
+          data.message || "Verification failed. Please try again.",
+        );
       }
     },
     onError: (error: any) => {
@@ -117,7 +130,9 @@ export const AgentVerificationModal: React.FC<AgentVerificationModalProps> = ({
     try {
       // Check if window.ethereum (MetaMask or similar) is available
       if (!window.ethereum) {
-        setErrorMessage("Ethereum wallet not detected. Please install MetaMask.");
+        setErrorMessage(
+          "Ethereum wallet not detected. Please install MetaMask.",
+        );
         return;
       }
 
@@ -163,7 +178,9 @@ export const AgentVerificationModal: React.FC<AgentVerificationModalProps> = ({
       <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 p-6">
         {/* Header */}
         <div className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-bold text-gray-900">Verify Your Identity</h2>
+          <h2 className="text-2xl font-bold text-gray-900">
+            Verify Your Identity
+          </h2>
           <button
             onClick={onClose}
             className="text-gray-400 hover:text-gray-600 transition"
@@ -184,14 +201,20 @@ export const AgentVerificationModal: React.FC<AgentVerificationModalProps> = ({
             <div className="mb-6">
               {isVerified && (
                 <div className="bg-green-50 border border-green-200 rounded-lg p-4 flex items-start gap-3">
-                  <CheckCircle className="text-green-600 flex-shrink-0 mt-0.5" size={20} />
+                  <CheckCircle
+                    className="text-green-600 flex-shrink-0 mt-0.5"
+                    size={20}
+                  />
                   <div>
-                    <h3 className="font-semibold text-green-900">Identity Verified</h3>
+                    <h3 className="font-semibold text-green-900">
+                      Identity Verified
+                    </h3>
                     <p className="text-sm text-green-700 mt-1">
                       Your agent identity is verified on ERC-8004.
                       {status.verifiedAt && (
                         <span className="block mt-1">
-                          Verified: {new Date(status.verifiedAt).toLocaleDateString()}
+                          Verified:{" "}
+                          {new Date(status.verifiedAt).toLocaleDateString()}
                         </span>
                       )}
                     </p>
@@ -206,11 +229,17 @@ export const AgentVerificationModal: React.FC<AgentVerificationModalProps> = ({
 
               {isPending && (
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start gap-3">
-                  <AlertCircle className="text-blue-600 flex-shrink-0 mt-0.5" size={20} />
+                  <AlertCircle
+                    className="text-blue-600 flex-shrink-0 mt-0.5"
+                    size={20}
+                  />
                   <div>
-                    <h3 className="font-semibold text-blue-900">Verification Pending</h3>
+                    <h3 className="font-semibold text-blue-900">
+                      Verification Pending
+                    </h3>
                     <p className="text-sm text-blue-700 mt-1">
-                      Your verification is being processed. Please try again shortly.
+                      Your verification is being processed. Please try again
+                      shortly.
                     </p>
                   </div>
                 </div>
@@ -218,9 +247,14 @@ export const AgentVerificationModal: React.FC<AgentVerificationModalProps> = ({
 
               {isSuspended && (
                 <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
-                  <AlertCircle className="text-red-600 flex-shrink-0 mt-0.5" size={20} />
+                  <AlertCircle
+                    className="text-red-600 flex-shrink-0 mt-0.5"
+                    size={20}
+                  />
                   <div>
-                    <h3 className="font-semibold text-red-900">Account Suspended</h3>
+                    <h3 className="font-semibold text-red-900">
+                      Account Suspended
+                    </h3>
                     <p className="text-sm text-red-700 mt-1">
                       This agent account has been {status?.verificationStatus}.
                       Contact support for assistance.
@@ -231,9 +265,14 @@ export const AgentVerificationModal: React.FC<AgentVerificationModalProps> = ({
 
               {!isVerified && !isPending && !isSuspended && (
                 <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 flex items-start gap-3">
-                  <AlertCircle className="text-yellow-600 flex-shrink-0 mt-0.5" size={20} />
+                  <AlertCircle
+                    className="text-yellow-600 flex-shrink-0 mt-0.5"
+                    size={20}
+                  />
                   <div>
-                    <h3 className="font-semibold text-yellow-900">Unverified Agent</h3>
+                    <h3 className="font-semibold text-yellow-900">
+                      Unverified Agent
+                    </h3>
                     <p className="text-sm text-yellow-700 mt-1">
                       Verify your identity to create rooms and earn rewards.
                     </p>
@@ -316,7 +355,9 @@ export const AgentVerificationModal: React.FC<AgentVerificationModalProps> = ({
                   {(walletAddress || proof || signature) && (
                     <button
                       onClick={handleSignatureRequest}
-                      disabled={isVerifying || !walletAddress || !proof || !signature}
+                      disabled={
+                        isVerifying || !walletAddress || !proof || !signature
+                      }
                       className="flex-1 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white font-semibold py-2 px-4 rounded-lg transition"
                     >
                       {isVerifying ? "Verifying..." : "Verify Identity"}
@@ -340,8 +381,9 @@ export const AgentVerificationModal: React.FC<AgentVerificationModalProps> = ({
         {/* Help Text */}
         <div className="mt-6 pt-6 border-t border-gray-200">
           <p className="text-xs text-gray-600">
-            <strong>How it works:</strong> Click "Request Signature" to connect your wallet.
-            Sign the message with your wallet to verify you own this agent identity.
+            <strong>How it works:</strong> Click "Request Signature" to connect
+            your wallet. Sign the message with your wallet to verify you own
+            this agent identity.
           </p>
         </div>
       </div>
