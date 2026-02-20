@@ -39,18 +39,22 @@ COPY common ./common
 # Install production dependencies
 RUN npm ci --omit=dev
 
+# Install tsconfig-paths to handle @/ aliases at runtime
+RUN npm install -g tsconfig-paths
+
 # Copy the built files from the builder stage
-# The builder stage runs 'npm run build -w backend' which outputs to /app/backend/dist
-# We need to preserve the directory structure so that imports work
 COPY --from=builder /app/backend/dist ./backend/dist
 
 EXPOSE 4000
 
 ENV NODE_ENV=production
+# Set NODE_PATH to include the dist directory for module resolution
+ENV NODE_PATH=/app/backend/dist
 
 # Healthcheck using node to check the /health endpoint
 HEALTHCHECK --interval=10s --timeout=5s --retries=5 \
   CMD node -e "require('http').get('http://localhost:4000/health', (r) => {if (r.statusCode !== 200) throw new Error(r.statusCode)})"
 
-# Start the server using tsx to handle path aliases at runtime
-CMD ["node", "--import", "tsx", "backend/dist/backend/src/server.js"]
+# Start the server using tsconfig-paths to resolve @/ aliases
+# We use -r tsconfig-paths/register and point to the backend tsconfig
+CMD ["node", "-r", "tsconfig-paths/register", "backend/dist/server.js"]
