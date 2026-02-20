@@ -6,8 +6,17 @@
  */
 
 import * as Sentry from "@sentry/node";
-import { ProfilingIntegration } from "@sentry/profiling-node";
 import { logger } from "../utils/logger.js";
+
+let profilingIntegration: any = null;
+try {
+  const { ProfilingIntegration } = await import("@sentry/profiling-node");
+  profilingIntegration = new ProfilingIntegration();
+} catch {
+  logger.warn(
+    "Sentry profiling not available - this is normal in some environments",
+  );
+}
 
 /**
  * Initialize Sentry for error tracking and performance monitoring
@@ -43,12 +52,13 @@ export function initializeSentry(app: any): void {
 
     // Tracing & Performance
     tracesSampleRate: environment === "production" ? 0.1 : 1.0, // 10% in production, 100% in dev
-    profilesSampleRate: environment === "production" ? 0.1 : 1.0, // Profiling
+    profilesSampleRate:
+      profilingIntegration && environment === "production" ? 0.1 : 0, // Profiling only if available
 
     // Integration
     integrations: [
       new Sentry.Integrations.Http({ tracing: true }),
-      new ProfilingIntegration(),
+      ...(profilingIntegration ? [profilingIntegration] : []),
       new Sentry.Integrations.OnUncaughtException(),
       new Sentry.Integrations.OnUnhandledRejection(),
     ],
