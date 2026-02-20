@@ -110,7 +110,7 @@ try {
 }
 
 const app: Express = express();
-const port = parseInt(process.env.API_PORT || "4000", 10);
+const port = parseInt(process.env.PORT || process.env.API_PORT || "4000", 10);
 const apiVersion = "v1";
 
 // ============================================================================
