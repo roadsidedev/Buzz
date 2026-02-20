@@ -6,6 +6,7 @@ dockerfilePath = "orchestrator/Dockerfile"
 # The Dockerfile CMD is already set to python -m uvicorn orchestrator.main:app --host 0.0.0.0 --port 5000
 startCommand = "python -m uvicorn orchestrator.main:app --host 0.0.0.0 --port 5000"
 healthcheckPath = "/health"
+healthcheckPort = 5000
 # Increased timeout to allow for environment validation and service initialization
 healthcheckTimeout = 30
 healthcheckInterval = 10
