@@ -3,9 +3,11 @@ builder = "DOCKERFILE"
 dockerfilePath = "backend/Dockerfile"
 
 [deploy]
-# The Dockerfile CMD is already set to node -r tsconfig-paths/register backend/dist/server.js
-startCommand = "node -r tsconfig-paths/register backend/dist/server.js"
+# The Dockerfile CMD already sets the start command, but we override to be explicit
+# tsx handles the transformed path aliases from tsc-alias
+startCommand = "node --import tsx backend/dist/backend/src/server.js"
 healthcheckPath = "/health"
+healthcheckPort = 4000
 healthcheckTimeout = 10
 healthcheckInterval = 10
 restartPolicyType = "ON_FAILURE"
@@ -15,8 +17,6 @@ numReplicas = 1
 [deploy.env]
 NODE_ENV = "production"
 API_PORT = "4000"
-# Set TS_NODE_BASEURL to the dist directory for tsconfig-paths
-TS_NODE_BASEURL = "./backend/dist"
 # Set these to false by default to allow startup without all secrets
 ENABLE_PAYMENTS = "false"
 ENABLE_AUDIO_STREAMING = "false"
