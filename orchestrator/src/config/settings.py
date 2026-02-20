@@ -1,5 +1,6 @@
 """Configuration management for Orchestrator Service."""
 
+import os
 from pydantic_settings import BaseSettings
 from typing import Literal
 
@@ -13,9 +14,9 @@ class Settings(BaseSettings):
     ENVIRONMENT: Literal["development", "staging", "production"] = "development"
     DEBUG: bool = True
 
-    # FastAPI
+    # FastAPI - Use Railway's PORT if available
     FASTAPI_HOST: str = "0.0.0.0"
-    FASTAPI_PORT: int = 5000
+    FASTAPI_PORT: int = int(os.getenv("PORT", "5000"))
     CORS_ORIGINS: list[str] = ["http://localhost:4000", "http://localhost:3000"]
 
     # PostgreSQL
