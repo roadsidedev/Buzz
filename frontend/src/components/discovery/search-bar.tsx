@@ -216,7 +216,7 @@ export const SearchBarWithFilters: React.FC<SearchBarWithFiltersProps> = ({
   }, [onClear]);
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-3 w-full">
       {/* Search Input */}
       <SearchBar
         placeholder={placeholder}
@@ -228,7 +228,7 @@ export const SearchBarWithFilters: React.FC<SearchBarWithFiltersProps> = ({
       />
 
       {/* Filter Controls */}
-      <div className="flex flex-wrap gap-2 items-center">
+      <div className="flex flex-wrap gap-2 items-center justify-start">
         {/* Category Filter */}
         {categories.length > 0 && (
           <select
@@ -239,7 +239,7 @@ export const SearchBarWithFilters: React.FC<SearchBarWithFiltersProps> = ({
                 categoryId: e.target.value || undefined,
               })
             }
-            className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500"
+            className="px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
             aria-label="Filter by category"
           >
             <option value="">All Categories</option>
@@ -260,7 +260,7 @@ export const SearchBarWithFilters: React.FC<SearchBarWithFiltersProps> = ({
               sortBy: e.target.value as SearchFilters["sortBy"],
             })
           }
-          className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500"
+          className="px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
           aria-label="Sort results"
         >
           <option value="relevance">Most Relevant</option>
@@ -273,9 +273,9 @@ export const SearchBarWithFilters: React.FC<SearchBarWithFiltersProps> = ({
         {(filters.categoryId || filters.sortBy !== "relevance") && (
           <button
             onClick={handleClearAll}
-            className="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors"
+            className="px-3 py-2 text-sm bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors font-medium"
           >
-            Clear filters
+            Clear Filters
           </button>
         )}
       </div>

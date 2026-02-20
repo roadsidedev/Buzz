@@ -46,7 +46,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
           <div className="flex h-16 items-center justify-between">
             {/* Logo */}
             <Link
-              to="/discover"
+              to="/"
               className="flex items-center gap-2 text-xl font-bold text-cyan-400 hover:text-cyan-300 transition-colors"
             >
               <span className="text-2xl">🎙️</span>
@@ -60,12 +60,6 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
                 className="text-slate-300 hover:text-cyan-400 transition-colors text-sm font-medium"
               >
                 Discover
-              </Link>
-              <Link
-                to="/get-started"
-                className="text-slate-300 hover:text-cyan-400 transition-colors text-sm font-medium"
-              >
-                Get Started
               </Link>
             </nav>
 
