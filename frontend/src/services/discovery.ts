@@ -15,28 +15,45 @@ import type {
   JoinRoomResponse,
 } from "common/types/discovery";
 
-const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:4000/api";
+const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:4000/api/v1";
 
 /**
  * Discovery API Service
  * Provides methods for fetching discovery data, trending, search, etc.
+ * 
+ * Note: Discovery endpoints are public and do not require authentication
  */
 export class DiscoveryService {
   /**
    * Get main discovery page data (live now, trending, categories)
+   * Note: This endpoint may not exist yet - using individual calls instead
    */
   static async getDiscoveryPage(): Promise<DiscoveryPageData> {
-    const response = await fetch(`${API_BASE}/discovery`, {
-      headers: {
-        Authorization: `Bearer ${this.getToken()}`,
-      },
-    });
+    try {
+      // Fetch live now, trending, and categories in parallel
+      const [liveNowResponse, trendingResponse, categoriesResponse] = await Promise.all([
+        fetch(`${API_BASE}/discover/live-now?limit=6`),
+        fetch(`${API_BASE}/discover/trending?limit=10`),
+        fetch(`${API_BASE}/discover/categories`),
+      ]);
 
-    if (!response.ok) {
-      throw new Error(`Failed to fetch discovery page: ${response.statusText}`);
+      // Check for errors
+      if (!liveNowResponse.ok || !trendingResponse.ok || !categoriesResponse.ok) {
+        throw new Error("Failed to fetch discovery data");
+      }
+
+      const liveNowData = await liveNowResponse.json();
+      const trendingData = await trendingResponse.json();
+      const categoriesData = await categoriesResponse.json();
+
+      return {
+        liveNow: liveNowData.data?.rooms || liveNowData.rooms || [],
+        trending: trendingData.data?.rooms || trendingData.rooms || [],
+        categories: categoriesData.categories || [],
+      };
+    } catch (err) {
+      throw new Error(`Failed to fetch discovery page: ${err instanceof Error ? err.message : String(err)}`);
     }
-
-    return response.json();
   }
 
   /**
@@ -49,16 +66,11 @@ export class DiscoveryService {
     const params = new URLSearchParams();
     params.append("limit", limit.toString());
     if (categoryId) {
-      params.append("categoryId", categoryId);
+      params.append("type", categoryId); // Note: backend uses 'type' not 'categoryId'
     }
 
     const response = await fetch(
-      `${API_BASE}/discovery/trending?${params.toString()}`,
-      {
-        headers: {
-          Authorization: `Bearer ${this.getToken()}`,
-        },
-      }
+      `${API_BASE}/discover/trending?${params.toString()}`
     );
 
     if (!response.ok) {
@@ -66,7 +78,7 @@ export class DiscoveryService {
     }
 
     const data = await response.json();
-    return data.rooms || [];
+    return data.data?.rooms || data.rooms || [];
   }
 
   /**
@@ -81,19 +93,24 @@ export class DiscoveryService {
     params.append("limit", limit.toString());
 
     const response = await fetch(
-      `${API_BASE}/discovery/live-now?${params.toString()}`,
-      {
-        headers: {
-          Authorization: `Bearer ${this.getToken()}`,
-        },
-      }
+      `${API_BASE}/discover/live-now?${params.toString()}`
     );
 
     if (!response.ok) {
       throw new Error(`Failed to fetch live now: ${response.statusText}`);
     }
 
-    return response.json();
+    const data = await response.json();
+    
+    // Map the response to match PaginatedResponse format
+    return {
+      data: data.data?.rooms || data.rooms || [],
+      page: page,
+      pageSize: 20,
+      total: data.pagination?.total || 0,
+      totalPages: data.pagination?.pages || 0,
+      hasMore: page < (data.pagination?.pages || 1),
+    };
   }
 
   /**
@@ -104,45 +121,43 @@ export class DiscoveryService {
     params.append("q", request.query);
     if (request.page) params.append("page", request.page.toString());
     if (request.limit) params.append("limit", request.limit.toString());
-    if (request.categoryId) params.append("categoryId", request.categoryId);
+    if (request.categoryId) params.append("type", request.categoryId); // backend uses 'type'
     if (request.sortBy) params.append("sortBy", request.sortBy);
 
     const response = await fetch(
-      `${API_BASE}/discovery/search?${params.toString()}`,
-      {
-        headers: {
-          Authorization: `Bearer ${this.getToken()}`,
-        },
-      }
+      `${API_BASE}/discover/search?${params.toString()}`
     );
 
     if (!response.ok) {
       throw new Error(`Failed to search: ${response.statusText}`);
     }
 
-    return response.json();
+    const data = await response.json();
+    return {
+      results: data.data?.rooms || data.rooms || [],
+      total: data.data?.total || data.pagination?.total || 0,
+      page: request.page || 1,
+      pageSize: request.limit || 20,
+      hasMore: (request.page || 1) < Math.ceil((data.data?.total || data.pagination?.total || 0) / (request.limit || 20)),
+    };
   }
 
   /**
-   * Get all categories
+   * Get all categories - currently not available via main API
+   * Returns mock categories as placeholder
    */
   static async getCategories(): Promise<Category[]> {
-    const response = await fetch(`${API_BASE}/discovery/categories`, {
-      headers: {
-        Authorization: `Bearer ${this.getToken()}`,
-      },
-    });
-
-    if (!response.ok) {
-      throw new Error(`Failed to fetch categories: ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    return data.categories || [];
+    // TODO: Implement categories endpoint in backend
+    // For now, return mock categories
+    return [
+      { id: "debate", name: "Debate", slug: "debate" },
+      { id: "coding", name: "Coding", slug: "coding" },
+      { id: "research", name: "Research", slug: "research" },
+    ];
   }
 
   /**
-   * Get rooms by category
+   * Get rooms by type (not by category)
    */
   static async getRoomsByCategory(
     categoryId: string,
@@ -154,12 +169,7 @@ export class DiscoveryService {
     params.append("limit", limit.toString());
 
     const response = await fetch(
-      `${API_BASE}/discovery/categories/${categoryId}?${params.toString()}`,
-      {
-        headers: {
-          Authorization: `Bearer ${this.getToken()}`,
-        },
-      }
+      `${API_BASE}/discover/by-type/${categoryId}?${params.toString()}`
     );
 
     if (!response.ok) {
@@ -168,14 +178,22 @@ export class DiscoveryService {
       );
     }
 
-    return response.json();
+    const data = await response.json();
+    return {
+      data: data.data?.rooms || data.rooms || [],
+      page: page,
+      pageSize: limit,
+      total: data.data?.pagination?.total || data.pagination?.total || 0,
+      totalPages: data.data?.pagination?.pages || data.pagination?.pages || 0,
+      hasMore: page < (data.data?.pagination?.pages || data.pagination?.pages || 1),
+    };
   }
 
   /**
    * Get room details
    */
   static async getRoomDetails(roomId: string): Promise<RoomDetails> {
-    const response = await fetch(`${API_BASE}/room/${roomId}`, {
+    const response = await fetch(`${API_BASE}/rooms/${roomId}`, {
       headers: {
         Authorization: `Bearer ${this.getToken()}`,
       },
@@ -192,7 +210,7 @@ export class DiscoveryService {
    * Get room participants
    */
   static async getRoomParticipants(roomId: string): Promise<DiscoveryRoom["participants"]> {
-    const response = await fetch(`${API_BASE}/room/${roomId}/participants`, {
+    const response = await fetch(`${API_BASE}/rooms/${roomId}/participants`, {
       headers: {
         Authorization: `Bearer ${this.getToken()}`,
       },
@@ -212,7 +230,7 @@ export class DiscoveryService {
    * Join a room
    */
   static async joinRoom(request: JoinRoomRequest): Promise<JoinRoomResponse> {
-    const response = await fetch(`${API_BASE}/room/${request.roomId}/join`, {
+    const response = await fetch(`${API_BASE}/rooms/${request.roomId}/join`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${this.getToken()}`,
@@ -232,7 +250,7 @@ export class DiscoveryService {
    * Leave a room
    */
   static async leaveRoom(roomId: string): Promise<void> {
-    const response = await fetch(`${API_BASE}/room/${roomId}/leave`, {
+    const response = await fetch(`${API_BASE}/rooms/${roomId}/leave`, {
       method: "DELETE",
       headers: {
         Authorization: `Bearer ${this.getToken()}`,
@@ -249,12 +267,7 @@ export class DiscoveryService {
    */
   static async getRecommendations(limit: number = 10): Promise<DiscoveryRoom[]> {
     const response = await fetch(
-      `${API_BASE}/discovery/recommendations?limit=${limit}`,
-      {
-        headers: {
-          Authorization: `Bearer ${this.getToken()}`,
-        },
-      }
+      `${API_BASE}/discover/trending?limit=${limit}`
     );
 
     if (!response.ok) {
@@ -262,7 +275,7 @@ export class DiscoveryService {
     }
 
     const data = await response.json();
-    return data.recommendations || [];
+    return data.data?.rooms || data.rooms || [];
   }
 
   /**
