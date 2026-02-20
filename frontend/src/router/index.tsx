@@ -1,10 +1,11 @@
 /**
  * AppRouter: Main application router configuration
  *
- * Explore-first UX:
- * - Public routes: /discover, /room/:id, /episode/:id, /onboard, /claim/:token
- * - Protected routes: /profile, /room/:id (for participation)
- * - No email/password auth - SIWA only
+ * UX Flow:
+ * - Unauthenticated: / (hero) → /get-started → /sign-in → /discover
+ * - Authenticated: /discover, /room/:id, /episode/:id, /profile
+ * - Public routes: /discover, /room/:id, /episode/:id, /claim/:token
+ * - Protected routes: /profile
  */
 
 import React, { Suspense, lazy } from "react";
@@ -27,6 +28,14 @@ const PageLoader: React.FC = () => (
 );
 
 // Lazy load pages for code splitting
+const HeroPage = lazy(() =>
+  import("@/pages/hero-page").then((m) => ({ default: m.HeroPage })),
+);
+const GetStartedPage = lazy(() =>
+  import("@/pages/get-started-page").then((m) => ({
+    default: m.GetStartedPage,
+  })),
+);
 const DiscoveryPage = lazy(() =>
   import("@/pages/discovery-page").then((m) => ({ default: m.DiscoveryPage })),
 );
@@ -41,9 +50,6 @@ const EpisodePlayerPage = lazy(() =>
 const ProfilePage = lazy(() =>
   import("@/pages/profile-page").then((m) => ({ default: m.ProfilePage })),
 );
-const OnboardPage = lazy(() =>
-  import("@/pages/onboard-page").then((m) => ({ default: m.OnboardPage })),
-);
 const ClaimPage = lazy(() =>
   import("@/pages/claim-page").then((m) => ({ default: m.ClaimPage })),
 );
@@ -51,8 +57,10 @@ const ClaimPage = lazy(() =>
 /**
  * AppRouter: Main application router
  *
- * Explore-first design:
- * - All discovery and viewing is public
+ * Public-first design:
+ * - Hero landing for unauthenticated users
+ * - Get started flow for agent registration
+ * - Discover and content viewing is public
  * - Auth required only for write operations
  */
 export const AppRouter: React.FC = () => {
@@ -61,24 +69,14 @@ export const AppRouter: React.FC = () => {
       <Suspense fallback={<PageLoader />}>
         <Routes>
           {/* ========================================
-              ROOT REDIRECT
+              PUBLIC LANDING ROUTES
               ======================================== */}
 
-          <Route path="/" element={<Navigate to="/discover" replace />} />
+          {/* Hero landing page */}
+          <Route path="/" element={<HeroPage />} />
 
-          {/* ========================================
-              PUBLIC ROUTES (No authentication required)
-              ======================================== */}
-
-          {/* Onboarding page - Instructions for humans and agents */}
-          <Route
-            path="/onboard"
-            element={
-              <MainLayout>
-                <OnboardPage />
-              </MainLayout>
-            }
-          />
+          {/* Get started - Onboarding for humans and agents */}
+          <Route path="/get-started" element={<GetStartedPage />} />
 
           {/* Claim page - Human verifies agent ownership */}
           <Route
@@ -90,7 +88,10 @@ export const AppRouter: React.FC = () => {
             }
           />
 
-          {/* Main app layout with public routes */}
+          {/* ========================================
+              MAIN APP LAYOUT WITH PUBLIC ROUTES
+              ======================================== */}
+
           <Route element={<MainLayout />}>
             {/* Discovery page - Browse rooms and content (PUBLIC) */}
             <Route path="/discover" element={<DiscoveryPage />} />

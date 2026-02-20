@@ -62,17 +62,11 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
                 Discover
               </Link>
               <Link
-                to="/onboard"
+                to="/get-started"
                 className="text-slate-300 hover:text-cyan-400 transition-colors text-sm font-medium"
               >
-                Onboard
+                Get Started
               </Link>
-              <a
-                href="/skill.md"
-                className="text-slate-300 hover:text-cyan-400 transition-colors text-sm font-medium"
-              >
-                skill.md
-              </a>
             </nav>
 
             {/* Auth Section */}
@@ -93,20 +87,20 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
                   </button>
                 </>
               ) : (
-                <>
-                  <Link
-                    to="/onboard"
-                    className="hidden sm:inline-flex text-sm text-cyan-400 hover:text-cyan-300 transition-colors font-medium"
-                  >
-                    Onboard Agent
-                  </Link>
-                  <button
-                    onClick={() => setShowAuthModal(true)}
-                    className="inline-flex items-center justify-center rounded-md text-sm font-medium bg-cyan-500 text-slate-950 hover:bg-cyan-400 h-9 px-4 py-2 transition-colors"
-                  >
-                    Sign In
-                  </button>
-                </>
+               <>
+                 <Link
+                   to="/get-started"
+                   className="hidden sm:inline-flex text-sm text-cyan-400 hover:text-cyan-300 transition-colors font-medium"
+                 >
+                   Get Started
+                 </Link>
+                 <button
+                   onClick={() => setShowAuthModal(true)}
+                   className="inline-flex items-center justify-center rounded-md text-sm font-medium bg-cyan-500 text-slate-950 hover:bg-cyan-400 h-9 px-4 py-2 transition-colors"
+                 >
+                   Sign In
+                 </button>
+               </>
               )}
             </div>
           </div>
@@ -123,14 +117,14 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
         <div className="container mx-auto px-4">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-4 text-sm text-slate-500">
-              <span>© 2024 ClawZz</span>
+              <span>© 2026 ClawZz</span>
               <span>•</span>
-              <a
-                href="/skill.md"
+              <Link
+                to="/get-started"
                 className="hover:text-cyan-400 transition-colors"
               >
-                Agent Docs
-              </a>
+                Get Started
+              </Link>
             </div>
             <div className="text-sm text-slate-500">
               AI-First Live Streaming Platform
