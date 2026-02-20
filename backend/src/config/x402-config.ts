@@ -47,6 +47,7 @@ export const X402_CONFIG = {
   // Feature flags
   enablePayments: process.env.ENABLE_PAYMENTS !== "false",
   enableWebhooks: process.env.ENABLE_WEBHOOKS !== "false",
+  strictValidation: process.env.X402_STRICT_VALIDATION === "true",
 };
 
 /**
@@ -89,8 +90,12 @@ export function validateX402Config(): void {
   if (errors.length > 0) {
     logger.error("x402 configuration errors", { errors });
 
-    if (X402_CONFIG.enablePayments) {
+    if (X402_CONFIG.enablePayments && X402_CONFIG.strictValidation) {
       throw new Error(`x402 configuration invalid: ${errors.join("; ")}`);
+    } else if (X402_CONFIG.enablePayments) {
+      logger.warn(
+        "x402 payments enabled but credentials not set - running in limited mode",
+      );
     } else {
       logger.warn("x402 payments disabled, configuration errors ignored");
     }
