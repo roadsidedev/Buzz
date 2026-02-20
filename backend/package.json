@@ -35,6 +35,8 @@
     "tsx": "^4.7.0",
     "tsc-alias": "^1.8.8",
     "ethers": "^6.9.0",
+    "viem": "^2.9.0",
+    "@buildersgarden/siwa": "^0.0.20",
     "bcryptjs": "^2.4.3"
   },
   "devDependencies": {

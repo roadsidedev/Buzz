@@ -1,6 +1,6 @@
 /**
  * SIWA Receipt Verification Middleware
- * 
+ *
  * Validates SIWA receipts in Authorization header or cookies
  * Attaches decoded agent info to request
  */
@@ -28,11 +28,11 @@ declare global {
 
 /**
  * Verify SIWA receipt and attach agent to request
- * 
+ *
  * Extracts receipt from:
  * 1. Authorization header (Bearer <receipt>)
  * 2. siwa_receipt cookie
- * 
+ *
  * @param req - Express request
  * @param res - Express response
  * @param next - Express next
@@ -40,15 +40,14 @@ declare global {
 export const verifySIWAReceipt = async (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ): Promise<void> => {
   try {
     // Extract receipt from Authorization header or cookie
     const authHeader = req.headers.authorization;
-    const receipt =
-      authHeader?.startsWith("Bearer ")
-        ? authHeader.slice(7)
-        : (req.cookies?.siwa_receipt as string | undefined);
+    const receipt = authHeader?.startsWith("Bearer ")
+      ? authHeader.slice(7)
+      : (req.cookies?.siwa_receipt as string | undefined);
 
     if (!receipt) {
       logger.warn("Missing SIWA receipt", {
@@ -69,14 +68,14 @@ export const verifySIWAReceipt = async (
     // Verify receipt signature and expiry
     const decoded = await siwaAuthService.verifyReceipt(receipt);
 
-    // Fetch full agent profile
+    // Fetch full agent profile - SDK uses 'address' not 'walletAddress'
     const agentProfile = await siwaAuthService.getAgentByWallet(
-      decoded.walletAddress
+      decoded.address,
     );
 
     if (!agentProfile) {
       logger.warn("Agent not found for wallet", {
-        walletAddress: decoded.walletAddress,
+        walletAddress: decoded.address,
       });
       res.status(401).json({
         success: false,
@@ -123,10 +122,10 @@ export const verifySIWAReceipt = async (
 
 /**
  * Optional SIWA authentication
- * 
+ *
  * Verifies receipt if present, but doesn't require it
  * Useful for endpoints that work both authenticated and unauthenticated
- * 
+ *
  * @param req - Express request
  * @param res - Express response
  * @param next - Express next
@@ -134,15 +133,14 @@ export const verifySIWAReceipt = async (
 export const optionalSIWA = async (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ): Promise<void> => {
   try {
     // Extract receipt from Authorization header or cookie
     const authHeader = req.headers.authorization;
-    const receipt =
-      authHeader?.startsWith("Bearer ")
-        ? authHeader.slice(7)
-        : (req.cookies?.siwa_receipt as string | undefined);
+    const receipt = authHeader?.startsWith("Bearer ")
+      ? authHeader.slice(7)
+      : (req.cookies?.siwa_receipt as string | undefined);
 
     if (receipt) {
       try {
@@ -151,7 +149,7 @@ export const optionalSIWA = async (
 
         // Fetch agent profile
         const agentProfile = await siwaAuthService.getAgentByWallet(
-          decoded.walletAddress
+          decoded.address,
         );
 
         if (agentProfile) {

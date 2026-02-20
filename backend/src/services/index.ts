@@ -18,3 +18,8 @@ export { SIWAAuthService } from "./siwa-auth-service";
  * SIWA Authentication Service instance
  */
 export const siwaAuthService = new SIWAAuthService(db);
+
+// Initialize SIWA service asynchronously
+siwaAuthService.initialize().catch((err) => {
+  console.error("Failed to initialize SIWA service:", err);
+});

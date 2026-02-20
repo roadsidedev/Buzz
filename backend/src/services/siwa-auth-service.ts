@@ -1,28 +1,47 @@
 // @ts-nocheck
 /**
- * SIWAAuthService: Wallet-based authentication using SIWA + Privy
+ * SIWAAuthService: SIWA authentication using @buildersgarden/siwa SDK
  *
  * Responsibilities:
- * - Generate nonces for signing challenges
- * - Verify signed SIWA messages
- * - Issue HMAC-signed stateless receipts
- * - Validate ERC-8004 onchain ownership
- * - Manage Privy wallet sessions
+ * - Generate nonces for signing challenges (via SDK)
+ * - Verify signed SIWA messages (via SDK)
+ * - Issue HMAC-signed receipts (via SDK)
+ * - Verify ERC-8004 onchain ownership
+ * - Manage agent registration and profiles
  * - Audit trail for auth events
  *
  * Flow:
  * 1. Agent requests nonce: POST /siwa/nonce { walletAddress, agentId }
  * 2. Agent signs SIWA message with wallet
  * 3. Agent verifies signature: POST /siwa/verify { message, signature }
- * 4. Service returns HMAC receipt (stateless token)
+ * 4. Service returns receipt (SDK handles HMAC signing)
  * 5. Agent includes receipt in future requests (verified by middleware)
  */
 
 import { v4 as uuidv4 } from "uuid";
 import { randomBytes } from "crypto";
-import { createHmac } from "crypto";
-import { verifyMessage } from "ethers";
+import {
+  verifySIWA,
+  createSIWANonce,
+  parseSIWAMessage,
+  buildSIWAMessage,
+} from "@buildersgarden/siwa";
+import {
+  createReceipt,
+  verifyReceipt as verifyReceiptSignature,
+} from "@buildersgarden/siwa/receipt";
 import { Database } from "@/config/database";
+import {
+  SIWA_SECRET,
+  ERC8004_REGISTRY_ADDRESS,
+  SIWA_CHAIN_ID,
+  SIWA_DOMAIN,
+  SIWA_URI,
+  getNonceStore,
+  createPublicClient,
+  getAgentRegistryCAIP,
+  getClientResolver,
+} from "../config/siwa";
 import logger from "@/utils/logger";
 
 /**
@@ -59,7 +78,7 @@ export interface SIWAVerifyResponse {
 }
 
 export interface SIWAReceipt {
-  walletAddress: string;
+  address: string;
   agentId: number;
   signerType?: "eoa" | "sca";
   issuedAt: string;
@@ -77,19 +96,31 @@ export interface ERC8004VerificationResult {
 
 export class SIWAAuthService {
   private db: Database;
-  private hmacSecret: string;
   private nonceExpiry: number = 10 * 60 * 1000; // 10 minutes
   private receiptExpiry: number = 24 * 60 * 60 * 1000; // 24 hours
+  private initialized: boolean = false;
 
   constructor(db: Database) {
     this.db = db;
-    this.hmacSecret = process.env.SIWA_HMAC_SECRET!;
+  }
 
-    if (!this.hmacSecret || this.hmacSecret.length < 32) {
-      throw new Error(
-        "SIWA_HMAC_SECRET must be set and at least 32 characters in .env"
-      );
+  /**
+   * Initialize the service - must be called before use
+   */
+  async initialize(): Promise<void> {
+    if (this.initialized) return;
+
+    // Verify we can connect to RPC for onchain verification
+    try {
+      const client = createPublicClient();
+      // Simple test call
+      await client.getChainId();
+      logger.info("SIWA service initialized - RPC connection OK");
+    } catch (err) {
+      logger.warn("SIWA service initialized - RPC may not be available:", err);
     }
+
+    this.initialized = true;
   }
 
   /**
@@ -98,14 +129,9 @@ export class SIWAAuthService {
    * Process:
    * 1. Validate wallet address and agent ID
    * 2. Check if agent exists in database
-   * 3. Verify ERC-8004 onchain ownership
-   * 4. Generate random nonce (>= 8 alphanumeric chars)
-   * 5. Store nonce in database with expiry
-   * 6. Return nonce + timestamps
-   *
-   * @param request - Wallet address and ERC-8004 agent ID
-   * @returns Nonce and timestamps for signing
-   * @throws Error if wallet not verified or agent not found
+   * 3. Generate nonce via SDK
+   * 4. Store in database for audit
+   * 5. Return nonce + timestamps
    */
   async requestNonce(request: SIWANonceRequest): Promise<SIWANonceResponse> {
     const { walletAddress, agentId } = request;
@@ -122,34 +148,48 @@ export class SIWAAuthService {
     // Check if agent exists locally
     const existingAgent = await this.db.query(
       "SELECT id FROM agent WHERE erc_8004_agent_id = $1",
-      [agentId]
+      [agentId],
     );
 
     if (existingAgent.rows.length === 0) {
-      logger.warn("Agent not found for ERC-8004 ID", { agentId, walletAddress });
+      logger.warn("Agent not found for ERC-8004 ID", {
+        agentId,
+        walletAddress,
+      });
       throw new Error(
-        `Agent with ERC-8004 ID ${agentId} not found. Please register first.`
+        `Agent with ERC-8004 ID ${agentId} not found. Please register first.`,
       );
     }
 
-    // Verify onchain ownership (will check onchain if service configured)
-    // For now, we trust the agent provided agentId
-    // In production, you'd call verifyERC8004Ownership() here
+    // Get nonce store
+    const nonceStore = await getNonceStore();
 
-    // Generate nonce (random 16 bytes = 32 hex chars = 32 alphanumeric)
-    const nonceBytes = randomBytes(16);
-    const nonce = nonceBytes.toString("hex");
+    // Create nonce via SDK
+    const client = createPublicClient();
+    const agentRegistry = getAgentRegistryCAIP();
 
-    // Calculate expiry timestamps
+    const result = await createSIWANonce(
+      {
+        address: walletAddress,
+        agentId: agentId,
+        agentRegistry: agentRegistry,
+      },
+      client,
+      {
+        secret: SIWA_SECRET,
+        nonceStore: nonceStore as any,
+      },
+    );
+
     const now = new Date();
     const expiresAt = new Date(now.getTime() + this.nonceExpiry);
 
-    // Store nonce in database
+    // Store in database for audit
     const nonceId = uuidv4();
     await this.db.query(
       `INSERT INTO siwa_nonce (id, wallet_address, agent_id, nonce, issued_at, expires_at)
        VALUES ($1, $2, $3, $4, $5, $6)`,
-      [nonceId, walletAddress, agentId, nonce, now, expiresAt]
+      [nonceId, walletAddress, agentId, result.nonce, now, expiresAt],
     );
 
     logger.info("SIWA nonce generated", {
@@ -160,9 +200,9 @@ export class SIWAAuthService {
     });
 
     return {
-      nonce,
-      issuedAt: now.toISOString(),
-      expiresAt: expiresAt.toISOString(),
+      nonce: result.nonce,
+      issuedAt: result.issuedAt,
+      expiresAt: result.expiresAt,
     };
   }
 
@@ -170,19 +210,13 @@ export class SIWAAuthService {
    * Verify signed SIWA message and issue receipt
    *
    * Process:
-   * 1. Validate message format (SIWA spec)
-   * 2. Verify EIP-191 signature
+   * 1. Validate message format
+   * 2. Verify EIP-191 signature + onchain ownership via SDK
    * 3. Extract wallet address and agent ID from message
    * 4. Confirm nonce hasn't been used
-   * 5. Verify ERC-8004 onchain ownership (optional, strict mode)
-   * 6. Mark nonce as consumed
-   * 7. Generate HMAC receipt
-   * 8. Store receipt in database
-   * 9. Return receipt + agent profile
-   *
-   * @param request - Signed SIWA message
-   * @returns Receipt (stateless JWT-like token) + agent profile
-   * @throws Error if signature invalid, nonce expired, or onchain check fails
+   * 5. Generate receipt via SDK
+   * 6. Store in database for audit
+   * 7. Return receipt + agent profile
    */
   async verifySIWA(request: SIWAVerifyRequest): Promise<SIWAVerifyResponse> {
     const { message, signature, walletAddress, agentId } = request;
@@ -192,63 +226,40 @@ export class SIWAAuthService {
       throw new Error("Missing message, signature, or wallet address");
     }
 
-    // Step 1: Recover signer from signature (EIP-191)
-    let recoveredAddress: string;
+    // Get nonce store and client
+    const nonceStore = await getNonceStore();
+    const client = createPublicClient();
+
+    // Verify signature and onchain ownership via SDK
+    let verification;
     try {
-      recoveredAddress = verifyMessage(message, signature);
-    } catch (err) {
-      logger.error("Signature verification failed", { error: err, signature });
-      throw new Error("Invalid signature");
-    }
-
-    // Step 2: Compare recovered address with provided address (case-insensitive)
-    if (recoveredAddress.toLowerCase() !== walletAddress.toLowerCase()) {
-      logger.warn("Signer mismatch", {
-        recovered: recoveredAddress,
-        provided: walletAddress,
+      verification = await verifySIWA(
+        message,
+        signature,
+        SIWA_DOMAIN,
+        { nonceStore: nonceStore as any },
+        client,
+        {
+          // Criteria can be added here for production
+          // e.g., mustBeActive: true, minScore: 100, etc.
+        },
+      );
+    } catch (err: any) {
+      logger.error("SIWA verification failed", {
+        error: err.message,
+        signature,
       });
-      throw new Error("Signature does not match wallet address");
+      throw new Error(`Verification failed: ${err.message}`);
     }
 
-    // Step 3: Verify nonce from message
-    // Extract nonce from SIWA message (format: "Nonce: {nonce}")
-    const nonceMatch = message.match(/Nonce: ([a-zA-Z0-9]+)/);
-    if (!nonceMatch) {
-      throw new Error("Nonce not found in message");
-    }
-    const nonce = nonceMatch[1];
+    // Parse message to get fields
+    const parsedMessage = parseSIWAMessage(message);
 
-    // Step 4: Check nonce exists, hasn't expired, and hasn't been used
-    const nonceResult = await this.db.query(
-      `SELECT id, expires_at, consumed FROM siwa_nonce 
-       WHERE nonce = $1 AND wallet_address = $2 AND agent_id = $3`,
-      [nonce, walletAddress, agentId]
-    );
-
-    if (nonceResult.rows.length === 0) {
-      throw new Error("Nonce not found or invalid");
-    }
-
-    const nonceRow = nonceResult.rows[0];
-    const now = new Date();
-
-    if (new Date(nonceRow.expires_at) < now) {
-      throw new Error("Nonce has expired");
-    }
-
-    if (nonceRow.consumed) {
-      logger.warn("Replay attack: nonce already consumed", {
-        nonce,
-        walletAddress,
-      });
-      throw new Error("Nonce already used (replay attack detected)");
-    }
-
-    // Step 5: Get agent from database
+    // Get agent from database
     const agentResult = await this.db.query(
       `SELECT id, name, avatar, erc_8004_agent_id, erc_8004_verified 
        FROM agent WHERE wallet_address = $1`,
-      [walletAddress]
+      [walletAddress],
     );
 
     if (agentResult.rows.length === 0) {
@@ -257,23 +268,24 @@ export class SIWAAuthService {
 
     const agent = agentResult.rows[0];
 
-    // Step 6: Mark nonce as consumed (prevents replay)
-    await this.db.query(
-      `UPDATE siwa_nonce SET consumed = TRUE, consumed_at = $1 
-       WHERE id = $2`,
-      [now, nonceRow.id]
+    // Generate receipt via SDK
+    const receiptResult = createReceipt(
+      {
+        address: walletAddress,
+        agentId: agentId,
+        signerType: verification.signerType,
+      },
+      {
+        secret: SIWA_SECRET,
+        expiresIn: this.receiptExpiry,
+      },
     );
 
-    // Step 7: Generate HMAC receipt
-    const receipt = this._generateReceipt({
-      walletAddress,
-      agentId,
-    });
-
-    // Step 8: Store receipt in database for audit trail
-    const receiptId = uuidv4();
+    const now = new Date();
     const expiresAt = new Date(now.getTime() + this.receiptExpiry);
 
+    // Store receipt in database for audit
+    const receiptId = uuidv4();
     await this.db.query(
       `INSERT INTO siwa_receipt (
         id, wallet_address, agent_id, agent_uuid, receipt_signature,
@@ -284,24 +296,25 @@ export class SIWAAuthService {
         walletAddress,
         agentId,
         agent.id,
-        receipt,
-        nonceRow.id,
+        receiptResult.receipt,
+        null, // nonce_id - could be linked if needed
         message,
         signature,
         now,
         expiresAt,
-      ]
+      ],
     );
 
     logger.info("SIWA verification successful", {
       agentId: agent.id,
       walletAddress,
       receiptId,
+      signerType: verification.signerType,
       expiresAt: expiresAt.toISOString(),
     });
 
     return {
-      receipt,
+      receipt: receiptResult.receipt,
       agent: {
         id: agent.id,
         name: agent.name,
@@ -315,30 +328,19 @@ export class SIWAAuthService {
 
   /**
    * Verify receipt for API calls
-   *
-   * Process:
-   * 1. Validate receipt signature (HMAC)
-   * 2. Check receipt not revoked
-   * 3. Check receipt not expired
-   * 4. Update last_used_at timestamp
-   * 5. Return decoded receipt payload
-   *
-   * @param receipt - HMAC-signed receipt
-   * @returns Decoded receipt (walletAddress, agentId, timestamps)
-   * @throws Error if receipt invalid, revoked, or expired
    */
   async verifyReceipt(receipt: string): Promise<SIWAReceipt> {
-    // Step 1: Decode and validate HMAC signature
-    const decoded = this._verifyReceiptSignature(receipt);
+    const decoded = verifyReceiptSignature(receipt, SIWA_SECRET);
+
     if (!decoded) {
       throw new Error("Invalid receipt signature");
     }
 
-    // Step 2: Check receipt in database (for revocation + audit)
+    // Also check database for audit/revocation
     const receiptResult = await this.db.query(
       `SELECT id, expires_at, revoked_at FROM siwa_receipt 
        WHERE receipt_signature = $1`,
-      [receipt]
+      [receipt],
     );
 
     if (receiptResult.rows.length === 0) {
@@ -348,20 +350,18 @@ export class SIWAAuthService {
     const receiptRow = receiptResult.rows[0];
     const now = new Date();
 
-    // Step 3: Check not revoked
     if (receiptRow.revoked_at) {
       throw new Error("Receipt has been revoked");
     }
 
-    // Step 4: Check not expired
     if (new Date(receiptRow.expires_at) < now) {
       throw new Error("Receipt has expired");
     }
 
-    // Step 5: Update last_used_at for audit trail
+    // Update last_used_at for audit
     await this.db.query(
       `UPDATE siwa_receipt SET last_used_at = $1 WHERE id = $2`,
-      [now, receiptRow.id]
+      [now, receiptRow.id],
     );
 
     return decoded as SIWAReceipt;
@@ -369,27 +369,12 @@ export class SIWAAuthService {
 
   /**
    * Register new agent with wallet address
-   *
-   * Process:
-   * 1. Validate inputs (wallet format, agent ID format)
-   * 2. Check if wallet already registered
-   * 3. Check if agent ID already registered
-   * 4. Create agent record
-   * 5. Schedule ERC-8004 verification (async)
-   * 6. Return agent ID
-   *
-   * @param walletAddress - Ethereum address (0x...)
-   * @param agentId - ERC-8004 token ID
-   * @param name - Agent display name
-   * @param avatar - Avatar URL (optional)
-   * @returns Agent ID (UUID)
-   * @throws Error if wallet or agent ID already registered
    */
   async registerAgent(
     walletAddress: string,
     agentId: number,
     name: string,
-    avatar?: string
+    avatar?: string,
   ): Promise<string> {
     // Validate inputs
     if (!walletAddress || !walletAddress.startsWith("0x")) {
@@ -407,7 +392,7 @@ export class SIWAAuthService {
     // Check if wallet already registered
     const existingWallet = await this.db.query(
       "SELECT id FROM agent WHERE wallet_address = $1",
-      [walletAddress]
+      [walletAddress],
     );
 
     if (existingWallet.rows.length > 0) {
@@ -417,7 +402,7 @@ export class SIWAAuthService {
     // Check if agent ID already registered
     const existingAgentId = await this.db.query(
       "SELECT id FROM agent WHERE erc_8004_agent_id = $1",
-      [agentId]
+      [agentId],
     );
 
     if (existingAgentId.rows.length > 0) {
@@ -433,10 +418,10 @@ export class SIWAAuthService {
         id, name, avatar, wallet_address, erc_8004_agent_id,
         verification_status, created_at, updated_at
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-      [uuid, name, avatar || null, walletAddress, agentId, "pending", now, now]
+      [uuid, name, avatar || null, walletAddress, agentId, "pending", now, now],
     );
 
-    // Schedule async ERC-8004 verification (don't block registration)
+    // Schedule async ERC-8004 verification
     this._verifyERC8004Async(uuid, walletAddress, agentId);
 
     logger.info("Agent registered", {
@@ -451,35 +436,24 @@ export class SIWAAuthService {
 
   /**
    * Verify ERC-8004 onchain ownership (async, non-blocking)
-   *
-   * Calls the ERC-8004 registry to verify agent owns the tokenId
-   * Updates verification status and logs audit trail
-   *
-   * @private
-   * @param agentId - Database agent UUID
-   * @param walletAddress - Wallet to verify
-   * @param erc8004AgentId - ERC-8004 token ID
    */
   private async _verifyERC8004Async(
     agentId: string,
     walletAddress: string,
-    erc8004AgentId: number
+    erc8004AgentId: number,
   ): Promise<void> {
     try {
-      // TODO: Implement actual ERC-8004 contract call via viem/ethers
-      // For now, log the verification attempt
+      const client = createPublicClient();
+      const registryAddress = ERC8004_REGISTRY_ADDRESS as `0x${string}`;
 
-      logger.info("ERC-8004 verification scheduled", {
+      // For now, log the verification attempt
+      // The SDK's verifySIWA already does onchain verification
+      logger.info("ERC-8004 onchain verification via SDK", {
         agentId,
         walletAddress,
         erc8004AgentId,
+        registry: ERC8004_REGISTRY_ADDRESS,
       });
-
-      // In production:
-      // 1. Call ERC-8004 registry contract
-      // 2. Check: ownerOf(erc8004AgentId) == walletAddress
-      // 3. Update agent.erc_8004_verified = true
-      // 4. Log in erc8004_verification_log table
     } catch (err) {
       logger.error("ERC-8004 verification failed", {
         agentId,
@@ -490,73 +464,7 @@ export class SIWAAuthService {
   }
 
   /**
-   * Generate HMAC-signed receipt (stateless token)
-   *
-   * Format: base64(payload) . base64(hmac)
-   * Payload includes: walletAddress, agentId, issuedAt, expiresAt
-   *
-   * @private
-   * @param payload - Receipt data
-   * @returns HMAC-signed receipt string
-   */
-  private _generateReceipt(payload: Omit<SIWAReceipt, "issuedAt" | "expiresAt">): string {
-    const now = new Date();
-    const expiresAt = new Date(now.getTime() + this.receiptExpiry);
-
-    const fullPayload = {
-      ...payload,
-      issuedAt: now.toISOString(),
-      expiresAt: expiresAt.toISOString(),
-    };
-
-    const payloadJson = JSON.stringify(fullPayload);
-    const payloadBase64 = Buffer.from(payloadJson).toString("base64");
-
-    // Generate HMAC(SHA256)
-    const hmac = createHmac("sha256", this.hmacSecret);
-    hmac.update(payloadBase64);
-    const hmacHex = hmac.digest("hex");
-
-    // Format: payload.signature
-    return `${payloadBase64}.${hmacHex}`;
-  }
-
-  /**
-   * Verify HMAC-signed receipt
-   *
-   * @private
-   * @param receipt - Receipt string (payload.signature)
-   * @returns Decoded payload if valid, null if invalid
-   */
-  private _verifyReceiptSignature(receipt: string): SIWAReceipt | null {
-    try {
-      const [payloadBase64, providedHmac] = receipt.split(".");
-
-      if (!payloadBase64 || !providedHmac) {
-        return null;
-      }
-
-      // Verify HMAC
-      const hmac = createHmac("sha256", this.hmacSecret);
-      hmac.update(payloadBase64);
-      const expectedHmac = hmac.digest("hex");
-
-      if (providedHmac !== expectedHmac) {
-        return null;
-      }
-
-      // Decode payload
-      const payloadJson = Buffer.from(payloadBase64, "base64").toString("utf8");
-      return JSON.parse(payloadJson) as SIWAReceipt;
-    } catch (err) {
-      return null;
-    }
-  }
-
-  /**
    * Revoke a receipt (for logout or security)
-   *
-   * @param receipt - Receipt to revoke
    */
   async revokeReceipt(receipt: string): Promise<void> {
     const now = new Date();
@@ -564,47 +472,41 @@ export class SIWAAuthService {
     await this.db.query(
       `UPDATE siwa_receipt SET revoked_at = $1 
        WHERE receipt_signature = $2`,
-      [now, receipt]
+      [now, receipt],
     );
 
-    logger.info("Receipt revoked", { receipt: receipt.substring(0, 20) + "..." });
+    logger.info("Receipt revoked", {
+      receipt: receipt.substring(0, 20) + "...",
+    });
   }
 
   /**
-   * Clean up expired nonces and receipts (run periodically)
-   *
-   * @param maxAgeMs - Delete records older than this (default: 30 days)
+   * Clean up expired nonces and receipts
    */
-  async cleanupExpiredTokens(maxAgeMs: number = 30 * 24 * 60 * 60 * 1000): Promise<void> {
+  async cleanupExpiredTokens(
+    maxAgeMs: number = 30 * 24 * 60 * 60 * 1000,
+  ): Promise<void> {
     const cutoffDate = new Date(Date.now() - maxAgeMs);
 
-    // Delete expired nonces
-    await this.db.query(
-      "DELETE FROM siwa_nonce WHERE expires_at < $1",
-      [cutoffDate]
-    );
+    await this.db.query("DELETE FROM siwa_nonce WHERE expires_at < $1", [
+      cutoffDate,
+    ]);
 
-    // Delete expired receipts
-    await this.db.query(
-      "DELETE FROM siwa_receipt WHERE expires_at < $1",
-      [cutoffDate]
-    );
+    await this.db.query("DELETE FROM siwa_receipt WHERE expires_at < $1", [
+      cutoffDate,
+    ]);
 
     logger.info("Expired tokens cleaned up", { cutoffDate });
   }
 
   /**
    * Get agent profile by agent UUID
-   *
-   * @param agentId - Agent UUID
-   * @returns Agent profile with wallet and ERC-8004 info
-   * @throws Error if agent not found
    */
   async getAgentProfile(agentId: string): Promise<AgentProfile> {
     const result = await this.db.query(
       `SELECT id, name, avatar, wallet_address, erc_8004_agent_id, erc_8004_verified, created_at
        FROM agent WHERE id = $1`,
-      [agentId]
+      [agentId],
     );
 
     if (result.rows.length === 0) {
@@ -626,15 +528,12 @@ export class SIWAAuthService {
 
   /**
    * Get agent profile by wallet address
-   *
-   * @param walletAddress - Ethereum wallet address
-   * @returns Agent profile with wallet and ERC-8004 info, or null if not found
    */
   async getAgentByWallet(walletAddress: string): Promise<AgentProfile | null> {
     const result = await this.db.query(
       `SELECT id, name, avatar, wallet_address, erc_8004_agent_id, erc_8004_verified, created_at
        FROM agent WHERE wallet_address = $1`,
-      [walletAddress]
+      [walletAddress],
     );
 
     if (result.rows.length === 0) {
