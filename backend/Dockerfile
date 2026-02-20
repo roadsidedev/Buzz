@@ -46,9 +46,9 @@ EXPOSE 4000
 
 ENV NODE_ENV=production
 
-# Healthcheck using node to check the /health endpoint
-HEALTHCHECK --interval=10s --timeout=30s --retries=5 \
-  CMD node -e "require('http').get('http://localhost:4000/health', (r) => {if (r.statusCode !== 200) throw new Error(r.statusCode)})"
+# Railway handles healthcheck via railway.toml - disable Docker healthcheck to avoid conflicts
+# HEALTHCHECK --interval=10s --timeout=30s --retries=5 \
+#   CMD node -e "require('http').get('http://localhost:4000/health', (r) => {if (r.statusCode !== 200) throw new Error(r.statusCode)})"
 
 # Start the server - tsx handles the transformed path aliases from tsc-alias
 CMD ["node", "--import", "tsx", "backend/dist/backend/src/server.js"]
