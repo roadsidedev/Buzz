@@ -1,0 +1,14 @@
+.idea
+*.iml
+node_modules
+ui/public/bundle*
+ui/public/css/tailwind.css
+ui/bundle*
+ui/public/js
+ui/esbuild.json
+*.DS_Store
+.env
+.venv
+data
+jam-config
+__pycache__

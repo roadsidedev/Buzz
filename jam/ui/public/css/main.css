@@ -1,0 +1,331 @@
+.jam {
+  /* width: 100%; */
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI',
+    'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans',
+    'Helvetica Neue', sans-serif;
+  background-color: rgb(250, 245, 239);
+}
+
+/* markdown styling */
+.jam .markdown a {
+  text-decoration: underline;
+  color: rgba(30, 64, 175); /* blue-800 */
+}
+
+/* util */
+.spaced-w-2 > *:not(:last-child) {
+  margin-right: 0.5rem;
+}
+.spaced-h-2 > *:not(:last-child) {
+  margin-bottom: 0.5rem;
+}
+
+/* bazaar */
+.jam .room-header a[href^="https://gumroad.com"]
+{
+  background-image: url('/img/bazaar/gumroad-logo.svg');
+  background-repeat: no-repeat;
+  padding-left: 23px;
+  text-decoration: underline;
+}
+
+.jam .room-header a[href^="https://paypal.me"]
+{
+  background-image: url('/img/bazaar/paypal-logo.svg');
+  background-repeat: no-repeat;
+  background-size: 18px;
+  padding-left: 23px;
+  text-decoration: underline;
+}
+
+.jam .room-header a[href^='bitcoin:'] {
+  background-image: url('/img/bazaar/bitcoin-logo.svg');
+  background-repeat: no-repeat;
+  background-size: 18px;
+  padding-left: 23px;
+  text-decoration: underline;
+}
+
+.jam .room-header a[href^='https://github.com']
+{
+  background-image: url('/img/bazaar/github-logo.svg');
+  background-repeat: no-repeat;
+  background-size: 18px;
+  padding-left: 23px;
+  text-decoration: underline;
+}
+
+.jam .room-header a[href^='https://beondeck.com']
+{
+  background-image: url('/img/bazaar/ondeck-logo.png');
+  background-repeat: no-repeat;
+  background-size: 18px;
+  padding-left: 23px;
+  text-decoration: underline;
+}
+
+.jam .room-header a[href^='https://ycombinator.com']
+{
+  background-image: url('/img/bazaar/ycombinator-logo.svg');
+  background-repeat: no-repeat;
+  background-size: 18px;
+  padding-left: 23px;
+  text-decoration: underline;
+}
+
+.jam .room-header a[href^='https://tiktok.com']
+{
+  background-image: url('/img/bazaar/tiktok-logo.svg');
+  background-repeat: no-repeat;
+  background-size: 18px;
+  padding-left: 23px;
+  text-decoration: underline;
+}
+
+.jam .room-header a[href^='https://twitter.com']
+{
+  background-image: url('/img/bazaar/twitter-logo.svg');
+  background-repeat: no-repeat;
+  background-size: 18px;
+  padding-left: 23px;
+  text-decoration: underline;
+}
+
+.jam .room-header a[href^='https://patreon.com']
+{
+  background-image: url('/img/bazaar/patreon-logo.png');
+  background-repeat: no-repeat;
+  background-size: 18px;
+  padding-left: 23px;
+  text-decoration: underline;
+}
+
+.jam .room-header a[href^='https://ko-fi.com']
+{
+  background-image: url('/img/bazaar/kofi-logo.png');
+  background-repeat: no-repeat;
+  background-size: 18px;
+  padding-left: 23px;
+  text-decoration: underline;
+}
+
+.jam .room-header a[href^='https://youtube.com']
+{
+  background-image: url('/img/bazaar/youtube-logo.svg');
+  background-repeat: no-repeat;
+  background-size: 18px;
+  padding-left: 23px;
+  text-decoration: underline;
+}
+
+.jam .room-header a[href^='https://instagram.com']
+{
+  background-image: url('/img/bazaar/instagram-logo.svg');
+  background-repeat: no-repeat;
+  background-size: 18px;
+  padding-left: 23px;
+  text-decoration: underline;
+}
+
+.jam .room-header a[href^='https://twitch.tv'],
+.jam .room-header a[href^='https://www.twitch.tv']
+{
+  background-image: url('/img/bazaar/twitch-logo.png');
+  background-repeat: no-repeat;
+  background-size: 18px;
+  padding-left: 23px;
+  text-decoration: underline;
+}
+
+.jam .room-header a[href$='substack.com'] {
+  background-image: url('/img/bazaar/substack-logo.png');
+  background-repeat: no-repeat;
+  background-size: 18px;
+  padding-left: 23px;
+  text-decoration: underline;
+}
+
+.jam .room-header a[href$='transistor.fm'], .room-header a[href^='https://share.transistor.fm'], a[href^='https://transistor.fm']
+{
+  background-image: url('/img/bazaar/transistorfm-logo.png');
+  background-repeat: no-repeat;
+  background-size: 18px;
+  padding-left: 23px;
+  text-decoration: underline;
+}
+
+.jam .room-header a[href^='ethereum:'] {
+  background-image: url('/img/bazaar/ethereum-logo.svg');
+  background-repeat: no-repeat;
+  background-size: 10px;
+  background-position: 4px;
+  padding-left: 23px;
+  text-decoration: underline;
+}
+
+.jam .room-header a[href^='https://cash.app']
+{
+  background-image: url('/img/bazaar/cashapp-logo.svg');
+  background-repeat: no-repeat;
+  background-size: 16px;
+  padding-left: 20px;
+  text-decoration: underline;
+}
+
+.jam .room-header .call-to-action a {
+  background-repeat: no-repeat;
+  background-size: 18px;
+  text-decoration: none;
+}
+
+.jam .room-header .call-to-action a[href^="https://paypal.me"]
+{
+  background-image: url('/img/bazaar/paypal-logo.svg');
+  background-position: 20px 50%;
+  padding-left: 48px;
+}
+
+.jam .room-header .call-to-action a[href^="https://gumroad.com"]
+{
+  background-image: url('/img/bazaar/gumroad-logo.svg');
+  background-position: 20px 50%;
+  padding-left: 48px;
+}
+
+.jam .room-header .call-to-action a[href^='bitcoin:'] {
+  background-image: url('/img/bazaar/bitcoin-logo.svg');
+  background-position: 20px 50%;
+  padding-left: 48px;
+}
+
+.jam .room-header .call-to-action a[href^='https://github.com']
+{
+  background-image: url('/img/bazaar/github-logo.svg');
+  background-position: 20px 50%;
+  padding-left: 48px;
+}
+
+.jam .room-header .call-to-action a[href^='https://beondeck.com']
+{
+  background-image: url('/img/bazaar/ondeck-logo.png');
+  background-position: 20px 50%;
+  padding-left: 48px;
+}
+
+.jam .room-header .call-to-action a[href^='https://ycombinator.com']
+{
+  background-image: url('/img/bazaar/ycombinator-logo.svg');
+  background-position: 20px 50%;
+  padding-left: 48px;
+}
+
+.jam .room-header .call-to-action a[href^='https://tiktok.com']
+{
+  background-image: url('/img/bazaar/tiktok-logo.svg');
+  background-position: 20px 50%;
+  padding-left: 48px;
+}
+
+.jam .room-header .call-to-action a[href^='https://twitter.com']
+{
+  background-image: url('/img/bazaar/twitter-logo.svg');
+  background-position: 20px 50%;
+  padding-left: 48px;
+}
+
+.jam .room-header .call-to-action a[href^='https://patreon.com']
+{
+  background-image: url('/img/bazaar/patreon-logo.png');
+  background-position: 20px 50%;
+  padding-left: 48px;
+}
+
+.jam .room-header .call-to-action a[href^='https://ko-fi.com']
+{
+  background-image: url('/img/bazaar/kofi-logo.png');
+  background-position: 20px 50%;
+  padding-left: 48px;
+}
+
+.jam .room-header .call-to-action a[href^='https://youtube.com']
+{
+  background-image: url('/img/bazaar/youtube-logo.svg');
+  background-position: 20px 50%;
+  padding-left: 48px;
+}
+
+.jam .room-header .call-to-action a[href^='https://instagram.com']
+{
+  background-image: url('/img/bazaar/instagram-logo.svg');
+  background-position: 20px 50%;
+  padding-left: 48px;
+}
+
+.jam .room-header .call-to-action a[href^='https://twitch.tv'],
+.jam .room-header .call-to-action a[href^='https://www.twitch.tv']
+{
+  background-image: url('/img/bazaar/twitch-logo.png');
+  background-position: 20px 50%;
+  padding-left: 48px;
+}
+
+.jam .room-header .call-to-action a[href$='substack.com'] {
+  background-image: url('/img/bazaar/substack-logo.png');
+  background-position: 20px 50%;
+  padding-left: 48px;
+}
+
+.jam .room-header .call-to-action a[href$='transistor.fm'], .room-header .call-to-action a[href^='https://share.transistor.fm'], .room-header .call-to-action a[href^='https://transistor.fm']
+{
+  background-image: url('/img/bazaar/transistorfm-logo.png');
+  background-position: 20px 50%;
+  padding-left: 48px;
+}
+
+.jam .room-header .call-to-action a[href^='ethereum:'] {
+  background-image: url('/img/bazaar/ethereum-logo.svg');
+  background-position: 22px 50%;
+  background-size: 12px;
+  padding-left: 48px;
+}
+
+.jam .room-header .call-to-action a[href^='https://cash.app']
+{
+  background-image: url('/img/bazaar/cashapp-logo.svg');
+  background-position: 16px 50%;
+  background-size: 16px;
+  padding-left: 48px;
+}
+
+.jam h1,
+.jam h2,
+.jam h3 {
+  width: 100%;
+  font-weight: normal;
+}
+.jam h1 {
+  font-size: 24px;
+}
+.jam h2 {
+  font-size: 20px;
+  margin: -4% 0 6% 0;
+}
+.jam input,
+.jam textarea {
+  padding: 10px;
+  font-size: 18px;
+  border-radius: 3px;
+  border: 1px solid rgb(213, 213, 213);
+}
+.jam input[type='color'] {
+  padding: 0;
+}
+.jam table td {
+  padding: 0;
+  border: 5px solid transparent;
+  vertical-align: top;
+}
+
+.jam .human-radius {
+  border-radius: 42%;
+}

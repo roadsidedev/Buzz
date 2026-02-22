@@ -16,6 +16,7 @@
   "dependencies": {
     "@buildersgarden/siwa": "^0.0.20",
     "@circle-fin/developer-controlled-wallets": "^10.1.0",
+    "@noble/ed25519": "^3.0.0",
     "@opentelemetry/auto-instrumentations-node": "^0.40.1",
     "@opentelemetry/exporter-trace-otlp-http": "^0.45.1",
     "@opentelemetry/resources": "^1.18.1",
@@ -30,6 +31,7 @@
     "ethers": "^6.9.0",
     "express": "^4.18.2",
     "helmet": "^7.1.0",
+    "ioredis": "^5.9.3",
     "jsonwebtoken": "^9.0.2",
     "morgan": "^1.10.0",
     "pg": "^8.11.3",

@@ -1,7 +1,9 @@
-version: '3.8'
+version: "3.8"
 
 services:
-  # Frontend (React)
+  # ============================================
+  # FRONTEND
+  # ============================================
   frontend:
     build:
       context: ./frontend
@@ -12,8 +14,13 @@ services:
     environment:
       - REACT_APP_API_URL=http://localhost:4000
       - REACT_APP_WS_URL=ws://localhost:4000
+      - VITE_PANTRY_URL=http://localhost:3003/_/pantry
+      - VITE_STUN_URL=stun:localhost:3478
+      - VITE_TURN_URL=turn:localhost:3478
+      - VITE_TURN_SECRET=${COTURN_SECRET}
     depends_on:
       - backend
+      - pantry
     volumes:
       - ./frontend/src:/app/src
     healthcheck:
@@ -21,8 +28,12 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - clawhouse-network
 
-  # API Gateway (Node.js Express)
+  # ============================================
+  # API GATEWAY (Node.js Express)
+  # ============================================
   backend:
     build:
       context: ./backend
@@ -36,14 +47,27 @@ services:
       - REDIS_URL=${REDIS_URL:-redis://redis:6379}
       - JWT_SECRET=${JWT_SECRET}
       - ORCHESTRATOR_URL=${ORCHESTRATOR_URL:-http://orchestrator:5000}
-      - JAM_URL=${JAM_URL:-http://jam:3001}
       - GCP_PROJECT_ID=${GCP_PROJECT_ID}
+      # Self-hosted Jam configuration
+      - PANTRY_URL=http://pantry:3000
+      - JAM_SELF_HOSTED_ENABLED=${JAM_SELF_HOSTED_ENABLED:-true}
+      - JAM_FALLBACK_ENABLED=${JAM_FALLBACK_ENABLED:-true}
+      # Fallback (API-key Jam)
+      - JAM_URL=${JAM_URL:-http://jam:3001}
+      - JAM_API_KEY=${JAM_API_KEY}
+      - JAM_WEBHOOK_SECRET=${JAM_WEBHOOK_SECRET}
+      # Coturn configuration
+      - COTURN_SECRET=${COTURN_SECRET}
+      - COTURN_EXTERNAL_IP=${COTURN_EXTERNAL_IP:-}
+      - COTURN_REALM=${COTURN_REALM:-clawzz.dev}
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
       orchestrator:
+        condition: service_healthy
+      pantry:
         condition: service_healthy
     volumes:
       - ./backend/src:/app/src
@@ -52,8 +76,12 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - clawhouse-network
 
-  # Orchestrator (Python FastAPI)
+  # ============================================
+  # ORCHESTRATOR (Python FastAPI)
+  # ============================================
   orchestrator:
     build:
       context: ./orchestrator
@@ -81,11 +109,86 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - clawhouse-network
 
-  # Jam (Open Source Audio Rooms)
+  # ============================================
+  # JAM STACK - SELF HOSTED AUDIO ROOMS
+  # ============================================
+
+  # Pantry - Jam Backend Service
+  pantry:
+    build:
+      context: ./jam/pantry
+      dockerfile: Dockerfile
+    container_name: clawzz-pantry
+    ports:
+      - "3003:3000"
+    environment:
+      - JAM_HOST=${JAM_HOST:-localhost}
+      - REDIS_URL=redis://redis:6379
+      - JAM_RESTRICT_ROOM_CREATION=false
+      - NODE_ENV=production
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - clawhouse-network
+
+  # Pantry-SFU - Mediasoup SFU for Large Rooms
+  pantry-sfu:
+    build:
+      context: ./jam/pantry-sfu
+      dockerfile: Dockerfile
+    container_name: clawzz-sfu
+    environment:
+      - JAM_SFU=true
+      - JAM_SFU_EXTERNAL_IP=${COTURN_EXTERNAL_IP:-}
+      - PANTRY_URL=ws://pantry:3000
+      - MEDIASOUP_MIN_PORT=30000
+      - MEDIASOUP_MAX_PORT=39999
+      - NODE_ENV=production
+    ports:
+      - "30000-39999:30000-39999/udp"
+      - "30000-39999:30000-39999/tcp"
+    depends_on:
+      - pantry
+      - redis
+    networks:
+      - clawhouse-network
+    profiles:
+      - sfu
+
+  # Coturn - STUN/TURN Server for NAT Traversal
+  coturn:
+    build:
+      context: ./coturn
+      dockerfile: Dockerfile
+    container_name: clawzz-coturn
+    environment:
+      - COTURN_SECRET=${COTURN_SECRET}
+      - COTURN_EXTERNAL_IP=${COTURN_EXTERNAL_IP:-}
+      - COTURN_REALM=${COTURN_REALM:-clawzz.dev}
+    ports:
+      - "3478:3478/udp"
+      - "3478:3478/tcp"
+      - "5349:5349/tcp"
+      - "49152-65535:49152-65535/udp"
+    networks:
+      - clawhouse-network
+    restart: unless-stopped
+
+  # ============================================
+  # LEGACY JAM (Fallback - API Key Based)
+  # ============================================
   jam:
     image: ghcr.io/jam-systems/jam:latest
-    container_name: clawzz-jam
+    container_name: clawzz-jam-legacy
     ports:
       - "3001:3000"
     environment:
@@ -97,8 +200,14 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - clawhouse-network
+    profiles:
+      - legacy-jam
 
-  # PostgreSQL Database
+  # ============================================
+  # DATABASE
+  # ============================================
   postgres:
     image: postgres:15-alpine
     container_name: clawzz-postgres
@@ -110,17 +219,21 @@ services:
       - POSTGRES_DB=${POSTGRES_DB:-clawzz}
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./migrations/001_initial_schema.sql:/docker-entrypoint-initdb.d/001_initial_schema.sql
+      - ./migrations:/docker-entrypoint-initdb.d
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U clawzz"]
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - clawhouse-network
 
-  # Redis Cache
+  # ============================================
+  # REDIS (Shared Cache & Event Bus)
+  # ============================================
   redis:
     image: redis:7-alpine
-    container_name: clawhouse-redis
+    container_name: clawzz-redis
     ports:
       - "6379:6379"
     command: redis-server --appendonly yes
@@ -131,11 +244,13 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - clawhouse-network
 
 volumes:
   postgres_data:
   redis_data:
 
 networks:
-  default:
-    name: clawhouse-network
+  clawhouse-network:
+    driver: bridge

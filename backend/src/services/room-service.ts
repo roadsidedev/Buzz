@@ -6,15 +6,11 @@
  * Integrates:
  * - ERC-8004 agent identity verification
  * - x402 payment processing
- * - Jam room creation and lifecycle
+ * - Jam room creation and lifecycle (V2 self-hosted with V1 fallback)
  */
 
 import crypto from "crypto";
-import type {
-  Room,
-  CreateRoomRequest,
-  RoomStatus,
-} from "@common/types/index";
+import type { Room, CreateRoomRequest, RoomStatus } from "@common/types/index";
 import {
   ValidationError,
   NotFoundError,
@@ -23,6 +19,13 @@ import {
 import { logger } from "../utils/logger.js";
 import { roomRepository, agentRepository } from "../repositories/index.js";
 import { getJamService } from "./jam-service.js";
+import {
+  getJam,
+  getJamServiceFactory,
+  initializeJamServiceFactory,
+} from "./jam-service-factory.js";
+import { JamServiceV2 } from "./jam-service-v2.js";
+import { getAgentKeypair, generateJamIdentityId } from "../utils/ssr-auth.js";
 import { getX402PaymentService } from "./x402-payment-service.js";
 import { paymentService } from "./payment-service.js";
 import { roomOrchestrationService } from "./room-orchestration-service.js";
@@ -36,6 +39,22 @@ interface CreateRoomInput extends CreateRoomRequest {
   hostAgentId: string;
   hostAgentName: string;
   authenticatedUser?: JWTPayload;
+}
+
+// Track if factory has been initialized
+let factoryInitialized = false;
+
+/**
+ * Ensure Jam service factory is initialized
+ */
+function ensureFactoryInitialized(): void {
+  if (!factoryInitialized) {
+    initializeJamServiceFactory();
+    factoryInitialized = true;
+    logger.info("Jam service factory initialized", {
+      serviceType: getJamServiceFactory()?.getServiceType(),
+    });
+  }
 }
 
 /**
@@ -91,7 +110,7 @@ export class RoomService {
           agentId: input.hostAgentId,
           currentStatus: hostAgent.verification_status,
           code: "AGENT_NOT_VERIFIED",
-        }
+        },
       );
     }
 
@@ -156,18 +175,94 @@ export class RoomService {
 
     // 5. CREATE JAM AUDIO ROOM
     try {
-      const jamService = getJamService();
-      const jamRoom = await jamService.createRoom(roomId, {
-        title: `${input.hostAgentName}'s ${input.type} room`,
-        description: input.objective,
-        hostId: input.hostAgentId,
-        roomType: input.type as "debate" | "coding" | "trading" | "research",
-        maxParticipants: 50,
-        metadata: {
-          objective: input.objective,
-          spawnFee: input.spawnFee,
-        },
-      });
+      // Ensure factory is initialized
+      ensureFactoryInitialized();
+
+      const factory = getJamServiceFactory();
+      const jamService = factory?.getService();
+
+      if (!jamService) {
+        throw new Error("Jam service not configured");
+      }
+
+      // Check if we're using V2 (self-hosted with SSR auth)
+      const isV2 = jamService instanceof JamServiceV2;
+
+      let jamRoom;
+
+      if (isV2) {
+        // V2: Use SSR auth with agent keypair
+        const encryptionSecret = process.env.ENCRYPTION_SECRET || "";
+
+        // Get agent keypair (from ERC-8004 identity or stored)
+        const keyPair = await getAgentKeypair({
+          agentId: input.hostAgentId,
+          erc8004Identity: hostAgent.erc8004_identity,
+          storedPublicKey: hostAgent.jam_public_key || undefined,
+          storedPrivateKeyEncrypted:
+            hostAgent.jam_private_key_encrypted || undefined,
+          encryptionSecret,
+        });
+
+        // Store keypair if not already stored
+        if (!hostAgent.jam_public_key) {
+          const jamIdentityId = generateJamIdentityId(keyPair.publicKeyBase64);
+          await agentRepository.update(input.hostAgentId, {
+            jam_public_key: keyPair.publicKeyBase64,
+            jam_private_key_encrypted:
+              hostAgent.jam_private_key_encrypted || "",
+            jam_identity_id: jamIdentityId,
+          });
+          logger.info("Stored Jam keypair for agent", {
+            agentId: input.hostAgentId,
+          });
+        }
+
+        jamRoom = await (jamService as JamServiceV2).createRoom(
+          roomId,
+          {
+            title: `${input.hostAgentName}'s ${input.type} room`,
+            description: input.objective,
+            hostId: input.hostAgentId,
+            roomType: input.type as
+              | "debate"
+              | "coding"
+              | "trading"
+              | "research",
+            maxParticipants: 50,
+            metadata: {
+              objective: input.objective,
+              spawnFee: input.spawnFee,
+            },
+          },
+          keyPair,
+        );
+
+        logger.info("Jam room created (V2 - self-hosted)", {
+          roomId,
+          jamRoomId: jamRoom.roomId,
+          serviceType: "v2",
+        });
+      } else {
+        // V1: Use API key auth (fallback)
+        jamRoom = await jamService.createRoom(roomId, {
+          title: `${input.hostAgentName}'s ${input.type} room`,
+          description: input.objective,
+          hostId: input.hostAgentId,
+          roomType: input.type as "debate" | "coding" | "trading" | "research",
+          maxParticipants: 50,
+          metadata: {
+            objective: input.objective,
+            spawnFee: input.spawnFee,
+          },
+        });
+
+        logger.info("Jam room created (V1 - API key)", {
+          roomId,
+          jamRoomId: jamRoom.roomId,
+          serviceType: "v1",
+        });
+      }
 
       // Update room with Jam details
       await roomRepository.updateJamDetails(roomId, {
@@ -217,7 +312,8 @@ export class RoomService {
     // 6. CHARGE SPAWN FEE VIA x402
     try {
       // Get agent wallet address from authenticated user or fetch from database
-      let hostWalletAddress: string | null = input.authenticatedUser?.walletAddress || null;
+      let hostWalletAddress: string | null =
+        input.authenticatedUser?.walletAddress || null;
 
       if (!hostWalletAddress) {
         // Fallback: fetch agent from database
@@ -443,9 +539,37 @@ export class RoomService {
 
     // 3. END ROOM ON JAM SIDE
     try {
-      const jamService = getJamService();
-      await jamService.closeRoom(room.jam_room_id || roomId);
-      logger.info("Jam room closed", { roomId, jamRoomId: room.jam_room_id });
+      ensureFactoryInitialized();
+
+      const factory = getJamServiceFactory();
+      const jamService = factory?.getService();
+
+      if (jamService) {
+        // Check if V2 with SSR auth
+        if (jamService instanceof JamServiceV2) {
+          // For V2, we need the host's keypair
+          const hostAgent = await agentRepository.getById(room.host_agent_id);
+          if (hostAgent) {
+            const encryptionSecret = process.env.ENCRYPTION_SECRET || "";
+            const keyPair = await getAgentKeypair({
+              agentId: room.host_agent_id,
+              erc8004Identity: hostAgent.erc8004_identity,
+              storedPublicKey: hostAgent.jam_public_key || undefined,
+              storedPrivateKeyEncrypted:
+                hostAgent.jam_private_key_encrypted || undefined,
+              encryptionSecret,
+            });
+            await (jamService as JamServiceV2).endRoom(
+              room.jam_room_id || roomId,
+              keyPair,
+            );
+          }
+        } else {
+          // V1 - use simple closeRoom
+          await jamService.closeRoom(room.jam_room_id || roomId);
+        }
+        logger.info("Jam room closed", { roomId, jamRoomId: room.jam_room_id });
+      }
     } catch (err) {
       logger.warn("Failed to close Jam room", {
         roomId,
@@ -458,9 +582,11 @@ export class RoomService {
     try {
       // Get all room participants
       const participants = await roomRepository.getParticipants(roomId);
-      
+
       if (participants.length === 0) {
-        logger.warn("No participants found for revenue distribution", { roomId });
+        logger.warn("No participants found for revenue distribution", {
+          roomId,
+        });
         logger.info("Room closed without distribution", { roomId });
         return;
       }
@@ -488,11 +614,13 @@ export class RoomService {
               agentId: p.agent_id,
               walletAddress: agent?.erc8004_address || null,
             };
-          })
+          }),
       );
 
       // Filter out participants without wallets
-      const validParticipants = participantData.filter((p) => p.walletAddress !== null);
+      const validParticipants = participantData.filter(
+        (p) => p.walletAddress !== null,
+      );
 
       if (validParticipants.length === 0) {
         logger.warn("No valid participant wallets for distribution", {
@@ -502,7 +630,8 @@ export class RoomService {
       }
 
       // Calculate total spawn fee amount (convert cents to wei)
-      const totalSpawnFee = BigInt(room.spawn_fee) * BigInt(10_000_000_000_000_000);
+      const totalSpawnFee =
+        BigInt(room.spawn_fee) * BigInt(10_000_000_000_000_000);
 
       // Distribute revenue
       const distributions = await paymentService.distributeRevenue(
