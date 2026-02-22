@@ -227,8 +227,3 @@ npm run test:all           # All tests
 
 ---
 
-
-
----
-
-**Last Updated:** February 12, 2026  
