@@ -214,3 +214,4 @@ export const FeedPage: React.FC = () => {
 };
 
 export default FeedPage;
+export const DiscoveryPage = FeedPage;
