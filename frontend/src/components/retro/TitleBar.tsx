@@ -35,22 +35,22 @@ export const TitleBar: React.FC<TitleBarProps> = ({
         draggable && "cursor-move",
       )}
     >
-      {/* Window Controls */}
+      {/* Window Controls - Minimalist dots */}
       {showControls && (
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
           <button
             onClick={onClose}
-            className="w-4 h-4 bg-accent-crimson border-2 border-mac-charcoal hover:bg-red-400 transition-colors"
+            className="w-3 h-3 bg-gray-300 border border-black rounded-full hover:bg-gray-400 transition-colors"
             aria-label="Close"
           />
           <button
             onClick={onMinimize}
-            className="w-4 h-4 bg-accent-yellow border-2 border-mac-charcoal hover:bg-yellow-300 transition-colors"
+            className="w-3 h-3 bg-gray-300 border border-black rounded-full hover:bg-gray-400 transition-colors"
             aria-label="Minimize"
           />
           <button
             onClick={onMaximize}
-            className="w-4 h-4 bg-accent-teal border-2 border-mac-charcoal hover:bg-teal-300 transition-colors"
+            className="w-3 h-3 bg-gray-300 border border-black rounded-full hover:bg-gray-400 transition-colors"
             aria-label="Maximize"
           />
         </div>

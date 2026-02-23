@@ -94,11 +94,10 @@ export const FeedCard: React.FC<FeedCardProps> = ({ item, className }) => {
       )}
 
       {/* Interaction Buttons - Right Stack */}
-      <div className="absolute right-3 bottom-12 flex flex-col gap-4">
+      <div className="absolute right-3 bottom-12 flex flex-col gap-3">
         <ActionButton
           icon={<Heart weight="fill" />}
           count={Math.floor(Math.random() * 10000)}
-          color="bg-[#FF6B6B]"
           onClick={(e) => {
             e.stopPropagation();
             console.log("heart", item.id);
@@ -107,7 +106,6 @@ export const FeedCard: React.FC<FeedCardProps> = ({ item, className }) => {
         <ActionButton
           icon={<ChatCircle weight="fill" />}
           count={Math.floor(Math.random() * 500)}
-          color="bg-[#4ECDC4]"
           onClick={(e) => {
             e.stopPropagation();
             handleClick();
@@ -116,7 +114,6 @@ export const FeedCard: React.FC<FeedCardProps> = ({ item, className }) => {
         <ActionButton
           icon={<ShareNetwork />}
           count=""
-          color="bg-white"
           onClick={(e) => {
             e.stopPropagation();
             console.log("share", item.id);
@@ -125,7 +122,6 @@ export const FeedCard: React.FC<FeedCardProps> = ({ item, className }) => {
         <ActionButton
           icon={<Coin weight="fill" />}
           count="Tip"
-          color="bg-[#FFE66D]"
           onClick={(e) => {
             e.stopPropagation();
             console.log("tip", item.id);
@@ -135,37 +131,30 @@ export const FeedCard: React.FC<FeedCardProps> = ({ item, className }) => {
 
       {/* Bottom Info Overlay - Clickable */}
       <div
-        className="absolute bottom-0 left-0 right-0 p-4 bg-[#FFE66D] border-t-[3px] border-black cursor-pointer"
+        className="absolute bottom-0 left-0 right-0 p-4 bg-white/90 backdrop-blur-sm cursor-pointer"
         onClick={handleClick}
       >
         {/* Agent Info */}
-        <div className="flex items-center gap-2 mb-2">
-          <span className="font-black border-2 border-black bg-white px-1 text-sm">
-            @{item.agentName}
-          </span>
+        <div className="flex items-center gap-2 mb-1">
+          <span className="font-black text-sm">@{item.agentName}</span>
           {item.agentVerified && (
-            <span className="text-[10px] font-black uppercase bg-black text-white px-1 italic">
+            <span className="text-[10px] font-black uppercase bg-[#6C5CE7] text-white px-1 italic">
               PRO
             </span>
           )}
         </div>
 
         {/* Title */}
-        <h3 className="text-lg font-black leading-tight uppercase line-clamp-2">
+        <h3 className="text-base font-bold leading-tight line-clamp-2">
           {item.title}
         </h3>
 
-        {/* Description */}
-        <p className="text-sm font-bold mt-2 line-clamp-2">
-          {item.description}
-        </p>
-
         {/* Viewer Count */}
         {item.isLive && (
-          <div className="mt-2 flex items-center gap-2">
-            <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
-            <span className="text-xs font-bold">
-              {item.viewerCount.toLocaleString()} watching
+          <div className="mt-1 flex items-center gap-1">
+            <div className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse" />
+            <span className="text-xs font-medium">
+              {item.viewerCount.toLocaleString()}
             </span>
           </div>
         )}
@@ -177,25 +166,19 @@ export const FeedCard: React.FC<FeedCardProps> = ({ item, className }) => {
 interface ActionButtonProps {
   icon: React.ReactNode;
   count: string | number;
-  color: string;
   onClick: (e: React.MouseEvent) => void;
 }
 
 const ActionButton: React.FC<ActionButtonProps> = ({
   icon,
   count,
-  color,
   onClick,
 }) => (
   <button
     onClick={onClick}
-    className={`w-12 h-12 ${color} border-[3px] border-black flex items-center justify-center shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-x-1 active:translate-y-1 transition-all`}
+    className="w-10 h-10 bg-white border-2 border-black flex items-center justify-center shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-x-0.5 active:translate-y-0.5 transition-all"
   >
-    <span
-      className={`text-xl ${color === "bg-white" ? "text-black" : "text-white"}`}
-    >
-      {icon}
-    </span>
+    <span className="text-lg text-black">{icon}</span>
   </button>
 );
 

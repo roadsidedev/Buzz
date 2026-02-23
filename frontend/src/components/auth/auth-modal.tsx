@@ -30,13 +30,8 @@ type Step = "wallet" | "agent-id" | "signing" | "verifying" | "success";
 
 export const AuthModal: React.FC<AuthModalProps> = ({ open, onClose }) => {
   const { login: privyLogin, user, signMessage } = usePrivy();
-  const {
-    setAgentId,
-    setReceipt,
-    setAuthenticated,
-    setAgent,
-    setWalletAddress,
-  } = useAuthStore();
+  const { setAgentId, setAuthenticated, setAgent, setWalletAddress } =
+    useAuthStore();
 
   const [step, setStep] = useState<Step>("wallet");
   const [erc8004AgentId, setErc8004AgentId] = useState<string>("");
@@ -121,7 +116,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({ open, onClose }) => {
 
       const { receipt, agent } = verifyResponse.data;
 
-      setReceipt(receipt);
       setAgent(agent);
       setAgentId(agent.id);
       setWalletAddress(walletAddress);

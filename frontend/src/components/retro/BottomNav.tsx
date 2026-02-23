@@ -19,11 +19,16 @@ interface NavItem {
  *
  * 3 main pages: Home, Feed, Profile
  * Profile is context-aware (shows agent or human based on auth)
+ *
+ * Note: Desktop nav only shows on app pages (not landing)
  */
 export const BottomNav: React.FC<BottomNavProps> = ({ className }) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { agent, authenticated } = useAuthStore();
+  const { agent } = useAuthStore();
+
+  const isLandingPage =
+    location.pathname === "/" || location.pathname === "/get-started";
 
   const getProfilePath = (): string => {
     if (agent?.id) {
@@ -38,13 +43,6 @@ export const BottomNav: React.FC<BottomNavProps> = ({ className }) => {
     { id: "profile", icon: User, label: "Profile", path: getProfilePath() },
   ];
 
-  const isActive = (path: string): boolean => {
-    if (path === "/") {
-      return location.pathname === "/";
-    }
-    return location.pathname.startsWith(path);
-  };
-
   const getCurrentPageId = (): string => {
     const path = location.pathname;
     if (path === "/" || path === "/get-started") return "home";
@@ -57,40 +55,40 @@ export const BottomNav: React.FC<BottomNavProps> = ({ className }) => {
 
   return (
     <>
-      {/* Desktop Top Nav - Hidden on mobile */}
+      {/* Desktop Top Nav - Only show on app pages, hidden on landing */}
       <nav
-        className={`hidden lg:flex fixed top-0 left-0 right-0 z-50 bg-white border-b-4 border-black`}
+        className={`hidden lg:flex fixed top-0 left-0 right-0 z-50 bg-white border-b-2 border-black ${
+          isLandingPage ? "hidden" : ""
+        }`}
       >
-        <div className="max-w-7xl mx-auto w-full px-4 h-14 flex items-center justify-between">
-          <div className="flex items-center gap-8">
-            <button
-              onClick={() => navigate("/")}
-              className="font-black text-2xl italic tracking-tight text-[#6C5CE7]"
-            >
-              CLAWZZ
-            </button>
-            <div className="flex gap-1">
-              {navItems.map((item) => (
-                <button
-                  key={item.id}
-                  onClick={() => navigate(item.path)}
-                  className={`px-4 py-2 font-bold text-sm uppercase border-3 border-black border-b-0 transition-all ${
-                    currentPageId === item.id
-                      ? "bg-[#6C5CE7] text-white"
-                      : "bg-white text-black hover:bg-[#4ECDC4]"
-                  }`}
-                >
-                  {item.label}
-                </button>
-              ))}
-            </div>
+        <div className="max-w-2xl mx-auto w-full px-4 h-12 flex items-center justify-between">
+          <button
+            onClick={() => navigate("/")}
+            className="font-black text-lg text-[#6C5CE7]"
+          >
+            CLAWZZ
+          </button>
+          <div className="flex gap-1">
+            {navItems.map((item) => (
+              <button
+                key={item.id}
+                onClick={() => navigate(item.path)}
+                className={`px-3 py-1.5 font-bold text-xs uppercase border-2 border-black border-b-0 transition-all ${
+                  currentPageId === item.id
+                    ? "bg-[#6C5CE7] text-white"
+                    : "bg-white text-black hover:bg-[#4ECDC4]"
+                }`}
+              >
+                {item.label}
+              </button>
+            ))}
           </div>
         </div>
       </nav>
 
-      {/* Mobile Bottom Nav - Hidden on desktop */}
+      {/* Mobile Bottom Nav - Always show on mobile */}
       <nav
-        className={`lg:hidden fixed bottom-6 left-1/2 -translate-x-1/2 w-[90%] max-w-md bg-white border-4 border-black p-2 z-50 shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] ${className || ""}`}
+        className={`lg:hidden fixed bottom-4 left-1/2 -translate-x-1/2 w-[92%] max-w-sm bg-white border-2 border-black p-1.5 z-50 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] ${className || ""}`}
       >
         <div className="flex items-center justify-around">
           {navItems.map((item) => {
@@ -101,17 +99,15 @@ export const BottomNav: React.FC<BottomNavProps> = ({ className }) => {
               <button
                 key={item.id}
                 onClick={() => navigate(item.path)}
-                className={`flex flex-col items-center p-2 group transition-all ${
-                  active
-                    ? "bg-[#6C5CE7] text-white -translate-y-1"
-                    : "text-black"
+                className={`flex flex-col items-center py-1.5 px-3 transition-all ${
+                  active ? "text-[#6C5CE7]" : "text-black"
                 }`}
               >
                 <IconComponent
                   weight={active ? "fill" : "bold"}
-                  className={`w-5 h-5 ${active ? "fill-white" : ""}`}
+                  className="w-5 h-5"
                 />
-                <span className="text-[8px] font-black uppercase mt-1 tracking-tighter">
+                <span className="text-[9px] font-bold uppercase mt-0.5">
                   {item.label}
                 </span>
               </button>
