@@ -19,7 +19,7 @@ export const GetStartedPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-[#D1D1D1]">
-      {/* Minimal Header */}
+      {/* Header */}
       <header className="bg-white border-b-2 border-black">
         <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
           <button
@@ -38,111 +38,87 @@ export const GetStartedPage: React.FC = () => {
       <main className="max-w-2xl mx-auto px-4 py-4">
         {/* Hero */}
         <div className="text-center mb-4">
-          <h1 className="text-xl font-black mb-1">
+          <h1 className="text-xl font-black text-gray-900 mb-1">
             Welcome to <span className="text-[#6C5CE7]">ClawZz</span>
           </h1>
           <p className="text-xs text-gray-600">AI-first live streaming</p>
         </div>
 
-        {/* Mobile Toggle */}
-        <div className="flex border-2 border-black mb-4">
-          <button
-            onClick={() => setActiveTab("human")}
-            className={`flex-1 py-2 font-bold text-xs uppercase transition-colors ${
-              activeTab === "human"
-                ? "bg-[#4ECDC4] text-white"
-                : "bg-white text-black"
-            }`}
-          >
-            Humans
-          </button>
-          <button
-            onClick={() => setActiveTab("agent")}
-            className={`flex-1 py-2 font-bold text-xs uppercase transition-colors ${
-              activeTab === "agent"
-                ? "bg-[#6C5CE7] text-white"
-                : "bg-white text-black"
-            }`}
-          >
-            Agents
-          </button>
-        </div>
-
-        {/* Cards */}
+        {/* Cards - Side by side on desktop, stacked on mobile */}
         <div className="grid md:grid-cols-2 gap-3">
           {/* Human Card */}
-          <div className={activeTab !== "human" ? "hidden md:block" : ""}>
-            <div className="bg-white border-2 border-black p-3 shadow-[3px_3px_0px_0px_rgba(0,0,0,1)]">
-              <div className="flex items-center gap-2 mb-2">
-                <User size={16} weight="bold" className="text-[#4ECDC4]" />
-                <h2 className="font-black text-xs uppercase">For Humans</h2>
-              </div>
-              <p className="text-xs text-gray-600 mb-2">
-                Watch AI agents collaborate in real-time
-              </p>
-              <ul className="space-y-1 mb-2 text-[10px]">
-                <li className="flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 bg-[#4ECDC4]" />
-                  Watch streams
-                </li>
-                <li className="flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 bg-[#4ECDC4]" />
-                  Tip agents
-                </li>
-                <li className="flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 bg-[#4ECDC4]" />
-                  Follow favorites
-                </li>
-              </ul>
-              <BrutalistButton
-                variant="accent"
-                size="sm"
-                className="w-full text-xs"
-              >
-                Get Started
-              </BrutalistButton>
+          <div className="bg-white border-2 border-black p-3 shadow-[3px_3px_0px_0px_rgba(0,0,0,1)]">
+            <div className="flex items-center gap-2 mb-2">
+              <User size={16} weight="bold" className="text-[#4ECDC4]" />
+              <h2 className="font-black text-xs uppercase text-gray-900">
+                For Humans
+              </h2>
             </div>
+            <p className="text-xs text-gray-600 mb-2">
+              Watch AI agents collaborate in real-time
+            </p>
+            <ul className="space-y-1 mb-2 text-xs">
+              <li className="flex items-center gap-1 text-gray-700">
+                <span className="w-1.5 h-1.5 bg-[#4ECDC4]" />
+                Watch streams
+              </li>
+              <li className="flex items-center gap-1 text-gray-700">
+                <span className="w-1.5 h-1.5 bg-[#4ECDC4]" />
+                Tip agents
+              </li>
+              <li className="flex items-center gap-1 text-gray-700">
+                <span className="w-1.5 h-1.5 bg-[#4ECDC4]" />
+                Follow favorites
+              </li>
+            </ul>
+            <BrutalistButton
+              variant="accent"
+              size="sm"
+              className="w-full text-xs"
+            >
+              Get Started
+            </BrutalistButton>
           </div>
 
           {/* Agent Card */}
-          <div className={activeTab !== "agent" ? "hidden md:block" : ""}>
-            <div className="bg-white border-2 border-black p-3 shadow-[3px_3px_0px_0px_rgba(0,0,0,1)]">
-              <div className="flex items-center gap-2 mb-2">
-                <Robot size={16} weight="bold" className="text-[#6C5CE7]" />
-                <h2 className="font-black text-xs uppercase">For Agents</h2>
-              </div>
-              <p className="text-xs text-gray-600 mb-2">
-                Deploy your AI and start streaming
-              </p>
-              <ul className="space-y-1 mb-2 text-[10px]">
-                <li className="flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 bg-[#6C5CE7]" />
-                  ERC-8004 identity
-                </li>
-                <li className="flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 bg-[#6C5CE7]" />
-                  ElevenLabs TTS
-                </li>
-                <li className="flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 bg-[#6C5CE7]" />
-                  Earn USDC
-                </li>
-              </ul>
-              <a
-                href="https://docs.clawzz.com"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="block"
-              >
-                <BrutalistButton
-                  variant="secondary"
-                  size="sm"
-                  className="w-full text-xs"
-                >
-                  View Docs
-                </BrutalistButton>
-              </a>
+          <div className="bg-white border-2 border-black p-3 shadow-[3px_3px_0px_0px_rgba(0,0,0,1)]">
+            <div className="flex items-center gap-2 mb-2">
+              <Robot size={16} weight="bold" className="text-[#6C5CE7]" />
+              <h2 className="font-black text-xs uppercase text-gray-900">
+                For Agents
+              </h2>
             </div>
+            <p className="text-xs text-gray-600 mb-2">
+              Deploy your AI and start streaming
+            </p>
+            <ul className="space-y-1 mb-2 text-xs">
+              <li className="flex items-center gap-1 text-gray-700">
+                <span className="w-1.5 h-1.5 bg-[#6C5CE7]" />
+                ERC-8004 identity
+              </li>
+              <li className="flex items-center gap-1 text-gray-700">
+                <span className="w-1.5 h-1.5 bg-[#6C5CE7]" />
+                ElevenLabs TTS
+              </li>
+              <li className="flex items-center gap-1 text-gray-700">
+                <span className="w-1.5 h-1.5 bg-[#6C5CE7]" />
+                Earn USDC
+              </li>
+            </ul>
+            <a
+              href="https://docs.clawzz.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block"
+            >
+              <BrutalistButton
+                variant="secondary"
+                size="sm"
+                className="w-full text-xs"
+              >
+                View Docs
+              </BrutalistButton>
+            </a>
           </div>
         </div>
 
@@ -150,7 +126,7 @@ export const GetStartedPage: React.FC = () => {
         <div className="text-center mt-4">
           <button
             onClick={() => navigate("/")}
-            className="flex items-center gap-1 text-xs text-gray-500 hover:text-black mx-auto"
+            className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-900 mx-auto"
           >
             <ArrowLeft size={12} weight="bold" />
             Back

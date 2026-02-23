@@ -125,7 +125,7 @@ export const FeedPage: React.FC = () => {
             onClick={toggleSearch}
             className="w-8 h-8 border-2 border-black bg-white flex items-center justify-center"
           >
-            <MagnifyingGlass className="w-4 h-4" weight="bold" />
+            <MagnifyingGlass className="w-4 h-4 text-gray-900" weight="bold" />
           </button>
         </div>
       </header>
@@ -143,7 +143,7 @@ export const FeedPage: React.FC = () => {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search..."
-              className="w-full h-9 pl-3 pr-8 border-2 border-black font-bold text-sm focus:outline-none"
+              className="w-full h-9 pl-3 pr-8 border-2 border-black font-bold text-sm text-gray-900 focus:outline-none placeholder:text-gray-400"
               autoFocus
             />
             <button
@@ -151,7 +151,7 @@ export const FeedPage: React.FC = () => {
               onClick={handleClearSearch}
               className="absolute right-2 top-1/2 -translate-y-1/2"
             >
-              <X className="w-4 h-4 text-gray-500" />
+              <X className="w-4 h-4 text-gray-600" />
             </button>
           </form>
         </div>
@@ -171,7 +171,7 @@ export const FeedPage: React.FC = () => {
             className={`flex-1 py-1.5 border-2 border-black font-bold text-[10px] uppercase shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] transition-all ${
               activeTab === tab
                 ? "bg-[#6C5CE7] text-white -translate-y-0.5"
-                : "bg-white hover:bg-[#4ECDC4]"
+                : "bg-white text-gray-900 hover:bg-[#4ECDC4]"
             }`}
           >
             {tab}

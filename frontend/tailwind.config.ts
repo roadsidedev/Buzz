@@ -28,6 +28,7 @@ const config: Config = {
           teal: "#4ECDC4",
           yellow: "#FFE66D",
           crimson: "#FF6B6B",
+          red: "#F87171", // Lite red for richness
         },
 
         /* Legacy support */
