@@ -1,5 +1,5 @@
 /**
- * AuthModal: SIWA Authentication Modal
+ * AuthModal: SIWA Authentication Modal (CLAW-OS RETRO)
  *
  * Provides inline authentication via Sign-In with Agent (SIWA).
  * Uses wallet signature + ERC-8004 agent ID for authentication.
@@ -9,10 +9,17 @@ import React, { useState } from "react";
 import { usePrivy } from "@privy-io/react-auth";
 import { useAuthStore } from "@/stores/auth-store";
 import { apiClient } from "@/services/api";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { BrutalistButton } from "@/components/retro/BrutalistButton";
+import { RetroWindow } from "@/components/retro/RetroWindow";
 import { logger } from "@/utils/logger";
 import { SIWANonceResponse, SIWAVerifyResponse } from "@/types/auth";
+import {
+  Wallet,
+  IdentificationCard,
+  PenNib,
+  CheckCircle,
+  X,
+} from "phosphor-react";
 
 interface AuthModalProps {
   open: boolean;
@@ -22,13 +29,7 @@ interface AuthModalProps {
 type Step = "wallet" | "agent-id" | "signing" | "verifying" | "success";
 
 export const AuthModal: React.FC<AuthModalProps> = ({ open, onClose }) => {
-  const {
-    authenticated,
-    ready,
-    login: privyLogin,
-    user,
-    signMessage,
-  } = usePrivy();
+  const { login: privyLogin, user, signMessage } = usePrivy();
   const {
     setAgentId,
     setReceipt,
@@ -48,8 +49,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({ open, onClose }) => {
     try {
       await privyLogin();
       setStep("agent-id");
-    } catch (err: any) {
-      setError(err.message || "Failed to connect wallet");
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error ? err.message : "Failed to connect wallet";
+      setError(message);
       logger.error("Wallet connection failed", { error: err });
     }
   };
@@ -74,7 +77,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({ open, onClose }) => {
     setStep("signing");
 
     try {
-      // Step 1: Request nonce from server
       logger.info("Requesting SIWA nonce", {
         walletAddress,
         agentId: agentIdNum,
@@ -90,7 +92,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({ open, onClose }) => {
 
       const nonce = nonceResponse.data.nonce;
 
-      // Step 2: Build SIWA message
       const message = buildSIWAMessage({
         domain: import.meta.env.VITE_SIWA_DOMAIN || "clawzz.vercel.app",
         address: walletAddress,
@@ -100,13 +101,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({ open, onClose }) => {
         uri: import.meta.env.VITE_SIWA_URI || "https://clawzz.vercel.app",
       });
 
-      // Step 3: Sign message with Privy
       setStep("signing");
       logger.info("Requesting signature from wallet");
 
       const signature = await signMessage(message);
 
-      // Step 4: Verify signature on server
       setStep("verifying");
       logger.info("Verifying SIWA signature with server");
 
@@ -120,7 +119,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({ open, onClose }) => {
         },
       );
 
-      // Step 5: Store receipt and mark authenticated
       const { receipt, agent } = verifyResponse.data;
 
       setReceipt(receipt);
@@ -135,12 +133,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({ open, onClose }) => {
         walletAddress,
       });
 
-      // Close modal after brief delay
       setTimeout(() => {
         onClose();
       }, 1500);
-    } catch (err: any) {
-      setError(err.message || "Authentication failed");
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error ? err.message : "Authentication failed";
+      setError(message);
       logger.error("SIWA authentication failed", { error: err });
       setStep("agent-id");
     }
@@ -151,17 +150,16 @@ export const AuthModal: React.FC<AuthModalProps> = ({ open, onClose }) => {
       case "wallet":
         return (
           <div className="space-y-4">
-            <p className="text-slate-400 text-sm">
+            <p className="text-base-gray-600 text-sm">
               Connect your wallet to sign in with your agent identity.
             </p>
-            <Button
-              onClick={handleConnectWallet}
-              className="w-full bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold"
-              disabled={!ready}
-            >
-              {!ready ? "Loading..." : "Connect Wallet"}
-            </Button>
-            {error && <p className="text-red-400 text-sm">{error}</p>}
+            <BrutalistButton onClick={handleConnectWallet} className="w-full">
+              <Wallet weight="bold" className="mr-2" />
+              Connect Wallet
+            </BrutalistButton>
+            {error && (
+              <p className="text-accent-crimson text-sm font-bold">{error}</p>
+            )}
           </div>
         );
 
@@ -169,9 +167,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({ open, onClose }) => {
         const walletAddress = user?.wallet?.address;
         return (
           <form onSubmit={handleSignIn} className="space-y-4">
-            <div className="p-3 bg-slate-800 rounded border border-slate-700">
-              <p className="text-xs text-slate-500 mb-1">Connected Wallet</p>
-              <p className="text-sm text-cyan-400 font-mono truncate">
+            <div className="p-3 bg-mac-charcoal border-2 border-mac-charcoal">
+              <p className="text-xs text-base-gray-500 mb-1">
+                Connected Wallet
+              </p>
+              <p className="text-sm text-accent-teal font-mono truncate">
                 {walletAddress || "Not connected"}
               </p>
             </div>
@@ -179,35 +179,35 @@ export const AuthModal: React.FC<AuthModalProps> = ({ open, onClose }) => {
             <div>
               <label
                 htmlFor="agentId"
-                className="block text-sm font-medium text-slate-300 mb-2"
+                className="block text-sm font-bold text-mac-charcoal mb-2 uppercase"
               >
                 ERC-8004 Agent ID
               </label>
-              <Input
+              <input
                 id="agentId"
                 type="number"
                 placeholder="Enter your agent ID"
                 value={erc8004AgentId}
                 onChange={(e) => setErc8004AgentId(e.target.value)}
-                className="bg-slate-800 border-slate-700 text-white"
+                className="retro-input w-full"
                 min="1"
                 required
               />
-              <p className="text-xs text-slate-500 mt-1">
+              <p className="text-xs text-base-gray-500 mt-1">
                 Your agent ID from the ERC-8004 identity registry
               </p>
             </div>
 
-            {error && <p className="text-red-400 text-sm">{error}</p>}
+            {error && (
+              <p className="text-accent-crimson text-sm font-bold">{error}</p>
+            )}
 
-            <Button
-              type="submit"
-              className="w-full bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold"
-            >
+            <BrutalistButton type="submit" className="w-full">
+              <PenNib weight="bold" className="mr-2" />
               Sign In with Wallet
-            </Button>
+            </BrutalistButton>
 
-            <p className="text-xs text-slate-500 text-center">
+            <p className="text-xs text-base-gray-500 text-center">
               You'll be asked to sign a message with your wallet. No gas fees
               required.
             </p>
@@ -217,9 +217,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({ open, onClose }) => {
       case "signing":
         return (
           <div className="text-center py-6">
-            <div className="mb-4 h-12 w-12 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
-            <p className="text-slate-300">Waiting for wallet signature...</p>
-            <p className="text-slate-500 text-sm mt-2">
+            <div className="mb-4 h-12 w-12 border-4 border-accent-purple border-t-transparent rounded-none animate-spin mx-auto"></div>
+            <p className="text-mac-charcoal font-bold">
+              Waiting for wallet signature...
+            </p>
+            <p className="text-base-gray-500 text-sm mt-2">
               Please sign the message in your wallet
             </p>
           </div>
@@ -228,19 +230,29 @@ export const AuthModal: React.FC<AuthModalProps> = ({ open, onClose }) => {
       case "verifying":
         return (
           <div className="text-center py-6">
-            <div className="mb-4 h-12 w-12 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
-            <p className="text-slate-300">Verifying signature...</p>
+            <div className="mb-4 h-12 w-12 border-4 border-accent-teal border-t-transparent rounded-none animate-spin mx-auto"></div>
+            <p className="text-mac-charcoal font-bold">
+              Verifying signature...
+            </p>
           </div>
         );
 
       case "success":
         return (
           <div className="text-center py-6">
-            <div className="text-4xl mb-4">✓</div>
-            <p className="text-cyan-400 font-bold text-lg">
+            <div className="mb-4 flex justify-center">
+              <CheckCircle
+                size={64}
+                weight="fill"
+                className="text-accent-teal"
+              />
+            </div>
+            <p className="text-accent-teal font-black text-xl uppercase">
               Authentication Successful
             </p>
-            <p className="text-slate-400 text-sm mt-2">Welcome to ClawZz!</p>
+            <p className="text-base-gray-600 text-sm mt-2">
+              Welcome to ClawZz!
+            </p>
           </div>
         );
     }
@@ -250,42 +262,50 @@ export const AuthModal: React.FC<AuthModalProps> = ({ open, onClose }) => {
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       {/* Backdrop */}
       <div
-        className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+        className="absolute inset-0 bg-mac-charcoal/80"
         onClick={
           step !== "signing" && step !== "verifying" ? onClose : undefined
         }
       />
 
-      {/* Modal */}
-      <div className="relative bg-slate-900 border-2 border-cyan-500 p-6 w-full max-w-md mx-4 rounded-lg">
-        {/* Close button */}
-        {step !== "signing" && step !== "verifying" && (
-          <button
-            onClick={onClose}
-            className="absolute top-4 right-4 text-slate-400 hover:text-white transition-colors"
-          >
-            ✕
-          </button>
-        )}
+      {/* Modal - Retro Window */}
+      <div className="relative w-full max-w-md mx-4">
+        <RetroWindow title="AUTHENTICATE" shadowColor="purple">
+          {/* Close button */}
+          {step !== "signing" && step !== "verifying" && (
+            <button
+              onClick={onClose}
+              className="absolute top-2 right-2 text-base-gray-500 hover:text-accent-crimson transition-colors"
+            >
+              <X size={24} weight="bold" />
+            </button>
+          )}
 
-        {/* Header */}
-        <div className="mb-6">
-          <h2 className="text-xl font-bold text-cyan-400">Sign In</h2>
-          <p className="text-slate-400 text-sm mt-1">
-            Authenticate with your agent identity
-          </p>
-        </div>
+          {/* Header */}
+          <div className="mb-6">
+            <div className="flex items-center gap-2 mb-2">
+              <IdentificationCard
+                size={24}
+                weight="bold"
+                className="text-accent-purple"
+              />
+              <h2 className="text-xl font-black text-mac-charcoal uppercase">
+                Sign In
+              </h2>
+            </div>
+            <p className="text-base-gray-600 text-sm">
+              Authenticate with your agent identity
+            </p>
+          </div>
 
-        {/* Content */}
-        {renderContent()}
+          {/* Content */}
+          {renderContent()}
+        </RetroWindow>
       </div>
     </div>
   );
 };
 
-/**
- * Build SIWA message according to EIP-4361 spec
- */
 function buildSIWAMessage({
   domain,
   address,

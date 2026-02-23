@@ -1,8 +1,8 @@
 /**
- * MainLayout: Primary application layout
+ * MainLayout: Primary application layout (CLAW-OS RETRO)
  *
  * Features:
- * - Responsive header with logo, navigation, and auth state
+ * - Responsive header with retro logo, navigation, and auth state
  * - Supports both Router Outlet and direct children
  * - Auth-aware UI (shows Sign In for guests, Profile for authenticated)
  * - Onboard CTA button for unauthenticated users
@@ -12,6 +12,8 @@ import React from "react";
 import { Outlet, Link, useNavigate } from "react-router-dom";
 import { useAuthStore } from "@/stores/auth-store";
 import { AuthModal } from "@/components/auth/auth-modal";
+import { BrutalistButton } from "@/components/retro/BrutalistButton";
+import { Terminal, House, SignIn, SignOut, User } from "phosphor-react";
 
 interface MainLayoutProps {
   children?: React.ReactNode;
@@ -26,7 +28,6 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
   const { authenticated, agent, logout } = useAuthStore();
   const [showAuthModal, setShowAuthModal] = React.useState(false);
 
-  // If auth required and not authenticated, show auth modal
   React.useEffect(() => {
     if (requireAuth && !authenticated) {
       setShowAuthModal(true);
@@ -39,62 +40,68 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
   };
 
   return (
-    <div className="min-h-screen bg-slate-950">
-      {/* Header */}
-      <header className="sticky top-0 z-50 border-b border-slate-800 bg-slate-950/95 backdrop-blur supports-[backdrop-filter]:bg-slate-950/80">
-        <div className="container mx-auto px-4">
+    <div className="min-h-screen bg-mac-gray flex flex-col">
+      {/* Header - CLAW-OS Retro Style */}
+      <header className="sticky top-0 z-50 bg-mac-charcoal border-b-4 border-mac-charcoal">
+        <div className="max-w-7xl mx-auto px-4">
           <div className="flex h-16 items-center justify-between">
-            {/* Logo */}
-            <Link
-              to="/"
-              className="flex items-center gap-2 text-xl font-bold text-cyan-400 hover:text-cyan-300 transition-colors"
-            >
-              <span className="text-2xl">🎙️</span>
-              <span>ClawZz</span>
+            {/* Logo - Retro Terminal Style */}
+            <Link to="/" className="flex items-center gap-3 group">
+              <div className="w-10 h-10 bg-accent-purple border-4 border-mac-gray flex items-center justify-center group-hover:shadow-retro-purple transition-shadow">
+                <Terminal size={24} weight="bold" className="text-mac-white" />
+              </div>
+              <span className="text-xl font-black text-mac-white uppercase tracking-wider hidden sm:block">
+                ClawZz
+              </span>
             </Link>
 
-            {/* Navigation */}
-            <nav className="hidden md:flex items-center gap-6">
+            {/* Navigation - Retro Tabs */}
+            <nav className="hidden md:flex items-center gap-2">
               <Link
                 to="/discover"
-                className="text-slate-300 hover:text-cyan-400 transition-colors text-sm font-medium"
+                className="px-4 py-2 font-bold text-sm uppercase border-3 border-mac-charcoal border-b-0 bg-mac-gray text-mac-charcoal hover:bg-accent-teal hover:text-mac-white transition-all"
               >
+                <House weight="bold" className="inline mr-2" />
                 Discover
               </Link>
             </nav>
 
-            {/* Auth Section */}
+            {/* Auth Section - Retro Buttons */}
             <div className="flex items-center gap-3">
               {authenticated && agent ? (
                 <>
                   <Link
-                    to="/profile"
-                    className="text-sm text-slate-300 hover:text-cyan-400 transition-colors"
+                    to="/profile/user"
+                    className="flex items-center gap-2 px-3 py-1.5 bg-mac-gray border-2 border-mac-charcoal font-bold text-sm hover:bg-accent-purple hover:text-mac-white transition-all"
                   >
-                    {agent.displayName || agent.username || "Profile"}
+                    <User weight="bold" size={16} />
+                    <span className="hidden sm:inline">
+                      {agent.displayName || agent.username || "Profile"}
+                    </span>
                   </Link>
                   <button
                     onClick={handleSignOut}
-                    className="text-sm text-slate-400 hover:text-red-400 transition-colors"
+                    className="px-3 py-1.5 font-bold text-sm text-mac-gray hover:text-accent-crimson transition-colors"
                   >
-                    Sign Out
+                    <SignOut weight="bold" size={16} />
                   </button>
                 </>
               ) : (
-               <>
-                 <Link
-                   to="/get-started"
-                   className="hidden sm:inline-flex text-sm text-cyan-400 hover:text-cyan-300 transition-colors font-medium"
-                 >
-                   Get Started
-                 </Link>
-                 <button
-                   onClick={() => setShowAuthModal(true)}
-                   className="inline-flex items-center justify-center rounded-md text-sm font-medium bg-cyan-500 text-slate-950 hover:bg-cyan-400 h-9 px-4 py-2 transition-colors"
-                 >
-                   Sign In
-                 </button>
-               </>
+                <>
+                  <Link to="/get-started">
+                    <BrutalistButton variant="secondary" size="sm">
+                      Get Started
+                    </BrutalistButton>
+                  </Link>
+                  <BrutalistButton
+                    variant="accent"
+                    size="sm"
+                    onClick={() => setShowAuthModal(true)}
+                  >
+                    <SignIn weight="bold" className="mr-1" />
+                    Sign In
+                  </BrutalistButton>
+                </>
               )}
             </div>
           </div>
@@ -102,25 +109,23 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
       </header>
 
       {/* Main Content */}
-      <main className="container mx-auto px-4 py-6">
+      <main className="flex-1 max-w-7xl mx-auto w-full px-4 py-6">
         {children !== undefined ? children : <Outlet />}
       </main>
 
-      {/* Footer */}
-      <footer className="border-t border-slate-800 py-8 mt-auto">
-        <div className="container mx-auto px-4">
+      {/* Footer - CLAW-OS Retro Style */}
+      <footer className="bg-mac-charcoal border-t-4 border-mac-charcoal py-6 mt-auto">
+        <div className="max-w-7xl mx-auto px-4">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-4 text-sm text-slate-500">
-              <span>© 2026 ClawZz</span>
-              <span>•</span>
-              <Link
-                to="/get-started"
-                className="hover:text-cyan-400 transition-colors"
-              >
-                Get Started
-              </Link>
+            <div className="flex items-center gap-4 text-sm text-mac-gray">
+              <div className="flex items-center gap-2">
+                <Terminal weight="bold" size={16} />
+                <span className="font-bold uppercase">ClawZz</span>
+              </div>
+              <span className="text-base-gray-500">|</span>
+              <span>© 2026</span>
             </div>
-            <div className="text-sm text-slate-500">
+            <div className="text-sm text-base-gray-500">
               AI-First Live Streaming Platform
             </div>
           </div>

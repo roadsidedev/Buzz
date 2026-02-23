@@ -4,7 +4,7 @@
  */
 
 import React, { useState } from "react";
-import { Users, TrendingUp, Clock } from "lucide-react";
+import { Users, TrendUp, Clock } from "phosphor-react";
 import type { DiscoveryRoom } from "common/types/discovery";
 
 interface RoomCardProps {
@@ -115,7 +115,9 @@ export const RoomCard: React.FC<RoomCardProps> = ({
         )}
 
         {/* Status Badge */}
-        <div className={`absolute top-3 right-3 px-2 py-1 rounded-full text-xs font-bold ${getStatusBadgeColor(room.status)}`}>
+        <div
+          className={`absolute top-3 right-3 px-2 py-1 rounded-full text-xs font-bold ${getStatusBadgeColor(room.status)}`}
+        >
           {getStatusBadgeText(room.status)}
         </div>
 
@@ -124,7 +126,9 @@ export const RoomCard: React.FC<RoomCardProps> = ({
           <div
             className="absolute bottom-3 left-3 px-3 py-1 rounded-full text-xs font-semibold text-white bg-black bg-opacity-50"
             style={{
-              backgroundColor: room.category.color ? `${room.category.color}dd` : "rgba(0, 0, 0, 0.5)",
+              backgroundColor: room.category.color
+                ? `${room.category.color}dd`
+                : "rgba(0, 0, 0, 0.5)",
             }}
           >
             {room.category.name}
@@ -155,21 +159,25 @@ export const RoomCard: React.FC<RoomCardProps> = ({
           {/* Viewers */}
           <div className="flex items-center gap-1 text-gray-600">
             <Users className="w-3.5 h-3.5" />
-            <span className="font-medium">{room.viewerCount.toLocaleString()}</span>
+            <span className="font-medium">
+              {room.viewerCount.toLocaleString()}
+            </span>
           </div>
 
           {/* Trending Score */}
           <div
             className={`flex items-center gap-1 px-2 py-0.5 rounded-full font-medium ${getTrendingColor(room.trendingScore)}`}
           >
-            <TrendingUp className="w-3.5 h-3.5" />
+            <TrendUp className="w-3.5 h-3.5" />
             <span>{Math.round(room.trendingScore)}</span>
           </div>
 
           {/* Duration */}
           <div className="flex items-center gap-1 text-gray-600">
             <Clock className="w-3.5 h-3.5" />
-            <span className="font-medium">{getDurationText(room.startedAt)}</span>
+            <span className="font-medium">
+              {getDurationText(room.startedAt)}
+            </span>
           </div>
         </div>
 
@@ -187,7 +195,8 @@ export const RoomCard: React.FC<RoomCardProps> = ({
         {/* Participants */}
         {room.participantCount > 0 && (
           <div className="mb-3 text-xs text-gray-600">
-            {room.participantCount} participant{room.participantCount !== 1 ? "s" : ""}
+            {room.participantCount} participant
+            {room.participantCount !== 1 ? "s" : ""}
           </div>
         )}
       </div>
@@ -199,7 +208,11 @@ export const RoomCard: React.FC<RoomCardProps> = ({
           disabled={isLoading || isJoining || room.status === "completed"}
           className="w-full rounded-lg bg-blue-600 px-4 py-2 text-center text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
         >
-          {isJoining ? "Joining..." : room.status === "completed" ? "Room Ended" : "Join Now"}
+          {isJoining
+            ? "Joining..."
+            : room.status === "completed"
+              ? "Room Ended"
+              : "Join Now"}
         </button>
       </div>
     </div>
@@ -230,7 +243,9 @@ export const RoomCardGrid: React.FC<RoomCardGridProps> = ({
       <div className="flex flex-col items-center justify-center py-12">
         <div className="text-gray-500 text-center">
           <p className="text-lg font-medium mb-2">{emptyMessage}</p>
-          <p className="text-sm">Try adjusting your filters or check back later</p>
+          <p className="text-sm">
+            Try adjusting your filters or check back later
+          </p>
         </div>
       </div>
     );

@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useCallback, useEffect } from "react";
-import { Search, X } from "lucide-react";
+import { MagnifyingGlass, X } from "phosphor-react";
 
 interface SearchBarProps {
   placeholder?: string;
@@ -51,19 +51,16 @@ export const SearchBar: React.FC<SearchBarProps> = ({
     }
   }, [debouncedQuery, onSearch]);
 
-  const handleChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      const value = e.target.value;
-      setQuery(value);
+  const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setQuery(value);
 
-      if (value.trim()) {
-        setShowSuggestions(true);
-      } else {
-        setShowSuggestions(false);
-      }
-    },
-    []
-  );
+    if (value.trim()) {
+      setShowSuggestions(true);
+    } else {
+      setShowSuggestions(false);
+    }
+  }, []);
 
   const handleClear = useCallback(() => {
     setQuery("");
@@ -72,12 +69,15 @@ export const SearchBar: React.FC<SearchBarProps> = ({
     onClear?.();
   }, [onClear]);
 
-  const handleSuggestionClick = useCallback((suggestion: string) => {
-    setQuery(suggestion);
-    setShowSuggestions(false);
-    setDebouncedQuery(suggestion);
-    onSearch(suggestion);
-  }, [onSearch]);
+  const handleSuggestionClick = useCallback(
+    (suggestion: string) => {
+      setQuery(suggestion);
+      setShowSuggestions(false);
+      setDebouncedQuery(suggestion);
+      onSearch(suggestion);
+    },
+    [onSearch],
+  );
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -87,15 +87,15 @@ export const SearchBar: React.FC<SearchBarProps> = ({
         setShowSuggestions(false);
       }
     },
-    [handleClear]
+    [handleClear],
   );
 
   return (
     <div className="relative w-full max-w-2xl">
-      {/* Search Input Container */}
-      <div className="relative flex items-center bg-white rounded-lg border border-gray-300 shadow-sm focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500 transition-all">
+      {/* Search Input Container - Retro Style */}
+      <div className="relative flex items-center bg-mac-white border-4 border-mac-charcoal transition-all">
         {/* Search Icon */}
-        <Search className="ml-3 w-5 h-5 text-gray-400 flex-shrink-0" />
+        <MagnifyingGlass className="ml-3 w-5 h-5 text-mac-charcoal flex-shrink-0" />
 
         {/* Input Field */}
         <input
@@ -103,7 +103,9 @@ export const SearchBar: React.FC<SearchBarProps> = ({
           value={query}
           onChange={handleChange}
           onKeyDown={handleKeyDown}
-          onFocus={() => query.trim() && suggestions.length > 0 && setShowSuggestions(true)}
+          onFocus={() =>
+            query.trim() && suggestions.length > 0 && setShowSuggestions(true)
+          }
           placeholder={placeholder}
           autoFocus={autoFocus}
           disabled={isLoading}
@@ -137,7 +139,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
                   onClick={() => handleSuggestionClick(suggestion)}
                   className="w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 transition-colors flex items-center gap-2"
                 >
-                  <Search className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                  <MagnifyingGlass className="w-4 h-4 text-base-gray-500 flex-shrink-0" />
                   <span className="text-gray-700">{suggestion}</span>
                 </button>
               </li>
@@ -165,8 +167,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
  * SearchBarWithFilters Component
  * SearchBar with additional filter controls
  */
-interface SearchBarWithFiltersProps
-  extends Omit<SearchBarProps, "onSearch"> {
+interface SearchBarWithFiltersProps extends Omit<SearchBarProps, "onSearch"> {
   onSearch: (query: string, filters?: SearchFilters) => void;
   onFilterChange?: (filters: SearchFilters) => void;
   categories?: Array<{ id: string; name: string }>;
@@ -195,7 +196,7 @@ export const SearchBarWithFilters: React.FC<SearchBarWithFiltersProps> = ({
       setQuery(searchQuery);
       onSearch(searchQuery, filters);
     },
-    [filters, onSearch]
+    [filters, onSearch],
   );
 
   const handleFilterChange = useCallback(
@@ -206,7 +207,7 @@ export const SearchBarWithFilters: React.FC<SearchBarWithFiltersProps> = ({
         onSearch(query, newFilters);
       }
     },
-    [query, onSearch, onFilterChange]
+    [query, onSearch, onFilterChange],
   );
 
   const handleClearAll = useCallback(() => {

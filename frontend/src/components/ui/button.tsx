@@ -3,26 +3,38 @@ import { Slot } from "@radix-ui/react-slot";
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
+/**
+ * CLAW-OS RETRO Button Component
+ *
+ * Features:
+ * - 4px solid black border
+ * - Hard drop shadow
+ * - Offset on :active (translate 2px)
+ * - Shadow removal on :active
+ */
 const buttonVariants = cva(
-  "inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
+  "inline-flex items-center justify-center whitespace-nowrap font-bold tracking-wide transition-all duration-100 cursor-pointer active:translate-x-1 active:translate-y-1 active:shadow-none disabled:pointer-events-none disabled:opacity-50 border-4 border-mac-charcoal",
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground hover:bg-primary/90",
+        default:
+          "bg-mac-charcoal text-mac-white hover:bg-accent-purple hover:shadow-retro-purple",
         destructive:
-          "bg-destructive text-destructive-foreground hover:bg-destructive/90",
+          "bg-accent-crimson text-mac-white hover:bg-red-600 hover:shadow-retro-crimson",
         outline:
-          "border border-input bg-background hover:bg-accent hover:text-accent-foreground",
+          "bg-transparent text-mac-charcoal hover:bg-mac-charcoal hover:text-mac-white",
         secondary:
-          "bg-secondary text-secondary-foreground hover:bg-secondary/80",
-        ghost: "hover:bg-accent hover:text-accent-foreground",
-        link: "text-primary underline-offset-4 hover:underline",
+          "bg-mac-white text-mac-charcoal hover:bg-accent-yellow hover:shadow-retro-yellow",
+        accent:
+          "bg-accent-purple text-mac-white hover:bg-accent-teal hover:shadow-retro-teal",
+        ghost: "bg-transparent text-mac-charcoal hover:bg-base-gray-200",
+        link: "bg-transparent text-accent-purple underline-offset-4 hover:underline",
       },
       size: {
-        default: "h-10 px-4 py-2",
-        sm: "h-9 rounded-md px-3",
-        lg: "h-11 rounded-md px-8",
-        icon: "h-10 w-10",
+        default: "px-6 py-3 text-base",
+        sm: "px-3 py-1.5 text-sm",
+        lg: "px-8 py-4 text-lg",
+        icon: "w-10 h-10",
       },
     },
     defaultVariants: {

@@ -71,9 +71,9 @@ export function RoomLivePage({ roomId: propsRoomId }: RoomLivePageProps) {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-white flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-gray-600 mb-4">Loading room...</p>
+      <div className="min-h-screen bg-mac-gray flex items-center justify-center">
+        <div className="retro-window p-8 text-center">
+          <p className="font-mono text-mac-charcoal mb-4">Loading room...</p>
         </div>
       </div>
     );
@@ -81,18 +81,18 @@ export function RoomLivePage({ roomId: propsRoomId }: RoomLivePageProps) {
 
   if (!room) {
     return (
-      <div className="min-h-screen bg-white flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-red-600 mb-4">Room not found</p>
+      <div className="min-h-screen bg-mac-gray flex items-center justify-center">
+        <div className="retro-window p-8 text-center border-4 border-accent-crimson shadow-retro-crimson">
+          <p className="text-accent-crimson font-bold mb-4">Room not found</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-white">
-      {/* Header */}
-      <header className="border-b-2 border-black p-6">
+    <div className="min-h-screen bg-mac-gray">
+      {/* Header - Retro Style */}
+      <header className="bg-mac-charcoal border-b-4 border-mac-charcoal p-6">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold uppercase">{room.type} Room</h1>

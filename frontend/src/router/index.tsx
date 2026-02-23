@@ -2,10 +2,9 @@
  * AppRouter: Main application router configuration
  *
  * UX Flow:
- * - Unauthenticated: / (hero) → /get-started → /sign-in → /discover
- * - Authenticated: /discover, /room/:id, /episode/:id, /profile
- * - Public routes: /discover, /room/:id, /episode/:id, /claim/:token
- * - Protected routes: /profile
+ * - Landing page with TikTok-style navigation
+ * - Discovery with feed
+ * - Profile with context switching
  */
 
 import React, { Suspense, lazy } from "react";
@@ -19,10 +18,10 @@ import { NotFoundPage } from "@/pages/not-found-page";
 
 // Loading component
 const PageLoader: React.FC = () => (
-  <div className="flex items-center justify-center min-h-screen bg-mac-gray">
-    <div className="text-center retro-window p-8">
-      <div className="mb-4 h-12 w-12 border-4 border-mac-charcoal bg-accent-purple mx-auto animate-pulse"></div>
-      <p className="font-mono text-mac-charcoal">Loading...</p>
+  <div className="flex items-center justify-center min-h-screen bg-[#D1D1D1]">
+    <div className="border-[3px] border-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] bg-white p-8">
+      <div className="mb-4 h-12 w-12 border-[3px] border-black bg-[#6C5CE7] mx-auto animate-pulse"></div>
+      <p className="font-mono font-black uppercase">Loading...</p>
     </div>
   </div>
 );
@@ -50,45 +49,25 @@ const EpisodePlayerPage = lazy(() =>
 const ProfilePage = lazy(() =>
   import("@/pages/profile-page").then((m) => ({ default: m.ProfilePage })),
 );
-const AgentProfilePage = lazy(() =>
-  import("@/pages/agent-profile-page").then((m) => ({
-    default: m.AgentProfilePage,
-  })),
-);
-const HumanProfilePage = lazy(() =>
-  import("@/pages/human-profile-page").then((m) => ({
-    default: m.HumanProfilePage,
-  })),
-);
 const ClaimPage = lazy(() =>
   import("@/pages/claim-page").then((m) => ({ default: m.ClaimPage })),
 );
 
 /**
  * AppRouter: Main application router
- *
- * Public-first design:
- * - Hero landing for unauthenticated users
- * - Get started flow for agent registration
- * - Discover and content viewing is public
- * - Auth required only for write operations
  */
 export const AppRouter: React.FC = () => {
   return (
     <BrowserRouter>
       <Suspense fallback={<PageLoader />}>
         <Routes>
-          {/* ========================================
-              PUBLIC LANDING ROUTES
-              ======================================== */}
-
-          {/* Hero landing page */}
+          {/* Hero/landing page */}
           <Route path="/" element={<HeroPage />} />
 
-          {/* Get started - Onboarding for humans and agents */}
+          {/* Get started - Onboarding */}
           <Route path="/get-started" element={<GetStartedPage />} />
 
-          {/* Claim page - Human verifies agent ownership */}
+          {/* Claim page */}
           <Route
             path="/claim/:token"
             element={
@@ -98,39 +77,21 @@ export const AppRouter: React.FC = () => {
             }
           />
 
-          {/* ========================================
-              MAIN APP LAYOUT WITH PUBLIC ROUTES
-              ======================================== */}
+          {/* Discovery page - TikTok-style feed */}
+          <Route path="/discover" element={<DiscoveryPage />} />
 
-          <Route element={<MainLayout />}>
-            {/* Discovery page - Browse rooms and content (PUBLIC) */}
-            <Route path="/discover" element={<DiscoveryPage />} />
+          {/* Live room */}
+          <Route path="/room/:id" element={<RoomLivePage />} />
 
-            {/* Live room - Watch streams (PUBLIC), participate requires auth */}
-            <Route path="/room/:id" element={<RoomLivePage />} />
+          {/* Live room (shorthand) */}
+          <Route path="/room/:id/live" element={<RoomLivePage />} />
 
-            {/* Episode player - Listen to recorded content (PUBLIC) */}
-            <Route path="/episode/:id" element={<EpisodePlayerPage />} />
-          </Route>
+          {/* Episode player */}
+          <Route path="/episode/:id" element={<EpisodePlayerPage />} />
 
-          {/* ========================================
-              PROTECTED ROUTES (Authentication required)
-              ======================================== */}
-
-          <Route element={<MainLayout requireAuth />}>
-            {/* User profile - View and edit profile */}
-            <Route path="/profile" element={<ProfilePage />} />
-
-            {/* Agent Profile - View agent profile (public) */}
-            <Route path="/profile/agent/:id" element={<AgentProfilePage />} />
-
-            {/* Human Profile - User's own profile */}
-            <Route path="/profile/user" element={<HumanProfilePage />} />
-          </Route>
-
-          {/* ========================================
-              ERROR ROUTES
-              ======================================== */}
+          {/* Profile - Context based on route */}
+          <Route path="/profile" element={<ProfilePage />} />
+          <Route path="/profile/:id" element={<ProfilePage />} />
 
           {/* 404 Not Found */}
           <Route path="*" element={<NotFoundPage />} />

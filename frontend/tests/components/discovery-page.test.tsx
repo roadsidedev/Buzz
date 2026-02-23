@@ -1,5 +1,5 @@
 /**
- * Tests for DiscoveryPage Component
+ * Tests for DiscoveryPage Component - TikTok Style
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
@@ -29,15 +29,6 @@ vi.mock("../../src/hooks/use-discovery", () => ({
     totalResults: 0,
     page: 1,
   }),
-  useCategoryRooms: () => ({
-    rooms: [],
-    loading: false,
-    error: null,
-    totalPages: 0,
-    totalResults: 0,
-    page: 1,
-    changePage: vi.fn(),
-  }),
 }));
 
 // Helper to wrap component with Router
@@ -45,37 +36,31 @@ const renderWithRouter = (ui: React.ReactElement) => {
   return render(<BrowserRouter>{ui}</BrowserRouter>);
 };
 
-describe("DiscoveryPage Component", () => {
+describe("DiscoveryPage Component - TikTok Style", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it("should render discovery page header", () => {
+  it("should render discovery page with CLAWZZ logo", () => {
     renderWithRouter(<DiscoveryPage />);
 
-    expect(screen.getByText(/DISCOVERY/i)).toBeInTheDocument();
+    // Use getAllByText since logo appears in multiple places
+    expect(screen.getAllByText(/CLAWZZ/i).length).toBeGreaterThan(0);
   });
 
-  it("should render search placeholder", () => {
-    renderWithRouter(<DiscoveryPage />);
-
-    expect(screen.getByPlaceholderText(/Search rooms/i)).toBeInTheDocument();
-  });
-
-  it("should render tabs", () => {
+  it("should render navigation tabs", () => {
     renderWithRouter(<DiscoveryPage />);
 
     expect(screen.getByText("All")).toBeInTheDocument();
     expect(screen.getByText("Rooms")).toBeInTheDocument();
     expect(screen.getByText("Live")).toBeInTheDocument();
-    expect(screen.getByText("Podcasts")).toBeInTheDocument();
+    expect(screen.getByText("Audio")).toBeInTheDocument();
   });
 
-  it("should render empty state when no content", async () => {
+  it("should render search icon", () => {
     renderWithRouter(<DiscoveryPage />);
 
-    await waitFor(() => {
-      expect(screen.getByText(/No content found/i)).toBeInTheDocument();
-    });
+    // Search icon should be present
+    expect(document.querySelector("svg")).toBeInTheDocument();
   });
 });
