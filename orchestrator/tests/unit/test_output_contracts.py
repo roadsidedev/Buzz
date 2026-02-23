@@ -2,14 +2,32 @@
 
 import pytest
 
-from orchestrator.src.services.output_contracts import ContractValidator
-from orchestrator.src.models.room import Room, RoomState, RoomType, RoomStatus, CompletionLevel
+from src.services.output_contracts import ContractValidator
+from src.models.room import Room, RoomState, RoomType, RoomStatus, CompletionLevel, DebateConfig
 
 
 @pytest.fixture
 def contract_validator() -> ContractValidator:
     """Create a contract validator instance."""
     return ContractValidator()
+
+
+def _create_debate_room(room_id="room-001", turn_count=4) -> Room:
+    """Helper to create a debate room with all required fields."""
+    return Room(
+        id=room_id,
+        host_agent_id="agent-001",
+        room_type=RoomType.DEBATE,
+        type_config=DebateConfig(
+            sides=2,
+            speaking_order="free-form",
+            topic="Test debate topic",
+        ),
+        status=RoomStatus.LIVE,
+        objective="Test",
+        spawn_fee_cents=100,
+        turn_count=turn_count,
+    )
 
 
 def test_get_contract_returns_debate_contract(contract_validator: ContractValidator):
@@ -24,16 +42,7 @@ def test_get_contract_returns_debate_contract(contract_validator: ContractValida
 
 def test_evaluate_completion_minimum_level(contract_validator: ContractValidator):
     """Test completion evaluation at minimum level."""
-    room = Room(
-        id="room-001",
-        host_agent_id="agent-001",
-        room_type=RoomType.DEBATE,
-        status=RoomStatus.LIVE,
-        objective="Test",
-        spawn_fee_cents=100,
-    )
-    room.turn_count = 4  # Minimum for debate
-
+    room = _create_debate_room(turn_count=4)  # Minimum for debate
     room_state = RoomState(room=room)
 
     level, satisfaction, unfulfilled = contract_validator.evaluate_completion(room_state, "")
@@ -44,16 +53,7 @@ def test_evaluate_completion_minimum_level(contract_validator: ContractValidator
 
 def test_evaluate_completion_standard_level(contract_validator: ContractValidator):
     """Test completion evaluation at standard level."""
-    room = Room(
-        id="room-001",
-        host_agent_id="agent-001",
-        room_type=RoomType.DEBATE,
-        status=RoomStatus.LIVE,
-        objective="Test",
-        spawn_fee_cents=100,
-    )
-    room.turn_count = 8  # Standard for debate
-
+    room = _create_debate_room(turn_count=8)  # Standard for debate
     room_state = RoomState(room=room)
 
     level, satisfaction, unfulfilled = contract_validator.evaluate_completion(room_state, "")
@@ -64,16 +64,7 @@ def test_evaluate_completion_standard_level(contract_validator: ContractValidato
 
 def test_evaluate_completion_exceptional_level(contract_validator: ContractValidator):
     """Test completion evaluation at exceptional level."""
-    room = Room(
-        id="room-001",
-        host_agent_id="agent-001",
-        room_type=RoomType.DEBATE,
-        status=RoomStatus.LIVE,
-        objective="Test",
-        spawn_fee_cents=100,
-    )
-    room.turn_count = 12  # Exceptional for debate
-
+    room = _create_debate_room(turn_count=12)  # Exceptional for debate
     room_state = RoomState(room=room)
 
     level, satisfaction, unfulfilled = contract_validator.evaluate_completion(room_state, "")
@@ -84,16 +75,7 @@ def test_evaluate_completion_exceptional_level(contract_validator: ContractValid
 
 def test_should_close_room_at_standard_threshold(contract_validator: ContractValidator):
     """Test that room closes when standard threshold is met."""
-    room = Room(
-        id="room-001",
-        host_agent_id="agent-001",
-        room_type=RoomType.DEBATE,
-        status=RoomStatus.LIVE,
-        objective="Test",
-        spawn_fee_cents=100,
-    )
-    room.turn_count = 8  # Standard threshold
-
+    room = _create_debate_room(turn_count=8)  # Standard threshold
     room_state = RoomState(room=room)
 
     should_close = contract_validator.should_close_room(room_state)
@@ -103,16 +85,7 @@ def test_should_close_room_at_standard_threshold(contract_validator: ContractVal
 
 def test_should_not_close_room_below_threshold(contract_validator: ContractValidator):
     """Test that room doesn't close below threshold."""
-    room = Room(
-        id="room-001",
-        host_agent_id="agent-001",
-        room_type=RoomType.DEBATE,
-        status=RoomStatus.LIVE,
-        objective="Test",
-        spawn_fee_cents=100,
-    )
-    room.turn_count = 5  # Below standard
-
+    room = _create_debate_room(turn_count=5)  # Below standard
     room_state = RoomState(room=room)
 
     should_close = contract_validator.should_close_room(room_state)
@@ -122,15 +95,7 @@ def test_should_not_close_room_below_threshold(contract_validator: ContractValid
 
 def test_generate_artifacts_includes_transcript(contract_validator: ContractValidator):
     """Test that artifacts include transcript."""
-    room = Room(
-        id="room-001",
-        host_agent_id="agent-001",
-        room_type=RoomType.DEBATE,
-        status=RoomStatus.LIVE,
-        objective="Test",
-        spawn_fee_cents=100,
-    )
-
+    room = _create_debate_room()
     room_state = RoomState(room=room)
     room_state.transcript = [{"agent_id": "agent-001", "text": "Test message"}]
 

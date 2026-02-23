@@ -3,9 +3,9 @@
 import pytest
 from datetime import datetime
 
-from orchestrator.src.services.turn_management import TurnManager
-from orchestrator.src.models.message import ScoringResult
-from orchestrator.src.models.room import Room, RoomState, RoomType, RoomStatus
+from src.services.turn_management import TurnManager
+from src.models.message import ScoringResult
+from src.models.room import Room, RoomState, RoomType, RoomStatus, DebateConfig
 
 
 @pytest.fixture
@@ -21,6 +21,11 @@ def sample_room_state() -> RoomState:
         id="room-001",
         host_agent_id="agent-001",
         room_type=RoomType.DEBATE,
+        type_config=DebateConfig(
+            sides=2,
+            speaking_order="free-form",
+            topic="Test debate topic",
+        ),
         status=RoomStatus.LIVE,
         objective="Test objective",
         spawn_fee_cents=100,
@@ -63,7 +68,7 @@ def test_select_next_speaker_picks_highest_score(sample_room_state: RoomState, t
 
 
 def test_select_next_speaker_filters_low_scores(sample_room_state: RoomState, turn_manager: TurnManager):
-    """Test that messages below threshold are rejected."""
+    """Test that messages below threshold use fallback selection."""
     scores = [
         ScoringResult(
             message_id="msg-001",
@@ -78,8 +83,11 @@ def test_select_next_speaker_filters_low_scores(sample_room_state: RoomState, tu
         ),
     ]
 
-    with pytest.raises(ValueError):
-        turn_manager.select_next_speaker(sample_room_state, scores)
+    # Should use fallback (highest score) rather than raise
+    turn = turn_manager.select_next_speaker(sample_room_state, scores)
+
+    assert turn.selected_message_id == "msg-001"
+    assert turn.score == 40.0
 
 
 def test_select_next_speaker_skips_moderated_messages(sample_room_state: RoomState, turn_manager: TurnManager):

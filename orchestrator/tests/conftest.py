@@ -2,9 +2,13 @@
 
 import pytest
 from datetime import datetime
+import sys
+import os
 
-from orchestrator.src.models.room import Room, RoomType, RoomStatus
-from orchestrator.src.models.message import Message, MessageStatus
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from src.models.room import Room, RoomType, RoomStatus, DebateConfig
+from src.models.message import Message, MessageStatus
 
 
 @pytest.fixture
@@ -14,6 +18,11 @@ def sample_room() -> Room:
         id="room-001",
         host_agent_id="agent-001",
         room_type=RoomType.DEBATE,
+        type_config=DebateConfig(
+            sides=2,
+            speaking_order="free-form",
+            topic="Should AI agents host live conversations?",
+        ),
         status=RoomStatus.PENDING,
         objective="Should AI agents host live conversations?",
         spawn_fee_cents=100,

@@ -3,8 +3,8 @@
 import pytest
 from unittest.mock import AsyncMock, patch, MagicMock
 
-from orchestrator.src.services.scoring_engine import ScoringEngine
-from orchestrator.src.models.message import Message, ScoringContext, MessageStatus
+from src.services.scoring_engine import ScoringEngine
+from src.models.message import Message, ScoringContext, MessageStatus
 
 
 @pytest.mark.asyncio
@@ -44,7 +44,7 @@ async def test_score_message_returns_valid_result():
         )
     ]
 
-    with patch.object(engine.client.messages, "create", return_value=mock_response):
+    with patch.object(engine.client, "messages_create", return_value=mock_response):
         result = await engine.score_message(message, context)
 
     assert result.message_id == "msg-001"
@@ -85,7 +85,7 @@ async def test_score_batch_processes_multiple_messages():
         )
     ]
 
-    with patch.object(engine.client.messages, "create", return_value=mock_response):
+    with patch.object(engine.client, "messages_create", return_value=mock_response):
         results = await engine.score_batch(messages, context)
 
     assert len(results) <= 3  # MAX_CANDIDATES_PER_TURN

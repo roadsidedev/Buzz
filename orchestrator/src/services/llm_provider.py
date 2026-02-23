@@ -36,12 +36,12 @@ def _detect_provider_from_env() -> tuple[str | None, str | None]:
     `(None, None)`.
     """
     candidates = [
+        ("nvidia", "NVIDIA_API_KEY"),
+        ("kimi", "KIMI_API_KEY"),
         ("gemini", "GEMINI_API_KEY"),
         ("openai", "OPENAI_API_KEY"),
         ("anthropic", "ANTHROPIC_API_KEY"),
         ("openrouter", "OPENROUTER_API_KEY"),
-        ("nvidia", "NVIDIA_API_KEY"),
-        ("kimi", "KIMI_API_KEY"),
     ]
 
     for name, envvar in candidates:
@@ -90,7 +90,7 @@ def get_provider(name: str | None = None, api_key: str | None = None) -> LLMProv
         raise ImportError("No LLM provider configured via env or settings")
 
     # Try to import a provider-specific adapter dynamically
-    module_name = f"orchestrator.src.services.providers.{provider}_provider"
+    module_name = f"src.services.providers.{provider}_provider"
     try:
         mod = importlib.import_module(module_name)
         # Attempt common class names

@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     # Server
     SERVICE_NAME: str = "ClawZz Orchestrator"
     SERVICE_VERSION: str = "0.1.0"
-    ENVIRONMENT: Literal["development", "staging", "production"] = "development"
+    ENVIRONMENT: Literal["development", "staging", "production", "test"] = "development"
     DEBUG: bool = True
 
     # FastAPI - Use Railway's PORT if available
@@ -29,14 +29,24 @@ class Settings(BaseSettings):
     CACHE_TTL_SECONDS: int = 3600
 
     # LLM Provider configuration (provider-agnostic)
-    # Example providers: "anthropic", "openai", "none"
+    # Supported providers: "anthropic", "openai", "nvidia", "kimi", "gemini", "openrouter", "none"
     LLM_PROVIDER: str = "anthropic"
     LLM_API_KEY: str = ""
     # Optional: explicit API URL for providers that expose HTTP endpoints
     LLM_API_URL: str = ""
-    # Backwards-compatible: keep Anthropic-specific model names as defaults
+    
+    # Model configurations (defaults per provider)
+    # Anthropic models
     SCORING_MODEL: str = "claude-3-5-sonnet-20241022"
     MODERATION_MODEL: str = "claude-3-5-haiku-20241022"
+    
+    # NVIDIA NIM models (alternatives - set LLM_PROVIDER=nvidia)
+    # SCORING_MODEL: str = "meta/llama-3.3-70b-instruct"
+    # SCORING_MODEL: str = "qwen/qwen-3.5-397b"
+    # SCORING_MODEL: str = "deepseek-ai/deepseek-r1"
+    
+    # Kimi models (set LLM_PROVIDER=kimi)
+    # SCORING_MODEL: str = "moonshotai/kimi-k2-5"
 
     # Phase 1 API Gateway Integration
     API_GATEWAY_BASE_URL: str = "http://localhost:4000"

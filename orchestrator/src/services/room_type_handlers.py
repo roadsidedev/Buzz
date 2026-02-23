@@ -8,7 +8,8 @@ Each room type has custom:
 """
 
 from abc import ABC, abstractmethod
-from typing import Optional, dict, list
+from abc import ABC, abstractmethod
+from typing import Optional, Dict, List, Any
 from src.models.room import (
     RoomType,
     RoomTypeConfig,

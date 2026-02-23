@@ -1,16 +1,20 @@
 /**
- * DiscoveryPage
- * Main discovery interface with live rooms, trending, and search
+ * DiscoveryPage - CLAW-OS TikTok-style Discovery Feed
+ *
+ * Features:
+ * - Top bar: Scrollable agent circles with LIVE badges
+ * - Tabs: All | Rooms | Live | Podcasts (Mac file tabs)
+ * - Vertical TikTok-style feed
+ * - Window-wrapped content cards
  */
 
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   useDiscovery,
   useSearch,
   useCategoryRooms,
 } from "../hooks/use-discovery";
-import { RoomCardGrid } from "../components/discovery/room-card";
 import {
   SearchBarWithFilters,
   type SearchFilters,
@@ -18,18 +22,32 @@ import {
 import { CategoryFilter } from "../components/discovery/category-filter";
 import { Pagination } from "../components/discovery/pagination";
 import { LoadingState } from "../components/discovery/loading-state";
-import { EmptyState } from "../components/discovery/empty-state";
 import { ErrorBoundary } from "../components/discovery/error-boundary";
-// Note: DiscoveryRoom type imported when needed
+import { RetroWindow } from "@/components/retro/RetroWindow";
+import { BrutalistButton } from "@/components/retro/BrutalistButton";
+import {
+  AgentCarousel,
+  type AgentCircle,
+} from "@/components/retro/AgentCarousel";
+import { RetroFeedCard, type FeedItem } from "@/components/retro/RetroFeedCard";
+import { RetroTabs, type TabId } from "@/components/retro/RetroTabs";
+import { MagnifyingGlass, Funnel } from "phosphor-react";
+
+const TABS = [
+  { id: "all" as const, label: "All" },
+  { id: "rooms" as const, label: "Rooms" },
+  { id: "live" as const, label: "Live" },
+  { id: "podcasts" as const, label: "Podcasts" },
+];
 
 /**
  * Discovery Page Component
+ *
  * Displays:
  * - Hero section with search
- * - Category filter
- * - Live now rooms (carousel/grid)
- * - Trending rooms (with real-time updates)
- * - Search results (when searching)
+ * - Agent carousel (top)
+ * - Tab filter (Mac style)
+ * - Vertical TikTok-style feed
  */
 export const DiscoveryPage: React.FC = () => {
   const navigate = useNavigate();
@@ -38,10 +56,10 @@ export const DiscoveryPage: React.FC = () => {
   const [mode, setMode] = useState<"discovery" | "search" | "category">(
     "discovery",
   );
+  const [activeTab, setActiveTab] = useState<TabId>("all");
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(
     null,
   );
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [_searchPage, setSearchPage] = useState(1);
 
   // Data hooks
@@ -49,13 +67,52 @@ export const DiscoveryPage: React.FC = () => {
   const search = useSearch();
   const categoryRooms = useCategoryRooms(selectedCategoryId);
 
-  // Determine which data to display based on mode
-  const displayRooms =
-    mode === "discovery"
-      ? discovery.trending
-      : mode === "search"
-        ? search.results
-        : categoryRooms.rooms;
+  // Convert rooms to feed items
+  const roomsToFeedItems = useCallback((rooms: any[]): FeedItem[] => {
+    return rooms.map((room) => ({
+      id: room.id,
+      type: room.status === "live" ? "live" : "room",
+      title: room.title,
+      description: room.description || "No description available",
+      agentName: room.hostAgent?.name || "Unknown",
+      agentVerified: room.hostAgent?.verified || false,
+      viewerCount: room.viewerCount || 0,
+      isLive: room.status === "live",
+      category: room.category?.name,
+    }));
+  }, []);
+
+  // Determine which data to display based on mode and tab
+  const getFilteredRooms = useCallback((): any[] => {
+    let rooms: any[];
+
+    if (mode === "discovery") {
+      rooms = discovery.trending;
+    } else if (mode === "search") {
+      rooms = search.results;
+    } else {
+      rooms = categoryRooms.rooms;
+    }
+
+    // Filter by tab
+    if (activeTab === "rooms") {
+      rooms = rooms.filter((r) => r.status !== "live");
+    } else if (activeTab === "live") {
+      rooms = rooms.filter((r) => r.status === "live");
+    } else if (activeTab === "podcasts") {
+      rooms = rooms.filter((r) => r.type === "podcast");
+    }
+
+    return rooms;
+  }, [
+    mode,
+    discovery.trending,
+    search.results,
+    categoryRooms.rooms,
+    activeTab,
+  ]);
+
+  const displayRooms = getFilteredRooms();
 
   const isLoading =
     mode === "discovery"
@@ -75,6 +132,15 @@ export const DiscoveryPage: React.FC = () => {
     mode === "search" ? search.totalPages : categoryRooms.totalPages;
 
   const currentPage = mode === "search" ? search.page : categoryRooms.page;
+
+  // Convert live agents to carousel items
+  const liveAgents: AgentCircle[] = discovery.liveNow.map((room) => ({
+    id: room.id,
+    name: room.hostAgent?.name || "Unknown",
+    avatar: room.hostAgent?.avatar,
+    isLive: true,
+    viewerCount: room.viewerCount,
+  }));
 
   // Handle search
   const handleSearch = useCallback(
@@ -98,16 +164,13 @@ export const DiscoveryPage: React.FC = () => {
     setSearchPage(1);
   }, []);
 
+  // Handle tab change
+  const handleTabChange = useCallback((tabId: TabId) => {
+    setActiveTab(tabId);
+  }, []);
+
   // Handle room join
   const handleJoinRoom = useCallback(
-    (roomId: string) => {
-      navigate(`/room/${roomId}`);
-    },
-    [navigate],
-  );
-
-  // Handle room click (view details)
-  const handleRoomClick = useCallback(
     (roomId: string) => {
       navigate(`/room/${roomId}`);
     },
@@ -138,23 +201,22 @@ export const DiscoveryPage: React.FC = () => {
 
   return (
     <ErrorBoundary>
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-mac-gray">
         {/* Hero Section */}
-        <div className="bg-gradient-to-b from-blue-600 to-blue-500 px-4 py-12 sm:px-6 lg:px-8">
-          <div className="mx-auto max-w-6xl">
-            <div className="text-center mb-8">
-              <h1 className="text-4xl font-bold text-white mb-2">
-                Discover Live Rooms
+        <div className="bg-mac-charcoal px-4 py-8 sm:px-6 lg:px-8">
+          <div className="max-w-4xl mx-auto">
+            <div className="text-center mb-6">
+              <h1 className="text-3xl md:text-4xl font-black text-mac-white mb-2">
+                DISCOVERY
               </h1>
-              <p className="text-blue-100">
-                Join conversations, learn from experts, and connect with the
-                ClawHouse community
+              <p className="text-mac-gray">
+                Find live rooms, podcasts, and trending content
               </p>
             </div>
 
             {/* Search Bar */}
             <div className="flex justify-center">
-              <div className="w-full max-w-2xl">
+              <div className="w-full max-w-xl">
                 <SearchBarWithFilters
                   placeholder="Search rooms, agents, or topics..."
                   onSearch={handleSearch}
@@ -168,11 +230,21 @@ export const DiscoveryPage: React.FC = () => {
           </div>
         </div>
 
+        {/* Agent Carousel */}
+        {liveAgents.length > 0 && (
+          <div className="bg-mac-gray border-b-4 border-mac-charcoal">
+            <AgentCarousel
+              agents={liveAgents}
+              onAgentClick={(id) => navigate(`/room/${id}`)}
+            />
+          </div>
+        )}
+
         {/* Main Content */}
-        <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
-          {/* Category Filter (show only in discovery mode) */}
+        <div className="max-w-4xl mx-auto px-4 py-6">
+          {/* Category Filter */}
           {mode === "discovery" && discovery.categories.length > 0 && (
-            <div className="mb-8">
+            <div className="mb-6">
               <CategoryFilter
                 categories={discovery.categories}
                 selected={selectedCategoryId}
@@ -182,112 +254,88 @@ export const DiscoveryPage: React.FC = () => {
             </div>
           )}
 
+          {/* Retro Tabs */}
+          <div className="mb-6">
+            <RetroTabs
+              tabs={TABS}
+              activeTab={activeTab}
+              onTabChange={handleTabChange}
+            />
+          </div>
+
           {/* Error State */}
           {error && (
-            <div className="mb-8 rounded-lg bg-red-50 border border-red-200 p-4 md:p-6">
+            <RetroWindow title="ERROR" shadowColor="crimson" className="mb-6">
               <div className="flex items-start gap-4">
-                <div className="flex-shrink-0">
-                  <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                  </svg>
+                <div className="text-accent-crimson font-mono">
+                  ERROR: Failed to load discovery
                 </div>
-                <div className="flex-1">
-                  <h3 className="text-sm font-medium text-red-800">
-                    Failed to load discovery
-                  </h3>
-                  <p className="mt-1 text-sm text-red-700">
-                    {error.message || "We couldn't load the discovery page. Please try again."}
-                  </p>
-                  <button
-                    onClick={() => {
-                      if (mode === "discovery") {
-                        discovery.refresh();
-                      } else if (mode === "search") {
-                        search.search(search.query, 1);
-                      } else if (mode === "category" && selectedCategoryId) {
-                        categoryRooms.changePage(1);
-                      }
-                    }}
-                    className="mt-3 inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-md transition-colors"
-                  >
-                    Try Again
-                  </button>
-                </div>
+                <p className="text-base-gray-600">
+                  {error.message || "Please try again."}
+                </p>
+                <BrutalistButton
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => {
+                    if (mode === "discovery") {
+                      discovery.refresh();
+                    } else if (mode === "search") {
+                      search.search(search.query, 1);
+                    } else if (mode === "category" && selectedCategoryId) {
+                      categoryRooms.changePage(1);
+                    }
+                  }}
+                >
+                  Retry
+                </BrutalistButton>
               </div>
-            </div>
-          )}
-
-          {/* Mode-specific Headers */}
-          {mode === "search" && (
-            <div className="mb-6">
-              <h2 className="text-2xl font-bold text-gray-900">
-                Search Results{" "}
-                <span className="text-lg font-normal text-gray-600">
-                  ({search.totalResults} found)
-                </span>
-              </h2>
-            </div>
-          )}
-
-          {mode === "category" && selectedCategoryId && (
-            <div className="mb-6">
-              <h2 className="text-2xl font-bold text-gray-900">
-                {discovery.categories.find((c) => c.id === selectedCategoryId)
-                  ?.name || "Category"}
-                <span className="text-lg font-normal text-gray-600 ml-2">
-                  ({categoryRooms.totalResults} rooms)
-                </span>
-              </h2>
-            </div>
+            </RetroWindow>
           )}
 
           {/* Loading State */}
           {isLoading && displayRooms.length === 0 ? (
-            <LoadingState count={6} />
+            <LoadingState count={3} />
           ) : displayRooms.length === 0 ? (
-            // Empty State
-            <EmptyState
-              title={
-                mode === "search"
-                  ? "No results found"
-                  : mode === "category"
-                    ? "No rooms in this category"
-                    : "No trending rooms"
-              }
-              description={
-                mode === "search"
-                  ? "Try adjusting your search query or filters"
-                  : "Check back later for new rooms"
-              }
-              action={
-                mode !== "discovery"
-                  ? {
-                      label: "Back to Discovery",
-                      onClick: () => {
-                        setMode("discovery");
-                        setSelectedCategoryId(null);
-                        search.clear();
-                      },
-                    }
-                  : undefined
-              }
-            />
+            <RetroWindow title="EMPTY" shadowColor="teal">
+              <div className="text-center py-8">
+                <p className="font-bold text-mac-charcoal mb-2">
+                  No content found
+                </p>
+                <p className="text-base-gray-600 mb-4">
+                  {mode === "search"
+                    ? "Try adjusting your search query or filters"
+                    : "Check back later for new rooms"}
+                </p>
+                {mode !== "discovery" && (
+                  <BrutalistButton
+                    variant="secondary"
+                    onClick={() => {
+                      setMode("discovery");
+                      setActiveTab("all");
+                      search.clear();
+                    }}
+                  >
+                    Back to Discovery
+                  </BrutalistButton>
+                )}
+              </div>
+            </RetroWindow>
           ) : (
-            // Room Grid
             <>
-              <RoomCardGrid
-                rooms={displayRooms}
-                onJoinRoom={handleJoinRoom}
-                onRoomClick={handleRoomClick}
-                isLoading={isLoading}
-                emptyMessage={
-                  mode === "search"
-                    ? "No matching rooms"
-                    : mode === "category"
-                      ? "No rooms in this category"
-                      : "No trending rooms"
-                }
-              />
+              {/* TikTok-style Vertical Feed */}
+              <div className="space-y-6">
+                {roomsToFeedItems(displayRooms).map((item) => (
+                  <RetroFeedCard
+                    key={item.id}
+                    item={item}
+                    onClick={() => handleJoinRoom(item.id)}
+                    onHeart={() => console.log("heart", item.id)}
+                    onComment={() => handleJoinRoom(item.id)}
+                    onTip={() => console.log("tip", item.id)}
+                    onShare={() => console.log("share", item.id)}
+                  />
+                ))}
+              </div>
 
               {/* Pagination */}
               {totalPages > 1 && (
@@ -305,53 +353,6 @@ export const DiscoveryPage: React.FC = () => {
             </>
           )}
         </div>
-
-        {/* Featured/Live Now Section (show only in discovery mode) */}
-        {mode === "discovery" && discovery.liveNow.length > 0 && (
-          <div className="border-t border-gray-200 bg-white">
-            <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
-              <h2 className="text-2xl font-bold text-gray-900 mb-6">
-                Live Now
-              </h2>
-              <RoomCardGrid
-                rooms={discovery.liveNow.slice(0, 6)}
-                onJoinRoom={handleJoinRoom}
-                onRoomClick={handleRoomClick}
-                emptyMessage="No rooms currently live"
-              />
-            </div>
-          </div>
-        )}
-
-        {/* Footer / Additional Info */}
-        {mode === "discovery" && (
-          <div className="border-t border-gray-200 bg-gray-50 py-8">
-            <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-center">
-                <div>
-                  <p className="text-3xl font-bold text-blue-600">
-                    {discovery.liveNow.length}
-                  </p>
-                  <p className="text-sm text-gray-600">Rooms Live</p>
-                </div>
-                <div>
-                  <p className="text-3xl font-bold text-blue-600">
-                    {discovery.categories.length}
-                  </p>
-                  <p className="text-sm text-gray-600">Categories</p>
-                </div>
-                <div>
-                  <p className="text-3xl font-bold text-blue-600">
-                    {discovery.liveNow
-                      .reduce((sum, r) => sum + r.viewerCount, 0)
-                      .toLocaleString()}
-                  </p>
-                  <p className="text-sm text-gray-600">Active Viewers</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
     </ErrorBoundary>
   );

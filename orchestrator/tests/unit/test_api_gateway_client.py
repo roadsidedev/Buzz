@@ -4,8 +4,8 @@ import pytest
 from unittest.mock import AsyncMock, patch, MagicMock
 import httpx
 
-from orchestrator.src.clients.api_gateway_client import APIGatewayClient
-from orchestrator.src.models.message import Message, MessageStatus
+from src.clients.api_gateway_client import APIGatewayClient
+from src.models.message import Message, MessageStatus
 
 
 @pytest.fixture

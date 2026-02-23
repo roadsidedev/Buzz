@@ -6,9 +6,6 @@ FROM coturn/coturn:4.6.3
 LABEL maintainer="ClawZz Team"
 LABEL description="Coturn TURN server for ClawZz audio rooms"
 
-# Create log directory
-RUN mkdir -p /var/log/turnserver
-
 # Copy configuration
 COPY turnserver.conf /etc/turnserver.conf
 

@@ -1,11 +1,11 @@
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&family=Public+Sans:wght@400;500;600;700;800;900&display=swap");
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 /* ============================================================
-   NEOBRUTALISM DESIGN SYSTEM: BASE STYLES
+   CLAW-OS RETRO DESIGN SYSTEM: BASE STYLES
    ============================================================ */
 
 /* Reset & Base */
@@ -22,19 +22,19 @@ html {
 }
 
 body {
-  font-family: "Inter", sans-serif;
-  background-color: #ffffff;
-  color: #000000;
+  font-family: "Inter", "Public Sans", sans-serif;
+  background-color: #e0e0e0;
+  color: #1a1a1a;
   line-height: 1.6;
   font-size: 16px;
   font-weight: 400;
 }
 
-/* Typography: Aggressive Hierarchy */
+/* Typography: CLAW-OS Hierarchy */
 h1 {
-  font-family: "Space Grotesk", system-ui, sans-serif;
+  font-family: "Inter", "Public Sans", system-ui, sans-serif;
   font-size: 3.75rem;
-  font-weight: 700;
+  font-weight: 900;
   line-height: 1.1;
   letter-spacing: -0.02em;
   margin: 0 0 1.5rem 0;
@@ -42,16 +42,16 @@ h1 {
 }
 
 h2 {
-  font-family: "Space Grotesk", system-ui, sans-serif;
+  font-family: "Inter", "Public Sans", system-ui, sans-serif;
   font-size: 2.25rem;
-  font-weight: 700;
+  font-weight: 800;
   line-height: 1.2;
   letter-spacing: -0.01em;
   margin: 0 0 1rem 0;
 }
 
 h3 {
-  font-family: "Space Grotesk", system-ui, sans-serif;
+  font-family: "Inter", "Public Sans", system-ui, sans-serif;
   font-size: 1.5rem;
   font-weight: 700;
   line-height: 1.3;
@@ -59,22 +59,22 @@ h3 {
 }
 
 h4 {
-  font-family: "Space Grotesk", system-ui, sans-serif;
+  font-family: "Inter", "Public Sans", system-ui, sans-serif;
   font-size: 1.25rem;
-  font-weight: 600;
+  font-weight: 700;
   letter-spacing: 0.02em;
   margin: 0 0 0.5rem 0;
 }
 
 h5 {
-  font-family: "Space Grotesk", system-ui, sans-serif;
+  font-family: "Inter", "Public Sans", system-ui, sans-serif;
   font-size: 1.125rem;
   font-weight: 600;
   margin: 0 0 0.5rem 0;
 }
 
 h6 {
-  font-family: "Inter", sans-serif;
+  font-family: "Inter", "Public Sans", sans-serif;
   font-size: 1rem;
   font-weight: 600;
   text-transform: uppercase;
@@ -93,17 +93,17 @@ p strong {
 }
 
 a {
-  color: #0ea5e9;
+  color: #6c5ce7;
   text-decoration: none;
-  font-weight: 500;
-  border-bottom: 2px solid #0ea5e9;
-  transition: all 0.2s ease-in-out;
+  font-weight: 600;
+  border-bottom: 3px solid #6c5ce7;
+  transition: all 0.1s ease-in-out;
 }
 
 a:hover {
-  color: #0284c7;
-  border-bottom-color: #0284c7;
-  background-color: #f0f9ff;
+  color: #4ecdc4;
+  border-bottom-color: #4ecdc4;
+  background-color: rgba(108, 92, 231, 0.1);
 }
 
 a:active {
@@ -181,29 +181,31 @@ textarea {
   min-height: 120px;
 }
 
-/* Buttons */
+/* Buttons - CLAW-OS Retro Style */
 button {
-  font-family: inherit;
+  font-family: "Inter", "Public Sans", sans-serif;
   font-size: 1rem;
-  font-weight: 600;
+  font-weight: 700;
   padding: 0.75rem 1.5rem;
-  border: 2px solid #000000;
-  background-color: #000000;
+  border: 4px solid #1a1a1a;
+  background-color: #1a1a1a;
   color: #ffffff;
   cursor: pointer;
-  transition: all 0.2s ease-in-out;
+  transition: all 0.1s ease-in-out;
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
 
 button:hover {
-  background-color: #ffffff;
-  color: #000000;
+  background-color: #6c5ce7;
+  border-color: #1a1a1a;
+  box-shadow: 6px 6px 0px 0px #1a1a1a;
   transform: translate(-2px, -2px);
 }
 
 button:active {
-  transform: translate(0, 0);
+  transform: translate(2px, 2px);
+  box-shadow: none;
 }
 
 button:disabled {
@@ -491,6 +493,133 @@ button:disabled {
   max-width: 500px;
   width: 90%;
   animation: scaleUp 0.3s ease-out;
+}
+
+/* ============================================================
+   CLAW-OS RETRO COMPONENTS
+   ============================================================ */
+
+/* Retro Title Bar */
+.retro-titlebar {
+  background-color: #1a1a1a;
+  padding: 0.5rem 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 4px solid #1a1a1a;
+}
+
+.retro-titlebar-title {
+  font-family: "Inter", "Public Sans", sans-serif;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: #e0e0e0;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.retro-window-controls {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.retro-window-btn {
+  width: 14px;
+  height: 14px;
+  border: 2px solid #1a1a1a;
+  cursor: pointer;
+}
+
+.retro-window-btn-close {
+  background-color: #ff6b6b;
+}
+
+.retro-window-btn-minimize {
+  background-color: #ffe66d;
+}
+
+.retro-window-btn-maximize {
+  background-color: #4ecdc4;
+}
+
+/* Retro Card */
+.retro-card {
+  background-color: #e0e0e0;
+  border: 4px solid #1a1a1a;
+  box-shadow: 6px 6px 0px 0px #1a1a1a;
+  padding: 1.5rem;
+}
+
+.retro-card:hover {
+  box-shadow: 8px 8px 0px 0px #1a1a1a;
+  transform: translate(-2px, -2px);
+}
+
+/* Live Badge */
+.live-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.25rem 0.5rem;
+  background-color: #ff6b6b;
+  border: 2px solid #1a1a1a;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #ffffff;
+  text-transform: uppercase;
+  animation: blink 1s steps(2, start) infinite;
+}
+
+.live-badge::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  background-color: #ffffff;
+  animation: blink 1s steps(2, start) infinite;
+}
+
+/* Retro Tabs - Mac System 7 style */
+.retro-tab {
+  padding: 0.5rem 1.5rem;
+  background-color: #e0e0e0;
+  border: 3px solid #1a1a1a;
+  border-bottom: none;
+  font-family: "Inter", "Public Sans", sans-serif;
+  font-size: 0.875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.1s ease-in-out;
+}
+
+.retro-tab:hover {
+  background-color: #4ecdc4;
+}
+
+.retro-tab.active {
+  background-color: #1a1a1a;
+  color: #e0e0e0;
+}
+
+/* Retro Input */
+.retro-input {
+  background-color: #ffffff;
+  border: 4px solid #1a1a1a;
+  padding: 0.75rem 1rem;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.875rem;
+  transition: all 0.1s ease-in-out;
+}
+
+.retro-input:focus {
+  outline: none;
+  border-color: #6c5ce7;
+  box-shadow: 4px 4px 0px 0px #6c5ce7;
+}
+
+.retro-input::placeholder {
+  color: #6b6b6b;
 }
 
 /* ============================================================

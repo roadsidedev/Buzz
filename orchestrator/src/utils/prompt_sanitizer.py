@@ -247,7 +247,7 @@ def get_sanitizer(strict_mode: bool = False) -> PromptSanitizer:
     """Get or create prompt sanitizer singleton"""
     global _sanitizer
     
-    if _sanitizer is None:
+    if _sanitizer is None or _sanitizer.strict_mode != strict_mode:
         _sanitizer = PromptSanitizer(strict_mode=strict_mode)
     
     return _sanitizer

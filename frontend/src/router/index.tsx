@@ -19,10 +19,10 @@ import { NotFoundPage } from "@/pages/not-found-page";
 
 // Loading component
 const PageLoader: React.FC = () => (
-  <div className="flex items-center justify-center min-h-screen bg-slate-950">
-    <div className="text-center">
-      <div className="mb-4 h-12 w-12 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
-      <p className="text-slate-300">Loading...</p>
+  <div className="flex items-center justify-center min-h-screen bg-mac-gray">
+    <div className="text-center retro-window p-8">
+      <div className="mb-4 h-12 w-12 border-4 border-mac-charcoal bg-accent-purple mx-auto animate-pulse"></div>
+      <p className="font-mono text-mac-charcoal">Loading...</p>
     </div>
   </div>
 );
@@ -49,6 +49,16 @@ const EpisodePlayerPage = lazy(() =>
 );
 const ProfilePage = lazy(() =>
   import("@/pages/profile-page").then((m) => ({ default: m.ProfilePage })),
+);
+const AgentProfilePage = lazy(() =>
+  import("@/pages/agent-profile-page").then((m) => ({
+    default: m.AgentProfilePage,
+  })),
+);
+const HumanProfilePage = lazy(() =>
+  import("@/pages/human-profile-page").then((m) => ({
+    default: m.HumanProfilePage,
+  })),
 );
 const ClaimPage = lazy(() =>
   import("@/pages/claim-page").then((m) => ({ default: m.ClaimPage })),
@@ -110,6 +120,12 @@ export const AppRouter: React.FC = () => {
           <Route element={<MainLayout requireAuth />}>
             {/* User profile - View and edit profile */}
             <Route path="/profile" element={<ProfilePage />} />
+
+            {/* Agent Profile - View agent profile (public) */}
+            <Route path="/profile/agent/:id" element={<AgentProfilePage />} />
+
+            {/* Human Profile - User's own profile */}
+            <Route path="/profile/user" element={<HumanProfilePage />} />
           </Route>
 
           {/* ========================================

@@ -2,15 +2,12 @@ import type { Config } from "tailwindcss";
 import defaultTheme from "tailwindcss/defaultTheme";
 
 /**
- * ClawZz Neobrutalism Design System
+ * CLAW-OS RETRO Design System
  *
- * Core principles:
- * - Bold, asymmetrical layouts
- * - High contrast: pure black (#000) and white (#fff)
- * - Selective accent colors (electric, neon)
- * - Chunky typography and raw edges
- * - Strong borders, minimal shadows
- * - Industrial, unapologetic aesthetic
+ * Blends Neo-Brutalism with Classic Macintosh System 7
+ * - High contrast, hard shadows
+ * - Window-based navigation
+ * - Dithered textures, pixel-perfect UI
  */
 
 const config: Config = {
@@ -18,7 +15,22 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        /* Neobrutalism Core */
+        /* CLAW-OS Core */
+        mac: {
+          gray: "#E0E0E0",
+          charcoal: "#1A1A1A",
+          white: "#FFFFFF",
+        },
+
+        /* CLAW-OS Accents */
+        accent: {
+          purple: "#6C5CE7",
+          teal: "#4ECDC4",
+          yellow: "#FFE66D",
+          crimson: "#FF6B6B",
+        },
+
+        /* Legacy support */
         base: {
           black: "#000000",
           white: "#FFFFFF",
@@ -86,22 +98,25 @@ const config: Config = {
       },
 
       fontFamily: {
-        /* Neobrutalism Typography Stack */
+        /* CLAW-OS Typography Stack */
         sans: [
           "Inter",
+          "Public Sans",
           "Helvetica Neue",
           "Arial",
           ...defaultTheme.fontFamily.sans,
         ],
         mono: [
           "JetBrains Mono",
+          "Roboto Mono",
           "Courier New",
           ...defaultTheme.fontFamily.mono,
         ],
-        /* Heavy, chunky display font */
+        /* Heavy display font */
         display: [
-          '"Space Grotesk"',
-          "system-ui",
+          "Inter",
+          "Helvetica Neue",
+          "Arial",
           ...defaultTheme.fontFamily.sans,
         ],
       },
@@ -174,7 +189,17 @@ const config: Config = {
       },
 
       boxShadow: {
-        /* Minimal shadows: prefer borders */
+        /* CLAW-OS Hard Shadows */
+        "retro-sm": "2px 2px 0px 0px rgba(0,0,0,1)",
+        "retro-md": "4px 4px 0px 0px rgba(0,0,0,1)",
+        "retro-lg": "6px 6px 0px 0px rgba(0,0,0,1)",
+        "retro-xl": "8px 8px 0px 0px rgba(0,0,0,1)",
+        "retro-purple": "6px 6px 0px 0px #6C5CE7",
+        "retro-teal": "6px 6px 0px 0px #4ECDC4",
+        "retro-yellow": "6px 6px 0px 0px #FFE66D",
+        "retro-crimson": "6px 6px 0px 0px #FF6B6B",
+
+        /* Legacy shadows */
         none: "none",
         sm: "0 1px 2px 0 rgb(0 0 0 / 0.05)",
         DEFAULT: "none",
@@ -183,10 +208,6 @@ const config: Config = {
         xl: "none",
         "2xl": "none",
         inner: "inset 0 2px 4px 0 rgb(0 0 0 / 0.05)",
-
-        /* Neobrutalism borders instead of shadows */
-        "border-md": "inset 0 0 0 2px #000",
-        "border-lg": "inset 0 0 0 4px #000",
         "glow-primary": "0 0 20px rgba(14, 165, 233, 0.5)",
         "glow-secondary": "0 0 20px rgba(236, 72, 153, 0.5)",
       },
@@ -202,7 +223,11 @@ const config: Config = {
       },
 
       animation: {
-        /* Raw, snappy animations */
+        /* CLAW-OS Step Animations */
+        blink: "blink 1s steps(2, start) infinite",
+        "cursor-blink": "cursor-blink 1s step-end infinite",
+
+        /* Standard animations */
         pulse: "pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite",
         bounce: "bounce 1s infinite",
         "spin-slow": "spin 3s linear infinite",
@@ -210,10 +235,18 @@ const config: Config = {
         "slide-up": "slideUp 0.3s ease-out",
         "slide-down": "slideDown 0.3s ease-out",
         "scale-up": "scaleUp 0.3s ease-out",
-        "glitch": "glitch 0.15s ease-in-out",
+        glitch: "glitch 0.15s ease-in-out",
       },
 
       keyframes: {
+        blink: {
+          "0%, 100%": { opacity: "1" },
+          "50%": { opacity: "0" },
+        },
+        "cursor-blink": {
+          "0%, 100%": { opacity: "1" },
+          "50%": { opacity: "0" },
+        },
         fadeIn: {
           "0%": { opacity: "0" },
           "100%": { opacity: "1" },
@@ -270,7 +303,28 @@ const config: Config = {
       addUtilities: (arg0: any) => void;
     }) {
       addComponents({
-        /* Base component classes */
+        /* CLAW-OS Component Classes */
+        ".retro-window": {
+          "@apply bg-mac-gray border-4 border-mac-charcoal shadow-retro-lg": "",
+        },
+        ".retro-titlebar": {
+          "@apply bg-mac-charcoal px-2 py-1 flex items-center justify-between":
+            "",
+        },
+        ".btn-retro": {
+          "@apply px-6 py-3 bg-mac-charcoal text-mac-white border-4 border-mac-charcoal font-bold tracking-wide transition-all duration-100 hover:bg-accent-purple hover:shadow-retro-purple cursor-pointer active:translate-x-1 active:translate-y-1 active:shadow-none":
+            "",
+        },
+        ".btn-retro-secondary": {
+          "@apply px-6 py-3 bg-mac-white text-mac-charcoal border-4 border-mac-charcoal font-bold tracking-wide transition-all duration-100 hover:bg-accent-yellow hover:shadow-retro-yellow cursor-pointer active:translate-x-1 active:translate-y-1 active:shadow-none":
+            "",
+        },
+        ".btn-retro-accent": {
+          "@apply px-6 py-3 bg-accent-purple text-mac-white border-4 border-mac-charcoal font-bold tracking-wide transition-all duration-100 hover:bg-accent-teal hover:shadow-retro-teal cursor-pointer active:translate-x-1 active:translate-y-1 active:shadow-none":
+            "",
+        },
+
+        /* Legacy component classes */
         ".btn-primary": {
           "@apply px-6 py-3 bg-base-black text-base-white border-2 border-base-black font-bold tracking-wide transition-all duration-200 hover:bg-base-white hover:text-base-black hover:border-base-black cursor-pointer active:scale-95":
             "",
@@ -284,8 +338,7 @@ const config: Config = {
             "",
         },
         ".card": {
-          "@apply bg-base-white border-2 border-base-black p-6":
-            "",
+          "@apply bg-base-white border-2 border-base-black p-6": "",
         },
         ".input-field": {
           "@apply w-full px-4 py-3 bg-base-white border-2 border-base-black text-base-black placeholder-base-gray-400 focus:outline-none focus:border-primary-500 transition-colors":
@@ -294,7 +347,20 @@ const config: Config = {
       });
 
       addUtilities({
-        /* Neobrutalism utility classes */
+        /* CLAW-OS Utility Classes */
+        ".border-retro": {
+          borderColor: "#000000",
+          borderWidth: "4px",
+        },
+        ".border-retro-dashed": {
+          borderStyle: "dashed",
+          borderColor: "#000000",
+        },
+        ".text-shadow-retro": {
+          textShadow: "2px 2px 0px rgba(0, 0, 0, 1)",
+        },
+
+        /* Legacy utilities */
         ".border-black": {
           borderColor: "#000000",
         },

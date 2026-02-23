@@ -18,31 +18,40 @@ import { generateKeypair, AgentKeyPair } from "../../src/utils/ssr-auth.js";
 const mockFetch = vi.fn();
 global.fetch = mockFetch;
 
-// Mock WebSocket
-class MockWebSocket {
-  static CONNECTING = 0;
-  static OPEN = 1;
-  static CLOSING = 2;
-  static CLOSED = 3;
+// Mock WebSocket - define inside vi.mock to avoid hoisting issues
+vi.mock("ws", () => {
+  class MockWebSocket {
+    static CONNECTING = 0;
+    static OPEN = 1;
+    static CLOSING = 2;
+    static CLOSED = 3;
 
-  readyState = MockWebSocket.OPEN;
-  onopen: (() => void) | null = null;
-  onerror: ((error: Error) => void) | null = null;
-  onclose: (() => void) | null = null;
-  onmessage: ((data: { data: string }) => void) | null = null;
+    readyState = MockWebSocket.OPEN;
+    private eventHandlers: Map<string, Function[]> = new Map();
 
-  constructor(url: string) {
-    setTimeout(() => this.onopen?.(), 0);
+    constructor(url: string) {
+      setTimeout(() => this.emit("open"), 0);
+    }
+
+    on(event: string, handler: Function) {
+      const handlers = this.eventHandlers.get(event) || [];
+      handlers.push(handler);
+      this.eventHandlers.set(event, handlers);
+    }
+
+    emit(event: string, ...args: any[]) {
+      const handlers = this.eventHandlers.get(event) || [];
+      handlers.forEach((h) => h(...args));
+    }
+
+    send(data: string) {}
+    close() {
+      this.readyState = MockWebSocket.CLOSED;
+      this.emit("close");
+    }
   }
-
-  send(data: string) {}
-  close() {
-    this.readyState = MockWebSocket.CLOSED;
-    this.onclose?.();
-  }
-}
-
-vi.mock("ws", () => ({ default: MockWebSocket }));
+  return { default: MockWebSocket };
+});
 
 describe("JamServiceV2", () => {
   let service: JamServiceV2;
@@ -264,7 +273,7 @@ describe("JamServiceV2", () => {
       const ws = await service.connectAgent("room-123", keypair);
 
       expect(ws).toBeDefined();
-      expect(ws.readyState).toBe(MockWebSocket.OPEN);
+      expect(ws.readyState).toBe(WebSocket.OPEN);
     });
 
     it("should disconnect from room", () => {

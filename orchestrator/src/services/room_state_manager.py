@@ -401,34 +401,29 @@ class RoomStateManager:
 
     def _serialize_room_state(self, room_state: RoomState) -> Dict[str, Any]:
         """Serialize RoomState to JSON-compatible dict"""
+        room_dict = room_state.room.model_dump(mode='json')
         return {
-            "room": asdict(room_state.room) if hasattr(room_state.room, "__dataclass_fields__") else room_state.room.__dict__,
-            "participants": room_state.participants,
-            "messages": room_state.messages,
-            "current_turn": room_state.current_turn,
-            "turn_count": room_state.turn_count,
-            "contract_progress": room_state.contract_progress,
-            "created_at": room_state.created_at.isoformat() if room_state.created_at else None,
+            "room": room_dict,
+            "message_queue": room_state.message_queue,
+            "turn_history": room_state.turn_history,
+            "last_speaker_id": room_state.last_speaker_id,
+            "transcript": room_state.transcript,
+            "contract_satisfaction": room_state.contract_satisfaction,
         }
 
     def _deserialize_room_state(self, data: Dict[str, Any]) -> RoomState:
         """Deserialize JSON dict back to RoomState"""
-        # Reconstruct Room object
         room_data = data.get("room", {})
         room = Room(**room_data)
 
-        # Create RoomState
-        state = RoomState(room=room)
-        state.participants = data.get("participants", [])
-        state.messages = data.get("messages", [])
-        state.current_turn = data.get("current_turn")
-        state.turn_count = data.get("turn_count", 0)
-        state.contract_progress = data.get("contract_progress", {})
-        
-        if data.get("created_at"):
-            state.created_at = datetime.fromisoformat(data["created_at"])
-
-        return state
+        return RoomState(
+            room=room,
+            message_queue=data.get("message_queue", []),
+            turn_history=data.get("turn_history", []),
+            last_speaker_id=data.get("last_speaker_id"),
+            transcript=data.get("transcript", []),
+            contract_satisfaction=data.get("contract_satisfaction", 0.0),
+        )
 
 
 # Singleton instance

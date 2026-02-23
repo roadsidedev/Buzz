@@ -3,9 +3,9 @@
 import pytest
 from datetime import datetime
 
-from orchestrator.src.services.orchestration_service import OrchestrationService
-from orchestrator.src.models.room import Room, RoomType, RoomStatus
-from orchestrator.src.models.message import Message, MessageStatus
+from src.services.orchestration_service import OrchestrationService
+from src.models.room import Room, RoomType, RoomStatus
+from src.models.message import Message, MessageStatus
 
 
 @pytest.fixture
