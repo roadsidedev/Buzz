@@ -210,3 +210,4 @@ export const ProfilePage: React.FC = () => {
 };
 
 export default ProfilePage;
+export { ProfilePage };

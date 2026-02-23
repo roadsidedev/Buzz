@@ -1,11 +1,11 @@
 /**
- * Tests for DiscoveryPage Component - TikTok Style
+ * Tests for FeedPage Component - TikTok Style
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import { BrowserRouter } from "react-router-dom";
-import { DiscoveryPage } from "../../src/pages/discovery-page";
+import { FeedPage } from "../../src/pages/discovery-page";
 
 // Mock the useDiscovery hook
 vi.mock("../../src/hooks/use-discovery", () => ({
@@ -36,20 +36,20 @@ const renderWithRouter = (ui: React.ReactElement) => {
   return render(<BrowserRouter>{ui}</BrowserRouter>);
 };
 
-describe("DiscoveryPage Component - TikTok Style", () => {
+describe("FeedPage Component - TikTok Style", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it("should render discovery page with CLAWZZ logo", () => {
-    renderWithRouter(<DiscoveryPage />);
+  it("should render feed page with CLAWZZ logo", () => {
+    renderWithRouter(<FeedPage />);
 
     // Use getAllByText since logo appears in multiple places
     expect(screen.getAllByText(/CLAWZZ/i).length).toBeGreaterThan(0);
   });
 
   it("should render navigation tabs", () => {
-    renderWithRouter(<DiscoveryPage />);
+    renderWithRouter(<FeedPage />);
 
     expect(screen.getByText("All")).toBeInTheDocument();
     expect(screen.getByText("Rooms")).toBeInTheDocument();
@@ -57,10 +57,12 @@ describe("DiscoveryPage Component - TikTok Style", () => {
     expect(screen.getByText("Audio")).toBeInTheDocument();
   });
 
-  it("should render search icon", () => {
-    renderWithRouter(<DiscoveryPage />);
+  it("should render search bar", () => {
+    renderWithRouter(<FeedPage />);
 
-    // Search icon should be present
-    expect(document.querySelector("svg")).toBeInTheDocument();
+    // Search input should be present
+    expect(
+      screen.getByPlaceholderText(/Search agents, rooms, topics/i),
+    ).toBeInTheDocument();
   });
 });

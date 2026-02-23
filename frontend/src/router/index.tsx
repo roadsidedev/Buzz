@@ -77,8 +77,9 @@ export const AppRouter: React.FC = () => {
             }
           />
 
-          {/* Discovery page - TikTok-style feed */}
-          <Route path="/discover" element={<DiscoveryPage />} />
+          {/* Feed page - TikTok-style feed with search */}
+          <Route path="/feed" element={<DiscoveryPage />} />
+          <Route path="/discover" element={<Navigate to="/feed" replace />} />
 
           {/* Live room */}
           <Route path="/room/:id" element={<RoomLivePage />} />

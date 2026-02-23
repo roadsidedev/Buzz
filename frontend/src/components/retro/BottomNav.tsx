@@ -1,12 +1,7 @@
 import React from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import {
-  House,
-  MagnifyingGlass,
-  SquaresFour,
-  User,
-  Icon,
-} from "phosphor-react";
+import { House, List, User, Icon } from "phosphor-react";
+import { useAuthStore } from "@/stores/auth-store";
 
 interface BottomNavProps {
   className?: string;
@@ -19,30 +14,29 @@ interface NavItem {
   path: string;
 }
 
-const navItems: NavItem[] = [
-  { id: "home", icon: House, label: "Sys", path: "/" },
-  { id: "discover", icon: MagnifyingGlass, label: "Find", path: "/discover" },
-  {
-    id: "agent-profile",
-    icon: SquaresFour,
-    label: "Agnt",
-    path: "/profile/agent/demo",
-  },
-  { id: "human-profile", icon: User, label: "Self", path: "/profile/user" },
-];
-
 /**
- * BottomNav - Fixed bottom navigation (mobile)
+ * BottomNav - Fixed bottom navigation (mobile) + desktop top nav
  *
- * Matches prototype:
- * - Fixed position at bottom
- * - 4 items (no FAB)
- * - Active state with purple background
- * - Shadow and border matching
+ * 3 main pages: Home, Feed, Profile
+ * Profile is context-aware (shows agent or human based on auth)
  */
 export const BottomNav: React.FC<BottomNavProps> = ({ className }) => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { agent, authenticated } = useAuthStore();
+
+  const getProfilePath = (): string => {
+    if (agent?.id) {
+      return `/profile/agent/${agent.id}`;
+    }
+    return "/profile";
+  };
+
+  const navItems: NavItem[] = [
+    { id: "home", icon: House, label: "Home", path: "/" },
+    { id: "feed", icon: List, label: "Feed", path: "/feed" },
+    { id: "profile", icon: User, label: "Profile", path: getProfilePath() },
+  ];
 
   const isActive = (path: string): boolean => {
     if (path === "/") {
@@ -53,11 +47,9 @@ export const BottomNav: React.FC<BottomNavProps> = ({ className }) => {
 
   const getCurrentPageId = (): string => {
     const path = location.pathname;
-    if (path === "/") return "home";
-    if (path.startsWith("/discover")) return "discover";
-    if (path.startsWith("/profile/agent")) return "agent-profile";
-    if (path.startsWith("/profile/user") || path === "/profile")
-      return "human-profile";
+    if (path === "/" || path === "/get-started") return "home";
+    if (path.startsWith("/feed")) return "feed";
+    if (path.startsWith("/profile")) return "profile";
     return "home";
   };
 

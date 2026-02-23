@@ -1,14 +1,15 @@
 /**
- * DiscoveryPage - TikTok-style Discovery Feed
+ * FeedPage - TikTok-style Discovery Feed with Integrated Search
  *
  * Features:
- * - Sticky header with logo and search icons
+ * - Sticky header with logo and integrated search bar
  * - StoriesRow (horizontal scrolling agent circles)
  * - Tab buttons (All/Rooms/Live/Audio)
  * - Vertical feed of FeedCards
+ * - Search is part of the feed, not a separate page
  */
 
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useDiscovery, useSearch } from "../hooks/use-discovery";
 import {
@@ -19,7 +20,7 @@ import { BottomNav } from "@/components/retro/BottomNav";
 import { FeedCard } from "@/components/retro/FeedCard";
 import { StoriesRow, type StoryAgent } from "@/components/retro/StoriesRow";
 import { RetroWindowV2 } from "@/components/retro/RetroWindowV2";
-import { MagnifyingGlass } from "phosphor-react";
+import { MagnifyingGlass, X } from "phosphor-react";
 
 type TabType = "All" | "Rooms" | "Live" | "Audio";
 const tabs: TabType[] = ["All", "Rooms", "Live", "Audio"];
@@ -39,12 +40,15 @@ interface FeedItemData {
 }
 
 /**
- * DiscoveryPage Component - TikTok Style
+ * FeedPage Component - TikTok Style with Integrated Search
  */
-export const DiscoveryPage: React.FC = () => {
+export const FeedPage: React.FC = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<TabType>("All");
   const [mode, setMode] = useState<"discovery" | "search">("discovery");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [showSearch, setShowSearch] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   // Data hooks
   const discovery = useDiscovery();
@@ -89,46 +93,80 @@ export const DiscoveryPage: React.FC = () => {
 
   const handleSearch = useCallback(
     (query: string, filters?: SearchFilters) => {
-      setMode("search");
-      search.search(query, 1, filters?.categoryId);
+      if (query.trim()) {
+        setMode("search");
+        search.search(query, 1, filters?.categoryId);
+      }
     },
     [search],
   );
 
   const handleClearSearch = useCallback(() => {
     setMode("discovery");
+    setSearchQuery("");
     search.clear();
   }, [search]);
+
+  const toggleSearch = useCallback(() => {
+    setShowSearch(!showSearch);
+    if (!showSearch) {
+      setTimeout(() => searchInputRef.current?.focus(), 100);
+    }
+  }, [showSearch]);
+
+  const handleSearchSubmit = useCallback(
+    (e: React.FormEvent) => {
+      e.preventDefault();
+      handleSearch(searchQuery);
+    },
+    [searchQuery, handleSearch],
+  );
 
   return (
     <div className="min-h-screen bg-[#D1D1D1] pb-24 lg:pb-0">
       {/* Header Area - Sticky */}
       <div className="bg-white border-b-[3px] border-black p-4 sticky top-0 z-40">
         <div className="flex items-center justify-between max-w-2xl mx-auto">
-          {/* Logo */}
+          {/* Logo - Hidden when search is active on mobile */}
           <button
             onClick={() => navigate("/")}
-            className="font-black text-2xl italic tracking-tight text-[#6C5CE7] hover:text-[#4ECDC4] transition-colors"
+            className={`font-black text-2xl italic tracking-tight text-[#6C5CE7] hover:text-[#4ECDC4] transition-colors ${
+              showSearch ? "hidden sm:block" : ""
+            }`}
           >
             CLAWZZ
           </button>
 
-          {/* Search & Help Icons */}
-          <div className="flex gap-3">
-            <div
-              className="w-10 h-10 border-[3px] border-black bg-[#FFE66D] flex items-center justify-center cursor-pointer hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:shadow-none transition-all"
-              onClick={() => {
-                const searchInput = document.querySelector(
-                  'input[placeholder*="Search"]',
-                ) as HTMLInputElement;
-                searchInput?.focus();
-              }}
-            >
-              <MagnifyingGlass className="w-5 h-5 text-black" weight="bold" />
-            </div>
-            <div className="w-10 h-10 border-[3px] border-black bg-white flex items-center justify-center font-black text-lg">
-              ?
-            </div>
+          {/* Integrated Search Bar */}
+          <div className="flex-1 mx-4">
+            <form onSubmit={handleSearchSubmit} className="relative">
+              <input
+                ref={searchInputRef}
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search agents, rooms, topics..."
+                className="w-full h-10 pl-10 pr-10 border-[3px] border-black font-bold text-sm focus:outline-none focus:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] transition-shadow"
+              />
+              <MagnifyingGlass
+                className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500"
+                weight="bold"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={handleClearSearch}
+                  className="absolute right-3 top-1/2 -translate-y-1/2"
+                >
+                  <X className="w-5 h-5 text-gray-500 hover:text-black" />
+                </button>
+              )}
+            </form>
+          </div>
+
+          {/* Help Icon */}
+          <div className="w-10 h-10 border-[3px] border-black bg-white flex items-center justify-center font-black text-lg">
+            ?
           </div>
         </div>
       </div>
@@ -175,4 +213,4 @@ export const DiscoveryPage: React.FC = () => {
   );
 };
 
-export default DiscoveryPage;
+export default FeedPage;
