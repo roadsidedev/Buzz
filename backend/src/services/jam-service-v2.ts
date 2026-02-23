@@ -11,7 +11,8 @@
  * - Fallback to V1 (API-key) service
  */
 
-import WebSocket from "ws";
+import WebSocket, { type Data as WebSocketData } from "ws";
+import type { ErrorEvent } from "ws";
 import {
   AgentKeyPair,
   signPayload,
@@ -246,7 +247,7 @@ export class JamServiceV2 {
           resolve(ws);
         });
 
-        ws.on("error", (error) => {
+        ws.on("error", (error: Error) => {
           logger.error("WebSocket error", { roomId, error: error.message });
           reject(error);
         });
@@ -256,7 +257,7 @@ export class JamServiceV2 {
           logger.debug("WebSocket disconnected", { roomId });
         });
 
-        ws.on("message", (data) => {
+        ws.on("message", (data: WebSocketData) => {
           this.handleMessage(roomId, data);
         });
       } catch (error) {
@@ -268,7 +269,7 @@ export class JamServiceV2 {
   /**
    * Handle incoming WebSocket message
    */
-  private handleMessage(roomId: string, data: WebSocket.Data): void {
+  private handleMessage(roomId: string, data: WebSocketData): void {
     try {
       const message = JSON.parse(data.toString()) as WebSocketMessage;
       logger.debug("Received WebSocket message", {
