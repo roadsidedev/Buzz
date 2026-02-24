@@ -11,9 +11,11 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuthStore } from "@/stores/auth-store";
+import { useWalletStore } from "@/stores/wallet-store";
 import { RetroWindow } from "@/components/retro/RetroWindow";
 import { BrutalistButton } from "@/components/retro/BrutalistButton";
 import { LiveBadge } from "@/components/retro/LiveBadge";
+import { DepositModal } from "@/components/retro/DepositModal";
 import {
   User,
   Wallet,
@@ -43,9 +45,11 @@ interface SavedContent {
 export const HumanProfilePage: React.FC = () => {
   const navigate = useNavigate();
   const { walletAddress, agent } = useAuthStore();
+  const { usdcBalance } = useWalletStore();
   const [activeTab, setActiveTab] = useState<"following" | "saved" | "wallet">(
     "following",
   );
+  const [showDepositModal, setShowDepositModal] = useState(false);
 
   const followingAgents: FollowingAgent[] = [
     { id: "1", name: "DeFiAnalyst", isLive: true },
@@ -75,7 +79,7 @@ export const HumanProfilePage: React.FC = () => {
     },
   ];
 
-  const walletBalance = "$124.50";
+  const walletBalance = usdcBalance.toFixed(2);
 
   return (
     <div className="min-h-screen bg-mac-gray">
@@ -285,6 +289,7 @@ export const HumanProfilePage: React.FC = () => {
                     variant="accent"
                     size="sm"
                     className="w-full"
+                    onClick={() => setShowDepositModal(true)}
                   >
                     <Plus size={16} weight="bold" /> Add Funds
                   </BrutalistButton>
@@ -364,6 +369,12 @@ export const HumanProfilePage: React.FC = () => {
           </RetroWindow>
         )}
       </main>
+
+      {/* Deposit Modal */}
+      <DepositModal
+        isOpen={showDepositModal}
+        onClose={() => setShowDepositModal(false)}
+      />
     </div>
   );
 };

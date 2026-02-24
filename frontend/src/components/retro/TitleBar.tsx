@@ -30,63 +30,57 @@ export const TitleBar: React.FC<TitleBarProps> = ({
   return (
     <div
       className={clsx(
-        "bg-mac-charcoal px-3 py-2 flex items-center justify-between",
-        "border-b-4 border-mac-charcoal",
+        "bg-white px-3 py-1.5 flex items-center justify-between",
+        "border-b-4 border-black",
         draggable && "cursor-move",
       )}
     >
-      {/* Window Controls - Minimalist dots */}
+      {/* Window Controls - Square boxes */}
       {showControls && (
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1">
           <button
             onClick={onClose}
-            className="w-3 h-3 bg-gray-300 border border-black rounded-full hover:bg-gray-400 transition-colors"
+            className="w-3.5 h-3.5 bg-white border-2 border-black hover:bg-gray-300 transition-colors flex items-center justify-center"
             aria-label="Close"
-          />
+          >
+            <div className="w-1 h-1 bg-black" />
+          </button>
           <button
             onClick={onMinimize}
-            className="w-3 h-3 bg-gray-300 border border-black rounded-full hover:bg-gray-400 transition-colors"
+            className="w-3.5 h-3.5 bg-white border-2 border-black hover:bg-gray-300 transition-colors"
             aria-label="Minimize"
           />
           <button
             onClick={onMaximize}
-            className="w-3 h-3 bg-gray-300 border border-black rounded-full hover:bg-gray-400 transition-colors"
+            className="w-3.5 h-3.5 bg-black border-2 border-black hover:bg-gray-700 transition-colors"
             aria-label="Maximize"
           />
         </div>
       )}
 
       {/* Title */}
-      <div className="flex-1 flex items-center justify-center gap-2">
+      <div className="flex-1 flex items-center justify-center gap-2 px-4">
         {/* Drag Lines Pattern */}
-        <div className="flex gap-0.5">
-          {Array.from({ length: 3 }).map((_, i) => (
-            <div
-              key={i}
-              className="w-0.5 h-3 bg-mac-gray"
-              style={{ opacity: 0.5 }}
-            />
+        <div className="flex flex-col justify-between h-3 opacity-20">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="w-full h-px bg-black" />
           ))}
         </div>
 
-        <span className="font-sans text-sm font-bold uppercase tracking-wider text-mac-gray">
+        <span className="text-[10px] font-black uppercase tracking-widest whitespace-nowrap">
           {title}
         </span>
 
         {/* Drag Lines Pattern (mirrored) */}
-        <div className="flex gap-0.5">
-          {Array.from({ length: 3 }).map((_, i) => (
-            <div
-              key={i}
-              className="w-0.5 h-3 bg-mac-gray"
-              style={{ opacity: 0.5 }}
-            />
+        <div className="flex flex-col justify-between h-3 opacity-20">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="w-full h-px bg-black" />
           ))}
         </div>
       </div>
 
       {/* Placeholder for balance */}
-      {showControls && <div className="w-12" />}
+      {showControls && <div className="w-10" />}
     </div>
   );
 };

@@ -9,6 +9,7 @@ export interface RetroWindowProps {
   shadowColor?: "black" | "purple" | "teal" | "yellow" | "crimson";
   showControls?: boolean;
   draggable?: boolean;
+  footer?: React.ReactNode;
 }
 
 /**
@@ -24,6 +25,7 @@ export const RetroWindow: React.FC<RetroWindowProps> = ({
   shadowColor = "black",
   showControls = true,
   draggable = false,
+  footer,
 }) => {
   const shadowClasses = {
     black: "shadow-retro-lg",
@@ -36,7 +38,7 @@ export const RetroWindow: React.FC<RetroWindowProps> = ({
   return (
     <div
       className={clsx(
-        "bg-mac-gray border-4 border-mac-charcoal",
+        "bg-mac-gray border-4 border-mac-charcoal flex flex-col",
         shadowClasses[shadowColor],
         draggable && "cursor-move",
         className,
@@ -49,7 +51,12 @@ export const RetroWindow: React.FC<RetroWindowProps> = ({
           draggable={draggable}
         />
       )}
-      <div className="p-4">{children}</div>
+      <div className="flex-1 overflow-auto">{children}</div>
+      {footer && (
+        <div className="border-t-4 border-mac-charcoal bg-[#E0E0E0] px-3 py-1 text-[9px] font-bold uppercase tracking-tighter flex justify-between shrink-0">
+          {footer}
+        </div>
+      )}
     </div>
   );
 };

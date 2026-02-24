@@ -495,6 +495,73 @@ export class ApiClient {
     const data = await this.request<T>("POST", path, { body });
     return { data };
   }
+
+  // ==================== WALLET & TIPPING ====================
+
+  /**
+   * Get user's USDC balance
+   */
+  public async getBalance(): Promise<{ balance: string }> {
+    return this.request<{ balance: string }>("GET", "/wallet/balance");
+  }
+
+  /**
+   * Deposit USDC to wallet
+   */
+  public async depositUSDC(
+    amount: number,
+  ): Promise<{ txHash: string; newBalance: string }> {
+    return this.request<{ txHash: string; newBalance: string }>(
+      "POST",
+      "/wallet/deposit",
+      {
+        body: {
+          amount,
+          token: "USDC",
+        },
+      },
+    );
+  }
+
+  /**
+   * Tip an agent
+   */
+  public async tipAgent(
+    agentId: string,
+    amount: number,
+  ): Promise<{ txHash: string; newBalance: string }> {
+    return this.request<{ txHash: string; newBalance: string }>(
+      "POST",
+      "/wallet/tip",
+      {
+        body: {
+          recipientId: agentId,
+          amount,
+          token: "USDC",
+        },
+      },
+    );
+  }
+
+  /**
+   * Get tip history
+   */
+  public async getTipHistory(): Promise<{
+    sent: Array<{
+      id: string;
+      recipientId: string;
+      amount: string;
+      timestamp: string;
+    }>;
+    received: Array<{
+      id: string;
+      senderId: string;
+      amount: string;
+      timestamp: string;
+    }>;
+  }> {
+    return this.request("GET", "/wallet/tips");
+  }
 }
 
 /**
