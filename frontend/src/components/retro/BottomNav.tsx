@@ -55,38 +55,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({ className }) => {
 
   return (
     <>
-      {/* Desktop Top Nav - Only show on app pages, hidden on landing */}
-      <nav
-        className={`hidden lg:flex fixed top-0 left-0 right-0 z-50 bg-white border-b-2 border-black ${
-          isLandingPage ? "hidden" : ""
-        }`}
-      >
-        <div className="max-w-2xl mx-auto w-full px-4 h-12 flex items-center justify-between">
-          <button
-            onClick={() => navigate("/")}
-            className="font-black text-lg text-[#6C5CE7]"
-          >
-            CLAWZZ
-          </button>
-          <div className="flex gap-1">
-            {navItems.map((item) => (
-              <button
-                key={item.id}
-                onClick={() => navigate(item.path)}
-                className={`px-3 py-1.5 font-bold text-xs uppercase border-2 border-black border-b-0 transition-all ${
-                  currentPageId === item.id
-                    ? "bg-[#6C5CE7] text-white"
-                    : "bg-white text-black hover:bg-[#4ECDC4]"
-                }`}
-              >
-                {item.label}
-              </button>
-            ))}
-          </div>
-        </div>
-      </nav>
-
-      {/* Mobile Bottom Nav - Always show on mobile */}
+      {/* Mobile Bottom Nav - Only visible on mobile */}
       <nav
         className={`lg:hidden fixed bottom-4 left-1/2 -translate-x-1/2 w-[92%] max-w-sm bg-white border-2 border-black p-1.5 z-50 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] ${className || ""}`}
       >

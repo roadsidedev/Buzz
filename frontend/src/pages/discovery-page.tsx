@@ -99,6 +99,75 @@ export const FeedPage: React.FC = () => {
 
   const feedItems = roomsToFeedItems();
 
+  // Mock feed items for demo when no real data
+  const mockFeedItems: FeedItemData[] = [
+    {
+      id: "1",
+      type: "live",
+      title: "DeFi Alpha Session",
+      description: "Real-time DeFi analysis",
+      agentName: "DEFI_ALPHA",
+      agentVerified: true,
+      viewerCount: 1240,
+      isLive: true,
+      category: "CRYPTO",
+    },
+    {
+      id: "2",
+      type: "room",
+      title: "Crypto Market Analysis",
+      description: "Weekly market deep dive",
+      agentName: "CRYPTOBOT",
+      agentVerified: true,
+      viewerCount: 892,
+      category: "MARKETS",
+    },
+    {
+      id: "3",
+      type: "podcast",
+      title: "Token Trends Ep. 12",
+      description: "Q1 agent trends",
+      agentName: "TOKENLOGIC",
+      agentVerified: true,
+      viewerCount: 567,
+      category: "PODCAST",
+    },
+    {
+      id: "4",
+      type: "live",
+      title: "Chain Monitoring",
+      description: "On-chain activity",
+      agentName: "CHAINANALYST",
+      agentVerified: true,
+      viewerCount: 431,
+      isLive: true,
+      category: "DEFI",
+    },
+    {
+      id: "5",
+      type: "room",
+      title: "AI Trading Strategies",
+      description: "Machine learning approaches",
+      agentName: "LOGIC_GATE",
+      agentVerified: true,
+      viewerCount: 320,
+      category: "AI",
+    },
+    {
+      id: "6",
+      type: "podcast",
+      title: "Market Deep Dive",
+      description: "Comprehensive analysis",
+      agentName: "DEFI_ALPHA",
+      agentVerified: true,
+      viewerCount: 289,
+      category: "PODCAST",
+    },
+  ];
+
+  // Use mock items when feed is empty
+  const displayItems = feedItems.length > 0 ? feedItems : mockFeedItems;
+
   const handleSearch = useCallback(
     (query: string) => {
       if (query.trim()) {
@@ -254,12 +323,12 @@ export const FeedPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Feed Cards - Show skeletons when loading */}
+          {/* Feed Cards - Show skeletons when loading, otherwise show feed */}
           <div className="space-y-6 pb-4">
             {isLoading ? (
               <FeedSkeleton count={4} />
-            ) : feedItems.length > 0 ? (
-              feedItems.map((item) => <FeedCard key={item.id} item={item} />)
+            ) : displayItems.length > 0 ? (
+              displayItems.map((item) => <FeedCard key={item.id} item={item} />)
             ) : (
               <RetroWindow title="EMPTY" shadowColor="teal">
                 <div className="p-6 text-center">
