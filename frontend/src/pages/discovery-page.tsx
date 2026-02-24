@@ -202,46 +202,31 @@ export const FeedPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-[#A0A0A0] pb-20 lg:pb-0 p-2 lg:p-4">
-      {/* HEADER - Full width, sticky */}
-      <header className="bg-white border-[3px] border-black px-4 py-1.5 flex items-center justify-between shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] sticky top-0 z-50 mb-4">
-        <div className="flex items-center gap-6">
+      {/* HEADER - Clean app navigation */}
+      <header className="bg-white border-[3px] border-black px-4 py-2 flex items-center justify-between shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] sticky top-0 z-50 mb-4">
+        <button
+          onClick={() => navigate("/")}
+          className="flex items-center gap-2 font-black text-xl italic tracking-tighter hover:opacity-80"
+        >
+          <Lightning className="w-6 h-6" weight="fill" />
+          CLAWZZ
+        </button>
+
+        <div className="flex items-center gap-2">
           <button
             onClick={() => navigate("/")}
-            className="flex items-center gap-2 font-black text-lg italic tracking-tighter"
+            className="px-4 py-1.5 border-2 border-black font-black text-xs uppercase hover:bg-[#FFE66D] transition-colors"
           >
-            <Lightning className="w-5 h-5" weight="fill" />
-            CLAWZZ
+            Home
           </button>
-          <div className="hidden lg:flex gap-4 text-[11px] font-bold uppercase tracking-tight">
-            <span className="hover:bg-black hover:text-white px-2 cursor-pointer">
-              File
-            </span>
-            <span className="hover:bg-black hover:text-white px-2 cursor-pointer">
-              Edit
-            </span>
-            <span className="hover:bg-black hover:text-white px-2 cursor-pointer">
-              Agents
-            </span>
-            <span className="hover:bg-black hover:text-white px-2 cursor-pointer">
-              Network
-            </span>
-          </div>
-        </div>
-        <div className="flex items-center gap-4 text-[11px] font-black uppercase">
-          <div className="hidden lg:flex gap-2">
-            <button className="border-2 border-black px-3 py-0.5 hover:bg-[#FFE66D] transition-colors">
-              <House className="w-4 h-4" />
-            </button>
-            <button className="bg-black text-white px-3 py-0.5">FEED</button>
-            <button className="border-2 border-black px-3 py-0.5 hover:bg-[#FFE66D] transition-colors">
-              <User className="w-4 h-4" />
-            </button>
-          </div>
+          <button className="px-4 py-1.5 bg-black text-white border-2 border-black font-black text-xs uppercase">
+            Feed
+          </button>
           <button
-            onClick={toggleSearch}
-            className="w-8 h-8 border-2 border-black bg-white flex items-center justify-center hover:bg-[#FFE66D]"
+            onClick={() => navigate("/profile")}
+            className="px-4 py-1.5 border-2 border-black font-black text-xs uppercase hover:bg-[#FFE66D] transition-colors"
           >
-            <MagnifyingGlass className="w-4 h-4" weight="bold" />
+            Profile
           </button>
         </div>
       </header>
@@ -282,45 +267,20 @@ export const FeedPage: React.FC = () => {
           </div>
 
           {/* Tab Navigation */}
-          <div className="flex flex-col gap-2">
-            {/* Toggle for "All" tab - mobile only */}
-            {activeTab === "All" && (
-              <div className="lg:hidden flex gap-2 px-1">
-                <button
-                  onClick={() => setAllFeedFilter("trending")}
-                  className={`flex-1 py-1 border-2 border-black font-black text-[10px] uppercase shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] ${
-                    allFeedFilter === "trending" ? "bg-[#FFE66D]" : "bg-white"
-                  }`}
-                >
-                  Trending
-                </button>
-                <button
-                  onClick={() => setAllFeedFilter("all")}
-                  className={`flex-1 py-1 border-2 border-black font-black text-[10px] uppercase shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] ${
-                    allFeedFilter === "all" ? "bg-[#FFE66D]" : "bg-white"
-                  }`}
-                >
-                  All
-                </button>
-              </div>
-            )}
-
-            {/* Main Tabs */}
-            <div className="flex gap-2 px-1">
-              {tabs.map((tab) => (
-                <button
-                  key={tab}
-                  onClick={() => setActiveTab(tab)}
-                  className={`flex-1 py-1.5 border-[3px] border-black font-black text-xs uppercase shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-x-1 active:translate-y-1 transition-all ${
-                    activeTab === tab
-                      ? "bg-[#6C5CE7] text-white"
-                      : "bg-white hover:bg-[#FFE66D]"
-                  }`}
-                >
-                  {tab}
-                </button>
-              ))}
-            </div>
+          <div className="flex gap-2">
+            {tabs.map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={`flex-1 py-2 border-[3px] border-black font-black text-xs uppercase shadow-[4px_4px_0px_0px_rgba,0,1(0,0)] active:shadow-none active:translate-x-1 active:translate-y-1 transition-all ${
+                  activeTab === tab
+                    ? "bg-[#6C5CE7] text-white"
+                    : "bg-white hover:bg-[#FFE66D]"
+                }`}
+              >
+                {tab}
+              </button>
+            ))}
           </div>
 
           {/* Feed Cards - Show skeletons when loading, otherwise show feed */}

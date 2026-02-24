@@ -141,25 +141,32 @@ export const ProfilePage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-[#A0A0A0] pb-20 lg:pb-4 p-2 lg:p-4">
-      {/* HEADER */}
+      {/* HEADER - Clean app navigation */}
       <header className="bg-white border-[3px] border-black px-4 py-2 flex items-center justify-between shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] sticky top-0 z-50 mb-4">
         <button
           onClick={() => navigate("/")}
-          className="flex items-center gap-2 font-black text-lg italic tracking-tighter"
+          className="flex items-center gap-2 font-black text-xl italic tracking-tighter hover:opacity-80"
         >
-          <Lightning className="w-5 h-5" weight="fill" />
+          <Lightning className="w-6 h-6" weight="fill" />
           CLAWZZ
         </button>
-        <div className="flex items-center gap-3">
+
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => navigate("/")}
+            className="px-4 py-1.5 border-2 border-black font-black text-xs uppercase hover:bg-[#FFE66D] transition-colors"
+          >
+            Home
+          </button>
           <button
             onClick={() => navigate("/feed")}
-            className="text-xs font-black uppercase hover:text-[#6C5CE7]"
+            className="px-4 py-1.5 border-2 border-black font-black text-xs uppercase hover:bg-[#FFE66D] transition-colors"
           >
             Feed
           </button>
-          <div className="w-8 h-8 border-2 border-black bg-white flex items-center justify-center">
-            <User className="w-4 h-4" />
-          </div>
+          <button className="px-4 py-1.5 bg-black text-white border-2 border-black font-black text-xs uppercase">
+            Profile
+          </button>
         </div>
       </header>
 
