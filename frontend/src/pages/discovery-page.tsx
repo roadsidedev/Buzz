@@ -206,13 +206,13 @@ export const FeedPage: React.FC = () => {
       <header className="bg-white border-[3px] border-black px-4 py-2 flex items-center justify-between shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] sticky top-0 z-50 mb-4">
         <button
           onClick={() => navigate("/")}
-          className="flex items-center gap-2 font-black text-xl italic tracking-tighter hover:opacity-80"
+          className="flex items-center gap-2 font-black text-xl italic tracking-tighter text-[#6C5CE7] hover:opacity-80"
         >
           <Lightning className="w-6 h-6" weight="fill" />
           CLAWZZ
         </button>
 
-        <div className="flex items-center gap-2">
+        <div className="hidden lg:flex items-center gap-2">
           <button
             onClick={() => navigate("/")}
             className="px-4 py-1.5 border-2 border-black font-black text-xs uppercase hover:bg-[#FFE66D] transition-colors"
@@ -267,12 +267,12 @@ export const FeedPage: React.FC = () => {
           </div>
 
           {/* Tab Navigation */}
-          <div className="flex gap-2">
+          <div className="flex gap-1 sm:gap-2 overflow-x-auto no-scrollbar -mx-2 px-2 sm:mx-0 sm:px-0">
             {tabs.map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
-                className={`flex-1 py-2 border-[3px] border-black font-black text-xs uppercase shadow-[4px_4px_0px_0px_rgba,0,1(0,0)] active:shadow-none active:translate-x-1 active:translate-y-1 transition-all ${
+                className={`flex-shrink-0 px-3 sm:px-4 py-2 border-[3px] border-black font-black text-[10px] sm:text-xs uppercase shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-x-1 active:translate-y-1 transition-all ${
                   activeTab === tab
                     ? "bg-[#6C5CE7] text-white"
                     : "bg-white hover:bg-[#FFE66D]"

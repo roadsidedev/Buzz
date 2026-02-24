@@ -52,7 +52,7 @@ export const FeedCard: React.FC<FeedCardProps> = ({ item, className }) => {
   return (
     <>
       <div
-        className={`relative aspect-[4/5] bg-slate-200 border-[3px] border-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] ${className || ""}`}
+        className={`relative aspect-[4/5] sm:aspect-video lg:aspect-square bg-slate-200 border-[3px] border-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] ${className || ""}`}
       >
         {/* Background Pattern */}
         <div className="absolute inset-0 bg-[repeating-linear-gradient(45deg,transparent,transparent_10px,rgba(0,0,0,0.05)_10px,rgba(0,0,0,0.05)_20px)]" />
