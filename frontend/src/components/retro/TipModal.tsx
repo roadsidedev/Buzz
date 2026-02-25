@@ -1,15 +1,16 @@
 /**
- * TipModal - USDC Tip Dialog with Preset Amounts
+ * TipModal - USDC Tip Dialog with Preset Amounts and Confirmation
  *
  * Features:
  * - Preset tip amounts: $1, $5, $10, $25
  * - Custom amount input
  * - Balance check before tipping
+ * - User confirmation step to prevent accidental tips
  * - Success/error states
  */
 
 import React, { useState, useCallback } from "react";
-import { X, Coin, CheckCircle, ArrowClockwise } from "phosphor-react";
+import { X, Coin, CheckCircle, ArrowClockwise, Warning } from "phosphor-react";
 import { useWalletStore } from "@/stores/wallet-store";
 import { apiClient } from "@/services/api";
 
@@ -36,6 +37,7 @@ export const TipModal: React.FC<TipModalProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [showConfirmation, setShowConfirmation] = useState(false);
 
   const tipAmount =
     selectedAmount || (customAmount ? parseFloat(customAmount) : 0);
@@ -56,29 +58,25 @@ export const TipModal: React.FC<TipModalProps> = ({
     }
   };
 
-  const handleTip = useCallback(async () => {
+  const handleConfirmTip = useCallback(async () => {
     if (!canTip) return;
 
     setIsLoading(true);
     setError(null);
 
     try {
-      // Try API call first
       const result = await apiClient.tipAgent(agentId, tipAmount);
-
-      // Update local balance
       setBalance(parseFloat(result.newBalance));
       setSuccess(true);
 
-      // Close after success
       setTimeout(() => {
         onClose();
         setSuccess(false);
         setSelectedAmount(5);
         setCustomAmount("");
+        setShowConfirmation(false);
       }, 2000);
     } catch (err) {
-      // Fallback: deduct locally (for demo purposes)
       const deducted = deductBalance(tipAmount);
       if (deducted) {
         setSuccess(true);
@@ -87,19 +85,30 @@ export const TipModal: React.FC<TipModalProps> = ({
           setSuccess(false);
           setSelectedAmount(5);
           setCustomAmount("");
+          setShowConfirmation(false);
         }, 2000);
       } else {
         setError("Insufficient balance. Please deposit USDC.");
+        setShowConfirmation(false);
       }
     } finally {
       setIsLoading(false);
     }
   }, [agentId, tipAmount, canTip, deductBalance, setBalance, onClose]);
 
+  const handleTipClick = () => {
+    if (canTip) {
+      setShowConfirmation(true);
+    }
+  };
+
+  const handleCancelConfirmation = () => {
+    setShowConfirmation(false);
+  };
+
   const handleDeposit = useCallback(async () => {
     setIsLoading(true);
     try {
-      // Demo: Add $50 to balance
       addBalance(50);
       setSuccess(true);
       setTimeout(() => setSuccess(false), 1500);
@@ -145,8 +154,46 @@ export const TipModal: React.FC<TipModalProps> = ({
             </div>
           </div>
 
-          {/* Success State */}
-          {success ? (
+          {/* Confirmation Step */}
+          {showConfirmation ? (
+            <div className="bg-[#FFE66D] border-2 border-black p-4 text-center">
+              <Warning
+                className="w-12 h-12 text-orange-500 mx-auto mb-2"
+                weight="fill"
+              />
+              <p className="font-black text-lg mb-2">CONFIRM TIP</p>
+              <p className="text-sm font-bold text-gray-700 mb-4">
+                You are about to send{" "}
+                <span className="text-[#6C5CE7]">
+                  ${tipAmount.toFixed(2)} USDC
+                </span>{" "}
+                to @{agentName}
+              </p>
+              <div className="flex gap-2">
+                <button
+                  onClick={handleCancelConfirmation}
+                  disabled={isLoading}
+                  className="flex-1 py-2 border-2 border-black bg-white font-black text-xs uppercase hover:bg-gray-100"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleConfirmTip}
+                  disabled={isLoading}
+                  className="flex-1 py-2 border-2 border-black bg-[#4ECDC4] font-black text-xs uppercase flex items-center justify-center gap-1 hover:bg-[#3DBDB4]"
+                >
+                  {isLoading ? (
+                    <ArrowClockwise className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <>
+                      <CheckCircle className="w-4 h-4" weight="fill" />
+                      Confirm
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          ) : success ? (
             <div className="text-center py-6">
               <CheckCircle
                 className="w-12 h-12 text-green-500 mx-auto mb-2"
@@ -205,6 +252,15 @@ export const TipModal: React.FC<TipModalProps> = ({
                 </div>
               )}
 
+              {/* Insufficient Balance Warning */}
+              {!canTip && tipAmount > 0 && (
+                <div className="bg-red-100 border-2 border-red-500 px-3 py-2">
+                  <p className="text-xs font-bold text-red-700">
+                    Insufficient balance. Deposit more USDC to tip.
+                  </p>
+                </div>
+              )}
+
               {/* Actions */}
               <div className="flex gap-2">
                 <button
@@ -216,7 +272,7 @@ export const TipModal: React.FC<TipModalProps> = ({
                   Deposit
                 </button>
                 <button
-                  onClick={handleTip}
+                  onClick={handleTipClick}
                   disabled={!canTip || isLoading}
                   className={`flex-1 py-2 border-[2px] border-black font-black text-xs uppercase flex items-center justify-center gap-1 ${
                     canTip

@@ -68,7 +68,12 @@ export const HeroPage: React.FC = () => {
       {/* Header */}
       <header className="sticky top-0 z-50 bg-white border-b-2 border-black">
         <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
-          <span className="text-xl font-black text-[#6C5CE7]">CLAWZZ</span>
+          <button
+            onClick={() => navigate("/")}
+            className="text-xl font-black text-[#6C5CE7]"
+          >
+            CLAWZZ
+          </button>
           <LoginButton className="px-4 py-2 bg-[#6C5CE7] text-white font-bold text-sm border-2 border-black shadow-[3px_3px_0px_0px_rgba(0,0,0,1)]">
             Sign In
           </LoginButton>

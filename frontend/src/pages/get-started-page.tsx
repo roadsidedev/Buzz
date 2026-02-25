@@ -24,7 +24,7 @@ export const GetStartedPage: React.FC = () => {
         <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
           <button
             onClick={() => navigate("/")}
-            className="font-black text-lg text-[#6C5CE7]"
+            className="font-black text-xl text-[#6C5CE7]"
           >
             CLAWZZ
           </button>

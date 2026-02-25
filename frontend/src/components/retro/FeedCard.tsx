@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Heart,
@@ -7,8 +7,11 @@ import {
   Coin,
   Repeat,
   BookmarkSimple,
+  CheckCircle,
 } from "phosphor-react";
 import { TipModal } from "./TipModal";
+import { useSocialStore } from "@/stores/social-store";
+import { apiClient } from "@/services/api";
 
 export interface FeedItem {
   id: string;
@@ -21,6 +24,9 @@ export interface FeedItem {
   isLive?: boolean;
   thumbnail?: string;
   category?: string;
+  likes?: number;
+  comments?: number;
+  reshares?: number;
 }
 
 interface FeedCardProps {
@@ -33,21 +39,89 @@ interface FeedCardProps {
  *
  * Features:
  * - Full aspect ratio container
- * - Action buttons stacked right
+ * - Action buttons stacked right (all functional)
  * - Agent info with PRO badge
  * - LIVE indicator when streaming
  */
 export const FeedCard: React.FC<FeedCardProps> = ({ item, className }) => {
   const navigate = useNavigate();
   const [showTipModal, setShowTipModal] = useState(false);
+  const [showShareToast, setShowShareToast] = useState(false);
+
+  const {
+    toggleLike,
+    toggleSave,
+    toggleReshare,
+    isLiked,
+    isSaved,
+    isReshared,
+  } = useSocialStore();
+
+  const isItemLiked = isLiked(item.id);
+  const isItemSaved = isSaved(item.id);
+  const isItemReshared = isReshared(item.id);
+
+  const [likeCount, setLikeCount] = useState(
+    item.likes || Math.floor(Math.random() * 1000),
+  );
+  const [commentCount, setCommentCount] = useState(
+    item.comments || Math.floor(Math.random() * 500),
+  );
+  const [reshareCount, setReshareCount] = useState(
+    item.reshares || Math.floor(Math.random() * 200),
+  );
 
   const handleClick = () => {
     if (item.isLive) {
       navigate(`/room/${item.id}/live`);
+    } else if (item.type === "podcast" || item.type === "audio") {
+      navigate(`/episode/${item.id}`);
     } else {
       navigate(`/room/${item.id}`);
     }
   };
+
+  const handleLike = useCallback(async () => {
+    await toggleLike(item.id);
+    setLikeCount((prev) => (isItemLiked ? prev - 1 : prev + 1));
+  }, [item.id, isItemLiked, toggleLike]);
+
+  const handleComment = useCallback(() => {
+    handleClick();
+  }, [handleClick]);
+
+  const handleReshare = useCallback(async () => {
+    await toggleReshare(item.id);
+    setReshareCount((prev) => (isItemReshared ? prev - 1 : prev + 1));
+  }, [item.id, isItemReshared, toggleReshare]);
+
+  const handleShare = useCallback(async () => {
+    const shareUrl = `${window.location.origin}/room/${item.id}`;
+
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: item.title,
+          text: `Check out this ${item.type}: ${item.title}`,
+          url: shareUrl,
+        });
+      } catch (err) {
+        if ((err as Error).name !== "AbortError") {
+          await navigator.clipboard.writeText(shareUrl);
+          setShowShareToast(true);
+          setTimeout(() => setShowShareToast(false), 2000);
+        }
+      }
+    } else {
+      await navigator.clipboard.writeText(shareUrl);
+      setShowShareToast(true);
+      setTimeout(() => setShowShareToast(false), 2000);
+    }
+  }, [item.id, item.title, item.type]);
+
+  const handleSave = useCallback(async () => {
+    await toggleSave(item.id);
+  }, [item.id, toggleSave]);
 
   return (
     <>
@@ -106,27 +180,31 @@ export const FeedCard: React.FC<FeedCardProps> = ({ item, className }) => {
         {/* Interaction Buttons - Right Stack */}
         <div className="absolute right-3 bottom-12 flex flex-col gap-3">
           <ActionButton
-            icon={<Heart weight="fill" />}
-            count={Math.floor(Math.random() * 10000)}
+            icon={<Heart weight={isItemLiked ? "fill" : "regular"} />}
+            count={likeCount}
+            active={isItemLiked}
+            activeColor="text-[#FF6B6B]"
             onClick={(e) => {
               e.stopPropagation();
-              console.log("heart", item.id);
+              handleLike();
             }}
           />
           <ActionButton
             icon={<ChatCircle weight="fill" />}
-            count={Math.floor(Math.random() * 500)}
+            count={commentCount}
             onClick={(e) => {
               e.stopPropagation();
-              handleClick();
+              handleComment();
             }}
           />
           <ActionButton
-            icon={<Repeat weight="fill" />}
-            count={Math.floor(Math.random() * 200)}
+            icon={<Repeat weight={isItemReshared ? "fill" : "regular"} />}
+            count={reshareCount}
+            active={isItemReshared}
+            activeColor="text-[#4ECDC4]"
             onClick={(e) => {
               e.stopPropagation();
-              console.log("reshare", item.id);
+              handleReshare();
             }}
           />
           <ActionButton
@@ -134,7 +212,7 @@ export const FeedCard: React.FC<FeedCardProps> = ({ item, className }) => {
             count=""
             onClick={(e) => {
               e.stopPropagation();
-              console.log("share", item.id);
+              handleShare();
             }}
           />
           <ActionButton
@@ -146,11 +224,13 @@ export const FeedCard: React.FC<FeedCardProps> = ({ item, className }) => {
             }}
           />
           <ActionButton
-            icon={<BookmarkSimple weight="fill" />}
+            icon={<BookmarkSimple weight={isItemSaved ? "fill" : "regular"} />}
             count=""
+            active={isItemSaved}
+            activeColor="text-[#FFE66D]"
             onClick={(e) => {
               e.stopPropagation();
-              console.log("save", item.id);
+              handleSave();
             }}
           />
         </div>
@@ -185,6 +265,14 @@ export const FeedCard: React.FC<FeedCardProps> = ({ item, className }) => {
             </div>
           )}
         </div>
+
+        {/* Share Toast */}
+        {showShareToast && (
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-black text-white px-4 py-2 border-2 border-white z-20 flex items-center gap-2">
+            <CheckCircle className="w-5 h-5 text-green-400" weight="fill" />
+            <span className="font-bold text-sm">Link Copied!</span>
+          </div>
+        )}
       </div>
 
       {/* Tip Modal */}
@@ -201,19 +289,25 @@ export const FeedCard: React.FC<FeedCardProps> = ({ item, className }) => {
 interface ActionButtonProps {
   icon: React.ReactNode;
   count: string | number;
+  active?: boolean;
+  activeColor?: string;
   onClick: (e: React.MouseEvent) => void;
 }
 
 const ActionButton: React.FC<ActionButtonProps> = ({
   icon,
   count,
+  active = false,
+  activeColor = "text-[#FF6B6B]",
   onClick,
 }) => (
   <button
     onClick={onClick}
     className="w-10 h-10 bg-white border-2 border-black flex items-center justify-center shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-x-0.5 active:translate-y-0.5 transition-all"
   >
-    <span className="text-lg text-black">{icon}</span>
+    <span className={`text-lg ${active ? activeColor : "text-black"}`}>
+      {icon}
+    </span>
   </button>
 );
 

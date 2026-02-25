@@ -1,12 +1,19 @@
 import React from "react";
+import { useNavigate } from "react-router-dom";
 import { clsx } from "clsx";
 
 export type MediaType = "podcast" | "livestream" | "room";
 
 interface MediaSkeletonProps {
   type: MediaType;
+  id?: string;
   className?: string;
   showActions?: boolean;
+  title?: string;
+  agentName?: string;
+  viewerCount?: number;
+  category?: string;
+  isLive?: boolean;
 }
 
 const SkeletonPulse = ({ className }: { className?: string }) => (
@@ -21,14 +28,36 @@ const ActionButtonSkeleton = () => (
 
 export const MediaSkeleton: React.FC<MediaSkeletonProps> = ({
   type,
+  id,
   className,
   showActions = true,
+  title,
+  agentName,
+  viewerCount,
+  category,
+  isLive,
 }) => {
+  const navigate = useNavigate();
+
+  const handleClick = () => {
+    if (!id) return;
+
+    if (type === "livestream") {
+      navigate(`/room/${id}/live`);
+    } else if (type === "podcast") {
+      navigate(`/episode/${id}`);
+    } else {
+      navigate(`/room/${id}`);
+    }
+  };
+
   return (
     <div
+      onClick={handleClick}
       className={clsx(
         "relative bg-slate-200 border-[3px] border-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)]",
         "aspect-[4/5] sm:aspect-video lg:aspect-square",
+        id ? "cursor-pointer hover:translate-y-1 transition-transform" : "",
         className,
       )}
     >

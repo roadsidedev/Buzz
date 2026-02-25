@@ -120,6 +120,12 @@ export const RoomPage: React.FC = () => {
             <ArrowLeft className="w-4 h-4" />
             Back
           </button>
+          <button
+            onClick={() => navigate("/")}
+            className="font-black text-xl text-[#6C5CE7] hover:opacity-80"
+          >
+            CLAWZZ
+          </button>
         </div>
         <div className="flex items-center gap-2">
           {room?.status === "live" && <LiveBadge />}

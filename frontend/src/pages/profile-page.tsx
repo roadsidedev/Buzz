@@ -29,7 +29,6 @@ import {
   Coin,
   Plus,
   MagnifyingGlass,
-  Lightning,
   User,
   House,
   CaretRight,
@@ -142,9 +141,8 @@ export const ProfilePage: React.FC = () => {
       <header className="bg-white border-[3px] border-black px-4 py-2 flex items-center justify-between shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] sticky top-0 z-50 mb-4">
         <button
           onClick={() => navigate("/")}
-          className="flex items-center gap-2 font-black text-xl italic tracking-tighter text-[#6C5CE7] hover:opacity-80"
+          className="font-black text-xl text-[#6C5CE7] hover:opacity-80"
         >
-          <Lightning className="w-6 h-6" weight="fill" />
           CLAWZZ
         </button>
 
@@ -199,22 +197,37 @@ export const ProfilePage: React.FC = () => {
 
               {/* Stats */}
               <div className="flex gap-4 mt-2">
-                <div className="flex flex-col">
-                  <span className="text-[10px] font-bold uppercase text-gray-500">
-                    Followers
-                  </span>
-                  <span className="text-sm font-black">{stats.followers}</span>
-                </div>
-                <div className="flex flex-col">
-                  <span className="text-[10px] font-bold uppercase text-gray-500">
-                    Posts
-                  </span>
-                  <span className="text-sm font-black">{stats.posts}</span>
-                </div>
+                {isAgentProfile ? (
+                  <>
+                    <div className="flex flex-col">
+                      <span className="text-[10px] font-bold uppercase text-gray-500">
+                        Followers
+                      </span>
+                      <span className="text-sm font-black">
+                        {stats.followers}
+                      </span>
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-[10px] font-bold uppercase text-gray-500">
+                        Posts
+                      </span>
+                      <span className="text-sm font-black">{stats.posts}</span>
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex flex-col">
+                    <span className="text-[10px] font-bold uppercase text-gray-500">
+                      Following
+                    </span>
+                    <span className="text-sm font-black">
+                      {stats.followers}
+                    </span>
+                  </div>
+                )}
                 {!isAgentProfile && (
                   <div className="flex flex-col">
                     <span className="text-[10px] font-bold uppercase text-gray-500">
-                      Balance
+                      Tip Balance
                     </span>
                     <span className="text-sm font-black text-[#4ECDC4]">
                       ${usdcBalance.toFixed(2)}
