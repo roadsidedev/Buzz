@@ -15,6 +15,24 @@ import { Request, Response, NextFunction } from "express";
 import * as Sentry from "@sentry/node";
 import { logger } from "../utils/logger.js";
 
+// Track if Sentry is initialized
+let isSentryInitialized = false;
+
+/**
+ * Check if Sentry has been initialized
+ * Used to conditionally enable Sentry middleware
+ */
+export function isSentryEnabled(): boolean {
+  return isSentryInitialized;
+}
+
+/**
+ * Mark Sentry as initialized (called by sentry-config.ts)
+ */
+export function setSentryInitialized(initialized: boolean): void {
+  isSentryInitialized = initialized;
+}
+
 /**
  * Start a Sentry transaction for the request
  * Tracks performance of each endpoint
@@ -31,57 +49,68 @@ export function sentryTransactionMiddleware(
   // Create transaction name from method + path
   const transactionName = `${method} ${path}`;
 
-  // Start Sentry transaction
-  const transaction = Sentry.startTransaction({
-    name: transactionName,
-    op: "http.request",
-    description: `${method} ${path}`,
-  });
+  // Start Sentry transaction only if Sentry is initialized
+  let transaction: Sentry.Transaction | undefined;
+  if (isSentryInitialized) {
+    transaction = Sentry.startTransaction({
+      name: transactionName,
+      op: "http.request",
+      description: `${method} ${path}`,
+    });
+  }
 
   // Store in request for later use
   (req as any).transaction = transaction;
 
-  // Capture request details
-  Sentry.addBreadcrumb({
-    category: "http",
-    message: `${method} ${path}`,
-    level: "info",
-    data: {
-      method,
-      path,
-      query: req.query,
-      params: req.params,
-    },
-  });
+  // Only add breadcrumbs if Sentry is initialized
+  if (isSentryInitialized) {
+    Sentry.addBreadcrumb({
+      category: "http",
+      message: `${method} ${path}`,
+      level: "info",
+      data: {
+        method,
+        path,
+        query: req.query,
+        params: req.params,
+      },
+    });
+  }
 
   // Capture response when finished
   const originalSend = res.send;
+  const hasTransaction = !!transaction;
+  
   res.send = function (data: any) {
     const duration = Date.now() - startTime;
     const statusCode = res.statusCode;
 
-    // Add response breadcrumb
-    Sentry.addBreadcrumb({
-      category: "response",
-      message: `Response ${statusCode}`,
-      level: statusCode >= 400 ? "warning" : "info",
-      data: {
-        statusCode,
-        duration: `${duration}ms`,
-      },
-    });
+    // Only add breadcrumbs and set transaction status if Sentry is initialized
+    if (isSentryInitialized) {
+      Sentry.addBreadcrumb({
+        category: "response",
+        message: `Response ${statusCode}`,
+        level: statusCode >= 400 ? "warning" : "info",
+        data: {
+          statusCode,
+          duration: `${duration}ms`,
+        },
+      });
 
-    // Set transaction status
-    if (statusCode >= 500) {
-      transaction.setStatus("internal_error");
-    } else if (statusCode >= 400) {
-      transaction.setStatus("invalid_argument");
-    } else {
-      transaction.setStatus("ok");
+      // Set transaction status only if transaction exists
+      if (hasTransaction && transaction) {
+        if (statusCode >= 500) {
+          transaction.setStatus("internal_error");
+        } else if (statusCode >= 400) {
+          transaction.setStatus("invalid_argument");
+        } else {
+          transaction.setStatus("ok");
+        }
+
+        // Finish transaction
+        transaction.finish();
+      }
     }
-
-    // Finish transaction
-    transaction.finish();
 
     // Log slow requests
     if (duration > 1000) {
@@ -108,6 +137,10 @@ export function sentrySecurityContextMiddleware(
   _res: Response,
   next: NextFunction,
 ): void {
+  if (!isSentryInitialized) {
+    return next();
+  }
+
   const agentId = (req as any).agentId;
   const ip = req.ip || req.get("x-forwarded-for");
 
@@ -136,6 +169,10 @@ export function sentryAuthTrackingMiddleware(
   _res: Response,
   next: NextFunction,
 ): void {
+  if (!isSentryInitialized) {
+    return next();
+  }
+
   if (req.path.includes("/auth/")) {
     Sentry.addBreadcrumb({
       category: "auth",
@@ -160,6 +197,10 @@ export function sentryErrorContextMiddleware(
   res: Response,
   next: NextFunction,
 ): void {
+  if (!isSentryInitialized) {
+    return next(error);
+  }
+
   const contextData = {
     method: req.method,
     path: req.path,

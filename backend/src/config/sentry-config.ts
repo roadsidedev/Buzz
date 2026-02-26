@@ -7,6 +7,7 @@
 
 import * as Sentry from "@sentry/node";
 import { logger } from "../utils/logger.js";
+import { setSentryInitialized } from "../middleware/sentry-middleware.js";
 
 let profilingIntegration: any = null;
 try {
@@ -104,6 +105,9 @@ export function initializeSentry(app: any): void {
   // Attach Sentry to Express
   app.use(Sentry.Handlers.requestHandler());
   app.use(Sentry.Handlers.errorHandler());
+
+  // Mark Sentry as initialized so middleware can use it
+  setSentryInitialized(true);
 
   logger.info("✅ Sentry initialized for error tracking", {
     dsn: dsn.substring(0, 30) + "...",
