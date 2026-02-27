@@ -34,8 +34,12 @@ export function setSentryInitialized(initialized: boolean): void {
 }
 
 /**
- * Start a Sentry transaction for the request
- * Tracks performance of each endpoint
+ * Start performance tracking for the request
+ *
+ * IMPORTANT: This middleware uses res.on('finish') instead of monkey-patching
+ * res.send. The previous approach of overriding res.send caused TypeError
+ * crashes across ALL endpoints because the patched function could corrupt
+ * the Express response chain, especially when errors were thrown downstream.
  */
 export function sentryTransactionMiddleware(
   req: Request,
@@ -46,84 +50,59 @@ export function sentryTransactionMiddleware(
   const method = req.method;
   const path = req.path;
 
-  // Create transaction name from method + path
-  const transactionName = `${method} ${path}`;
-
-  // Start Sentry transaction only if Sentry is initialized
-  let transaction: Sentry.Transaction | undefined;
+  // Add request breadcrumb (safe — wrapped in try/catch)
   if (isSentryInitialized) {
-    transaction = Sentry.startTransaction({
-      name: transactionName,
-      op: "http.request",
-      description: `${method} ${path}`,
-    });
-  }
-
-  // Store in request for later use
-  (req as any).transaction = transaction;
-
-  // Only add breadcrumbs if Sentry is initialized
-  if (isSentryInitialized) {
-    Sentry.addBreadcrumb({
-      category: "http",
-      message: `${method} ${path}`,
-      level: "info",
-      data: {
-        method,
-        path,
-        query: req.query,
-        params: req.params,
-      },
-    });
-  }
-
-  // Capture response when finished
-  const originalSend = res.send;
-  const hasTransaction = !!transaction;
-  
-  res.send = function (data: any) {
-    const duration = Date.now() - startTime;
-    const statusCode = res.statusCode;
-
-    // Only add breadcrumbs and set transaction status if Sentry is initialized
-    if (isSentryInitialized) {
+    try {
       Sentry.addBreadcrumb({
-        category: "response",
-        message: `Response ${statusCode}`,
-        level: statusCode >= 400 ? "warning" : "info",
+        category: "http",
+        message: `${method} ${path}`,
+        level: "info",
         data: {
-          statusCode,
-          duration: `${duration}ms`,
+          method,
+          path,
+          query: req.query,
+          params: req.params,
         },
       });
+    } catch {
+      // Silently ignore — Sentry breadcrumbs are non-critical
+    }
+  }
 
-      // Set transaction status only if transaction exists
-      if (hasTransaction && transaction) {
-        if (statusCode >= 500) {
-          transaction.setStatus("internal_error");
-        } else if (statusCode >= 400) {
-          transaction.setStatus("invalid_argument");
-        } else {
-          transaction.setStatus("ok");
-        }
+  // Use res.on('finish') to safely track response metrics
+  // This fires AFTER the response has been fully sent — no risk of
+  // corrupting the response chain like res.send monkey-patching did.
+  res.on("finish", () => {
+    try {
+      const duration = Date.now() - startTime;
+      const statusCode = res.statusCode;
 
-        // Finish transaction
-        transaction.finish();
+      // Add response breadcrumb
+      if (isSentryInitialized) {
+        Sentry.addBreadcrumb({
+          category: "response",
+          message: `Response ${statusCode}`,
+          level: statusCode >= 400 ? "warning" : "info",
+          data: {
+            statusCode,
+            duration: `${duration}ms`,
+          },
+        });
       }
-    }
 
-    // Log slow requests
-    if (duration > 1000) {
-      logger.warn("Slow request detected", {
-        method,
-        path,
-        duration: `${duration}ms`,
-        statusCode,
-      });
+      // Log slow requests
+      if (duration > 1000) {
+        logger.warn("Slow request detected", {
+          method,
+          path,
+          duration: `${duration}ms`,
+          statusCode,
+        });
+      }
+    } catch {
+      // Silently ignore — response tracking is non-critical
     }
-
-    return originalSend.call(this, data);
-  };
+  });
 
   next();
 }

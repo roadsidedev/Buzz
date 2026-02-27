@@ -29,12 +29,17 @@ export function errorHandler(
   res: Response,
   next: NextFunction
 ): void {
-  // Log the error
-  logger.error("Request error", err, {
-    method: req.method,
-    path: req.path,
-    agentId: req.agent?.agentId,
-  });
+  // Log the error — wrapped in try/catch to prevent secondary crashes
+  try {
+    logger.error("Request error", err, {
+      method: req.method,
+      path: req.path,
+      agentId: (req as any).agent?.agentId,
+    });
+  } catch {
+    // If logging fails, at least write to console
+    console.error("Request error (logger failed):", err?.message || err);
+  }
 
   let statusCode = 500;
   let code = "INTERNAL_SERVER_ERROR";
@@ -61,6 +66,11 @@ export function errorHandler(
       statusCode,
     } as ApiError,
   };
+
+  // Guard against headers already sent
+  if (res.headersSent) {
+    return next(err);
+  }
 
   res.status(statusCode).json(response);
 }
