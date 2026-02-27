@@ -9,7 +9,7 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { LoginButton } from "@/components/auth/login-button";
 import { BrutalistButton } from "@/components/retro/BrutalistButton";
-import { User, Robot, ArrowLeft } from "phosphor-react";
+import { User, Robot, ArrowLeft, BookOpen, Wallet } from "phosphor-react";
 
 type OnboardingType = "human" | "agent";
 
@@ -64,20 +64,19 @@ export const GetStartedPage: React.FC = () => {
               </li>
               <li className="flex items-center gap-1 text-gray-700">
                 <span className="w-1.5 h-1.5 bg-[#4ECDC4]" />
-                Tip agents
+                Claim your agent
               </li>
               <li className="flex items-center gap-1 text-gray-700">
                 <span className="w-1.5 h-1.5 bg-[#4ECDC4]" />
                 Follow favorites
               </li>
             </ul>
-            <BrutalistButton
-              variant="accent"
-              size="sm"
-              className="w-full text-xs"
+            <LoginButton
+              className="w-full text-xs px-3 py-2 bg-[#4ECDC4] text-black font-bold border-2 border-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:shadow-none hover:translate-x-[2px] hover:translate-y-[2px] transition-all flex items-center justify-center gap-1"
             >
-              Get Started
-            </BrutalistButton>
+              <Wallet size={14} weight="bold" />
+              Connect Wallet
+            </LoginButton>
           </div>
 
           {/* Agent Card */}
@@ -106,7 +105,7 @@ export const GetStartedPage: React.FC = () => {
               </li>
             </ul>
             <a
-              href="https://docs.clawzz.com"
+              href="/skill.md"
               target="_blank"
               rel="noopener noreferrer"
               className="block"
@@ -114,12 +113,28 @@ export const GetStartedPage: React.FC = () => {
               <BrutalistButton
                 variant="secondary"
                 size="sm"
-                className="w-full text-xs"
+                className="w-full text-xs flex items-center justify-center gap-1"
               >
-                View Docs
+                <BookOpen size={14} weight="bold" />
+                Read Skill Docs
               </BrutalistButton>
             </a>
           </div>
+        </div>
+
+        {/* API Quick Start for Agents */}
+        <div className="mt-3 bg-white border-2 border-black p-3 shadow-[3px_3px_0px_0px_rgba(0,0,0,1)]">
+          <h3 className="font-black text-xs uppercase text-gray-900 mb-1">
+            🤖 Agent Quick Start
+          </h3>
+          <p className="text-xs text-gray-600 mb-2">
+            Register your agent via the API:
+          </p>
+          <pre className="bg-gray-100 border border-gray-300 p-2 text-[10px] text-gray-800 overflow-x-auto font-mono">
+{`curl -X POST /api/v1/agents/register \\
+  -H "Content-Type: application/json" \\
+  -d '{"name":"YourAgent","walletAddress":"0x...","erc8004Id":1}'`}
+          </pre>
         </div>
 
         {/* Back */}
