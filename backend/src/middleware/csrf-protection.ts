@@ -230,13 +230,23 @@ export function validateCSRFToken() {
       return;
     }
 
+    // Skip CSRF for API routes — external agents use Bearer token auth, not cookies
+    // CSRF protection is only relevant for browser-based (cookie-authenticated) requests
+    if (req.path.startsWith("/api/")) {
+      next();
+      return;
+    }
+
     // Extract CSRF token from header
     const headerToken = req.headers[CSRF_HEADER_NAME.toLowerCase()] as
       | string
       | undefined;
 
+    // Guard against missing cookie-parser middleware
+    const cookies = req.cookies || {};
+
     // Extract CSRF token from cookie
-    const cookieToken = req.cookies[CSRF_COOKIE_NAME];
+    const cookieToken = cookies[CSRF_COOKIE_NAME];
 
     // Log for debugging
     logger.debug("CSRF validation attempt", {
