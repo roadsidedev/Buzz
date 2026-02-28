@@ -1,7 +1,13 @@
 /**
  * Payment Type Definitions
  * Handles spawn fees, revenue distribution, and micropayments
+ * Supports Base (EVM) and Solana chains via CDP facilitator.
  */
+
+/**
+ * Supported payment chains
+ */
+export type PaymentChain = "base" | "solana";
 
 /**
  * Payment status lifecycle
@@ -33,7 +39,8 @@ export interface SpawnFeeRequest {
   roomId: string;
   amount: number; // In cents USD (25-1000)
   agentName: string;
-  erc8004Address: string;
+  walletAddress: string;
+  chain?: PaymentChain; // Auto-detected from wallet if omitted
 }
 
 /**
@@ -47,6 +54,7 @@ export interface X402Transaction {
   currency: string;
   fromAddress: string;
   toAddress: string;
+  chain: PaymentChain;
   blockchainHash?: string;
   createdAt: Date;
   confirmedAt?: Date;
@@ -63,6 +71,7 @@ export interface Payment {
   type: PaymentType;
   amount: number; // Cents USD
   status: PaymentStatus;
+  chain: PaymentChain;
   x402TransactionId?: string;
   createdAt: Date;
   confirmedAt?: Date;

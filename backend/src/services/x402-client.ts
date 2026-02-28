@@ -4,7 +4,7 @@
  * @deprecated Needs refactoring to match updated types
  *
  * Implements the x402 payment protocol for ClawZz.
- * Enables micropayments over HTTP using the 402 Payment Required status code.
+ * Supports both Base (EVM) and Solana chains via CDP facilitator.
  *
  * Security Model:
  * - API-key based authentication to x402 gateway
@@ -13,12 +13,14 @@
  */
 
 import { logger } from "../utils/logger.js";
-import { X402Error, PaymentStatus } from "../config/x402-config.js";
+import { X402Error, PaymentStatus, type ChainType } from "../config/x402-config.js";
+import { mockTxHash, shortenWallet } from "../utils/wallet-utils.js";
 
 export interface X402PaymentRequest {
   from: string; // Payer wallet address
   to: string; // Payee wallet address
-  amount: bigint; // Amount in smallest unit (e.g., wei)
+  amount: bigint; // Amount in smallest unit (wei for EVM, lamports/micro-units for Solana)
+  chain: ChainType; // Target chain
   token?: string; // Token contract address (defaults to USDC)
   metadata?: Record<string, unknown>;
 }
@@ -27,6 +29,7 @@ export interface X402PaymentResponse {
   id: string; // Payment ID
   txHash: string; // Transaction hash
   status: PaymentStatus;
+  chain: ChainType;
   from: string;
   to: string;
   amount: bigint;
@@ -40,34 +43,33 @@ export interface X402Transaction {
   from: string;
   to: string;
   amount: bigint;
+  chain: ChainType;
   status: "pending" | "confirmed" | "failed";
   blockNumber?: number;
+  slot?: number; // Solana-specific
   confirmations: number;
   timestamp: number;
 }
 
 /**
  * x402 Client
- * Manages protocol-level payment requests
+ * Manages protocol-level payment requests across Base and Solana
  */
 export class X402Client {
   private apiKey: string;
   private secretKey: string;
-  private network: string;
   private apiUrl: string;
   private mockMode: boolean;
 
   constructor(config: {
     apiKey: string;
     secretKey: string;
-    network: string;
     apiUrl?: string;
     mockMode?: boolean;
   }) {
     this.apiKey = config.apiKey;
     this.secretKey = config.secretKey;
-    this.network = config.network;
-    this.apiUrl = config.apiUrl || "https://api.x402.io/v1";
+    this.apiUrl = config.apiUrl || "https://api.x402.org/v2";
     this.mockMode = config.mockMode ?? true;
 
     if (!this.mockMode && !this.apiKey) {
@@ -78,7 +80,6 @@ export class X402Client {
     }
 
     logger.info("x402 Client initialized", {
-      network: this.network,
       mockMode: this.mockMode,
       apiUrl: this.apiUrl,
     });
@@ -86,18 +87,15 @@ export class X402Client {
 
   /**
    * Create a payment request via x402 protocol
-   *
-   * @param request - Payment parameters
-   * @returns Payment response from gateway
-   * @throws X402Error if request fails
    */
   async createPayment(
     request: X402PaymentRequest,
   ): Promise<X402PaymentResponse> {
     try {
       logger.info("Initiating x402 payment", {
-        from: `${request.from.slice(0, 6)}...${request.from.slice(-4)}`,
-        to: `${request.to.slice(0, 6)}...${request.to.slice(-4)}`,
+        chain: request.chain,
+        from: shortenWallet(request.from),
+        to: shortenWallet(request.to),
         amount: request.amount.toString(),
         mockMode: this.mockMode,
       });
@@ -111,14 +109,14 @@ export class X402Client {
         headers: {
           Authorization: `Bearer ${this.apiKey}`,
           "Content-Type": "application/json",
-          "X-SDK-Version": "0.1.0-clawzz",
+          "X-SDK-Version": "0.2.0-clawzz",
         },
         body: JSON.stringify({
           from: request.from,
           to: request.to,
           amount: request.amount.toString(),
+          chain: request.chain,
           token: request.token || "USDC",
-          network: this.network,
           metadata: {
             ...request.metadata,
             platform: "clawzz",
@@ -141,6 +139,7 @@ export class X402Client {
         id: data.id,
         txHash: data.txHash,
         status: this._mapApiStatus(data.status),
+        chain: data.chain || request.chain,
         from: data.from,
         to: data.to,
         amount: BigInt(data.amount),
@@ -153,6 +152,7 @@ export class X402Client {
 
       logger.error("Failed to create x402 payment", {
         error: err instanceof Error ? err.message : String(err),
+        chain: request.chain,
         from: request.from,
       });
 
@@ -166,17 +166,23 @@ export class X402Client {
   /**
    * Get transaction status from network
    */
-  async getTransaction(txHash: string): Promise<X402Transaction> {
+  async getTransaction(
+    txHash: string,
+    chain: ChainType,
+  ): Promise<X402Transaction> {
     try {
       if (this.mockMode) {
-        return this._getMockTransaction(txHash);
+        return this._getMockTransaction(txHash, chain);
       }
 
-      const response = await fetch(`${this.apiUrl}/transactions/${txHash}`, {
-        headers: {
-          Authorization: `Bearer ${this.apiKey}`,
+      const response = await fetch(
+        `${this.apiUrl}/transactions/${txHash}?chain=${chain}`,
+        {
+          headers: {
+            Authorization: `Bearer ${this.apiKey}`,
+          },
         },
-      });
+      );
 
       if (!response.ok) {
         throw new X402Error("Transaction lookup failed", "API_ERROR");
@@ -189,8 +195,10 @@ export class X402Client {
         from: data.from,
         to: data.to,
         amount: BigInt(data.amount),
+        chain: data.chain || chain,
         status: data.status,
         blockNumber: data.blockNumber,
+        slot: data.slot,
         confirmations: data.confirmations,
         timestamp: new Date(data.timestamp).getTime(),
       };
@@ -210,6 +218,7 @@ export class X402Client {
       case "confirmed":
       case "completed":
       case "success":
+      case "finalized": // Solana finality
         return PaymentStatus.CONFIRMED;
       case "failed":
         return PaymentStatus.FAILED;
@@ -223,12 +232,11 @@ export class X402Client {
   /**
    * Create mock payment for development/testing
    */
-  private _createMockPayment(request: X402PaymentRequest): X402PaymentResponse {
+  private _createMockPayment(
+    request: X402PaymentRequest,
+  ): X402PaymentResponse {
     const paymentId = `pay-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    const txHash = `0x${Array(64)
-      .fill(0)
-      .map(() => Math.floor(Math.random() * 16).toString(16))
-      .join("")}`;
+    const txHash = mockTxHash(request.chain);
 
     const status =
       Math.random() > 0.9 ? PaymentStatus.PENDING : PaymentStatus.CONFIRMED;
@@ -237,6 +245,7 @@ export class X402Client {
       id: paymentId,
       txHash,
       status,
+      chain: request.chain,
       from: request.from,
       to: request.to,
       amount: request.amount,
@@ -250,6 +259,7 @@ export class X402Client {
       from: request.from,
       to: request.to,
       amount: request.amount,
+      chain: request.chain,
       status: status === PaymentStatus.CONFIRMED ? "confirmed" : "pending",
       confirmations: status === PaymentStatus.CONFIRMED ? 12 : 0,
       timestamp: Date.now(),
@@ -258,7 +268,10 @@ export class X402Client {
     return payment;
   }
 
-  private _getMockTransaction(txHash: string): X402Transaction {
+  private _getMockTransaction(
+    txHash: string,
+    chain: ChainType,
+  ): X402Transaction {
     const tx = MockX402Database.transactions.get(txHash);
     if (!tx)
       throw new X402Error("Transaction not found", "TX_NOT_FOUND", { txHash });
@@ -267,7 +280,7 @@ export class X402Client {
       tx.confirmations += 2;
       if (tx.confirmations >= 12) tx.status = "confirmed";
     }
-    return tx;
+    return { ...tx, chain: tx.chain || chain };
   }
 }
 

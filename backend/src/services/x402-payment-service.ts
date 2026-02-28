@@ -6,9 +6,7 @@
  * Handles spawn fee charging, payment status tracking, revenue distribution,
  * and error handling for the x402 micropayment system.
  *
- * Phase 2 (Day 4): Full x402 integration with testnet support
- * Phase 2 (Security): Webhook signature verification implemented
- * Phase 2 (Complete): Full x402 SDK integration with payment processing
+ * Multi-chain support: Base (EVM) and Solana via CDP facilitator.
  */
 
 import crypto from "crypto";
@@ -20,16 +18,23 @@ import {
   X402Error,
   type PaymentRecord,
   type X402Transaction,
+  type ChainType,
+  getPlatformWallet,
 } from "../config/x402-config.js";
 import { logger } from "../utils/logger.js";
 import { ValidationError } from "../utils/errors.js";
 import { query } from "../config/database.js";
 import { X402Client, type X402PaymentRequest } from "./x402-client.js";
+import {
+  detectChain,
+  isValidWallet,
+  shortenWallet,
+} from "../utils/wallet-utils.js";
 
 /**
  * x402 Payment Service
  *
- * Handles all payment operations for the platform
+ * Handles all payment operations for the platform across Base and Solana.
  */
 export class X402PaymentService {
   private x402Client: X402Client;
@@ -40,14 +45,13 @@ export class X402PaymentService {
     this.x402Client = new X402Client({
       apiKey: X402_CONFIG.apiKey,
       secretKey: X402_CONFIG.secretKey,
-      network: X402_CONFIG.network,
       mockMode: !X402_CONFIG.apiKey || process.env.X402_MOCK_MODE === "true",
     });
 
     this.isInitialized = true;
 
     logger.info("X402PaymentService initialized", {
-      network: X402_CONFIG.network,
+      supportedChains: X402_CONFIG.supportedChains,
       mockMode: !X402_CONFIG.apiKey || process.env.X402_MOCK_MODE === "true",
     });
   }
@@ -55,17 +59,20 @@ export class X402PaymentService {
   /**
    * Charge a spawn fee for room creation
    *
-   * Phase 2 (Day 4): 7.2 - Implement spawn fee collection
+   * Supports both EVM and Solana wallets. Chain is auto-detected from
+   * the wallet address format if not explicitly provided.
    *
    * @param agentId - Agent ID
-   * @param walletAddress - Agent's wallet address
+   * @param walletAddress - Agent's wallet address (EVM or Solana)
    * @param roomId - Room ID (optional at charge time)
+   * @param chain - Chain override (auto-detected if omitted)
    * @returns Payment record with pending status
    */
   async chargeSpawnFee(
     agentId: string,
     walletAddress: string,
     roomId?: string,
+    chain?: ChainType,
   ): Promise<PaymentRecord> {
     // Validate inputs
     if (!agentId || !walletAddress) {
@@ -75,20 +82,44 @@ export class X402PaymentService {
       });
     }
 
-    if (!walletAddress.startsWith("0x") || walletAddress.length !== 42) {
-      throw new ValidationError("Invalid wallet address format", {
+    // Auto-detect chain from wallet format
+    const effectiveChain = chain ?? detectChain(walletAddress);
+    if (!effectiveChain) {
+      throw new ValidationError("Could not detect chain from wallet address", {
         walletAddress: "***",
-        expected: "0x followed by 40 hex characters",
+        hint: "Provide a valid EVM (0x...) or Solana (Base58) address",
       });
     }
 
+    // Validate wallet for detected chain
+    if (!isValidWallet(walletAddress, effectiveChain)) {
+      throw new ValidationError("Invalid wallet address format", {
+        walletAddress: "***",
+        chain: effectiveChain,
+        expected:
+          effectiveChain === "solana"
+            ? "Base58 encoded, 32-44 chars"
+            : "0x followed by 40 hex characters",
+      });
+    }
+
+    // Unified USDC spawn fee (6 decimals, same on all chains)
     const amount = X402_CONFIG.minSpawnFee;
+    const platformWallet = getPlatformWallet(effectiveChain);
+
+    if (!platformWallet) {
+      throw new X402Error(
+        `Platform wallet not configured for ${effectiveChain}`,
+        "MISSING_PLATFORM_WALLET",
+        { chain: effectiveChain },
+      );
+    }
 
     try {
-      // Log payment initiation
       logger.info("Initiating spawn fee charge", {
         agentId,
-        walletAddress: `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}`,
+        walletAddress: shortenWallet(walletAddress),
+        chain: effectiveChain,
         amount: amount.toString(),
         roomId,
       });
@@ -96,8 +127,9 @@ export class X402PaymentService {
       // Call x402 SDK to create transaction
       const x402Request: X402PaymentRequest = {
         from: walletAddress,
-        to: X402_CONFIG.platformWallet,
+        to: platformWallet,
         amount: amount,
+        chain: effectiveChain,
         metadata: {
           agentId,
           roomId,
@@ -117,6 +149,7 @@ export class X402PaymentService {
         amount,
         type: PaymentType.SPAWN_FEE,
         status: x402Response.status as PaymentStatus,
+        chain: effectiveChain,
         txHash: x402Response.txHash,
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -128,6 +161,7 @@ export class X402PaymentService {
       logger.info("Spawn fee charge initiated", {
         paymentId: payment.id,
         agentId,
+        chain: effectiveChain,
         amount: amount.toString(),
         status: payment.status,
         txHash: payment.txHash,
@@ -140,11 +174,13 @@ export class X402PaymentService {
           ? err
           : new X402Error("Failed to charge spawn fee", "SPAWN_FEE_ERROR", {
               agentId,
+              chain: effectiveChain,
               walletAddress: "***",
             });
 
       logger.error("Spawn fee charge failed", {
         agentId,
+        chain: effectiveChain,
         error: error.message,
         code: error.code,
       });
@@ -155,8 +191,6 @@ export class X402PaymentService {
 
   /**
    * Check payment status and update if necessary
-   *
-   * Phase 2 (Day 4): 7.3 - Implement payment status tracking
    *
    * @param paymentId - Payment ID
    * @param txHash - Transaction hash (optional, for lookup)
@@ -194,7 +228,10 @@ export class X402PaymentService {
         return payment.status;
       }
 
-      const tx = await this.x402Client.getTransaction(effectiveTxHash);
+      const tx = await this.x402Client.getTransaction(
+        effectiveTxHash,
+        payment.chain,
+      );
 
       // Map x402 status to our PaymentStatus
       let newStatus = payment.status;
@@ -216,6 +253,7 @@ export class X402PaymentService {
 
         logger.info("Payment status updated", {
           paymentId,
+          chain: payment.chain,
           oldStatus: payment.status,
           newStatus,
           confirmations: tx.confirmations,
@@ -240,17 +278,18 @@ export class X402PaymentService {
   /**
    * Distribute revenue after room completion
    *
-   * Phase 2 (Day 4): 7.4 - Implement revenue distribution
-   *
    * Revenue split:
    * - Host: 50%
    * - Participants: 40% (shared equally)
    * - Platform: 10%
    *
+   * Each wallet's payout is routed to the correct chain based on address format.
+   *
    * @param roomId - Room ID
-   * @param hostWallet - Host wallet address
+   * @param hostWallet - Host wallet address (EVM or Solana)
    * @param participantWallets - Participant wallet addresses
    * @param totalRevenue - Total revenue to distribute (in smallest unit)
+   * @param chain - Chain override (auto-detected per wallet if omitted)
    * @returns Array of payout payment records
    */
   async distributeRevenue(
@@ -258,10 +297,20 @@ export class X402PaymentService {
     hostWallet: string,
     participantWallets: string[],
     totalRevenue: bigint,
+    chain?: ChainType,
   ): Promise<PaymentRecord[]> {
-    if (!hostWallet || !hostWallet.startsWith("0x")) {
+    // Auto-detect host chain
+    const hostChain = chain ?? detectChain(hostWallet);
+    if (!hostChain) {
+      throw new ValidationError("Could not detect chain from host wallet", {
+        hostWallet: "***",
+      });
+    }
+
+    if (!isValidWallet(hostWallet, hostChain)) {
       throw new ValidationError("Invalid host wallet address", {
         hostWallet: "***",
+        chain: hostChain,
       });
     }
 
@@ -277,6 +326,7 @@ export class X402PaymentService {
       logger.info("Starting revenue distribution", {
         roomId,
         totalRevenue: totalRevenue.toString(),
+        hostChain,
         participants: participantWallets.length,
       });
 
@@ -295,40 +345,50 @@ export class X402PaymentService {
         });
       }
 
-      // Host payout (50%)
+      // Host payout (50%) — routed to host's chain
       const hostPayout = await this._createPayout(
         uuidv4(),
         roomId,
         hostWallet,
         hostShare,
         PaymentType.HOST_PAYOUT,
+        hostChain,
       );
       payouts.push(hostPayout);
 
-      // Participant payouts (40%, split equally)
+      // Participant payouts (40%, split equally) — each routed per-wallet
       if (participantWallets.length > 0) {
         const perParticipantShare =
           participantShare / BigInt(participantWallets.length);
 
         for (const wallet of participantWallets) {
+          const pChain = chain ?? detectChain(wallet);
+          if (!pChain) {
+            logger.warn("Skipping participant with unrecognised wallet", {
+              wallet: shortenWallet(wallet),
+            });
+            continue;
+          }
           const participantPayout = await this._createPayout(
             uuidv4(),
             roomId,
             wallet,
             perParticipantShare,
             PaymentType.PARTICIPANT_PAYOUT,
+            pChain,
           );
           payouts.push(participantPayout);
         }
       }
 
-      // Platform revenue (10%)
+      // Platform revenue (10%) — routed on the same chain as the spawn fee
       const platformPayout = await this._createPayout(
         uuidv4(),
         roomId,
-        X402_CONFIG.platformWallet,
+        getPlatformWallet(hostChain),
         platformShare,
         PaymentType.PLATFORM_REVENUE,
+        hostChain,
       );
       payouts.push(platformPayout);
 
@@ -357,8 +417,6 @@ export class X402PaymentService {
 
   /**
    * Create a payout transaction
-   *
-   * @private
    */
   private async _createPayout(
     paymentId: string,
@@ -366,12 +424,16 @@ export class X402PaymentService {
     walletAddress: string,
     amount: bigint,
     type: PaymentType,
+    chain: ChainType,
   ): Promise<PaymentRecord> {
+    const platformWallet = getPlatformWallet(chain);
+
     // Call x402 SDK to create payout
     const x402Request: X402PaymentRequest = {
-      from: X402_CONFIG.platformWallet,
+      from: platformWallet,
       to: walletAddress,
       amount,
+      chain,
       metadata: {
         type,
         roomId,
@@ -390,6 +452,7 @@ export class X402PaymentService {
       amount,
       type,
       status: x402Response.status as PaymentStatus,
+      chain,
       txHash: x402Response.txHash,
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -402,6 +465,7 @@ export class X402PaymentService {
       paymentId,
       roomId,
       type,
+      chain,
       amount: amount.toString(),
       txHash: payment.txHash,
     });
@@ -420,11 +484,12 @@ export class X402PaymentService {
     const sql = `
       INSERT INTO payment (
         id, agent_id, room_id, wallet_address, amount, type, 
-        status, tx_hash, created_at, updated_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        status, chain, tx_hash, created_at, updated_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
       ON CONFLICT (id) DO UPDATE SET
         status = EXCLUDED.status,
         tx_hash = EXCLUDED.tx_hash,
+        chain = EXCLUDED.chain,
         updated_at = EXCLUDED.updated_at
     `;
 
@@ -436,6 +501,7 @@ export class X402PaymentService {
       payment.amount.toString(),
       payment.type,
       payment.status,
+      payment.chain,
       payment.txHash || null,
       payment.createdAt,
       payment.updatedAt,
@@ -467,6 +533,7 @@ export class X402PaymentService {
       amount: BigInt(row.amount),
       type: row.type as PaymentType,
       status: row.status as PaymentStatus,
+      chain: (row.chain || "base") as ChainType,
       txHash: row.tx_hash || undefined,
       createdAt: new Date(row.created_at),
       updatedAt: new Date(row.updated_at),
@@ -496,8 +563,6 @@ export class X402PaymentService {
   /**
    * Handle payment errors with appropriate recovery
    *
-   * Phase 2 (Day 4): 7.5 - Add payment error handling
-   *
    * @param error - Error from x402 SDK
    * @param paymentId - Payment ID
    */
@@ -520,9 +585,8 @@ export class X402PaymentService {
           break;
 
         case "RATE_LIMIT":
-          // Schedule retry - for now just log
+          // Schedule retry
           logger.warn("Payment rate limited, retry scheduled", { paymentId });
-          // In production, would use a job queue like Bull
           setTimeout(() => {
             this.checkPaymentStatus(paymentId).catch((err) => {
               logger.error("Retry check failed", {
@@ -553,23 +617,14 @@ export class X402PaymentService {
    * Verify x402 webhook signature using HMAC-SHA256
    *
    * SECURITY CRITICAL: Prevents forged payment webhooks
-   * All webhook requests must include a valid signature in the
-   * X-x402-Signature header computed from the request body
-   *
-   * @param body - Raw request body (must be exact bytes received)
-   * @param signature - Signature from X-x402-Signature header (hex format)
-   * @returns true if signature is valid
-   * @throws X402Error if webhook secret not configured
    */
   verifyWebhookSignature(body: string, signature: string): boolean {
     try {
-      // Check if webhooks are enabled
       if (!X402_CONFIG.enableWebhooks) {
         logger.warn("Webhook verification skipped: webhooks disabled");
         return false;
       }
 
-      // Verify webhook secret is configured
       if (!X402_CONFIG.webhookSecret) {
         logger.error(
           "Webhook verification failed: X402_WEBHOOK_SECRET not configured",
@@ -581,7 +636,6 @@ export class X402PaymentService {
         );
       }
 
-      // Validate inputs
       if (!body) {
         logger.error("Webhook verification failed: empty body");
         return false;
@@ -602,7 +656,6 @@ export class X402PaymentService {
       const signatureBuffer = Buffer.from(signature, "hex");
       const expectedBuffer = Buffer.from(expectedSignature, "hex");
 
-      // Validate signature format (must be valid hex)
       if (
         signatureBuffer.length === 0 ||
         signatureBuffer.toString("hex") !== signature.toLowerCase()
@@ -611,7 +664,6 @@ export class X402PaymentService {
         return false;
       }
 
-      // Constant-time comparison to prevent timing attacks
       if (signatureBuffer.length !== expectedBuffer.length) {
         logger.error("Webhook verification failed: signature length mismatch", {
           receivedLength: signature.length,
@@ -646,9 +698,6 @@ export class X402PaymentService {
 
   /**
    * Process webhook from x402
-   *
-   * @param paymentId - Payment ID
-   * @param status - New status from webhook
    */
   async processWebhookPayment(
     paymentId: string,
@@ -662,13 +711,11 @@ export class X402PaymentService {
     });
 
     try {
-      // Update payment status in database
       await this._updatePaymentStatus(paymentId, status, {
         confirmedAt:
           status === PaymentStatus.CONFIRMED ? new Date() : undefined,
       });
 
-      // Also update tx_hash if provided
       if (txHash) {
         await query(`UPDATE payment SET tx_hash = $1 WHERE id = $2`, [
           txHash,
@@ -695,7 +742,6 @@ export class X402PaymentService {
 
   /**
    * Verify a payment is complete
-   * Convenience method for checking if spawn fee is paid
    */
   async verifyPaymentComplete(paymentId: string): Promise<boolean> {
     try {
@@ -727,6 +773,7 @@ export class X402PaymentService {
       amount: BigInt(row.amount),
       type: row.type as PaymentType,
       status: row.status as PaymentStatus,
+      chain: (row.chain || "base") as ChainType,
       txHash: row.tx_hash || undefined,
       createdAt: new Date(row.created_at),
       updatedAt: new Date(row.updated_at),

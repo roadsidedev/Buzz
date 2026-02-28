@@ -2,35 +2,59 @@
  * x402 Payment System Configuration
  *
  * Configures the x402 SDK for micropayments, spawn fees, and revenue distribution.
- *
- * Phase 2 (Day 4): Payment Integration
+ * Supports both Base (EVM) and Solana chains via CDP facilitator.
  *
  * @see https://docs.x402.io/
  */
 
 import { logger } from "../utils/logger.js";
+import {
+  type ChainType,
+  isValidEvmAddress,
+  isValidSolanaAddress,
+} from "../utils/wallet-utils.js";
+
+export type { ChainType };
 
 /**
  * x402 Configuration
  */
 export const X402_CONFIG = {
-  // API credentials
+  // API credentials (CDP facilitator)
   apiKey: process.env.X402_API_KEY || "",
   secretKey: process.env.X402_SECRET_KEY || "",
 
-  // Wallet addresses
-  platformWallet: process.env.PLATFORM_WALLET || "",
+  // Supported chains
+  supportedChains: (
+    process.env.X402_SUPPORTED_CHAINS || "base,solana"
+  ).split(",") as ChainType[],
+
+  // ── Base (EVM) ──────────────────────────────────────────────
+  base: {
+    platformWallet: process.env.PLATFORM_WALLET || "",
+    network: process.env.X402_NETWORK || "base-sepolia",
+    rpcUrl:
+      process.env.ETH_RPC_URL ||
+      "https://sepolia.base.org",
+  },
+
+  // ── Solana ──────────────────────────────────────────────────
+  solana: {
+    platformWallet: process.env.SOLANA_PLATFORM_WALLET || "",
+    network: process.env.SOLANA_NETWORK || "devnet",
+    rpcUrl:
+      process.env.SOLANA_RPC_URL ||
+      "https://api.devnet.solana.com",
+  },
 
   // Webhook security
   webhookSecret: process.env.X402_WEBHOOK_SECRET || "",
 
-  // Network
-  network: process.env.X402_NETWORK || "sepolia", // sepolia for testnet
-  rpcUrl: process.env.ETH_RPC_URL || "https://sepolia.infura.io/v3/",
-
-  // Payment amounts (in smallest unit, e.g., wei)
-  minSpawnFee: BigInt(process.env.MIN_SPAWN_FEE || "1000000000000000000"), // 1 token
-  maxSpawnFee: BigInt(process.env.MAX_SPAWN_FEE || "1000000000000000000000"), // 1000 tokens
+  // Payment amounts — unified USDC (6 decimals on all chains)
+  // 1 USDC = 1_000_000 micro-units
+  minSpawnFee: BigInt(process.env.MIN_SPAWN_FEE || "1000000"), // 1 USDC
+  maxSpawnFee: BigInt(process.env.MAX_SPAWN_FEE || "1000000000"), // 1000 USDC
+  usdcDecimals: 6,
 
   // Revenue splits (percentages that sum to 100)
   revenueSplit: {
@@ -51,10 +75,36 @@ export const X402_CONFIG = {
 };
 
 /**
+ * Get platform wallet for a given chain
+ */
+export function getPlatformWallet(chain: ChainType): string {
+  return chain === "solana"
+    ? X402_CONFIG.solana.platformWallet
+    : X402_CONFIG.base.platformWallet;
+}
+
+/**
+ * Get network name for a given chain
+ */
+export function getNetwork(chain: ChainType): string {
+  return chain === "solana"
+    ? X402_CONFIG.solana.network
+    : X402_CONFIG.base.network;
+}
+
+/**
+ * Check if a chain is supported
+ */
+export function isChainSupported(chain: string): chain is ChainType {
+  return X402_CONFIG.supportedChains.includes(chain as ChainType);
+}
+
+/**
  * Validate x402 configuration on startup
  */
 export function validateX402Config(): void {
   const errors: string[] = [];
+  const warnings: string[] = [];
 
   if (!X402_CONFIG.apiKey) {
     errors.push("X402_API_KEY is not set");
@@ -64,15 +114,32 @@ export function validateX402Config(): void {
     errors.push("X402_SECRET_KEY is not set");
   }
 
-  if (
-    !X402_CONFIG.platformWallet ||
-    !X402_CONFIG.platformWallet.startsWith("0x")
-  ) {
-    errors.push("PLATFORM_WALLET is not set or invalid");
-  }
-
   if (!X402_CONFIG.webhookSecret) {
     errors.push("X402_WEBHOOK_SECRET is not set");
+  }
+
+  // Validate Base config
+  if (X402_CONFIG.supportedChains.includes("base")) {
+    if (!X402_CONFIG.base.platformWallet) {
+      errors.push("PLATFORM_WALLET is not set (required for Base chain)");
+    } else if (!isValidEvmAddress(X402_CONFIG.base.platformWallet)) {
+      errors.push(
+        "PLATFORM_WALLET is not a valid EVM address (expected 0x + 40 hex chars)",
+      );
+    }
+  }
+
+  // Validate Solana config
+  if (X402_CONFIG.supportedChains.includes("solana")) {
+    if (!X402_CONFIG.solana.platformWallet) {
+      warnings.push(
+        "SOLANA_PLATFORM_WALLET is not set — Solana payments will be unavailable",
+      );
+    } else if (!isValidSolanaAddress(X402_CONFIG.solana.platformWallet)) {
+      errors.push(
+        "SOLANA_PLATFORM_WALLET is not a valid Solana address (expected Base58, 32-44 chars)",
+      );
+    }
   }
 
   // Check revenue splits sum to 100%
@@ -87,6 +154,11 @@ export function validateX402Config(): void {
     );
   }
 
+  // Log warnings
+  for (const w of warnings) {
+    logger.warn(`x402 config warning: ${w}`);
+  }
+
   if (errors.length > 0) {
     logger.error("x402 configuration errors", { errors });
 
@@ -94,7 +166,7 @@ export function validateX402Config(): void {
       throw new Error(`x402 configuration invalid: ${errors.join("; ")}`);
     } else if (X402_CONFIG.enablePayments) {
       logger.warn(
-        "x402 payments enabled but credentials not set - running in limited mode",
+        "x402 payments enabled but credentials not set — running in limited mode",
       );
     } else {
       logger.warn("x402 payments disabled, configuration errors ignored");
@@ -102,7 +174,7 @@ export function validateX402Config(): void {
   }
 
   logger.info("✅ x402 configuration validated", {
-    network: X402_CONFIG.network,
+    supportedChains: X402_CONFIG.supportedChains,
     enablePayments: X402_CONFIG.enablePayments,
     enableWebhooks: X402_CONFIG.enableWebhooks,
     revenueSplit: `${(X402_CONFIG.revenueSplit.host * 100).toFixed(0)}/${(X402_CONFIG.revenueSplit.participants * 100).toFixed(0)}/${(X402_CONFIG.revenueSplit.platform * 100).toFixed(0)}`,
@@ -145,6 +217,7 @@ export interface PaymentRecord {
   amount: bigint;
   type: PaymentType;
   status: PaymentStatus;
+  chain: ChainType;
   txHash?: string;
   blockNumber?: number;
   error?: string;
@@ -161,6 +234,7 @@ export interface X402Transaction {
   from: string;
   to: string;
   amount: bigint;
+  chain: ChainType;
   status: "pending" | "confirmed" | "failed";
   blockNumber?: number;
   timestamp: number;
@@ -187,7 +261,9 @@ export class X402Error extends Error {
 export function initializeX402(): void {
   try {
     validateX402Config();
-    logger.info("x402 payment system initialized");
+    logger.info("x402 payment system initialized", {
+      chains: X402_CONFIG.supportedChains,
+    });
   } catch (err) {
     logger.error("Failed to initialize x402 payment system", {
       error: err instanceof Error ? err.message : String(err),
