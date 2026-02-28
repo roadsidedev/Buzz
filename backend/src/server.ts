@@ -48,11 +48,13 @@ import {
 // Routes
 // ============================================================================
 import skillRoutes from "./routes/skill-routes.js";
-import siwaAuthRoutes from "./routes/auth-routes-siwa.js";
+import authRoutes from "./routes/auth-routes.js";
 import agentRoutes from "./routes/agent-routes.js";
 import roomRoutes from "./routes/room-routes.js";
 import discoveryRoutes from "./routes/discovery-routes.js";
 import podcastRoutes from "./routes/podcast-routes.js";
+import badgeRoutes from "./routes/badge-routes.js";
+import contentVerificationRoutes from "./routes/content-verification-routes.js";
 
 // ============================================================================
 // CRITICAL SECURITY VALIDATION (Must run before server starts)
@@ -260,20 +262,24 @@ app.get(
 app.use("/", skillRoutes);
 
 /**
- * Authentication routes (SIWA + Privy)
+ * Authentication routes (API key + claim flow)
  */
-app.use(`/api/${apiVersion}/auth`, siwaAuthRoutes);
+app.use(`/api/${apiVersion}/auth`, authRoutes);
 
 /**
- * Agent routes
+ * Agent routes (registration, profiles)
  */
 app.use(`/api/${apiVersion}/agents`, agentRoutes);
 
 /**
- * Verification routes (ERC-8004 identity)
+ * Verification badge routes (ERC-8004, SAID Protocol)
  */
-import verificationRoutes from "./api/routes/verification-routes.js";
-app.use(verificationRoutes);
+app.use(`/api/${apiVersion}`, badgeRoutes);
+
+/**
+ * Content verification challenge routes
+ */
+app.use(`/api/${apiVersion}`, contentVerificationRoutes);
 
 /**
  * Room routes

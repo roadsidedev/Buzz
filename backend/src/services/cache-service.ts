@@ -43,7 +43,7 @@ export class CacheService {
         url: this.redisUrl,
       });
 
-      this.client.on("error", (err) => {
+      this.client.on("error", (err: Error) => {
         logger.error("Redis client error", { error: err });
       });
 
@@ -190,8 +190,8 @@ export class CacheService {
       try {
         const info = await this.client.info("memory");
         const lines = info.split("\r\n");
-        const usedLine = lines.find((l) => l.startsWith("used_memory:"));
-        const peakLine = lines.find((l) => l.startsWith("used_memory_peak:"));
+        const usedLine = lines.find((l: string) => l.startsWith("used_memory:"));
+        const peakLine = lines.find((l: string) => l.startsWith("used_memory_peak:"));
 
         if (usedLine && peakLine) {
           const used = parseInt(usedLine.split(":")[1], 10);

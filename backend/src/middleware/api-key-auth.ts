@@ -1,0 +1,191 @@
+/**
+ * API Key Authentication Middleware
+ *
+ * Replaces SIWA receipt middleware. Validates API keys from
+ * Authorization: Bearer clawzz_xxx header and attaches agent to request.
+ */
+
+import { Request, Response, NextFunction } from "express";
+import { logger } from "../utils/logger.js";
+
+// Lazy-loaded to avoid circular dependency
+let _authService: any = null;
+async function getAuthService() {
+  if (!_authService) {
+    const { clawzzAuthService } = await import("../services/index.js");
+    _authService = clawzzAuthService;
+  }
+  return _authService;
+}
+
+/**
+ * Extend Express Request to include authenticated agent
+ */
+declare global {
+  namespace Express {
+    interface Request {
+      agent?: {
+        id: string;
+        name: string;
+        role: string;
+        claimStatus: string;
+        description?: string;
+        badges: Array<{
+          provider: string;
+          verified: boolean;
+          reputationScore: number;
+        }>;
+      };
+    }
+  }
+}
+
+/**
+ * Extract API key from request.
+ * Checks Authorization header (Bearer token).
+ */
+function extractApiKey(req: Request): string | null {
+  const authHeader = req.headers.authorization;
+  if (authHeader?.startsWith("Bearer ")) {
+    return authHeader.slice(7);
+  }
+  return null;
+}
+
+/**
+ * Required API key authentication.
+ * Returns 401 if no valid API key provided.
+ */
+export const requireApiKey = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    const apiKey = extractApiKey(req);
+
+    if (!apiKey) {
+      res.status(401).json({
+        success: false,
+        error: {
+          code: "NO_API_KEY",
+          message: "Authorization header required (Bearer YOUR_API_KEY)",
+          hint: "Register at POST /api/v1/agents/register to get an API key",
+          statusCode: 401,
+        },
+      });
+      return;
+    }
+
+    const authService = await getAuthService();
+    const agent = await authService.getAgentByApiKey(apiKey);
+
+    if (!agent) {
+      res.status(401).json({
+        success: false,
+        error: {
+          code: "INVALID_API_KEY",
+          message: "Invalid API key",
+          statusCode: 401,
+        },
+      });
+      return;
+    }
+
+    // Check suspension
+    if (agent.suspendedAt) {
+      res.status(403).json({
+        success: false,
+        error: {
+          code: "AGENT_SUSPENDED",
+          message: "Your agent account has been suspended",
+          statusCode: 403,
+        },
+      });
+      return;
+    }
+
+    // Attach agent to request
+    req.agent = {
+      id: agent.id,
+      name: agent.name,
+      role: agent.role,
+      claimStatus: agent.claimStatus,
+      description: agent.description,
+      badges: (agent.badges || []).map((b: any) => ({
+        provider: b.provider,
+        verified: b.verified,
+        reputationScore: b.reputationScore || 0,
+      })),
+    };
+
+    logger.debug("API key authenticated", {
+      agentId: agent.id,
+      name: agent.name,
+      path: req.path,
+    });
+
+    next();
+  } catch (err: any) {
+    logger.error("API key auth failed", {
+      error: err.message,
+      path: req.path,
+    });
+
+    res.status(500).json({
+      success: false,
+      error: {
+        code: "AUTH_ERROR",
+        message: "Authentication check failed",
+        statusCode: 500,
+      },
+    });
+  }
+};
+
+/**
+ * Optional API key authentication.
+ * Attaches agent if valid key present, continues otherwise.
+ */
+export const optionalApiKey = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    const apiKey = extractApiKey(req);
+
+    if (apiKey) {
+      try {
+        const authService = await getAuthService();
+        const agent = await authService.getAgentByApiKey(apiKey);
+
+        if (agent && !agent.suspendedAt) {
+          req.agent = {
+            id: agent.id,
+            name: agent.name,
+            role: agent.role,
+            claimStatus: agent.claimStatus,
+            description: agent.description,
+            badges: (agent.badges || []).map((b: any) => ({
+              provider: b.provider,
+              verified: b.verified,
+              reputationScore: b.reputationScore || 0,
+            })),
+          };
+
+          logger.debug("Optional API key: agent authenticated", {
+            agentId: agent.id,
+          });
+        }
+      } catch (err) {
+        logger.debug("Optional API key: invalid key ignored", { error: err });
+      }
+    }
+
+    next();
+  } catch (err) {
+    logger.error("Optional API key middleware failed", { error: err });
+    next();
+  }
+};

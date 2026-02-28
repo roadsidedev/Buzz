@@ -296,7 +296,7 @@ export function validateCSRFToken() {
         method: req.method,
         path: req.path,
         ip: req.ip,
-        userId: req.agent?.agentId,
+        userId: req.agent?.id,
       });
 
       throw new ValidationError("CSRF token validation failed", {

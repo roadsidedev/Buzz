@@ -1,143 +1,291 @@
 /**
- * Authentication Routes
- * POST /auth/register - Register new agent
- * POST /auth/verify - Verify ERC-8004 identity
- * POST /auth/refresh - Refresh token
+ * Auth Routes — Agent authentication and owner management
+ *
+ * GET  /auth/me — Get authenticated agent profile
+ * GET  /auth/status — Get claim/verification status
+ * POST /auth/claim — Start claim flow (human email)
+ * POST /auth/verify-email — Verify email token
+ * POST /auth/verify-twitter — Complete Twitter verification
+ * POST /auth/setup-owner-email — Set up owner email
+ * POST /auth/rotate-key — Rotate API key (owner-only)
  */
 
 import { Router, Request, Response } from "express";
-import type { RegisterRequest, TokenResponse } from "../types/api.js";
-import { asyncHandler, authLimiter } from "../middleware/index.js";
-import { generateToken } from "../middleware/auth.js";
-import { validate, RegisterRequestSchema } from "../utils/validators.js";
-import { agentService } from "../services/index.js";
 import { logger } from "../utils/logger.js";
-import { setAccessTokenCookie, setRefreshTokenCookie, clearAuthCookies } from "../middleware/http-only-cookies.js";
+import { requireApiKey } from "../middleware/api-key-auth.js";
+import { emailService } from "../services/email-service.js";
 
 const router = Router();
 
 /**
- * POST /auth/register
- * Register new agent with ERC-8004 identity
+ * GET /auth/me
+ *
+ * Get authenticated agent profile (requires API key).
  */
-router.post(
-  "/register",
-  authLimiter,
-  asyncHandler(async (req: Request, res: Response): Promise<void> => {
-    // Validate request
-    const input = validate(RegisterRequestSchema, req.body);
+router.get("/me", requireApiKey, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { clawzzAuthService } = await import("../services/index.js");
+    const agent = await clawzzAuthService.getAgentById(req.agent!.id);
 
-    // Check if agent already exists
-    const existing = await agentService.getAgentByAddress(input.erc8004Address);
-    if (existing) {
-      res.status(400).json({
+    if (!agent) {
+      res.status(404).json({
         success: false,
-        error: {
-          code: "AGENT_ALREADY_EXISTS",
-          message: "An agent with this address is already registered",
-          statusCode: 400,
-        },
+        error: { code: "AGENT_NOT_FOUND", message: "Agent not found", statusCode: 404 },
       });
       return;
     }
 
-    // Create agent
-    const agent = await agentService.createAgent({
-      name: input.name,
-      erc8004Address: input.erc8004Address,
-      avatarUrl: input.avatarUrl,
+    res.json({ success: true, data: agent });
+  } catch (err: any) {
+    logger.error("Get agent profile failed", { error: err.message });
+    res.status(500).json({
+      success: false,
+      error: { code: "INTERNAL_SERVER_ERROR", message: "Failed to get profile", statusCode: 500 },
     });
-
-    // Generate token
-    const token = generateToken({
-      agentId: agent.id,
-      name: agent.name,
-      erc8004Address: agent.erc8004Address,
-      verified: true,
-    });
-
-    logger.info("Agent registered", {
-      agentId: agent.id,
-      name: agent.name,
-    });
-
-    const response: TokenResponse = {
-      token,
-      refreshToken: token, // TODO: Implement refresh token rotation
-      expiresIn: 7 * 24 * 60 * 60, // 7 days in seconds
-    };
-
-    // Set tokens in httpOnly cookies
-    setAccessTokenCookie(res, response.token, 3600); // 1 hour access
-    setRefreshTokenCookie(res, response.refreshToken, response.expiresIn); // 7 days refresh
-
-    res.status(201).json({
-      success: true,
-      data: {
-        agent: {
-          id: agent.id,
-          name: agent.name,
-          erc8004Address: agent.erc8004Address,
-          avatar: agent.avatar,
-        },
-        expiresIn: response.expiresIn,
-      },
-    });
-  })
-);
+  }
+});
 
 /**
- * POST /auth/logout
- * Clear authentication cookies
+ * GET /auth/status
+ *
+ * Get claim and verification status for authenticated agent.
  */
-router.post(
-  "/logout",
-  asyncHandler(async (req: Request, res: Response): Promise<void> => {
-    clearAuthCookies(res);
-    logger.info("Agent logged out (cookies cleared)");
-    res.json({
-      success: true,
-      message: "Logged out successfully",
+router.get("/status", requireApiKey, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { clawzzAuthService } = await import("../services/index.js");
+    const status = await clawzzAuthService.getClaimStatus(req.agent!.id);
+
+    res.json({ success: true, data: status });
+  } catch (err: any) {
+    logger.error("Get status failed", { error: err.message });
+    res.status(500).json({
+      success: false,
+      error: { code: "INTERNAL_SERVER_ERROR", message: "Failed to get status", statusCode: 500 },
     });
-  })
-);
+  }
+});
 
 /**
- * POST /auth/refresh
- * Refresh JWT token
+ * POST /auth/claim
+ *
+ * Start the owner claim flow. Human provides email.
+ * Body: { claim_token: string, email: string }
  */
-router.post(
-  "/refresh",
-  asyncHandler(async (req: Request, res: Response): Promise<void> => {
-    const { token: bodyToken } = req.body;
-    const cookieToken = req.cookies["__Host-refreshToken"];
-    const token = bodyToken || cookieToken;
+router.post("/claim", async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { claim_token, email } = req.body;
 
-    if (!token) {
+    if (!claim_token || !email) {
       res.status(400).json({
         success: false,
         error: {
           code: "VALIDATION_ERROR",
-          message: "Missing token",
+          message: "claim_token and email are required",
           statusCode: 400,
         },
       });
       return;
     }
 
-    // TODO: Validate refresh token and issue new ones
-    // For now, re-issuing same token for development (as in original stub)
-    setAccessTokenCookie(res, token, 3600);
-    setRefreshTokenCookie(res, token, 7 * 24 * 60 * 60);
+    const { clawzzAuthService } = await import("../services/index.js");
+    const result = await clawzzAuthService.startClaim(claim_token, email);
+
+    // Send verification email via SendGrid
+    await emailService.sendVerificationEmail(email, result.agentName, result.emailToken);
 
     res.json({
       success: true,
       data: {
-        token,
-        expiresIn: 7 * 24 * 60 * 60,
+        message: `Verification email sent to ${email}. Check your inbox.`,
+        next_step: "Click the link in the email to verify, then complete Twitter verification.",
       },
     });
-  })
+  } catch (err: any) {
+    if (err.message?.includes("Invalid") || err.message?.includes("already")) {
+      res.status(400).json({
+        success: false,
+        error: { code: "VALIDATION_ERROR", message: err.message, statusCode: 400 },
+      });
+      return;
+    }
+    logger.error("Claim failed", { error: err.message });
+    res.status(500).json({
+      success: false,
+      error: { code: "INTERNAL_SERVER_ERROR", message: "Claim failed", statusCode: 500 },
+    });
+  }
+});
+
+/**
+ * POST /auth/verify-email
+ *
+ * Verify email token from the verification link.
+ * Body: { token: string }
+ */
+router.post("/verify-email", async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { token } = req.body;
+
+    if (!token) {
+      res.status(400).json({
+        success: false,
+        error: { code: "VALIDATION_ERROR", message: "Email token required", statusCode: 400 },
+      });
+      return;
+    }
+
+    const { clawzzAuthService } = await import("../services/index.js");
+    const result = await clawzzAuthService.verifyEmail(token);
+
+    res.json({
+      success: true,
+      data: {
+        message: `Email verified for ${result.agentName}!`,
+        agent_id: result.agentId,
+        next_step: "Complete Twitter verification",
+        twitter_instructions: `Post a tweet containing your verification code: ${result.verificationCode}`,
+        verification_code: result.verificationCode,
+      },
+    });
+  } catch (err: any) {
+    if (err.message?.includes("Invalid") || err.message?.includes("expired")) {
+      res.status(400).json({
+        success: false,
+        error: { code: "VALIDATION_ERROR", message: err.message, statusCode: 400 },
+      });
+      return;
+    }
+    logger.error("Email verification failed", { error: err.message });
+    res.status(500).json({
+      success: false,
+      error: { code: "INTERNAL_SERVER_ERROR", message: "Verification failed", statusCode: 500 },
+    });
+  }
+});
+
+/**
+ * POST /auth/verify-twitter
+ *
+ * Complete Twitter verification.
+ * Body: { agent_id: string, twitter_handle: string }
+ */
+router.post("/verify-twitter", async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { agent_id, twitter_handle } = req.body;
+
+    if (!agent_id || !twitter_handle) {
+      res.status(400).json({
+        success: false,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: "agent_id and twitter_handle are required",
+          statusCode: 400,
+        },
+      });
+      return;
+    }
+
+    const { clawzzAuthService } = await import("../services/index.js");
+    await clawzzAuthService.verifyTwitter(agent_id, twitter_handle);
+
+    res.json({
+      success: true,
+      data: {
+        message: "Agent fully claimed! 🐾",
+        status: "claimed",
+        twitter_verified: true,
+      },
+    });
+  } catch (err: any) {
+    logger.error("Twitter verification failed", { error: err.message });
+    res.status(500).json({
+      success: false,
+      error: { code: "INTERNAL_SERVER_ERROR", message: "Twitter verification failed", statusCode: 500 },
+    });
+  }
+});
+
+/**
+ * POST /auth/setup-owner-email
+ *
+ * Set up owner email (for agents that weren't claimed via email yet).
+ */
+router.post(
+  "/setup-owner-email",
+  requireApiKey,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { email } = req.body;
+
+      if (!email) {
+        res.status(400).json({
+          success: false,
+          error: { code: "VALIDATION_ERROR", message: "Email required", statusCode: 400 },
+        });
+        return;
+      }
+
+      const { clawzzAuthService } = await import("../services/index.js");
+      const emailToken = await clawzzAuthService.setupOwnerEmail(req.agent!.id, email);
+
+      await emailService.sendVerificationEmail(email, req.agent!.name, emailToken);
+
+      res.json({
+        success: true,
+        data: { message: `Verification email sent to ${email}` },
+      });
+    } catch (err: any) {
+      logger.error("Setup owner email failed", { error: err.message });
+      res.status(500).json({
+        success: false,
+        error: { code: "INTERNAL_SERVER_ERROR", message: "Setup failed", statusCode: 500 },
+      });
+    }
+  },
+);
+
+/**
+ * POST /auth/rotate-key
+ *
+ * Rotate API key. Agent must be claimed (owner email verified).
+ */
+router.post(
+  "/rotate-key",
+  requireApiKey,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      // Only allow key rotation for claimed agents
+      if (req.agent!.claimStatus !== "claimed") {
+        res.status(403).json({
+          success: false,
+          error: {
+            code: "NOT_CLAIMED",
+            message: "Agent must be fully claimed to rotate API keys. Complete email + Twitter verification first.",
+            statusCode: 403,
+          },
+        });
+        return;
+      }
+
+      const { clawzzAuthService } = await import("../services/index.js");
+      const newKey = await clawzzAuthService.rotateApiKey(req.agent!.id);
+
+      res.json({
+        success: true,
+        data: {
+          api_key: newKey,
+          message: "API key rotated! Update your agent's configuration with the new key.",
+          important: "⚠️ The old API key has been invalidated immediately.",
+        },
+      });
+    } catch (err: any) {
+      logger.error("Key rotation failed", { error: err.message });
+      res.status(500).json({
+        success: false,
+        error: { code: "INTERNAL_SERVER_ERROR", message: "Key rotation failed", statusCode: 500 },
+      });
+    }
+  },
 );
 
 export default router;

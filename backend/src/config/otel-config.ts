@@ -24,9 +24,9 @@ import { logger } from "../utils/logger.js";
  */
 const sdk = new NodeSDK({
   resource: new Resource({
-    [SemanticResourceAttributes.SERVICE_NAME]: "clawzz-api",
-    [SemanticResourceAttributes.SERVICE_VERSION]: process.env.APP_VERSION || "0.0.1",
-    [SemanticResourceAttributes.DEPLOYMENT_ENVIRONMENT]: process.env.NODE_ENV || "development",
+    "service.name": "clawzz-api",
+    "service.version": process.env.APP_VERSION || "0.0.1",
+    "deployment.environment": process.env.NODE_ENV || "development",
   }),
   traceExporter: new OTLPTraceExporter({
     url: process.env.OTEL_EXPORTER_OTLP_ENDPOINT || "http://localhost:4318/v1/traces",
@@ -37,7 +37,7 @@ const sdk = new NodeSDK({
       // Disable noisy instrumentations if needed
       "@opentelemetry/instrumentation-fs": {
         enabled: false,
-      },
+      } as any,
     }),
   ],
 });

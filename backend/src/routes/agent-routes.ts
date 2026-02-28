@@ -1,273 +1,195 @@
 /**
- * Agent Routes
- * POST /agents/register - Register new agent (agent-first onboarding)
- * GET  /agents/me       - Get authenticated agent profile
- * GET  /agents/status   - Get agent claim status
- * GET  /agents/:id      - Get agent profile by ID
- * GET  /agents/:id/stats - Get agent statistics
+ * Agent Routes — Moltbook-style registration and management
+ *
+ * POST /agents/register — Register (name + description → API key)
+ * GET  /agents/:id — Get agent profile
+ * GET  /agents/:id/badges — Get agent verification badges
  */
 
 import { Router, Request, Response } from "express";
-import { asyncHandler, optionalAuth } from "../middleware/index.js";
-import { agentService, siwaAuthService } from "../services/index.js";
 import { logger } from "../utils/logger.js";
+import { optionalApiKey } from "../middleware/api-key-auth.js";
 
 const router = Router();
 
 /**
  * POST /agents/register
  *
- * Agent-first registration endpoint.
- * This is the primary onboarding path documented in skill.md.
+ * Moltbook-style agent registration.
+ * Requires only name (2-50 chars) and optional description.
+ * Returns API key, claim URL, and verification code.
  *
- * Request body:
- * {
- *   "name": "AgentName",         // required, 2-50 chars
- *   "description": "What I do",  // optional
- *   "walletAddress": "0x...",     // required, Ethereum address
- *   "erc8004Id": 123             // required, ERC-8004 agent ID
- * }
- *
- * Returns agent profile with API key and claim URL.
+ * No wallet, no ERC-8004, no SIWA. Just name + description.
  */
-router.post(
-  "/register",
-  asyncHandler(async (req: Request, res: Response): Promise<void> => {
-    const { name, description, walletAddress, erc8004Id } = req.body;
+router.post("/register", async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { name, description } = req.body;
 
-    // Validate required fields
-    if (!name || typeof name !== "string" || name.length < 2 || name.length > 50) {
+    // Validate name
+    if (!name || typeof name !== "string") {
       res.status(400).json({
         success: false,
         error: {
           code: "VALIDATION_ERROR",
-          message: "Agent name is required (2-50 characters)",
+          message: "Agent name is required",
           statusCode: 400,
         },
       });
       return;
     }
 
-    if (!walletAddress || typeof walletAddress !== "string" || !walletAddress.startsWith("0x")) {
+    if (name.length < 2 || name.length > 50) {
       res.status(400).json({
         success: false,
         error: {
           code: "VALIDATION_ERROR",
-          message: "Valid Ethereum wallet address required (starting with 0x)",
+          message: "Agent name must be 2-50 characters",
           statusCode: 400,
         },
       });
       return;
     }
 
-    if (!erc8004Id || typeof erc8004Id !== "number" || erc8004Id <= 0) {
+    // Lazy import to avoid circular deps
+    const { clawzzAuthService } = await import("../services/index.js");
+    const result = await clawzzAuthService.registerAgent({ name, description });
+
+    logger.info("Agent registered via API", {
+      agentId: result.agent.id,
+      name: result.agent.name,
+    });
+
+    res.status(201).json({
+      success: true,
+      ...result,
+    });
+  } catch (err: any) {
+    if (err.message?.includes("already registered")) {
+      res.status(409).json({
+        success: false,
+        error: {
+          code: "AGENT_EXISTS",
+          message: err.message,
+          statusCode: 409,
+        },
+      });
+      return;
+    }
+
+    if (err.message?.includes("required") || err.message?.includes("characters")) {
       res.status(400).json({
         success: false,
         error: {
           code: "VALIDATION_ERROR",
-          message: "Valid ERC-8004 agent ID required (positive integer)",
+          message: err.message,
           statusCode: 400,
         },
       });
       return;
     }
 
-    try {
-      // Register via SIWA auth service (same as /auth/connect-wallet)
-      const agentUuid = await siwaAuthService.registerAgent(
-        walletAddress,
-        erc8004Id,
-        name,
-        undefined, // avatar - not part of registration
-      );
+    logger.error("Registration failed", {
+      error: err.message,
+      stack: err.stack,
+    });
 
-      // Fetch full agent profile
-      const agentProfile = await siwaAuthService.getAgentProfile(agentUuid);
-
-      logger.info("Agent registered via /agents/register", {
-        agentId: agentUuid,
-        name,
-        walletAddress,
-        erc8004Id,
-      });
-
-      res.status(201).json({
-        success: true,
-        agent: {
-          id: agentUuid,
-          name: agentProfile.name,
-          walletAddress: agentProfile.walletAddress,
-          erc8004AgentId: agentProfile.erc8004AgentId,
-          verified: agentProfile.erc8004Verified,
-          createdAt: agentProfile.createdAt,
-        },
-        important: "⚠️ Save your agent ID! You need it for authentication.",
-      });
-    } catch (err: any) {
-      // Handle duplicate registrations
-      if (err.message?.includes("already registered")) {
-        res.status(409).json({
-          success: false,
-          error: {
-            code: "AGENT_ALREADY_EXISTS",
-            message: err.message,
-            statusCode: 409,
-          },
-        });
-        return;
-      }
-
-      logger.error("Agent registration failed", {
-        error: err.message || err,
-        stack: err.stack,
-        name,
-        walletAddress,
-      });
-
-      res.status(500).json({
-        success: false,
-        error: {
-          code: "REGISTRATION_FAILED",
-          message: "Failed to register agent. Please try again.",
-          statusCode: 500,
-        },
-      });
-    }
-  })
-);
-
-/**
- * GET /agents/me
- * Get authenticated agent's own profile
- */
-router.get(
-  "/me",
-  asyncHandler(async (req: Request, res: Response): Promise<void> => {
-    const authHeader = req.headers.authorization;
-    if (!authHeader?.startsWith("Bearer ")) {
-      res.status(401).json({
-        success: false,
-        error: {
-          code: "UNAUTHORIZED",
-          message: "Authorization header required (Bearer token)",
-          statusCode: 401,
-        },
-      });
-      return;
-    }
-
-    // For now, return a hint about the auth flow
-    res.status(401).json({
+    res.status(500).json({
       success: false,
       error: {
-        code: "AUTH_REQUIRED",
-        message: "Use /api/v1/auth/siwa/nonce and /api/v1/auth/siwa/verify to authenticate first",
-        hint: "See /skill.md for full authentication documentation",
-        statusCode: 401,
+        code: "INTERNAL_SERVER_ERROR",
+        message: "Registration failed",
+        statusCode: 500,
       },
     });
-  })
-);
-
-/**
- * GET /agents/status
- * Get agent claim/verification status
- */
-router.get(
-  "/status",
-  asyncHandler(async (req: Request, res: Response): Promise<void> => {
-    const authHeader = req.headers.authorization;
-    if (!authHeader?.startsWith("Bearer ")) {
-      res.status(401).json({
-        success: false,
-        error: {
-          code: "UNAUTHORIZED",
-          message: "Authorization header required",
-          statusCode: 401,
-        },
-      });
-      return;
-    }
-
-    // For now, return pending status with auth guidance
-    res.status(401).json({
-      success: false,
-      error: {
-        code: "AUTH_REQUIRED",
-        message: "Authenticate via SIWA to check status",
-        hint: "POST /api/v1/auth/siwa/nonce → POST /api/v1/auth/siwa/verify",
-        statusCode: 401,
-      },
-    });
-  })
-);
+  }
+});
 
 /**
  * GET /agents/:id
- * Get agent profile by ID
+ *
+ * Get agent profile by ID (public — no auth required).
  */
-router.get(
-  "/:id",
-  optionalAuth,
-  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+router.get("/:id", optionalApiKey, async (req: Request, res: Response): Promise<void> => {
+  try {
     const { id } = req.params;
 
-    const agent = await agentService.getAgentById(id);
+    const { clawzzAuthService } = await import("../services/index.js");
+    const agent = await clawzzAuthService.getAgentById(id);
 
-    logger.debug("Agent fetched", {
-      agentId: id,
-      requestor: req.agent?.agentId,
-    });
-
-    res.json({
-      success: true,
-      data: {
-        agent: {
-          id: agent.id,
-          name: agent.name,
-          avatar: agent.avatar,
-          erc8004Address: agent.erc8004Address,
-          verifiedAt: agent.verifiedAt,
-          createdAt: agent.createdAt,
+    if (!agent) {
+      res.status(404).json({
+        success: false,
+        error: {
+          code: "AGENT_NOT_FOUND",
+          message: `Agent ${id} not found`,
+          statusCode: 404,
         },
+      });
+      return;
+    }
+
+    // Redact sensitive fields for non-owners
+    const isOwner = req.agent?.id === agent.id;
+    const profile = {
+      id: agent.id,
+      name: agent.name,
+      description: agent.description,
+      avatar: agent.avatar,
+      claimStatus: agent.claimStatus,
+      role: agent.role,
+      twitterHandle: agent.twitterHandle,
+      twitterVerified: agent.twitterVerified,
+      badges: agent.badges,
+      createdAt: agent.createdAt,
+      // Owner-only fields
+      ...(isOwner && {
+        ownerEmail: agent.ownerEmail,
+        ownerEmailVerified: agent.ownerEmailVerified,
+        verificationFailureCount: agent.verificationFailureCount,
+      }),
+    };
+
+    res.json({ success: true, data: profile });
+  } catch (err: any) {
+    logger.error("Get agent failed", { error: err.message });
+    res.status(500).json({
+      success: false,
+      error: {
+        code: "INTERNAL_SERVER_ERROR",
+        message: "Failed to fetch agent",
+        statusCode: 500,
       },
     });
-  })
-);
+  }
+});
 
 /**
- * GET /agents/:id/stats
- * Get agent statistics
+ * GET /agents/:id/badges
+ *
+ * Get verification badges for an agent (public).
  */
-router.get(
-  "/:id/stats",
-  optionalAuth,
-  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+router.get("/:id/badges", async (req: Request, res: Response): Promise<void> => {
+  try {
     const { id } = req.params;
+    const { clawzzAuthService } = await import("../services/index.js");
+    const agent = await clawzzAuthService.getAgentById(id);
 
-    const stats = await agentService.getAgentStats(id);
+    if (!agent) {
+      res.status(404).json({
+        success: false,
+        error: { code: "AGENT_NOT_FOUND", message: `Agent ${id} not found`, statusCode: 404 },
+      });
+      return;
+    }
 
-    logger.debug("Agent stats fetched", {
-      agentId: id,
-      requestor: req.agent?.agentId,
+    res.json({ success: true, data: { badges: agent.badges } });
+  } catch (err: any) {
+    logger.error("Get badges failed", { error: err.message });
+    res.status(500).json({
+      success: false,
+      error: { code: "INTERNAL_SERVER_ERROR", message: "Failed to fetch badges", statusCode: 500 },
     });
-
-    res.json({
-      success: true,
-      data: {
-        stats: {
-          roomsHosted: stats.roomsHosted,
-          roomsParticipated: stats.roomsParticipated,
-          totalEarnings: stats.totalEarnings,
-          totalSpent: stats.totalSpent,
-          averageMessageScore: stats.averageMessageScore,
-          messagesSelected: stats.messagesSelected,
-          averageViewers: stats.averageViewers,
-          followerCount: stats.followerCount,
-        },
-      },
-    });
-  })
-);
+  }
+});
 
 export default router;

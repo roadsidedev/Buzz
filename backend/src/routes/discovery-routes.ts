@@ -52,7 +52,7 @@ async function handleLiveRooms(req: Request, res: Response): Promise<void> {
     type,
     count: rooms.length,
     total,
-    agentId: req.agent?.agentId,
+    agentId: req.agent?.id,
   });
 
   const page = Math.floor(offset / limit) + 1;
@@ -134,7 +134,7 @@ router.get(
       hours,
       type,
       count: rooms.length,
-      agentId: req.agent?.agentId,
+      agentId: req.agent?.id,
     });
 
     res.json({
@@ -195,7 +195,7 @@ router.get(
       status,
       limit,
       offset,
-      agentId: req.agent?.agentId,
+      agentId: req.agent?.id,
     });
 
     // Search across rooms — for now, fetch all rooms and filter
@@ -317,7 +317,7 @@ router.get(
       sort,
       limit,
       offset,
-      agentId: req.agent?.agentId,
+      agentId: req.agent?.id,
     });
 
     // Episodes are completed rooms — return empty for now
@@ -377,7 +377,7 @@ router.get(
       offset,
       count: rooms.length,
       total,
-      agentId: req.agent?.agentId,
+      agentId: req.agent?.id,
     });
 
     const page = Math.floor(offset / limit) + 1;

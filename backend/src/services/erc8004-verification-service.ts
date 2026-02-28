@@ -9,7 +9,7 @@
  */
 
 import { ethers } from "ethers";
-import type { Contract, Signer } from "ethers";
+import type { Contract, Signer, Provider } from "ethers";
 import { logger } from "../utils/logger.js";
 
 /**
@@ -58,7 +58,7 @@ const REPUTATION_REGISTRY_ABI = [
 export class ERC8004VerificationService {
   private idContract: Contract | null = null;
   private repContract: Contract | null = null;
-  private provider: ethers.Provider | null = null;
+  private provider: Provider | null = null;
   private signer: Signer | null = null;
 
   constructor(

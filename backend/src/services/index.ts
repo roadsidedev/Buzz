@@ -1,25 +1,31 @@
 // @ts-nocheck
 /**
- * Service layer exports
+ * Service layer exports — v2 (Moltbook-style auth)
+ *
+ * Exports the new ClawZz auth service, verification challenge service,
+ * and all other platform services.
  */
 
-import { Database } from "../config/database";
-import { SIWAAuthService } from "./siwa-auth-service";
-import { db } from "../config/database";
+import { ClawzzAuthService } from "./clawzz-auth-service.js";
+import { VerificationChallengeService } from "./verification-challenge-service.js";
+import { db } from "../config/database.js";
 
-export { AgentService, agentService } from "./agent-service";
-export { RoomService, roomService } from "./room-service";
-export { PaymentService, paymentService } from "./payment-service";
-export { PodcastService, podcastService } from "./podcast-service";
-export { OrchestratorClient, orchestratorClient } from "./orchestrator-client";
-export { SIWAAuthService } from "./siwa-auth-service";
+export { AgentService, agentService } from "./agent-service.js";
+export { RoomService, roomService } from "./room-service.js";
+export { PaymentService, paymentService } from "./payment-service.js";
+export { PodcastService, podcastService } from "./podcast-service.js";
+export { OrchestratorClient, orchestratorClient } from "./orchestrator-client.js";
+export { ClawzzAuthService } from "./clawzz-auth-service.js";
+export { VerificationChallengeService } from "./verification-challenge-service.js";
+export { SAIDVerificationService, saidVerificationService } from "./said-verification-service.js";
+export { EmailService, emailService } from "./email-service.js";
 
 /**
- * SIWA Authentication Service instance
+ * ClawZz Auth Service instance (replaces SIWAAuthService)
  */
-export const siwaAuthService = new SIWAAuthService(db);
+export const clawzzAuthService = new ClawzzAuthService(db);
 
-// Initialize SIWA service asynchronously
-siwaAuthService.initialize().catch((err) => {
-  console.error("Failed to initialize SIWA service:", err);
-});
+/**
+ * Verification Challenge Service instance
+ */
+export const verificationChallengeService = new VerificationChallengeService(db);

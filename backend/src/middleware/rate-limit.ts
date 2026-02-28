@@ -142,29 +142,68 @@ export function createRateLimiter(config: RateLimitConfig) {
  * Per-endpoint rate limiters
  */
 
-// Auth endpoints: 3 requests per 15 minutes (reduced for security)
-export const authLimiter = createRateLimiter({
-  windowMs: 15 * 60 * 1000,
-  maxRequests: 3,
+// Registration: 5 registrations per hour per IP
+export const registrationLimiter = createRateLimiter({
+  windowMs: 60 * 60 * 1000,
+  maxRequests: 5,
+  keyGenerator: (req: Request) => req.ip || "unknown",
 });
 
-// Room creation: 5 rooms per hour per agent (spawn fee prevention)
+// Auth endpoints: 10 requests per 15 minutes
+export const authLimiter = createRateLimiter({
+  windowMs: 15 * 60 * 1000,
+  maxRequests: 10,
+});
+
+// Room creation (established agents): 5 rooms per hour
 export const roomCreationLimiter = createRateLimiter({
   windowMs: 60 * 60 * 1000,
   maxRequests: 5,
 });
 
-// Message submission: 100 messages per minute per agent
+// Room creation (NEW agents, first 24h): 1 room per 2 hours
+export const newAgentRoomLimiter = createRateLimiter({
+  windowMs: 2 * 60 * 60 * 1000,
+  maxRequests: 1,
+});
+
+// Message submission (established): 100 messages per minute
 export const messageLimiter = createRateLimiter({
   windowMs: 60 * 1000,
   maxRequests: 100,
 });
 
-// General API: 1000 requests per minute per agent
+// Message submission (NEW agents): 20 messages per day
+export const newAgentMessageLimiter = createRateLimiter({
+  windowMs: 24 * 60 * 60 * 1000,
+  maxRequests: 20,
+});
+
+// Content verification: 30 attempts per minute
+export const verificationLimiter = createRateLimiter({
+  windowMs: 60 * 1000,
+  maxRequests: 30,
+});
+
+// General API: 100 requests per minute per agent
 export const generalApiLimiter = createRateLimiter({
   windowMs: 60 * 1000,
-  maxRequests: 1000,
+  maxRequests: 100,
 });
+
+/**
+ * Check if an agent is "new" (created within last 24 hours).
+ * Used by routes to pick the stricter rate limiter for fresh agents.
+ */
+export function isNewAgent(req: Request): boolean {
+  const agent = (req as any).agent;
+  if (!agent) return true; // unauthenticated = treat as new
+  // If agent has no created_at on the request object, we can't check, so be strict
+  const createdAt = agent.createdAt ? new Date(agent.createdAt) : null;
+  if (!createdAt) return true;
+  const ageMs = Date.now() - createdAt.getTime();
+  return ageMs < 24 * 60 * 60 * 1000; // 24 hours
+}
 
 /**
  * Initialize rate limiting on server startup

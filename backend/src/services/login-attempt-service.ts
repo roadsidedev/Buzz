@@ -40,11 +40,11 @@ export class LoginAttemptService {
     this.redis = createClient({
       url: process.env.REDIS_URL || "redis://localhost:6379",
       socket: {
-        reconnectStrategy: (retries) => Math.min(retries * 50, 500),
+        reconnectStrategy: (retries: number) => Math.min(retries * 50, 500),
       },
     });
 
-    this.redis.on("error", (err) => {
+    this.redis.on("error", (err: Error) => {
       logger.error("Redis client error in LoginAttemptService", {
         error: err.message,
       });
