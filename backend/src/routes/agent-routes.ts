@@ -119,6 +119,7 @@ router.post(
 
       logger.error("Agent registration failed", {
         error: err.message || err,
+        stack: err.stack,
         name,
         walletAddress,
       });
@@ -127,7 +128,7 @@ router.post(
         success: false,
         error: {
           code: "REGISTRATION_FAILED",
-          message: "Failed to register agent. Please try again.",
+          message: err.message || "Failed to register agent. Please try again.",
           statusCode: 500,
         },
       });
