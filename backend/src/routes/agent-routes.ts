@@ -128,7 +128,7 @@ router.post(
         success: false,
         error: {
           code: "REGISTRATION_FAILED",
-          message: err.message || "Failed to register agent. Please try again.",
+          message: "Failed to register agent. Please try again.",
           statusCode: 500,
         },
       });
