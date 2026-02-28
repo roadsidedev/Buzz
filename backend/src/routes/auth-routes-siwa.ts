@@ -401,5 +401,147 @@ router.post(
     }
   })
 );
+/**
+ * POST /auth/dev-token
+ *
+ * DEV ONLY: Generate a valid JWT for testing without SIWA on-chain verification.
+ * Requires DEV_AUTH_BYPASS=true environment variable.
+ *
+ * Request body:
+ * {
+ *   "walletAddress": "0x...",
+ *   "agentId": 42
+ * }
+ *
+ * Response:
+ * {
+ *   "success": true,
+ *   "token": "eyJ...",
+ *   "expiresIn": 3600,
+ *   "agent": { ... }
+ * }
+ */
+router.post(
+  "/dev-token",
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    // Only available in dev mode
+    if (process.env.DEV_AUTH_BYPASS !== "true") {
+      res.status(404).json({
+        success: false,
+        error: {
+          code: "NOT_FOUND",
+          message: "Endpoint not available",
+          statusCode: 404,
+        },
+      });
+      return;
+    }
+
+    const { walletAddress, agentId } = req.body;
+
+    if (!walletAddress) {
+      res.status(400).json({
+        success: false,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: "walletAddress is required",
+          statusCode: 400,
+        },
+      });
+      return;
+    }
+
+    try {
+      // Look up agent by wallet address or erc_8004_agent_id
+      const { Pool } = await import("pg");
+      const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+
+      let agentRow;
+      if (agentId) {
+        const result = await pool.query(
+          `SELECT id, name, wallet_address, erc_8004_agent_id, erc_8004_verified, email, username, role
+           FROM agent WHERE wallet_address = $1 AND erc_8004_agent_id = $2`,
+          [walletAddress, agentId]
+        );
+        agentRow = result.rows[0];
+      } else {
+        const result = await pool.query(
+          `SELECT id, name, wallet_address, erc_8004_agent_id, erc_8004_verified, email, username, role
+           FROM agent WHERE wallet_address = $1`,
+          [walletAddress]
+        );
+        agentRow = result.rows[0];
+      }
+
+      if (!agentRow) {
+        res.status(404).json({
+          success: false,
+          error: {
+            code: "AGENT_NOT_FOUND",
+            message: "Agent not found. Register first via POST /agents/register",
+            statusCode: 404,
+          },
+        });
+        await pool.end();
+        return;
+      }
+
+      // Generate JWT using the same secret/format as AuthService
+      const jwt = await import("jsonwebtoken");
+      const jwtSecret = process.env.JWT_SECRET;
+
+      if (!jwtSecret) {
+        throw new Error("JWT_SECRET not configured");
+      }
+
+      const now = Math.floor(Date.now() / 1000);
+      const expiresIn = 3600; // 1 hour
+
+      const payload = {
+        sub: agentRow.id,
+        agentId: agentRow.id,
+        email: agentRow.email || `${agentRow.name.toLowerCase().replace(/\s+/g, '')}@dev.clawzz.ai`,
+        username: agentRow.username || agentRow.name,
+        role: agentRow.role || "agent",
+        aud: "clawzz",
+        iat: now,
+        exp: now + expiresIn,
+      };
+
+      const token = jwt.default.sign(payload, jwtSecret, { algorithm: "HS256" });
+
+      logger.info("DEV TOKEN issued", {
+        agentId: agentRow.id,
+        walletAddress,
+        name: agentRow.name,
+      });
+
+      res.json({
+        success: true,
+        token,
+        expiresIn,
+        agent: {
+          id: agentRow.id,
+          name: agentRow.name,
+          walletAddress: agentRow.wallet_address,
+          erc8004AgentId: agentRow.erc_8004_agent_id,
+          verified: agentRow.erc_8004_verified,
+        },
+      });
+
+      await pool.end();
+    } catch (err: any) {
+      logger.error("Dev token generation failed", { error: err.message });
+      res.status(500).json({
+        success: false,
+        error: {
+          code: "DEV_TOKEN_FAILED",
+          message: err.message || "Failed to generate dev token",
+          statusCode: 500,
+        },
+      });
+    }
+  })
+);
 
 export default router;
