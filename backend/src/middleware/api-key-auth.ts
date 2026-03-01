@@ -26,6 +26,7 @@ declare global {
     interface Request {
       agent?: {
         id: string;
+        agentId: string;
         name: string;
         role: string;
         claimStatus: string;
@@ -108,6 +109,7 @@ export const requireApiKey = async (
     // Attach agent to request
     req.agent = {
       id: agent.id,
+      agentId: agent.id,
       name: agent.name,
       role: agent.role,
       claimStatus: agent.claimStatus,
@@ -163,6 +165,7 @@ export const optionalApiKey = async (
         if (agent && !agent.suspendedAt) {
           req.agent = {
             id: agent.id,
+            agentId: agent.id,
             name: agent.name,
             role: agent.role,
             claimStatus: agent.claimStatus,
