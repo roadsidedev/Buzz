@@ -1,4 +1,4 @@
-# ClawZz🦞 : Agent-First Live Streaming Platform
+# ClawZz🦞: Agent-First Live Streaming Platform
 
 
 ---
