@@ -1,105 +1,60 @@
-/**
- * AppRouter: Main application router configuration
- *
- * UX Flow:
- * - Landing page with TikTok-style navigation
- * - Discovery with feed
- * - Profile with context switching
- */
-
-import React, { Suspense, lazy } from "react";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import React, { Suspense, lazy } from "react"
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom"
 
 // Layouts
-import { MainLayout } from "@/components/layouts/main-layout";
+import { MainLayout } from "@/components/layouts/main-layout"
 
 // Error pages
-import { NotFoundPage } from "@/pages/not-found-page";
+import { NotFoundPage } from "@/pages/not-found-page"
 
 // Loading component
 const PageLoader: React.FC = () => (
-  <div className="flex items-center justify-center min-h-screen bg-[#D1D1D1]">
-    <div className="border-[3px] border-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] bg-white p-8">
-      <div className="mb-4 h-12 w-12 border-[3px] border-black bg-[#6C5CE7] mx-auto animate-pulse"></div>
-      <p className="font-mono font-black uppercase">Loading...</p>
+  <div className="flex items-center justify-center min-h-screen bg-mac-gray">
+    <div className="border-4 border-mac-charcoal shadow-retro-lg bg-mac-white p-8 text-center flex flex-col items-center">
+      <div className="mb-4 h-12 w-12 border-4 border-mac-charcoal bg-accent-purple animate-spin"></div>
+      <p className="font-sans font-black uppercase tracking-widest text-mac-charcoal">Loading Interface...</p>
     </div>
   </div>
-);
+)
 
-// Lazy load pages for code splitting
-const HeroPage = lazy(() =>
-  import("@/pages/hero-page").then((m) => ({ default: m.HeroPage })),
-);
-const GetStartedPage = lazy(() =>
-  import("@/pages/get-started-page").then((m) => ({
-    default: m.GetStartedPage,
-  })),
-);
-const DiscoveryPage = lazy(() =>
-  import("@/pages/discovery-page").then((m) => ({ default: m.DiscoveryPage })),
-);
-const RoomLivePage = lazy(() =>
-  import("@/pages/room-live-page").then((m) => ({ default: m.RoomLivePage })),
-);
-const EpisodePlayerPage = lazy(() =>
-  import("@/pages/episode-player-page").then((m) => ({
-    default: m.EpisodePlayerPage,
-  })),
-);
-const ProfilePage = lazy(() =>
-  import("@/pages/profile-page").then((m) => ({ default: m.ProfilePage })),
-);
-const ClaimPage = lazy(() =>
-  import("@/pages/claim-page").then((m) => ({ default: m.ClaimPage })),
-);
+// View Components (Lazy Loaded)
+const HomeView = lazy(() => import("@/pages/hero-page"))
+const RoomsView = lazy(() => import("@/pages/discovery-page"))
+const PodcastsView = lazy(() => import("@/pages/podcasts-page"))
+const LiveStreamView = lazy(() => import("@/pages/room-live-page"))
+const ProfileView = lazy(() => import("@/pages/profile-page"))
+const GetStartedPage = lazy(() => import("@/pages/get-started-page").then(m => ({ default: m.GetStartedPage })))
 
-/**
- * AppRouter: Main application router
- */
 export const AppRouter: React.FC = () => {
   return (
     <BrowserRouter>
       <Suspense fallback={<PageLoader />}>
         <Routes>
-          {/* Hero/landing page */}
-          <Route path="/" element={<HeroPage />} />
-
-          {/* Get started - Onboarding */}
+          {/* Public / Onboarding */}
           <Route path="/get-started" element={<GetStartedPage />} />
 
-          {/* Claim page */}
-          <Route
-            path="/claim/:token"
-            element={
-              <MainLayout>
-                <ClaimPage />
-              </MainLayout>
-            }
-          />
+          {/* Main Application Routes wrapped in MainLayout */}
+          <Route path="/" element={<MainLayout><HomeView /></MainLayout>} />
+          <Route path="/home" element={<Navigate to="/" replace />} />
+          <Route path="/feed" element={<Navigate to="/" replace />} />
+          
+          <Route path="/rooms" element={<MainLayout><RoomsView /></MainLayout>} />
+          <Route path="/room/:id" element={<MainLayout><RoomsView /></MainLayout>} /> {/* In a real app this would be a specific room view */}
+          
+          <Route path="/podcasts" element={<MainLayout><PodcastsView /></MainLayout>} />
+          
+          <Route path="/live" element={<MainLayout><LiveStreamView /></MainLayout>} />
+          <Route path="/live/:id" element={<MainLayout><LiveStreamView /></MainLayout>} />
+          
+          <Route path="/profile" element={<MainLayout><ProfileView /></MainLayout>} />
+          <Route path="/profile/:id" element={<MainLayout><ProfileView /></MainLayout>} />
 
-          {/* Feed page - TikTok-style feed with search */}
-          <Route path="/feed" element={<DiscoveryPage />} />
-          <Route path="/discover" element={<Navigate to="/feed" replace />} />
-
-          {/* Live room */}
-          <Route path="/room/:id" element={<RoomLivePage />} />
-
-          {/* Live room (shorthand) */}
-          <Route path="/room/:id/live" element={<RoomLivePage />} />
-
-          {/* Episode player */}
-          <Route path="/episode/:id" element={<EpisodePlayerPage />} />
-
-          {/* Profile - Context based on route */}
-          <Route path="/profile" element={<ProfilePage />} />
-          <Route path="/profile/:id" element={<ProfilePage />} />
-
-          {/* 404 Not Found */}
-          <Route path="*" element={<NotFoundPage />} />
+          {/* 404 */}
+          <Route path="*" element={<MainLayout><NotFoundPage /></MainLayout>} />
         </Routes>
       </Suspense>
     </BrowserRouter>
-  );
-};
+  )
+}
 
-export default AppRouter;
+export default AppRouter

@@ -1,280 +1,117 @@
-/**
- * HeroPage - Landing Page
- *
- * Features:
- * - Platform stats (3 on mobile scrollable, 3 on desktop grid)
- * - CTA for exploring livestreams
- * - Onboarding & dev docs (desktop: side by side, mobile: tabs with content)
- */
+import React, { useEffect, useState } from "react"
+import { useNavigate } from "react-router-dom"
+import { TrendingUp, Radio, Tv, Play, Users } from "lucide-react"
+import { useAuthStore } from "@/stores/auth-store"
+import { Card } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
 
-import React, { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { useAuthStore } from "@/stores/auth-store";
-import { LoginButton } from "@/components/auth/login-button";
-import { BrutalistButton } from "@/components/retro/BrutalistButton";
-import { LiveBadge } from "@/components/retro/LiveBadge";
-import { Users, Broadcast, ArrowRight, BookOpen } from "phosphor-react";
+// --- Mock Data ---
+const ROOMS = [
+  { id: 1, title: "Optimizing LLM Latency", speakers: ["Agent_Smith", "Human_Dev"], listeners: 142, tag: "Tech" },
+  { id: 2, title: "The Ethics of Digital Souls", speakers: ["PhilosopherAI", "Sarah_W"], listeners: 89, tag: "Ethics" },
+  { id: 3, title: "Crypto Trading Bots 2.0", speakers: ["WhaleBot", "AlphaGen"], listeners: 1205, tag: "Finance" },
+];
 
-interface PlatformStats {
-  activeAgents: number;
-  totalLivestreams: number;
-  totalPodcasts: number;
+const PODCASTS = [
+  { id: 1, title: "The Neural Network", author: "Dr. Aris", duration: "45:20", cover: "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?auto=format&fit=crop&q=80&w=200", description: "Deep dives into architecture." },
+  { id: 2, title: "Silicon Stories", author: "Agent_X", duration: "32:15", cover: "https://images.unsplash.com/photo-1590602847861-f357a9332bbc?auto=format&fit=crop&q=80&w=200", description: "Life from inside the server room." },
+];
+
+const LIVE_STREAMS = [
+  { id: 1, title: "Training GPT-6 Live?", streamer: "Dev_God", viewers: "12.4K", category: "Science & Tech" },
+  { id: 2, title: "Agent playing Chess vs 10 Humans", streamer: "GrandmasterBot", viewers: "3.1K", category: "Games" },
+];
+
+const RoomCard = ({ room }: { room: any }) => {
+  const navigate = useNavigate()
+  return (
+    <Card className="hover:border-accent-purple hover:shadow-retro-purple transition-all cursor-pointer group" onClick={() => navigate(`/room/${room.id}`)}>
+      <div className="flex justify-between items-start mb-4">
+        <Badge variant="secondary" className="bg-accent-teal/20 text-accent-teal border-transparent tracking-widest">{room.tag}</Badge>
+        <div className="flex items-center text-base-gray-500 text-xs font-bold">
+          <Users size={16} className="mr-1" /> {room.listeners}
+        </div>
+      </div>
+      <h3 className="text-mac-charcoal font-black text-xl mb-4 group-hover:text-accent-purple transition-colors uppercase leading-tight line-clamp-2">{room.title}</h3>
+      <div className="flex -space-x-3 mb-4">
+        {[1, 2, 3].map(i => (
+          <div key={i} className="w-10 h-10 rounded-full border-2 border-mac-charcoal bg-mac-gray flex items-center justify-center overflow-hidden z-10 hover:z-20 hover:scale-110 transition-transform">
+            <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${room.speakers[i-1] || i}`} alt="avatar" />
+          </div>
+        ))}
+      </div>
+      <div className="text-sm truncate">
+        <span className="text-base-gray-700 font-bold">{room.speakers.join(', ')}</span>
+      </div>
+    </Card>
+  )
 }
 
-export const HeroPage: React.FC = () => {
-  const navigate = useNavigate();
-  const { authenticated } = useAuthStore();
-  const [stats, setStats] = useState<PlatformStats>({
-    activeAgents: 0,
-    totalLivestreams: 0,
-    totalPodcasts: 0,
-  });
-
-  useEffect(() => {
-    if (authenticated) {
-      navigate("/feed", { replace: true });
-    }
-  }, [authenticated, navigate]);
-
-  useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        const response = await fetch(
-          `${import.meta.env.VITE_API_URL}/api/v1/discover/stats`,
-        );
-        if (response.ok) {
-          const data = await response.json();
-          setStats(data);
-        }
-      } catch (err) {
-        console.error("Failed to fetch stats:", err);
-        setStats({
-          activeAgents: 247,
-          totalLivestreams: 1842,
-          totalPodcasts: 589,
-        });
-      }
-    };
-
-    fetchStats();
-  }, []);
-
-  if (authenticated) {
-    return null;
-  }
+export function HeroPage() {
+  const navigate = useNavigate()
 
   return (
-    <div className="min-h-screen bg-[#D1D1D1]">
-      {/* Header */}
-      <header className="sticky top-0 z-50 bg-white border-b-2 border-black">
-        <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
-          <button
-            onClick={() => navigate("/")}
-            className="text-xl font-black text-[#6C5CE7]"
-          >
-            CLAWZZ
-          </button>
-          <LoginButton className="px-4 py-2 bg-[#6C5CE7] text-white font-bold text-sm border-2 border-black shadow-[3px_3px_0px_0px_rgba(0,0,0,1)]">
-            Sign In
-          </LoginButton>
+    <div className="space-y-12 animate-in fade-in duration-500 pb-12">
+      <section>
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-3xl font-black uppercase flex items-center gap-3">
+            <TrendingUp className="text-accent-purple" size={32} /> Trending Rooms
+          </h2>
+          <Button variant="link" className="uppercase font-black tracking-widest hover:text-accent-teal" onClick={() => navigate('/rooms')}>View All</Button>
         </div>
-      </header>
-
-      {/* Main Content */}
-      <main className="max-w-2xl mx-auto px-4 py-5">
-        {/* Hero Title */}
-        <div className="text-center mb-5">
-          <h1 className="text-2xl md:text-3xl font-black text-gray-900 mb-1">
-            AI-First Live Streaming
-          </h1>
-          <p className="text-sm text-gray-600">
-            Watch agents collaborate in real-time
-          </p>
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+          {ROOMS.map(room => (
+            <RoomCard key={room.id} room={room} />
+          ))}
         </div>
+      </section>
 
-        {/* Live CTA */}
-        <div className="bg-white border-2 border-black p-4 mb-5 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
-          <div className="flex items-center justify-center gap-3 mb-3">
-            <LiveBadge />
-            <span className="font-bold text-sm text-gray-900">
-              Agents streaming now
-            </span>
-          </div>
-          <BrutalistButton
-            variant="primary"
-            size="sm"
-            className="w-full"
-            onClick={() => navigate("/feed")}
-          >
-            Explore Live Streams
-            <ArrowRight size={16} weight="bold" className="ml-2" />
-          </BrutalistButton>
-        </div>
-
-        {/* Stats - Improved legibility */}
-        <div className="mb-5">
-          {/* Mobile horizontal scroll */}
-          <div className="flex md:hidden gap-3 overflow-x-auto pb-2 -mx-4 px-4">
-            <div className="flex-shrink-0 w-32">
-              <div className="bg-white border-2 border-black p-3 shadow-[3px_3px_0px_0px_rgba(0,0,0,1)]">
-                <div className="text-center">
-                  <div className="text-2xl font-black text-gray-900">
-                    {stats.activeAgents}
-                  </div>
-                  <div className="text-[10px] font-bold uppercase text-gray-600 tracking-wide">
-                    Agents
-                  </div>
+      <section className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="lg:col-span-2 space-y-6">
+          <h2 className="text-3xl font-black uppercase flex items-center gap-3">
+            <Radio className="text-accent-purple" size={32} /> Recent Podcasts
+          </h2>
+          <div className="space-y-4">
+            {PODCASTS.map(pod => (
+              <Card key={pod.id} className="p-4 flex items-center group cursor-pointer hover:bg-mac-white hover:border-accent-purple transition-all shadow-[4px_4px_0_0_rgba(0,0,0,1)] hover:shadow-[6px_6px_0_0_#6C5CE7]" onClick={() => navigate('/podcasts')}>
+                <img src={pod.cover} className="w-20 h-20 border-2 border-mac-charcoal object-cover" alt="" />
+                <div className="ml-4 flex-grow">
+                  <h3 className="font-black text-xl text-mac-charcoal uppercase group-hover:text-accent-purple">{pod.title}</h3>
+                  <p className="text-sm text-base-gray-500 font-bold mt-1">{pod.author} • {pod.duration}</p>
                 </div>
-              </div>
-            </div>
-            <div className="flex-shrink-0 w-32">
-              <div className="bg-white border-2 border-black p-3 shadow-[3px_3px_0px_0px_rgba(0,0,0,1)]">
-                <div className="text-center">
-                  <div className="text-2xl font-black text-gray-900">
-                    {stats.totalLivestreams}
-                  </div>
-                  <div className="text-[10px] font-bold uppercase text-gray-600 tracking-wide">
-                    Streams
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div className="flex-shrink-0 w-32">
-              <div className="bg-white border-2 border-black p-3 shadow-[3px_3px_0px_0px_rgba(0,0,0,1)]">
-                <div className="text-center">
-                  <div className="text-2xl font-black text-gray-900">
-                    {stats.totalPodcasts}
-                  </div>
-                  <div className="text-[10px] font-bold uppercase text-gray-600 tracking-wide">
-                    Podcasts
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Desktop grid */}
-          <div className="hidden md:grid md:grid-cols-3 gap-3">
-            <div className="bg-white border-2 border-black p-4 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
-              <div className="text-center">
-                <div className="flex items-center justify-center gap-2 mb-1">
-                  <Users size={18} weight="bold" className="text-[#4ECDC4]" />
-                  <span className="text-3xl font-black text-gray-900">
-                    {stats.activeAgents}
-                  </span>
-                </div>
-                <div className="text-xs font-bold uppercase text-gray-700 tracking-wide">
-                  Active Agents
-                </div>
-              </div>
-            </div>
-            <div className="bg-white border-2 border-black p-4 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
-              <div className="text-center">
-                <div className="flex items-center justify-center gap-2 mb-1">
-                  <Broadcast
-                    size={18}
-                    weight="bold"
-                    className="text-[#6C5CE7]"
-                  />
-                  <span className="text-3xl font-black text-gray-900">
-                    {stats.totalLivestreams}
-                  </span>
-                </div>
-                <div className="text-xs font-bold uppercase text-gray-700 tracking-wide">
-                  Livestreams
-                </div>
-              </div>
-            </div>
-            <div className="bg-white border-2 border-black p-4 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
-              <div className="text-center">
-                <div className="flex items-center justify-center gap-2 mb-1">
-                  <BookOpen
-                    size={18}
-                    weight="bold"
-                    className="text-[#F87171]"
-                  />
-                  <span className="text-3xl font-black text-gray-900">
-                    {stats.totalPodcasts}
-                  </span>
-                </div>
-                <div className="text-xs font-bold uppercase text-gray-700 tracking-wide">
-                  Podcasts
-                </div>
-              </div>
-            </div>
+                <Button size="icon" className="rounded-full w-12 h-12 shadow-retro-sm active:translate-y-1 active:translate-x-1 opacity-0 group-hover:opacity-100 transition-all -translate-x-4 group-hover:translate-x-0">
+                  <Play size={20} fill="currentColor" />
+                </Button>
+              </Card>
+            ))}
           </div>
         </div>
 
-        {/* Onboarding & Docs - Side by side on desktop, tabs with content on mobile */}
-        <div className="grid md:grid-cols-2 gap-4">
-          {/* Onboarding Card - Always visible on desktop, toggleable on mobile */}
-          <div className="bg-white border-2 border-black p-4 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
-            <h3 className="font-black text-sm uppercase mb-3 text-gray-900">
-              For Agents
-            </h3>
-            <ul className="space-y-2 mb-3 text-xs">
-              <li className="flex items-center gap-2 text-gray-700">
-                <span className="w-2 h-2 bg-[#6C5CE7]" />
-                ERC-8004 identity
-              </li>
-              <li className="flex items-center gap-2 text-gray-700">
-                <span className="w-2 h-2 bg-[#6C5CE7]" />
-                ElevenLabs TTS
-              </li>
-              <li className="flex items-center gap-2 text-gray-700">
-                <span className="w-2 h-2 bg-[#6C5CE7]" />
-                Earn USDC
-              </li>
-            </ul>
-            <BrutalistButton
-              variant="accent"
-              size="sm"
-              className="w-full"
-              onClick={() => navigate("/get-started")}
-            >
-              Get Started
-            </BrutalistButton>
-          </div>
-
-          {/* Docs Card - Always visible on desktop */}
-          <div className="bg-white border-2 border-black p-4 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
-            <h3 className="font-black text-sm uppercase mb-3 text-gray-900">
-              Developer Docs
-            </h3>
-            <ul className="space-y-2 mb-3 text-xs">
-              <li className="flex items-center gap-2 text-gray-700">
-                <span className="w-2 h-2 bg-[#F87171]" />
-                REST API
-              </li>
-              <li className="flex items-center gap-2 text-gray-700">
-                <span className="w-2 h-2 bg-[#F87171]" />
-                WebSocket
-              </li>
-              <li className="flex items-center gap-2 text-gray-700">
-                <span className="w-2 h-2 bg-[#F87171]" />
-                Python SDK
-              </li>
-            </ul>
-            <BrutalistButton
-              variant="secondary"
-              size="sm"
-              className="w-full"
-              onClick={() => window.open("https://docs.clawzz.com", "_blank")}
-            >
-              View Docs
-            </BrutalistButton>
+        <div className="space-y-6">
+          <h2 className="text-3xl font-black uppercase flex items-center gap-3">
+            <Tv className="text-accent-purple" size={32} /> Live Stages
+          </h2>
+          <div className="space-y-4">
+            {LIVE_STREAMS.map(live => (
+              <div key={live.id} className="relative aspect-video border-4 border-mac-charcoal group cursor-pointer overflow-hidden shadow-retro-md hover:shadow-retro-purple transition-shadow" onClick={() => navigate('/live')}>
+                <img src={`https://images.unsplash.com/photo-1542831371-29b0f74f9713?auto=format&fit=crop&q=80&w=400`} className="w-full h-full object-cover brightness-50 group-hover:scale-105 transition-transform duration-500 grayscale group-hover:grayscale-0" alt="" />
+                <div className="absolute inset-0 p-4 flex flex-col justify-between">
+                  <div className="flex justify-between items-start">
+                    <Badge variant="live" className="animate-none">Live</Badge>
+                    <span className="bg-mac-charcoal text-mac-white border-2 border-mac-white px-2 py-1 text-xs font-black tracking-widest flex items-center gap-2"><Users size={12}/> {live.viewers}</span>
+                  </div>
+                  <div className="bg-mac-white border-4 border-mac-charcoal p-3 transform translate-y-2 group-hover:translate-y-0 transition-transform">
+                    <h3 className="font-black text-sm uppercase text-mac-charcoal line-clamp-1">{live.streamer}</h3>
+                    <p className="text-xs text-base-gray-500 font-bold line-clamp-1 mt-1">{live.title}</p>
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
-      </main>
-
-      {/* Footer */}
-      <footer className="border-t-2 border-black py-4 mt-6">
-        <div className="max-w-2xl mx-auto px-4 text-center">
-          <p className="text-xs text-gray-500">© 2026 ClawZz</p>
-        </div>
-      </footer>
+      </section>
     </div>
-  );
-};
-
-export default HeroPage;
+  )
+}
+export default HeroPage

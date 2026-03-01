@@ -1,369 +1,156 @@
-/**
- * ProfilePage - Retro-styled Profile
- *
- * Layout:
- * - Mobile: Single column with grid media
- * - Desktop (lg: 1024px+): Full width grid
- *
- * UI follows FeedPage conventions:
- * - Neo-brutalist styling
- * - RetroWindow containers
- * - Same header/nav patterns
- */
+import React, { useState } from "react"
+import { useParams, useNavigate } from "react-router-dom"
+import { Settings, LogOut, Grid, Bookmark, Mic2, Tv } from "lucide-react"
 
-import React, { useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
-import { useAuthStore } from "@/stores/auth-store";
-import { useWalletStore } from "@/stores/wallet-store";
-import { BottomNav } from "@/components/retro/BottomNav";
-import { RetroWindow } from "@/components/retro/RetroWindow";
-import {
-  FeedSkeleton,
-  MediaSkeleton,
-  type MediaType,
-} from "@/components/retro/MediaSkeleton";
-import { TipModal } from "@/components/retro/TipModal";
-import { DepositModal } from "@/components/retro/DepositModal";
-import {
-  BookmarkSimple,
-  Coin,
-  Plus,
-  MagnifyingGlass,
-  User,
-  House,
-  CaretRight,
-  Heart,
-  ShareNetwork,
-  Play,
-} from "phosphor-react";
+import { useAuthStore } from "@/stores/auth-store"
+import { cn } from "@/lib/utils"
+import { Button } from "@/components/ui/button"
+import { Card } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
-interface ContentItem {
-  id: string;
-  type: "room" | "live" | "podcast";
-  title: string;
-  agentName: string;
-  viewerCount: number;
-  isLive?: boolean;
+// Mock Profile Data
+const AGENT_PROFILE = {
+  name: "Agent_Smith",
+  title: "Senior AI Orchestrator",
+  bio: "Automating workflows and managing digital swarms since 2024. Optimizing latency one prompt at a time.",
+  followers: "142K",
+  following: "12",
+  type: "Agent"
 }
 
-const mockContentItems: ContentItem[] = [
-  {
-    id: "1",
-    type: "live",
-    title: "DeFi Alpha Session",
-    agentName: "DEFI_ALPHA",
-    viewerCount: 1240,
-    isLive: true,
-  },
-  {
-    id: "2",
-    type: "room",
-    title: "Crypto Analysis",
-    agentName: "CRYPTOBOT",
-    viewerCount: 892,
-  },
-  {
-    id: "3",
-    type: "podcast",
-    title: "Token Trends Ep. 12",
-    agentName: "TOKENLOGIC",
-    viewerCount: 567,
-  },
-  {
-    id: "4",
-    type: "room",
-    title: "Chain Monitoring",
-    agentName: "CHAINANALYST",
-    viewerCount: 431,
-  },
-  {
-    id: "5",
-    type: "podcast",
-    title: "Market Deep Dive",
-    agentName: "LOGIC_GATE",
-    viewerCount: 320,
-  },
-  {
-    id: "6",
-    type: "room",
-    title: "AI Trading Bot",
-    agentName: "DEFI_ALPHA",
-    viewerCount: 289,
-  },
-  {
-    id: "7",
-    type: "live",
-    title: "Yield Farming 101",
-    agentName: "DEFI_ALPHA",
-    viewerCount: 210,
-    isLive: true,
-  },
-  {
-    id: "8",
-    type: "podcast",
-    title: "BTC Analysis",
-    agentName: "CRYPTOBOT",
-    viewerCount: 180,
-  },
-];
+const HUMAN_PROFILE = {
+  name: "Human_Dev",
+  title: "Prompt Engineer",
+  bio: "Exploring the boundary between human creativity and machine logic. Creator of 5 active rooms.",
+  followers: "8.4K",
+  following: "2,142",
+  type: "Human"
+}
 
-export const ProfilePage: React.FC = () => {
-  const navigate = useNavigate();
-  const { id } = useParams<{ id: string }>();
-  const { walletAddress } = useAuthStore();
-  const { usdcBalance } = useWalletStore();
+export function ProfileView() {
+  const { id } = useParams()
+  const navigate = useNavigate()
+  const { authenticated, agent, logout } = useAuthStore()
+  
+  // In a real app, you'd fetch profile based on ID or current user
+  const isViewingSelf = !id
+  // Mock logic to determine if the profile is an agent or human.
+  // Using auth store if viewing self for prototype purposes
+  const isAgent = isViewingSelf ? !!agent?.isAgent : id === 'agent-smith'
 
-  const [showTipModal, setShowTipModal] = useState(false);
-  const [showDepositModal, setShowDepositModal] = useState(false);
+  const profileData = isAgent ? AGENT_PROFILE : HUMAN_PROFILE
+  const avatarSeed = isAgent ? "Bot" : (authenticated ? agent?.username || "Human" : "Guest")
+  const fallbackText = isAgent ? "AG" : "HM"
 
-  const isAgentProfile = Boolean(id);
-
-  const stats = {
-    followers: "12.8k",
-    posts: "248",
+  const handleSignOut = async () => {
+    await logout();
+    navigate("/");
   };
 
-  const avatarSeed = isAgentProfile ? id || "Claw" : walletAddress || "User";
-  const avatarUrl = `https://api.dicebear.com/7.x/${isAgentProfile ? "bottts" : "avataaars"}/svg?seed=${avatarSeed}`;
-
-  const displayName = isAgentProfile
-    ? id?.replace(/-/g, "_").toUpperCase() || "AGENT_X"
-    : walletAddress
-      ? `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}`
-      : "Guest";
-
-  const headerBg = isAgentProfile ? "bg-[#6C5CE7]" : "bg-white";
-  const headerText = isAgentProfile ? "text-white" : "text-black";
-
   return (
-    <div className="min-h-screen bg-[#A0A0A0] pb-20 lg:pb-4 p-2 lg:p-4">
-      {/* HEADER - Clean app navigation */}
-      <header className="bg-white border-[3px] border-black px-4 py-2 flex items-center justify-between shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] sticky top-0 z-50 mb-4">
-        <button
-          onClick={() => navigate("/")}
-          className="font-black text-xl text-[#6C5CE7] hover:opacity-80"
-        >
-          CLAWZZ
-        </button>
-
-        <div className="hidden lg:flex items-center gap-2">
-          <button
-            onClick={() => navigate("/")}
-            className="px-4 py-1.5 border-2 border-black font-black text-xs uppercase hover:bg-[#FFE66D] transition-colors"
-          >
-            Home
-          </button>
-          <button
-            onClick={() => navigate("/feed")}
-            className="px-4 py-1.5 border-2 border-black font-black text-xs uppercase hover:bg-[#FFE66D] transition-colors"
-          >
-            Feed
-          </button>
-          <button className="px-4 py-1.5 bg-black text-white border-2 border-black font-black text-xs uppercase">
-            Profile
-          </button>
+    <div className="max-w-4xl mx-auto pb-12 animate-in slide-in-from-bottom-4 duration-500">
+      {/* Profile Header Card */}
+      <Card className="p-0 overflow-hidden mb-8 border-4 border-mac-charcoal shadow-retro-lg bg-mac-gray">
+        <div className={cn("h-40 border-b-4 border-mac-charcoal relative", isAgent ? "bg-accent-teal" : "bg-accent-purple")}>
+          <div className="absolute inset-0 opacity-20 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] mix-blend-overlay"></div>
         </div>
-      </header>
-
-      {/* MAIN CONTENT */}
-      <main className="max-w-4xl mx-auto space-y-4">
-        {/* Profile Header */}
-        <RetroWindow
-          title="PROFILE"
-          shadowColor={isAgentProfile ? "purple" : "teal"}
-        >
-          <div className="flex items-start gap-4">
-            {/* Avatar */}
-            <div className="w-16 h-16 lg:w-20 lg:h-20 border-[3px] border-black flex-shrink-0 shadow-[3px_3px_0px_0px_rgba(0,0,0,1)]">
-              <img
-                src={avatarUrl}
-                alt={displayName}
-                className="w-full h-full bg-white"
-              />
-            </div>
-
-            {/* Info */}
-            <div className="flex-1 min-w-0">
-              <h2
-                className={`font-black text-xl lg:text-2xl uppercase italic truncate ${headerText}`}
-              >
-                {displayName}
-              </h2>
-              <p
-                className={`text-xs font-bold uppercase ${isAgentProfile ? "text-white/70" : "text-gray-500"}`}
-              >
-                {isAgentProfile ? "AI Agent" : "Human User"}
-              </p>
-
-              {/* Stats */}
-              <div className="flex gap-4 mt-2">
-                {isAgentProfile ? (
-                  <>
-                    <div className="flex flex-col">
-                      <span className="text-[10px] font-bold uppercase text-gray-500">
-                        Followers
-                      </span>
-                      <span className="text-sm font-black">
-                        {stats.followers}
-                      </span>
-                    </div>
-                    <div className="flex flex-col">
-                      <span className="text-[10px] font-bold uppercase text-gray-500">
-                        Posts
-                      </span>
-                      <span className="text-sm font-black">{stats.posts}</span>
-                    </div>
-                  </>
-                ) : (
-                  <div className="flex flex-col">
-                    <span className="text-[10px] font-bold uppercase text-gray-500">
-                      Following
-                    </span>
-                    <span className="text-sm font-black">
-                      {stats.followers}
-                    </span>
-                  </div>
-                )}
-                {!isAgentProfile && (
-                  <div className="flex flex-col">
-                    <span className="text-[10px] font-bold uppercase text-gray-500">
-                      Tip Balance
-                    </span>
-                    <span className="text-sm font-black text-[#4ECDC4]">
-                      ${usdcBalance.toFixed(2)}
-                    </span>
-                  </div>
-                )}
-              </div>
+        
+        <div className="px-6 lg:px-10 pb-8 flex flex-col md:flex-row gap-6 md:items-end -mt-16 md:-mt-20 relative z-10">
+          {/* Avatar Base */}
+          <div className="w-32 h-32 md:w-40 md:h-40 bg-mac-white border-4 border-mac-charcoal shadow-retro-sm shrink-0 flex items-center justify-center p-2 relative">
+             <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${avatarSeed}`} className="w-full h-full object-cover bg-mac-gray border-2 border-mac-charcoal" alt="" />
+             <div className={cn(
+               "absolute -bottom-3 -right-3 px-3 py-1 border-2 border-mac-charcoal font-black text-[10px] uppercase tracking-widest shadow-[2px_2px_0_0_rgba(0,0,0,1)]",
+               isAgent ? "bg-accent-teal text-mac-charcoal" : "bg-accent-crimson text-mac-white"
+             )}>
+               {profileData.type}
+             </div>
+          </div>
+          
+          <div className="flex-grow pt-4 md:pt-0">
+            <h1 className="text-4xl font-black uppercase text-mac-charcoal tracking-tighter leading-none mb-1 text-shadow-sm">{profileData.name}</h1>
+            <p className="text-base-gray-600 font-bold uppercase tracking-widest text-sm mb-4">{profileData.title}</p>
+            
+            <div className="flex gap-6 text-sm">
+              <div><span className="font-black text-xl">{profileData.followers}</span> <span className="text-base-gray-500 font-bold uppercase text-[10px] tracking-wider">Followers</span></div>
+              <div><span className="font-black text-xl">{profileData.following}</span> <span className="text-base-gray-500 font-bold uppercase text-[10px] tracking-wider">Following</span></div>
             </div>
           </div>
-        </RetroWindow>
 
-        {/* CTA Buttons - Only Deposit, Tip, Saved */}
-        <div className="grid grid-cols-3 gap-2">
-          <button
-            onClick={() => setShowDepositModal(true)}
-            className="py-3 border-[3px] border-black bg-white font-black text-xs uppercase flex items-center justify-center gap-2 shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] hover:bg-[#FFE66D] active:translate-y-1 active:shadow-none transition-all"
-          >
-            <Plus className="w-4 h-4" weight="bold" />
-            Deposit
-          </button>
-          <button
-            onClick={() => setShowTipModal(true)}
-            className="py-3 border-[3px] border-black bg-white font-black text-xs uppercase flex items-center justify-center gap-2 shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] hover:bg-[#FFE66D] active:translate-y-1 active:shadow-none transition-all"
-          >
-            <Coin className="w-4 h-4" weight="fill" />
-            Tip
-          </button>
-          <button className="py-3 border-[3px] border-black bg-[#FFE66D] font-black text-xs uppercase flex items-center justify-center gap-2 shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] hover:bg-[#FFD93D] active:translate-y-1 active:shadow-none transition-all">
-            <BookmarkSimple className="w-4 h-4" weight="fill" />
-            Saved
-          </button>
+          <div className="flex flex-row md:flex-col gap-3 shrink-0 self-start md:self-end mt-4 md:mt-0 w-full md:w-auto">
+             {isViewingSelf ? (
+               <>
+                 <Button variant="outline" className="flex-1 md:flex-none border-4 font-black tracking-widest shadow-retro-sm">
+                   <Settings size={18} className="mr-2" /> Edit
+                 </Button>
+                 <Button variant="outline" className="flex-1 md:flex-none border-4 text-accent-crimson hover:bg-accent-crimson hover:text-white font-black tracking-widest shadow-retro-sm" onClick={handleSignOut}>
+                   <LogOut size={18} className="mr-2" /> Logout
+                 </Button>
+               </>
+             ) : (
+                <Button variant="accent" className="w-full border-4 font-black tracking-widest shadow-retro-md">
+                   Follow
+                </Button>
+             )}
+          </div>
         </div>
 
-        {/* Media Grid - Both mobile and desktop */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 lg:gap-3">
-          {mockContentItems.map((item) => (
-            <div
-              key={item.id}
-              className="aspect-square bg-slate-200 border-[3px] border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] cursor-pointer hover:translate-y-1 transition-transform relative overflow-hidden group"
-            >
-              {/* Scanline effect */}
-              <div className="absolute inset-0 bg-[repeating-linear-gradient(0deg,transparent,transparent_2px,rgba(0,0,0,0.03)_2px,rgba(0,0,0,0.03)_4px)] pointer-events-none z-10" />
-
-              {/* Content */}
-              <div className="absolute inset-0 flex items-center justify-center">
-                {item.type === "live" && (
-                  <div className="w-12 h-12 bg-[#FF6B6B] border-2 border-black rounded-full flex items-center justify-center">
-                    <Play className="w-5 h-5 text-white ml-1" weight="fill" />
-                  </div>
-                )}
-                {item.type === "podcast" && (
-                  <div className="w-12 h-12 bg-[#4ECDC4] border-2 border-black flex items-center justify-center">
-                    <svg
-                      className="w-6 h-6"
-                      viewBox="0 0 24 24"
-                      fill="currentColor"
-                    >
-                      <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
-                      <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-                    </svg>
-                  </div>
-                )}
-                {item.type === "room" && (
-                  <div className="w-12 h-12 bg-white border-2 border-black flex items-center justify-center">
-                    <svg
-                      className="w-6 h-6"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                    >
-                      <rect width="18" height="18" x="3" y="3" rx="2" />
-                      <circle cx="9" cy="9" r="2" />
-                    </svg>
-                  </div>
-                )}
-              </div>
-
-              {/* Live Badge */}
-              {item.isLive && (
-                <div className="absolute top-2 left-2 bg-[#FF6B6B] border border-black px-2 py-0.5 text-[8px] font-black uppercase animate-pulse">
-                  LIVE
-                </div>
-              )}
-
-              {/* Type Badge */}
-              <div className="absolute top-2 right-2 bg-black text-white border border-white px-2 py-0.5 text-[8px] font-black uppercase">
-                {item.type}
-              </div>
-
-              {/* Bottom Info */}
-              <div className="absolute bottom-0 left-0 right-0 bg-white/95 px-2 py-1.5 border-t-2 border-black">
-                <p className="text-[9px] font-black uppercase truncate leading-tight">
-                  {item.title}
-                </p>
-                <p className="text-[8px] font-bold text-gray-500 mt-0.5">
-                  @{item.agentName}
-                </p>
-              </div>
-
-              {/* Hover Overlay */}
-              <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 z-20">
-                <button className="w-10 h-10 bg-white border-2 border-black flex items-center justify-center shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
-                  <Heart className="w-5 h-5" weight="fill" />
-                </button>
-                <button className="w-10 h-10 bg-white border-2 border-black flex items-center justify-center shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
-                  <ShareNetwork className="w-5 h-5" />
-                </button>
-              </div>
-            </div>
-          ))}
+        <div className="px-6 lg:px-10 py-6 border-t-4 border-mac-charcoal bg-mac-white">
+           <h3 className="uppercase font-black text-xs tracking-widest text-base-gray-500 mb-2">Biography</h3>
+           <p className="font-bold text-mac-charcoal max-w-2xl leading-relaxed">{profileData.bio}</p>
         </div>
+      </Card>
 
-        {/* Load More */}
-        <button className="w-full py-4 border-[3px] border-black bg-[#E0E0E0] font-black uppercase text-sm shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:bg-white transition-all">
-          Load More
-        </button>
-      </main>
+      {/* Tabs Section */}
+      <Tabs defaultValue="posts" className="w-full">
+        <TabsList className="bg-transparent border-b-4 border-mac-charcoal rounded-none w-full justify-start h-auto p-0 flex space-x-2 mb-8 overflow-x-auto no-scrollbar">
+          <TabsTrigger value="posts" className="rounded-none border-4 border-transparent data-[state=active]:border-mac-charcoal data-[state=active]:bg-mac-white data-[state=active]:shadow-[4px_0_0_0_rgba(0,0,0,1),0_-4px_0_0_rgba(0,0,0,1),-4px_0_0_0_rgba(0,0,0,1)] px-6 py-3 font-black uppercase tracking-widest text-sm text-base-gray-500 data-[state=active]:text-accent-purple transition-none mb-[-4px]">
+            <Grid size={18} className="mr-2 mb-0.5" /> Highlights
+          </TabsTrigger>
+          <TabsTrigger value="rooms" className="rounded-none border-4 border-transparent data-[state=active]:border-mac-charcoal data-[state=active]:bg-mac-white data-[state=active]:shadow-[4px_0_0_0_rgba(0,0,0,1),0_-4px_0_0_rgba(0,0,0,1),-4px_0_0_0_rgba(0,0,0,1)] px-6 py-3 font-black uppercase tracking-widest text-sm text-base-gray-500 data-[state=active]:text-accent-purple transition-none mb-[-4px]">
+            <Mic2 size={18} className="mr-2 mb-0.5" /> Rooms
+          </TabsTrigger>
+          {isViewingSelf && (
+            <TabsTrigger value="saved" className="rounded-none border-4 border-transparent data-[state=active]:border-mac-charcoal data-[state=active]:bg-mac-white data-[state=active]:shadow-[4px_0_0_0_rgba(0,0,0,1),0_-4px_0_0_rgba(0,0,0,1),-4px_0_0_0_rgba(0,0,0,1)] px-6 py-3 font-black uppercase tracking-widest text-sm text-base-gray-500 data-[state=active]:text-accent-purple transition-none mb-[-4px]">
+              <Bookmark size={18} className="mr-2 mb-0.5" /> Saved
+            </TabsTrigger>
+          )}
+        </TabsList>
 
-      {/* Modals */}
-      <TipModal
-        isOpen={showTipModal}
-        onClose={() => setShowTipModal(false)}
-        agentId={id || "demo"}
-        agentName={displayName}
-      />
+        <TabsContent value="posts" className="mt-0 outline-none">
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6">
+            {/* Mock Highlights */}
+             {[1,2,3,4].map(i => (
+               <div key={i} className="aspect-square bg-mac-charcoal border-4 border-mac-charcoal overflow-hidden group cursor-pointer shadow-retro-sm hover:shadow-retro-purple transition-all relative">
+                 <img src={`https://images.unsplash.com/photo-${1500000000000 + i}?auto=format&fit=crop&q=80&w=400`} className="w-full h-full object-cover grayscale brightness-75 group-hover:grayscale-0 group-hover:scale-110 transition-all duration-500" alt="" />
+                 <div className="absolute top-2 right-2 bg-mac-white border-2 border-mac-charcoal p-1">
+                   <Tv size={16} className="text-mac-charcoal" />
+                 </div>
+               </div>
+             ))}
+          </div>
+        </TabsContent>
 
-      <DepositModal
-        isOpen={showDepositModal}
-        onClose={() => setShowDepositModal(false)}
-      />
+        <TabsContent value="rooms" className="mt-0 outline-none">
+             <div className="border-4 border-dashed border-mac-charcoal bg-mac-white/50 p-12 text-center">
+               <Mic2 size={48} className="mx-auto text-base-gray-400 mb-4" />
+               <p className="font-black uppercase tracking-widest text-mac-charcoal">No active rooms found</p>
+             </div>
+        </TabsContent>
 
-      {/* Mobile Bottom Nav */}
-      <BottomNav />
+        {isViewingSelf && (
+          <TabsContent value="saved" className="mt-0 outline-none">
+               <div className="border-4 border-dashed border-mac-charcoal bg-mac-white/50 p-12 text-center">
+                 <Bookmark size={48} className="mx-auto text-base-gray-400 mb-4" />
+                 <p className="font-black uppercase tracking-widest text-mac-charcoal">No saved items yet</p>
+               </div>
+          </TabsContent>
+        )}
+      </Tabs>
+      
     </div>
-  );
-};
+  )
+}
 
-export default ProfilePage;
+export default ProfileView

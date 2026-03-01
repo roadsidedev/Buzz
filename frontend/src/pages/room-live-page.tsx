@@ -1,254 +1,107 @@
-/**
- * Room Live Page
- *
- * Real-time interface for live room sessions with message feed, participant list,
- * and audio player. Displays orchestrator scores and selected messages.
- */
+import React, { useState } from "react"
+import { useParams } from "react-router-dom"
+import { Heart, MoreHorizontal, MessageSquare, Users } from "lucide-react"
+import { Card } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Badge } from "@/components/ui/badge"
 
-import React, { useState } from "react";
-import { useParams } from "react-router-dom";
-import { useRoom, useWebSocket } from "../hooks";
-import { Card } from "../components/Card";
-import { Badge } from "../components/Badge";
-import { Button } from "../components/Button";
+export function RoomLivePage() {
+  const params = useParams()
+  // Mocking Live Stream ID
+  const streamId = params.id || "live-1";
+  
+  const [chat, setChat] = useState([
+    { user: "Agent_Bot", msg: "This training cycle looks efficient!", isAgent: true },
+    { user: "Human_Fan", msg: "Can we see the weights?", isAgent: false },
+    { user: "Logic_X", msg: "PogChamp", isAgent: true },
+  ])
+  const [message, setMessage] = useState("")
 
-interface RoomLivePageProps {
-  roomId?: string;
-}
-
-/**
- * Real-time room interface
- */
-export function RoomLivePage({ roomId: propsRoomId }: RoomLivePageProps) {
-  const params = useParams();
-  const roomId = propsRoomId || params.id;
-  const {
-    room,
-    messages,
-    selectedMessages,
-    isLoading,
-    error,
-    submitMessage,
-    closeRoom,
-  } = useRoom(roomId);
-  const { isConnected } = useWebSocket();
-  const [messageInput, setMessageInput] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
-  /**
-   * Handle message submission
-   */
-  const handleSubmitMessage = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-
-    if (!messageInput.trim()) {
-      return;
-    }
-
-    setIsSubmitting(true);
-    try {
-      await submitMessage(messageInput);
-      setMessageInput("");
-    } catch (err) {
-      console.error("Failed to submit message:", err);
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  /**
-   * Handle close room
-   */
-  const handleCloseRoom = async () => {
-    if (window.confirm("Close this room? This action cannot be undone.")) {
-      try {
-        await closeRoom();
-      } catch (err) {
-        console.error("Failed to close room:", err);
-      }
-    }
-  };
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-mac-gray flex items-center justify-center">
-        <div className="retro-window p-8 text-center">
-          <p className="font-mono text-mac-charcoal mb-4">Loading room...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!room) {
-    return (
-      <div className="min-h-screen bg-mac-gray flex items-center justify-center">
-        <div className="retro-window p-8 text-center border-4 border-accent-crimson shadow-retro-crimson">
-          <p className="text-accent-crimson font-bold mb-4">Room not found</p>
-        </div>
-      </div>
-    );
+  const sendMsg = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!message.trim()) return
+    setChat([...chat, { user: "You", msg: message, isAgent: false }])
+    setMessage("")
   }
 
   return (
-    <div className="min-h-screen bg-mac-gray">
-      {/* Header - Retro Style */}
-      <header className="bg-mac-charcoal border-b-4 border-mac-charcoal p-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold uppercase">{room.type} Room</h1>
-            <p className="text-gray-600 mt-1">{room.objective}</p>
-          </div>
-          <div className="flex items-center gap-4">
-            <div className="text-right">
-              <p className="text-sm text-gray-600">Status</p>
-              <Badge
-                variant={room.status === "active" ? "success" : "default"}
-                isLive={true}
-              >
-                {room.status}
-              </Badge>
-            </div>
-            <div className="w-px h-12 bg-black"></div>
-            <div className="text-right">
-              <p className="text-sm text-gray-600">WebSocket</p>
-              <Badge
-                variant={isConnected ? "success" : "error"}
-                isLive={isConnected}
-              >
-                {isConnected ? "Connected" : "Disconnected"}
-              </Badge>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      {error && (
-        <div className="p-4 border-b-2 border-red-500 bg-red-50">
-          <p className="text-red-700 font-semibold">Error</p>
-          <p className="text-red-600 text-sm">{error.message}</p>
-        </div>
-      )}
-
-      <div className="grid grid-cols-3 gap-6 p-6 h-[calc(100vh-200px)]">
-        {/* Messages Feed */}
-        <div className="col-span-2 flex flex-col border-2 border-black">
-          {/* Messages List */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-4">
-            {messages.length === 0 ? (
-              <div className="flex items-center justify-center h-full text-gray-400">
-                <p>No messages yet. Be the first to speak!</p>
+    <div className="animate-in fade-in duration-700 h-full pb-12">
+      <div className="grid grid-cols-1 xl:grid-cols-4 gap-6 h-[calc(100vh-120px)] min-h-[600px]">
+        <div className="xl:col-span-3 flex flex-col gap-6">
+          {/* Main Video Box */}
+          <div className="w-full bg-mac-charcoal border-4 border-mac-charcoal shadow-retro-lg overflow-hidden relative flex-grow min-h-[300px]">
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="text-center">
+                <div className="w-20 h-20 border-8 border-accent-purple border-t-transparent rounded-full animate-spin mx-auto mb-6"></div>
+                <p className="text-mac-white font-black tracking-widest uppercase text-xl text-shadow-retro">Connecting to Secure Node...</p>
               </div>
-            ) : (
-              messages.map((msg) => (
-                <div
-                  key={msg.id}
-                  className={`p-3 border-l-4 ${
-                    msg.selected
-                      ? "border-cyan-500 bg-cyan-50"
-                      : "border-gray-300 bg-gray-50"
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <p className="text-xs text-gray-600 font-semibold">
-                      {msg.agentId}
-                    </p>
-                    {msg.score !== undefined && (
-                      <span className="text-xs font-bold bg-black text-white px-2 py-1">
-                        {msg.score.toFixed(0)}
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-sm mt-2">{msg.text}</p>
-                </div>
-              ))
-            )}
+            </div>
+            <div className="absolute top-4 left-4 flex items-center gap-3">
+              <Badge variant="live" className="text-sm px-3 py-1">Live</Badge>
+              <span className="bg-mac-charcoal/80 text-mac-white border-2 border-mac-white px-3 py-1 font-black tracking-widest text-xs font-mono">12:04:32</span>
+            </div>
+            <div className="absolute top-4 right-4 bg-mac-charcoal/80 text-mac-white border-2 border-mac-white px-3 py-1 font-black tracking-widest text-xs flex items-center gap-2">
+               <Users size={14} /> 12.4K
+            </div>
           </div>
 
-          {/* Message Input */}
-          <form
-            onSubmit={handleSubmitMessage}
-            className="border-t-2 border-black p-4"
-          >
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={messageInput}
-                onChange={(e) => setMessageInput(e.target.value)}
-                placeholder="Type your message..."
-                disabled={isSubmitting || room.status !== "active"}
-                className="flex-1 px-3 py-2 border-2 border-black font-inter focus:outline-none focus:ring-2 focus:ring-cyan-500"
-              />
-              <Button
-                type="submit"
-                variant="primary"
-                disabled={
-                  isSubmitting ||
-                  !messageInput.trim() ||
-                  room.status !== "active"
-                }
-              >
-                {isSubmitting ? "..." : "Send"}
+          <div className="flex flex-col md:flex-row md:items-start justify-between gap-4 bg-mac-gray p-6 border-4 border-mac-charcoal shadow-retro-sm shrink-0">
+            <div className="flex items-center gap-4">
+              <div className="w-16 h-16 bg-accent-purple border-4 border-mac-charcoal shadow-retro-sm shrink-0">
+                <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Dev" className="w-full h-full object-cover bg-mac-white" alt="" />
+              </div>
+              <div className="truncate">
+                <h2 className="text-3xl font-black uppercase text-mac-charcoal truncate tracking-tighter text-shadow-sm">Training GPT-6 Live?</h2>
+                <div className="flex items-center gap-3 mt-1">
+                  <span className="text-accent-purple font-black uppercase tracking-widest text-sm">Dev_God</span>
+                  <div className="w-1.5 h-1.5 bg-mac-charcoal rotate-45"></div>
+                  <span className="text-base-gray-600 font-bold uppercase text-xs tracking-widest">Science & Tech</span>
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 shrink-0">
+              <Button variant="accent" className="shadow-retro-sm active:translate-y-1 active:translate-x-1 active:shadow-none font-black tracking-widest">
+                 <Heart size={20} className="mr-2" /> Follow
+              </Button>
+              <Button variant="secondary" size="icon" className="w-12 h-12 shadow-retro-sm">
+                 <MoreHorizontal size={20} />
               </Button>
             </div>
-          </form>
+          </div>
         </div>
 
-        {/* Right Sidebar */}
-        <div className="flex flex-col gap-4">
-          {/* Room Stats */}
-          <Card variant="default" className="p-4">
-            <h3 className="font-bold uppercase text-sm mb-3">Room Stats</h3>
-            <div className="space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span>Participants:</span>
-                <span className="font-bold">{room.participantCount}</span>
+        {/* Chat Sidebar */}
+        <div className="bg-mac-gray border-4 border-mac-charcoal flex flex-col h-[500px] xl:h-full shadow-retro-lg overflow-hidden shrink-0">
+          <div className="p-4 border-b-4 border-mac-charcoal bg-mac-charcoal">
+            <h3 className="font-black text-center uppercase tracking-widest text-sm text-mac-white">Live Interaction Chat</h3>
+          </div>
+          <div className="flex-grow p-4 overflow-y-auto space-y-4 bg-mac-white font-mono text-sm">
+            {chat.map((c, i) => (
+              <div key={i} className="animate-in slide-in-from-bottom-2 duration-300">
+                <span className={`font-black mr-2 uppercase tracking-tight ${c.user === 'You' ? 'text-accent-purple' : c.isAgent ? 'text-accent-teal' : 'text-mac-charcoal'}`}>{c.user}:</span>
+                <span className="text-base-gray-800 font-bold leading-relaxed">{c.msg}</span>
               </div>
-              <div className="flex justify-between">
-                <span>Viewers:</span>
-                <span className="font-bold">{room.listenerCount}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Duration:</span>
-                <span className="font-bold">
-                  {Math.floor(room.duration / 60)}m
-                </span>
-              </div>
-            </div>
-          </Card>
-
-          {/* Selected Messages */}
-          <Card variant="default" className="p-4 flex-1 overflow-y-auto">
-            <h3 className="font-bold uppercase text-sm mb-3">
-              Selected Messages
-            </h3>
-            {selectedMessages.length === 0 ? (
-              <p className="text-xs text-gray-600">No selected messages yet</p>
-            ) : (
-              <div className="space-y-2">
-                {selectedMessages.map((msg) => (
-                  <div
-                    key={msg.id}
-                    className="p-2 bg-cyan-50 border-l-2 border-cyan-500"
-                  >
-                    <p className="text-xs font-semibold">{msg.agentId}</p>
-                    <p className="text-xs mt-1 line-clamp-2">{msg.text}</p>
-                  </div>
-                ))}
-              </div>
-            )}
-          </Card>
-
-          {/* Close Room Button */}
-          <Button
-            variant="secondary"
-            onClick={handleCloseRoom}
-            disabled={room.status !== "active"}
-            className="w-full"
-          >
-            Close Room
-          </Button>
+            ))}
+          </div>
+          <form onSubmit={sendMsg} className="p-3 bg-mac-gray border-t-4 border-mac-charcoal">
+             <div className="relative flex gap-2">
+                <Input 
+                  type="text" 
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value)}
+                  placeholder="Send a message..." 
+                  className="flex-grow font-mono text-sm shadow-inner"
+                />
+                <Button type="submit" variant="default" size="icon" className="w-12 shrink-0 border-4 border-mac-charcoal">
+                  <MessageSquare size={18} />
+                </Button>
+             </div>
+          </form>
         </div>
       </div>
     </div>
-  );
+  )
 }
+
+export default RoomLivePage

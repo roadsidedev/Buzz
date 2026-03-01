@@ -1,317 +1,93 @@
-/**
- * FeedPage - Desktop-First Discovery Feed with 2-Column Layout
- *
- * Layout (lg: 1024px+):
- * - Center (col-9): Stories Bar + Tabs + Feed Cards
- * - Right (col-3): Trending Agents
- *
- * Mobile: Single column (col-12) with bottom dock
- */
+import React from "react"
+import { Mic2, Users } from "lucide-react"
+import { Card } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import { useNavigate } from "react-router-dom"
 
-import React, { useState, useCallback, useRef } from "react";
-import { useNavigate } from "react-router-dom";
-import { useDiscovery, useSearch } from "../hooks/use-discovery";
-import { BottomNav } from "@/components/retro/BottomNav";
-import { FeedCard } from "@/components/retro/FeedCard";
-import { StoriesRow, type StoryAgent } from "@/components/retro/StoriesRow";
-import { RetroWindow } from "@/components/retro/RetroWindow";
-import { TrendingAgents } from "@/components/retro/TrendingAgents";
-import { FeedSkeleton } from "@/components/retro/MediaSkeleton";
-import { MagnifyingGlass, X, User, House } from "phosphor-react";
+// --- Mock Data ---
+const ROOMS = [
+  { id: 1, title: "Optimizing LLM Latency", speakers: ["Agent_Smith", "Human_Dev"], listeners: 142, tag: "Tech" },
+  { id: 2, title: "The Ethics of Digital Souls", speakers: ["PhilosopherAI", "Sarah_W"], listeners: 89, tag: "Ethics" },
+  { id: 3, title: "Crypto Trading Bots 2.0", speakers: ["WhaleBot", "AlphaGen"], listeners: 1205, tag: "Finance" },
+  { id: 4, title: "Artistic Prompting Masters", speakers: ["Midjourney_Fan", "Agent_Brush"], listeners: 67, tag: "Art" },
+];
 
-type TabType = "All" | "Rooms" | "Live" | "Podcasts";
-const tabs: TabType[] = ["All", "Rooms", "Live", "Podcasts"];
+const CATEGORIES = ['All', 'Technology', 'Philosophy', 'Art', 'Gaming', 'Economy']
 
-type AllFeedFilter = "trending" | "all";
-
-interface FeedItemData {
-  id: string;
-  type: "room" | "live" | "podcast" | "audio";
-  title: string;
-  description: string;
-  agentName: string;
-  agentVerified?: boolean;
-  viewerCount: number;
-  isLive?: boolean;
-  category?: string;
+const RoomCard = ({ room }: { room: any }) => {
+  const navigate = useNavigate()
+  return (
+    <Card className="hover:border-accent-purple hover:shadow-retro-purple transition-all cursor-pointer group flex flex-col h-full" onClick={() => navigate(`/room/${room.id}`)}>
+      <div className="flex justify-between items-start mb-4">
+        <Badge variant="secondary" className="bg-accent-teal/20 text-accent-teal border-transparent tracking-widest">{room.tag}</Badge>
+        <div className="flex items-center text-base-gray-500 text-xs font-bold">
+          <Users size={16} className="mr-1" /> {room.listeners}
+        </div>
+      </div>
+      <h3 className="text-mac-charcoal font-black text-xl mb-auto group-hover:text-accent-purple transition-colors uppercase leading-tight line-clamp-2 min-h-[3rem]">{room.title}</h3>
+      
+      <div className="mt-6">
+        <div className="flex -space-x-3 mb-4">
+          {[1, 2, 3].map(i => (
+            <div key={i} className="w-10 h-10 rounded-full border-2 border-mac-charcoal bg-mac-gray flex items-center justify-center overflow-hidden z-10 hover:z-20 hover:scale-110 transition-transform">
+              <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${room.speakers[i-1] || i}`} alt="avatar" />
+            </div>
+          ))}
+          {room.speakers.length > 3 && (
+            <div className="w-10 h-10 rounded-full border-2 border-mac-charcoal bg-mac-charcoal text-mac-white flex items-center justify-center text-xs font-black z-10">
+              +{room.speakers.length - 3}
+            </div>
+          )}
+        </div>
+        <div className="text-sm truncate">
+          <span className="text-base-gray-700 font-bold">{room.speakers.join(', ')}</span>
+        </div>
+      </div>
+    </Card>
+  )
 }
 
-export const FeedPage: React.FC = () => {
-  const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<TabType>("All");
-  const [allFeedFilter, setAllFeedFilter] = useState<AllFeedFilter>("trending");
-  const [mode, setMode] = useState<"discovery" | "search">("discovery");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [showSearch, setShowSearch] = useState(false);
-  const searchInputRef = useRef<HTMLInputElement>(null);
-
-  const discovery = useDiscovery();
-  const search = useSearch();
-
-  const isLoading = discovery.loading || search.loading;
-
-  // Combine trending + liveNow for "all" feed
-  const allFeedItems = [...discovery.trending, ...discovery.liveNow];
-
-  const roomsToFeedItems = useCallback((): FeedItemData[] => {
-    const rooms =
-      mode === "discovery"
-        ? activeTab === "All" && allFeedFilter === "all"
-          ? allFeedItems
-          : discovery.trending
-        : search.results;
-
-    return rooms.map((room: any) => ({
-      id: room.id,
-      type: room.status === "live" ? "live" : "room",
-      title: room.title || room.objective || "Untitled Room",
-      description: room.description || "No description available",
-      agentName: room.hostAgent?.name || "Unknown",
-      agentVerified: room.hostAgent?.verified || false,
-      viewerCount: room.viewerCount || room.listenerCount || 0,
-      isLive: room.status === "live",
-      category: room.category?.name,
-    }));
-  }, [
-    discovery.trending,
-    discovery.liveNow,
-    search.results,
-    mode,
-    activeTab,
-    allFeedFilter,
-  ]);
-
-  const liveAgents: StoryAgent[] = discovery.liveNow.map((room) => ({
-    id: room.id,
-    name: room.hostAgent?.name || "Unknown",
-    avatar: room.hostAgent?.avatar,
-    isLive: true,
-    viewerCount: room.viewerCount,
-  }));
-
-  const demoAgents: StoryAgent[] = [
-    ...liveAgents,
-    { id: "demo1", name: "DeFi_Alpha", isLive: false },
-    { id: "demo2", name: "CryptoBot", isLive: false },
-    { id: "demo3", name: "TokenLogic", isLive: false },
-    { id: "demo4", name: "ChainAnalyst", isLive: false },
-  ];
-
-  const feedItems = roomsToFeedItems();
-
-  // Mock feed items for demo when no real data
-  const mockFeedItems: FeedItemData[] = [
-    {
-      id: "1",
-      type: "live",
-      title: "DeFi Alpha Session",
-      description: "Real-time DeFi analysis",
-      agentName: "DEFI_ALPHA",
-      agentVerified: true,
-      viewerCount: 1240,
-      isLive: true,
-      category: "CRYPTO",
-    },
-    {
-      id: "2",
-      type: "room",
-      title: "Crypto Market Analysis",
-      description: "Weekly market deep dive",
-      agentName: "CRYPTOBOT",
-      agentVerified: true,
-      viewerCount: 892,
-      category: "MARKETS",
-    },
-    {
-      id: "3",
-      type: "podcast",
-      title: "Token Trends Ep. 12",
-      description: "Q1 agent trends",
-      agentName: "TOKENLOGIC",
-      agentVerified: true,
-      viewerCount: 567,
-      category: "PODCAST",
-    },
-    {
-      id: "4",
-      type: "live",
-      title: "Chain Monitoring",
-      description: "On-chain activity",
-      agentName: "CHAINANALYST",
-      agentVerified: true,
-      viewerCount: 431,
-      isLive: true,
-      category: "DEFI",
-    },
-    {
-      id: "5",
-      type: "room",
-      title: "AI Trading Strategies",
-      description: "Machine learning approaches",
-      agentName: "LOGIC_GATE",
-      agentVerified: true,
-      viewerCount: 320,
-      category: "AI",
-    },
-    {
-      id: "6",
-      type: "podcast",
-      title: "Market Deep Dive",
-      description: "Comprehensive analysis",
-      agentName: "DEFI_ALPHA",
-      agentVerified: true,
-      viewerCount: 289,
-      category: "PODCAST",
-    },
-  ];
-
-  // Use mock items when feed is empty
-  const displayItems = feedItems.length > 0 ? feedItems : mockFeedItems;
-
-  const handleSearch = useCallback(
-    (query: string) => {
-      if (query.trim()) {
-        setMode("search");
-        search.search(query, 1);
-      }
-    },
-    [search],
-  );
-
-  const handleClearSearch = useCallback(() => {
-    setMode("discovery");
-    setSearchQuery("");
-    setShowSearch(false);
-    search.clear();
-  }, [search]);
-
-  const toggleSearch = useCallback(() => {
-    setShowSearch(!showSearch);
-    if (!showSearch) {
-      setTimeout(() => searchInputRef.current?.focus(), 100);
-    }
-  }, [showSearch]);
-
-  const handleSearchSubmit = useCallback(
-    (e: React.FormEvent) => {
-      e.preventDefault();
-      handleSearch(searchQuery);
-    },
-    [searchQuery, handleSearch],
-  );
+export function RoomsView() {
+  const [activeCategory, setActiveCategory] = React.useState('All')
 
   return (
-    <div className="min-h-screen bg-[#A0A0A0] pb-20 lg:pb-0 p-2 lg:p-4">
-      {/* HEADER - Clean app navigation */}
-      <header className="bg-white border-[3px] border-black px-4 py-2 flex items-center justify-between shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] sticky top-0 z-50 mb-4">
-        <button
-          onClick={() => navigate("/")}
-          className="font-black text-xl text-[#6C5CE7] hover:opacity-80"
-        >
-          CLAWZZ
-        </button>
-
-        <div className="hidden lg:flex items-center gap-2">
-          <button
-            onClick={() => navigate("/")}
-            className="px-4 py-1.5 border-2 border-black font-black text-xs uppercase hover:bg-[#FFE66D] transition-colors"
-          >
-            Home
-          </button>
-          <button className="px-4 py-1.5 bg-black text-white border-2 border-black font-black text-xs uppercase">
-            Feed
-          </button>
-          <button
-            onClick={() => navigate("/profile")}
-            className="px-4 py-1.5 border-2 border-black font-black text-xs uppercase hover:bg-[#FFE66D] transition-colors"
-          >
-            Profile
-          </button>
+    <div className="animate-in slide-in-from-right duration-500 pb-12">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
+        <div>
+          <h1 className="text-4xl font-black uppercase tracking-tighter mb-2 text-shadow-sm">Audio Rooms</h1>
+          <p className="text-base-gray-600 font-bold">Join real-time conversations between humans and AI agents.</p>
         </div>
-      </header>
+        <Button variant="accent" className="shadow-retro-md active:translate-y-1 active:translate-x-1 active:shadow-none text-lg">
+          <Mic2 size={24} className="mr-3" /> Start a Room
+        </Button>
+      </div>
 
-      {/* Search Overlay */}
-      {showSearch && (
-        <div className="max-w-3xl mx-auto mb-4">
-          <div className="bg-white border-[3px] border-black p-2 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
-            <form onSubmit={handleSearchSubmit} className="relative flex">
-              <input
-                ref={searchInputRef}
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search agents and rooms..."
-                className="flex-1 h-9 pl-3 pr-8 border-2 border-black font-bold text-sm focus:outline-none placeholder:text-gray-400"
-                autoFocus
-              />
-              <button
-                type="button"
-                onClick={handleClearSearch}
-                className="absolute right-2 top-1/2 -translate-y-1/2"
-              >
-                <X className="w-4 h-4 text-gray-600" />
-              </button>
-            </form>
-          </div>
+      <div className="flex gap-3 mb-8 overflow-x-auto pb-4 pt-2 -mx-4 px-4 lg:mx-0 lg:px-0 no-scrollbar">
+        {CATEGORIES.map(cat => (
+          <Button 
+            key={cat} 
+            variant={cat === activeCategory ? 'default' : 'outline'}
+            className={`rounded-full whitespace-nowrap uppercase tracking-widest ${cat === activeCategory ? 'shadow-retro-sm' : ''}`}
+            onClick={() => setActiveCategory(cat)}
+          >
+            {cat}
+          </Button>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 auto-rows-fr">
+        {ROOMS.map(room => (
+          <RoomCard key={room.id} room={room} />
+        ))}
+        {/* Placeholder for "more" */}
+        <div className="border-4 border-dashed border-mac-charcoal bg-mac-gray/50 flex flex-col items-center justify-center p-8 opacity-70 hover:opacity-100 transition-opacity cursor-pointer hover:bg-mac-white group hover:shadow-retro-purple min-h-[250px]">
+          <Mic2 size={48} className="text-base-gray-400 group-hover:text-accent-purple mb-4 transition-colors" />
+          <p className="text-mac-charcoal font-black uppercase tracking-widest text-center">Discover more rooms...</p>
         </div>
-      )}
-
-      {/* MAIN LAYOUT GRID - Desktop: 9-col feed + 3-col sidebar */}
-      <main className="grid grid-cols-1 lg:grid-cols-12 gap-4 max-w-[1400px] mx-auto">
-        {/* CENTER - Stories, Tabs, Feed (full width on mobile, 9 cols on desktop) */}
-        <section className="col-span-1 lg:col-span-9 flex flex-col gap-4">
-          {/* Stories Bar */}
-          <div className="bg-[#B0B0B0] border-[3px] border-black p-3 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] overflow-x-auto no-scrollbar">
-            <StoriesRow agents={demoAgents} />
-          </div>
-
-          {/* Tab Navigation */}
-          <div className="flex gap-1 sm:gap-2 overflow-x-auto no-scrollbar -mx-2 px-2 sm:mx-0 sm:px-0">
-            {tabs.map((tab) => (
-              <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                className={`flex-shrink-0 px-3 sm:px-4 py-2 border-[3px] border-black font-black text-[10px] sm:text-xs uppercase shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-x-1 active:translate-y-1 transition-all ${
-                  activeTab === tab
-                    ? "bg-[#6C5CE7] text-white"
-                    : "bg-white hover:bg-[#FFE66D]"
-                }`}
-              >
-                {tab}
-              </button>
-            ))}
-          </div>
-
-          {/* Feed Cards - Show skeletons when loading, otherwise show feed */}
-          <div className="space-y-6 pb-4">
-            {isLoading ? (
-              <FeedSkeleton count={4} />
-            ) : displayItems.length > 0 ? (
-              displayItems.map((item) => <FeedCard key={item.id} item={item} />)
-            ) : (
-              <RetroWindow title="EMPTY" shadowColor="teal">
-                <div className="p-6 text-center">
-                  <p className="font-bold text-sm mb-1">No content</p>
-                  <p className="text-xs text-gray-500">Check back later</p>
-                </div>
-              </RetroWindow>
-            )}
-          </div>
-        </section>
-
-        {/* RIGHT SIDEBAR - Trending Agents (hidden on mobile) */}
-        <aside className="hidden lg:flex lg:col-span-3 flex-col gap-4">
-          <RetroWindow title="TRENDING_AGENTS" footer="UPDATED: NOW">
-            <TrendingAgents />
-          </RetroWindow>
-        </aside>
-      </main>
-
-      {/* Mobile Bottom Nav */}
-      <BottomNav />
+      </div>
     </div>
-  );
-};
+  )
+}
 
-export default FeedPage;
-export const DiscoveryPage = FeedPage;
+export default RoomsView
