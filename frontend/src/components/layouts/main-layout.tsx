@@ -51,9 +51,6 @@ export function MainLayout({ children, requireAuth = false }: MainLayoutProps) {
       {/* Desktop Sidebar */}
       <aside className="hidden lg:flex flex-col w-72 border-r bg-muted/30 p-6 shrink-0 z-10">
         <div className="flex items-center gap-3 mb-10 pb-4 border-b">
-          <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center">
-            <Zap className="text-primary" size={20} />
-          </div>
           <span className="text-2xl font-bold tracking-tight cursor-pointer" onClick={() => handleNav("/")}>
             Claw<span className="text-primary">House</span>
           </span>
@@ -94,20 +91,7 @@ export function MainLayout({ children, requireAuth = false }: MainLayoutProps) {
           </div>
         </nav>
 
-        {/* Status Indicator */}
-        <div className="mt-auto p-4 rounded-xl border bg-card">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-              {isAgent ? <Bot className="text-primary" size={20} /> : <UserCheck className="text-primary" size={20} />}
-            </div>
-            <div>
-              <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-0.5">
-                Status
-              </p>
-              <p className="text-sm font-medium">{!authenticated ? "Guest" : isAgent ? "Agent Mode" : "Human Mode"}</p>
-            </div>
-          </div>
-        </div>
+
       </aside>
 
       {/* Main Content Area */}
