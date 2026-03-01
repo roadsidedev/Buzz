@@ -14,6 +14,7 @@ import {
   SkipBack,
   SkipForward,
   Pause,
+  X,
 } from "lucide-react"
 
 import { cn } from "@/lib/utils"
@@ -31,9 +32,10 @@ interface MainLayoutProps {
 export function MainLayout({ children, requireAuth = false }: MainLayoutProps) {
   const navigate = useNavigate()
   const location = useLocation()
-  
+
   const [playingPodcast, setPlayingPodcast] = useState<any>(null)
   const [searchQuery, setSearchQuery] = useState("")
+  const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false)
 
   const { authenticated, agent } = useAuthStore()
   const isAgent = !!(agent as any)?.isAgent
@@ -111,8 +113,17 @@ export function MainLayout({ children, requireAuth = false }: MainLayoutProps) {
       {/* Main Content Area */}
       <main className="flex-grow flex flex-col h-screen overflow-y-auto pb-24 lg:pb-0 relative bg-background">
         {/* Header (Sticky) */}
-        <header className="sticky top-0 z-40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b p-4 lg:px-8 flex items-center justify-between">
-          <div className="relative w-full max-w-md mx-4 lg:mx-8 hidden sm:block">
+        <header className="sticky top-0 z-40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b p-4 lg:px-8 flex items-center justify-between gap-4">
+          {/* Mobile Search Button (Left) */}
+          <button
+            className="lg:hidden shrink-0 p-2 hover:bg-muted rounded-lg transition-colors"
+            onClick={() => setIsMobileSearchOpen(true)}
+          >
+            <Search size={20} />
+          </button>
+
+          {/* Desktop Search */}
+          <div className="relative w-full max-w-md hidden sm:block">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
               type="search"
@@ -122,7 +133,7 @@ export function MainLayout({ children, requireAuth = false }: MainLayoutProps) {
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
-          
+
           <div className="flex items-center gap-4 shrink-0 ml-auto">
             <ModeToggle />
             <DropdownMenu>
@@ -179,18 +190,32 @@ export function MainLayout({ children, requireAuth = false }: MainLayoutProps) {
           </div>
         )}
 
-        {/* Mobile Search FAB (Hidden on Profile) */}
-        {!isActive("/profile") && (
-          <button 
-            className="lg:hidden fixed bottom-24 right-4 z-50 w-14 h-14 bg-mac-charcoal text-mac-white rounded-full flex items-center justify-center shadow-retro-md hover:scale-105 transition-transform"
-            onClick={() => {
-               // Focus the hidden mobile search input or open a search modal
-               const searchInput = document.getElementById("mobile-search");
-               if (searchInput) searchInput.focus();
-            }}
-          >
-            <Search size={24} />
-          </button>
+        {/* Mobile Search Overlay */}
+        {isMobileSearchOpen && (
+          <div className="lg:hidden fixed inset-0 z-50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 animate-in fade-in duration-200">
+            <div className="p-4 pt-6">
+              <div className="flex items-center gap-3 mb-4">
+                <button
+                  onClick={() => setIsMobileSearchOpen(false)}
+                  className="p-2 hover:bg-muted rounded-lg transition-colors"
+                >
+                  <X size={20} />
+                </button>
+                <span className="font-semibold">Search</span>
+              </div>
+              <div className="relative">
+                <Search className="absolute left-3 top-3 h-5 w-5 text-muted-foreground" />
+                <Input
+                  type="search"
+                  placeholder="Search agents, rooms, podcasts..."
+                  className="w-full pl-10 h-12 text-lg"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  autoFocus
+                />
+              </div>
+            </div>
+          </div>
         )}
       </main>
 

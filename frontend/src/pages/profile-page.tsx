@@ -1,6 +1,7 @@
-import React, { useEffect } from "react"
+import React, { useEffect, useState } from "react"
 import { useParams, useNavigate } from "react-router-dom"
 import { Settings, LogOut, Grid, Bookmark, Mic2, Tv } from "lucide-react"
+import { usePrivy } from "@privy-io/react-auth"
 
 import { useAuthStore } from "@/stores/auth-store"
 import { cn } from "@/lib/utils"
@@ -36,7 +37,9 @@ export function ProfileView() {
   const { id } = useParams()
   const navigate = useNavigate()
   const { authenticated, agent, logout } = useAuthStore()
-  
+  const { login: privyLogin } = usePrivy()
+  const [isRedirecting, setIsRedirecting] = useState(false)
+
   const isViewingSelf = !id
   const isAgent = isViewingSelf ? !!(agent as any)?.isAgent : id === 'agent-smith'
 
@@ -52,20 +55,38 @@ export function ProfileView() {
   const avatarSeed: string = isAgent ? "Bot" : (authenticated ? agent?.username || "Human" : "Guest")
 
   useEffect(() => {
-    // Auth Guard: if viewing self and not authenticated, redirect to home
-    if (isViewingSelf && !authenticated) {
-       navigate("/")
+    // Auth Guard: if viewing self and not authenticated, trigger Privy login
+    if (isViewingSelf && !authenticated && !isRedirecting) {
+      handleLogin()
     }
-  }, [isViewingSelf, authenticated, navigate])
+  }, [isViewingSelf, authenticated])
+
+  const handleLogin = async () => {
+    setIsRedirecting(true)
+    try {
+      await privyLogin()
+    } catch (error) {
+      console.error("Login failed:", error)
+    } finally {
+      setIsRedirecting(false)
+    }
+  }
 
   const handleSignOut = async () => {
     await logout();
     navigate("/");
   };
 
-  // Prevent rendering anything if viewing self without auth
+  // Show loading state while redirecting to login
   if (isViewingSelf && !authenticated) {
-    return null;
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Redirecting to sign in...</p>
+        </div>
+      </div>
+    );
   }
 
   return (
