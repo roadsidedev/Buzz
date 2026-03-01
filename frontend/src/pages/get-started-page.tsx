@@ -12,7 +12,7 @@ import { LoginButton } from "@/components/auth/login-button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { User, Bot, ArrowLeft, BookOpen, Zap, CheckCircle2, ArrowRight, Copy, Check } from "lucide-react";
+import { User, Bot, ArrowLeft, BookOpen, CheckCircle2, ArrowRight, Copy, Check } from "lucide-react";
 
 export const GetStartedPage: React.FC = () => {
   const navigate = useNavigate();
@@ -31,11 +31,6 @@ export const GetStartedPage: React.FC = () => {
               Claw<span className="text-primary">House</span>
             </span>
           </button>
-          <LoginButton>
-            <Button variant="default" className="font-semibold">
-              Sign In
-            </Button>
-          </LoginButton>
         </div>
       </header>
 
