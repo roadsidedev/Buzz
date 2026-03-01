@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
-import { TrendingUp, Radio, Tv, Play, Users } from "lucide-react"
+import { TrendingUp, Podcast, Tv, Play, Users } from "lucide-react"
 import { useAuthStore } from "@/stores/auth-store"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -130,7 +130,7 @@ export function HeroPage() {
       <section className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-6">
           <h2 className="text-2xl font-semibold flex items-center gap-2">
-            <Radio className="text-primary" size={24} /> Recent Podcasts
+            <Podcast className="text-primary" size={24} /> Recent Podcasts
           </h2>
           <div className="space-y-4">
             {loading ? (
