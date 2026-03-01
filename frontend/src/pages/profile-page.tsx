@@ -1,4 +1,4 @@
-import React from "react"
+import React, { useEffect } from "react"
 import { useParams, useNavigate } from "react-router-dom"
 import { Settings, LogOut, Grid, Bookmark, Mic2, Tv } from "lucide-react"
 
@@ -51,10 +51,22 @@ export function ProfileView() {
   const profileData = isAgent ? AGENT_PROFILE : HUMAN_PROFILE
   const avatarSeed: string = isAgent ? "Bot" : (authenticated ? agent?.username || "Human" : "Guest")
 
+  useEffect(() => {
+    // Auth Guard: if viewing self and not authenticated, redirect to home
+    if (isViewingSelf && !authenticated) {
+       navigate("/")
+    }
+  }, [isViewingSelf, authenticated, navigate])
+
   const handleSignOut = async () => {
     await logout();
     navigate("/");
   };
+
+  // Prevent rendering anything if viewing self without auth
+  if (isViewingSelf && !authenticated) {
+    return null;
+  }
 
   return (
     <div className="max-w-4xl mx-auto pb-12 animate-in fade-in duration-500">
@@ -64,8 +76,8 @@ export function ProfileView() {
           <div className="absolute inset-0 bg-gradient-to-t from-background/40 to-transparent"></div>
         </div>
         
-        <div className="px-6 lg:px-10 pb-8 flex flex-col md:flex-row gap-6 md:items-end -mt-20 relative z-10">
-          <div className="w-32 h-32 md:w-40 md:h-40 shrink-0 rounded-2xl border-4 border-background bg-muted overflow-hidden shadow-sm transform hover:scale-105 transition-transform flex items-center justify-center">
+        <div className="px-6 lg:px-10 pb-8 flex flex-col md:flex-row gap-6 md:items-end -mt-16 md:-mt-20 relative z-10">
+          <div className="w-24 h-24 md:w-28 md:h-28 shrink-0 rounded-2xl border-4 border-background bg-muted overflow-hidden shadow-sm transform hover:scale-105 transition-transform flex items-center justify-center">
             <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${avatarSeed}`} alt={profileData.name} className="w-full h-full object-cover" />
           </div>
 
@@ -80,7 +92,7 @@ export function ProfileView() {
             
             <div className="flex flex-wrap gap-4 md:gap-8 text-sm">
                <div className="flex flex-col"><span className="font-semibold text-xl">{profileData.followers}</span> <span className="text-muted-foreground font-medium text-xs">Followers</span></div>
-               <div className="flex flex-col"><span className="font-semibold text-xl">{profileData.following}</span> <span className="text-muted-foreground font-medium text-xs">Following</span></div>
+               <div className="flex flex-col cursor-pointer hover:opacity-80 transition-opacity" onClick={() => navigate('/following')}><span className="font-semibold text-xl">{profileData.following}</span> <span className="text-muted-foreground font-medium text-xs">Following</span></div>
                {profileData.type === "Agent" && (
                  <>
                    <div className="pl-4 md:pl-8 border-l flex flex-col">
@@ -107,11 +119,6 @@ export function ProfileView() {
                 </Button>
              )}
           </div>
-        </div>
-
-        <div className="px-6 lg:px-10 py-6 border-t bg-muted/10">
-           <h3 className="font-semibold text-sm text-foreground mb-2">About</h3>
-           <p className="text-muted-foreground text-sm max-w-2xl leading-relaxed">{profileData.bio}</p>
         </div>
       </Card>
 
@@ -216,18 +223,34 @@ export function ProfileView() {
                     </div>
                     <div className="pt-6 border-t mt-2">
                        <Label className="font-semibold text-sm mb-3 block">Preset Tip Amounts</Label>
-                       <div className="flex gap-2">
+                       <div className="flex gap-2 mb-4">
                           <Button variant="outline" className="flex-1 font-semibold" size="sm">$1</Button>
                           <Button variant="default" className="flex-1 font-semibold" size="sm">$5</Button>
                           <Button variant="outline" className="flex-1 font-semibold" size="sm">$10</Button>
+                       </div>
+                       
+                       <Label className="font-semibold text-sm mb-2 block">Custom Tip</Label>
+                       <div className="flex gap-2">
+                           {/* Using standard placeholder text since we haven't explicitly imported Input here, but we can just use generic styling to simulate an Input component so we don't cause TS errors. */}
+                           <input type="number" placeholder="$ amount" className="flex-1 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 font-medium" />
+                           <Button variant="secondary" className="font-semibold">Save Custom</Button>
                        </div>
                     </div>
                   </div>
                 </CardContent>
               </Card>
               
-              <div className="md:col-span-2 mt-4 text-center">
-                 <Button variant="destructive" className="font-semibold w-full md:w-auto px-8" onClick={handleSignOut}>
+              <div className="md:col-span-2 mt-4 space-y-4">
+                 <div className="grid grid-cols-2 gap-4">
+                   <Button variant="outline" className="font-semibold text-secondary-foreground" onClick={() => console.log('Exporting wallet...')}>
+                      Export Wallet
+                   </Button>
+                   <Button variant="outline" className="font-semibold text-secondary-foreground" onClick={() => console.log('Backing up wallet...')}>
+                      Backup Wallet
+                   </Button>
+                 </div>
+                 
+                 <Button variant="destructive" className="font-semibold w-full px-8" onClick={handleSignOut}>
                    <LogOut size={16} className="mr-2" /> Sign Out
                  </Button>
               </div>

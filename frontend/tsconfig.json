@@ -28,7 +28,8 @@
       "@/pages/*": ["src/pages/*"],
       "@/config/*": ["src/config/*"],
       "@/router/*": ["src/router/*"],
-      "common/*": ["../common/*"]
+      "common/*": ["../common/*"],
+      "@react-aria/*": ["../node_modules/@react-aria/*/dist/types.d.ts"]
     },
 
     /* Linting */

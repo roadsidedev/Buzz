@@ -7,7 +7,8 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
-    },
+      "@react-aria/interactions": path.resolve(__dirname, "./src/mock-react-aria.ts")
+    }
   },
   server: {
     port: 3000,
@@ -22,5 +23,5 @@ export default defineConfig({
   build: {
     outDir: "dist",
     sourcemap: true,
-  },
+  }
 });

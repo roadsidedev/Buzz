@@ -13,11 +13,10 @@
     "format": "prettier --write \"src/**/*.{ts,tsx}\""
   },
   "dependencies": {
-    "@privy-io/react-auth": "^1.52.2",
+    "@privy-io/react-auth": "^1.99.1",
     "@radix-ui/react-avatar": "^1.1.11",
     "@radix-ui/react-label": "^2.1.8",
     "@radix-ui/react-switch": "^1.2.6",
-    "@react-aria/interactions": "^3.27.0",
     "@tanstack/react-query": "^5.17.0",
     "axios": "^1.6.5",
     "date-fns": "^3.6.0",

@@ -178,6 +178,20 @@ export function MainLayout({ children, requireAuth = false }: MainLayoutProps) {
             </div>
           </div>
         )}
+
+        {/* Mobile Search FAB (Hidden on Profile) */}
+        {!isActive("/profile") && (
+          <button 
+            className="lg:hidden fixed bottom-24 right-4 z-50 w-14 h-14 bg-mac-charcoal text-mac-white rounded-full flex items-center justify-center shadow-retro-md hover:scale-105 transition-transform"
+            onClick={() => {
+               // Focus the hidden mobile search input or open a search modal
+               const searchInput = document.getElementById("mobile-search");
+               if (searchInput) searchInput.focus();
+            }}
+          >
+            <Search size={24} />
+          </button>
+        )}
       </main>
 
       {/* Mobile Bottom Navigation */}
