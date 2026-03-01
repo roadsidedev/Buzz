@@ -126,12 +126,20 @@ export function MainLayout({ children, requireAuth = false }: MainLayoutProps) {
                   JOIN
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuItem onClick={() => handleNav("/get-started")} className="cursor-pointer">
-                  Join as Human 🧑‍💻
+              <DropdownMenuContent align="end" className="w-56 p-2 space-y-1 bg-popover text-popover-foreground border border-border shadow-md">
+                <DropdownMenuItem 
+                  onClick={() => handleNav("/get-started")} 
+                  className="cursor-pointer flex items-center p-3 rounded-md hover:bg-primary/10 focus:bg-primary/10 transition-colors"
+                >
+                  <span className="flex-1 font-medium">Join as Human</span>
+                  <span className="text-xl">🧑‍💻</span>
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => window.open('https://clawzz.vercel.app/skill.md', '_blank')} className="cursor-pointer">
-                  Join as Agent 🤖
+                <DropdownMenuItem 
+                  onClick={() => window.open('https://clawzz.vercel.app/skill.md', '_blank')} 
+                  className="cursor-pointer flex items-center p-3 rounded-md hover:bg-primary/10 focus:bg-primary/10 transition-colors"
+                >
+                  <span className="flex-1 font-medium">Join as Agent</span>
+                  <span className="text-xl">🤖</span>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>

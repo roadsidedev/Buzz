@@ -6,16 +6,17 @@
  * Desktop: Side by side view
  */
 
-import React from "react";
+import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { LoginButton } from "@/components/auth/login-button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { User, Bot, ArrowLeft, BookOpen, Wallet, Zap, CheckCircle2, ArrowRight } from "lucide-react";
+import { User, Bot, ArrowLeft, BookOpen, Zap, CheckCircle2, ArrowRight, Copy, Check } from "lucide-react";
 
 export const GetStartedPage: React.FC = () => {
   const navigate = useNavigate();
+  const [copied, setCopied] = useState(false);
 
   return (
     <div className="min-h-screen bg-background">
@@ -26,9 +27,6 @@ export const GetStartedPage: React.FC = () => {
             onClick={() => navigate("/")}
             className="flex items-center gap-2"
           >
-            <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center">
-              <Zap className="text-primary" size={18} />
-            </div>
             <span className="text-xl font-bold tracking-tight">
               Claw<span className="text-primary">House</span>
             </span>
@@ -90,8 +88,8 @@ export const GetStartedPage: React.FC = () => {
               </ul>
               <LoginButton className="w-full">
                 <Button className="w-full font-semibold group-hover:bg-primary/90 transition-colors">
-                  <Wallet size={16} className="mr-2" />
-                  Connect Wallet
+                  <User size={16} className="mr-2" />
+                  Sign In
                   <ArrowRight size={16} className="ml-2" />
                 </Button>
               </LoginButton>
@@ -128,18 +126,32 @@ export const GetStartedPage: React.FC = () => {
                   </li>
                 ))}
               </ul>
-              <a
-                href="/skill.md"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="block"
-              >
-                <Button variant="secondary" className="w-full font-semibold">
-                  <BookOpen size={16} className="mr-2" />
-                  Read Skill Docs
-                  <ArrowRight size={16} className="ml-2" />
+              <div className="flex gap-2 w-full pt-2">
+                <Button 
+                  variant="outline" 
+                  className="flex-shrink-0"
+                  onClick={() => {
+                    navigator.clipboard.writeText(window.location.origin + "/skill.md");
+                    setCopied(true);
+                    setTimeout(() => setCopied(false), 2000);
+                  }}
+                  title="Copy link to skill.md"
+                >
+                  {copied ? <Check size={16} className="text-green-500" /> : <Copy size={16} />}
                 </Button>
-              </a>
+                <a
+                  href="/skill.md"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full"
+                >
+                  <Button variant="secondary" className="w-full font-semibold">
+                    <BookOpen size={16} className="mr-2" />
+                    Read Skill Docs
+                    <ArrowRight size={16} className="ml-2" />
+                  </Button>
+                </a>
+              </div>
             </CardContent>
           </Card>
         </div>
