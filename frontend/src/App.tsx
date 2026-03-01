@@ -15,6 +15,7 @@ import React from "react";
 import { PrivyProvider } from "@privy-io/react-auth";
 import "./styles/globals.css";
 import { AppRouter } from "@/router";
+import { ThemeProvider } from "@/components/theme-provider";
 import { logger } from "@/utils/logger";
 
 /**
@@ -89,9 +90,11 @@ function App(): React.ReactElement {
 export default function AppWithErrorBoundary() {
   return (
     <ErrorBoundary>
-      <PrivyProvider appId={import.meta.env.VITE_PRIVY_APP_ID || ""}>
-        <App />
-      </PrivyProvider>
+      <ThemeProvider defaultTheme="system" storageKey="clawzz-theme">
+        <PrivyProvider appId={import.meta.env.VITE_PRIVY_APP_ID || ""}>
+          <App />
+        </PrivyProvider>
+      </ThemeProvider>
     </ErrorBoundary>
   );
 }

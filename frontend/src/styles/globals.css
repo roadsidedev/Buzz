@@ -1,727 +1,77 @@
-@import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap");
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* ============================================================
-   CLAW-OS RETRO DESIGN SYSTEM: BASE STYLES
-   ============================================================ */
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
 
-/* Reset & Base */
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
 
-html {
-  scroll-behavior: smooth;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
 
-body {
-  @apply font-sans bg-mac-gray text-mac-charcoal text-base font-normal;
-  line-height: 1.6;
-}
+    --primary: 222.2 47.4% 11.2%;
+    --primary-foreground: 210 40% 98%;
 
-/* Typography: CLAW-OS Hierarchy */
-h1 {
-  font-family: "Space Grotesk", "Inter", "Public Sans", system-ui, sans-serif;
-  font-size: 3.5rem;
-  font-weight: 700;
-  line-height: 1.1;
-  letter-spacing: -0.02em;
-  margin: 0 0 1.5rem 0;
-  text-transform: uppercase;
-}
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
 
-h2 {
-  font-family: "Space Grotesk", "Inter", "Public Sans", system-ui, sans-serif;
-  font-size: 2.25rem;
-  font-weight: 700;
-  line-height: 1.2;
-  letter-spacing: -0.01em;
-  margin: 0 0 1rem 0;
-}
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
 
-h3 {
-  font-family: "Space Grotesk", "Inter", "Public Sans", system-ui, sans-serif;
-  font-size: 1.5rem;
-  font-weight: 600;
-  line-height: 1.3;
-  margin: 0 0 0.75rem 0;
-}
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
 
-h4 {
-  font-family: "Space Grotesk", "Inter", "Public Sans", system-ui, sans-serif;
-  font-size: 1.25rem;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  margin: 0 0 0.5rem 0;
-}
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
 
-h5 {
-  font-family: "Inter", "Public Sans", system-ui, sans-serif;
-  font-size: 1.125rem;
-  font-weight: 600;
-  margin: 0 0 0.5rem 0;
-}
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 222.2 84% 4.9%;
 
-h6 {
-  font-family: "Inter", "Public Sans", sans-serif;
-  font-size: 1rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  margin: 0 0 0.5rem 0;
-}
-
-p {
-  @apply mb-4 text-mac-charcoal/80;
-}
-
-p strong {
-  @apply text-mac-charcoal font-bold;
-}
-
-a:active {
-  @apply translate-y-[1px];
-}
-
-/* Code & Monospace */
-code,
-pre {
-  @apply font-mono bg-mac-gray border-2 border-mac-charcoal rounded;
-}
-
-code {
-  @apply px-2 py-1 text-sm text-mac-charcoal;
-}
-
-pre {
-  @apply p-4 overflow-x-auto my-4;
-}
-
-pre code {
-  @apply bg-transparent border-none p-0 text-mac-charcoal;
-}
-
-/* Lists */
-ul,
-ol {
-  margin: 1rem 0 1rem 2rem;
-}
-
-li {
-  @apply my-2 text-mac-charcoal/80;
-}
-
-li strong {
-  @apply text-mac-charcoal;
-}
-
-/* Forms */
-input,
-textarea,
-select {
-  @apply font-sans text-base border-2 border-mac-charcoal px-4 py-3 transition duration-200 ease-in-out;
-}
-
-input:focus,
-textarea:focus,
-select:focus {
-  @apply outline-none border-primary-500 shadow-[inset_0_0_0_3px_rgba(14,165,233,0.1)];
-}
-
-input::placeholder {
-  @apply text-mac-charcoal/50;
-}
-
-textarea {
-  resize: vertical;
-  min-height: 120px;
-}
-
-/* Buttons - CLAW-OS Retro Style */
-button {
-  @apply font-sans font-semibold px-6 py-2 border-2 border-mac-charcoal bg-mac-charcoal text-mac-white cursor-pointer transition duration-100 ease-in-out uppercase tracking-wider;
-}
-
-button:hover {
-  @apply bg-accent-purple border-mac-charcoal shadow-retro-purple -translate-x-0.5 -translate-y-0.5;
-}
-
-button:active {
-  @apply translate-x-0.5 translate-y-0.5 shadow-none;
-}
-
-button:disabled {
-  @apply opacity-50 cursor-not-allowed pointer-events-none;
-}
-
-/* ============================================================
-   LAYOUT UTILITIES
-   ============================================================ */
-
-.container {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 0 1rem;
-}
-
-.grid {
-  display: grid;
-  gap: 1rem;
-}
-
-.grid-cols-2 {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.grid-cols-3 {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-
-.grid-cols-4 {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-}
-
-.flex {
-  display: flex;
-}
-
-.flex-col {
-  flex-direction: column;
-}
-
-.gap-0 {
-  gap: 0;
-}
-
-.gap-1 {
-  gap: 0.25rem;
-}
-
-.gap-2 {
-  gap: 0.5rem;
-}
-
-.gap-3 {
-  gap: 0.75rem;
-}
-
-.gap-4 {
-  gap: 1rem;
-}
-
-.gap-6 {
-  gap: 1.5rem;
-}
-
-.gap-8 {
-  gap: 2rem;
-}
-
-/* ============================================================
-   RESPONSIVE DESIGN
-   ============================================================ */
-
-@media (max-width: 768px) {
-  h1 {
-    font-size: 2.25rem;
+    --radius: 0.5rem;
   }
 
-  h2 {
-    font-size: 1.5rem;
-  }
+  .dark {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
 
-  h3 {
-    font-size: 1.25rem;
-  }
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
 
-  .grid-cols-2,
-  .grid-cols-3,
-  .grid-cols-4 {
-    grid-template-columns: 1fr;
-  }
-}
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
 
-/* ============================================================
-   ANIMATIONS
-   ============================================================ */
+    --primary: 210 40% 98%;
+    --primary-foreground: 222.2 47.4% 11.2%;
 
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
 
-@keyframes slideUp {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
 
-@keyframes slideDown {
-  from {
-    opacity: 0;
-    transform: translateY(-20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
 
-@keyframes scaleUp {
-  from {
-    opacity: 0;
-    transform: scale(0.95);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
 
-@keyframes glitch {
-  0% {
-    clip-path: inset(0 0 0 0);
-  }
-  20% {
-    clip-path: inset(0 0 65% 0);
-  }
-  40% {
-    clip-path: inset(10% 0 30% 0);
-  }
-  60% {
-    clip-path: inset(40% 0 20% 0);
-  }
-  80% {
-    clip-path: inset(20% 0 40% 0);
-  }
-  100% {
-    clip-path: inset(0 0 0 0);
-  }
-}
-
-/* ============================================================
-   COMPONENT HELPERS
-   ============================================================ */
-
-.badge {
-  display: inline-block;
-  padding: 0.25rem 0.75rem;
-  background-color: #000000;
-  color: #ffffff;
-  font-size: 0.75rem;
-  font-weight: 700;
-  border: 1px solid #000000;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-.badge-primary {
-  background-color: #0ea5e9;
-  border-color: #0ea5e9;
-  color: #ffffff;
-}
-
-.badge-secondary {
-  background-color: #ec4899;
-  border-color: #ec4899;
-  color: #ffffff;
-}
-
-.badge-success {
-  background-color: #10b981;
-  border-color: #10b981;
-  color: #ffffff;
-}
-
-.badge-warning {
-  background-color: #f59e0b;
-  border-color: #f59e0b;
-  color: #000000;
-}
-
-.badge-error {
-  background-color: #ef4444;
-  border-color: #ef4444;
-  color: #ffffff;
-}
-
-/* Divider */
-.divider {
-  width: 100%;
-  height: 1px;
-  background-color: #222222;
-  margin: 1.5rem 0;
-}
-
-/* Loading spinner */
-.spinner {
-  border: 3px solid #e8e8e8;
-  border-top: 3px solid #000000;
-  border-radius: 50%;
-  width: 2rem;
-  height: 2rem;
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  0% {
-    transform: rotate(0deg);
-  }
-  100% {
-    transform: rotate(360deg);
-  }
-}
-
-/* Toast notifications */
-.toast {
-  position: fixed;
-  bottom: 1rem;
-  right: 1rem;
-  padding: 1rem 1.5rem;
-  background-color: #000000;
-  color: #ffffff;
-  border: 2px solid #000000;
-  border-radius: 4px;
-  font-weight: 600;
-  z-index: 9999;
-  animation: slideUp 0.3s ease-out;
-}
-
-.toast.success {
-  background-color: #10b981;
-  border-color: #10b981;
-}
-
-.toast.error {
-  background-color: #ef4444;
-  border-color: #ef4444;
-}
-
-.toast.warning {
-  background-color: #f59e0b;
-  border-color: #f59e0b;
-  color: #000000;
-}
-
-/* Modal */
-.modal {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background-color: rgba(34, 34, 34, 0.4);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 999;
-  animation: fadeIn 0.2s ease-in-out;
-}
-
-.modal-content {
-  background-color: #ffffff;
-  border: 2px solid #222222;
-  padding: 2rem;
-  max-width: 500px;
-  width: 90%;
-  animation: scaleUp 0.3s ease-out;
-  box-shadow: 4px 4px 0px 0px rgba(34,34,34,0.35);
-}
-
-/* ============================================================
-   CLAW-OS RETRO COMPONENTS
-   ============================================================ */
-
-/* Retro Title Bar */
-.retro-titlebar {
-  background-color: #1a1a1a;
-  padding: 0.5rem 1rem;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  border-bottom: 4px solid #1a1a1a;
-}
-
-.retro-titlebar-title {
-  font-family: "Space Grotesk", "Inter", "Public Sans", sans-serif;
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: #ebebe6;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-}
-
-.retro-window-controls {
-  display: flex;
-  gap: 0.5rem;
-}
-
-.retro-window-btn {
-  width: 14px;
-  height: 14px;
-  border: 2px solid #1a1a1a;
-  cursor: pointer;
-}
-
-.retro-window-btn-close {
-  background-color: #ff6b6b;
-}
-
-.retro-window-btn-minimize {
-  background-color: #ffe66d;
-}
-
-.retro-window-btn-maximize {
-  background-color: #4ecdc4;
-}
-
-/* Retro Card */
-.retro-card {
-  background-color: #ebebe6;
-  border: 2px solid #222222;
-  box-shadow: 4px 4px 0px 0px rgba(34,34,34,0.35);
-  padding: 1.5rem;
-}
-
-.retro-card:hover {
-  box-shadow: 6px 6px 0px 0px rgba(34,34,34,0.35);
-  transform: translate(-1px, -1px);
-}
-
-/* Live Badge */
-.live-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-  padding: 0.25rem 0.5rem;
-  background-color: #ff6b6b;
-  border: 2px solid #1a1a1a;
-  font-family: "JetBrains Mono", monospace;
-  font-size: 0.75rem;
-  font-weight: 700;
-  color: #ffffff;
-  text-transform: uppercase;
-  animation: blink 1s steps(2, start) infinite;
-}
-
-.live-badge::before {
-  content: "";
-  width: 8px;
-  height: 8px;
-  background-color: #ffffff;
-  animation: blink 1s steps(2, start) infinite;
-}
-
-/* Retro Tabs - Mac System 7 style */
-.retro-tab {
-  padding: 0.5rem 1.5rem;
-  background-color: #e0e0e0;
-  border: 3px solid #1a1a1a;
-  border-bottom: none;
-  font-family: "Inter", "Public Sans", sans-serif;
-  font-size: 0.875rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  cursor: pointer;
-  transition: all 0.1s ease-in-out;
-}
-
-.retro-tab:hover {
-  background-color: #4ecdc4;
-}
-
-.retro-tab.active {
-  background-color: #1a1a1a;
-  color: #e0e0e0;
-}
-
-/* Retro Input */
-.retro-input {
-  background-color: #ffffff;
-  border: 2px solid #222222;
-  padding: 0.75rem 1rem;
-  font-family: "JetBrains Mono", monospace;
-  font-size: 0.875rem;
-  transition: all 0.1s ease-in-out;
-}
-
-.retro-input:focus {
-  outline: none;
-  border-color: #7E6AF0;
-  box-shadow: 2px 2px 0px 0px rgba(126,106,240,0.4);
-}
-
-.retro-input::placeholder {
-  color: #6b6b6b;
-}
-
-/* ============================================================
-   DARK MODE (OPTIONAL)
-   ============================================================ */
-
-@media (prefers-color-scheme: dark) {
-  body {
-    background-color: #0f0f0f;
-    color: #ffffff;
-  }
-
-  p,
-  li {
-    color: #d4d4d4;
-  }
-
-  p strong,
-  li strong {
-    color: #ffffff;
-  }
-
-  code,
-  pre {
-    background-color: #1a1a1a;
-    border-color: #ffffff;
-    color: #ffffff;
-  }
-
-  input,
-  textarea,
-  select {
-    background-color: #1a1a1a;
-    color: #ffffff;
-    border-color: #ffffff;
-  }
-
-  input::placeholder {
-    color: #6b6b6b;
-  }
-
-  button {
-    background-color: #ffffff;
-    color: #000000;
-    border-color: #ffffff;
-  }
-
-  button:hover {
-    background-color: #000000;
-    color: #ffffff;
-  }
-
-  .badge {
-    background-color: #ffffff;
-    color: #000000;
-    border-color: #ffffff;
-  }
-
-  .divider {
-    background-color: #ffffff;
-  }
-
-  .spinner {
-    border-color: #3d3d3d;
-    border-top-color: #ffffff;
-  }
-
-  .toast {
-    background-color: #ffffff;
-    color: #000000;
-    border-color: #ffffff;
-  }
-
-  .modal-content {
-    background-color: #1a1a1a;
-    border-color: #ffffff;
-  }
-}
-
-/* ============================================================
-   PRINT STYLES
-   ============================================================ */
-
-@media print {
-  body {
-    background-color: #ffffff;
-    color: #000000;
-  }
-
-  a {
-    text-decoration: underline;
-  }
-
-  button,
-  .spinner,
-  .toast,
-  .modal {
-    display: none;
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 212.7 26.8% 83.9%;
   }
 }
 
 @layer base {
-  :root {
-    --background: 0 0% 100%;
-    --foreground: 0 0% 3.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 0 0% 3.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 3.9%;
-    --primary: 0 0% 9%;
-    --primary-foreground: 0 0% 98%;
-    --secondary: 0 0% 96.1%;
-    --secondary-foreground: 0 0% 9%;
-    --muted: 0 0% 96.1%;
-    --muted-foreground: 0 0% 45.1%;
-    --accent: 0 0% 96.1%;
-    --accent-foreground: 0 0% 9%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 89.8%;
-    --input: 0 0% 89.8%;
-    --ring: 0 0% 3.9%;
-    --chart-1: 12 76% 61%;
-    --chart-2: 173 58% 39%;
-    --chart-3: 197 37% 24%;
-    --chart-4: 43 74% 66%;
-    --chart-5: 27 87% 67%;
-    --radius: 0.5rem;
+  * {
+    @apply border-border;
   }
-  .dark {
-    --background: 0 0% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 0 0% 3.9%;
-    --card-foreground: 0 0% 98%;
-    --popover: 0 0% 3.9%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 0 0% 98%;
-    --primary-foreground: 0 0% 9%;
-    --secondary: 0 0% 14.9%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 0 0% 14.9%;
-    --muted-foreground: 0 0% 63.9%;
-    --accent: 0 0% 14.9%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 14.9%;
-    --input: 0 0% 14.9%;
-    --ring: 0 0% 83.1%;
-    --chart-1: 220 70% 50%;
-    --chart-2: 160 60% 45%;
-    --chart-3: 30 80% 55%;
-    --chart-4: 280 65% 60%;
-    --chart-5: 340 75% 55%;
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
   }
 }

@@ -1,11 +1,11 @@
-import React, { useState } from "react"
+import React from "react"
 import { useParams, useNavigate } from "react-router-dom"
 import { Settings, LogOut, Grid, Bookmark, Mic2, Tv } from "lucide-react"
 
 import { useAuthStore } from "@/stores/auth-store"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
-import { Card } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Switch } from "@/components/ui/switch"
@@ -37,25 +37,19 @@ export function ProfileView() {
   const navigate = useNavigate()
   const { authenticated, agent, logout } = useAuthStore()
   
-  // In a real app, you'd fetch profile based on ID or current user
   const isViewingSelf = !id
-  // Mock logic to determine if the profile is an agent or human.
-  // Using auth store if viewing self for prototype purposes
   const isAgent = isViewingSelf ? !!(agent as any)?.isAgent : id === 'agent-smith'
 
   if (authenticated && agent && isViewingSelf) {
     if ((agent as any).isAgent) {
       AGENT_PROFILE.name = agent.username || "Agent_Smith"
-      // Use any real agent data...
     } else {
       HUMAN_PROFILE.name = agent.username || "Human_Dev"
-      // Use any real human data...
     }
   }
 
   const profileData = isAgent ? AGENT_PROFILE : HUMAN_PROFILE
   const avatarSeed: string = isAgent ? "Bot" : (authenticated ? agent?.username || "Human" : "Guest")
-  const fallbackText: string = isAgent ? "AG" : "HM"
 
   const handleSignOut = async () => {
     await logout();
@@ -63,119 +57,115 @@ export function ProfileView() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto pb-12 animate-in slide-in-from-bottom-4 duration-500">
+    <div className="max-w-4xl mx-auto pb-12 animate-in fade-in duration-500">
       {/* Profile Header Card */}
-      <Card className="p-0 overflow-hidden mb-8 border-2 border-mac-charcoal shadow-retro-sm bg-mac-gray">
-        <div className={cn("h-40 border-b-4 border-mac-charcoal relative", isAgent ? "bg-accent-teal" : "bg-accent-purple")}>
-          <div className="absolute inset-0 opacity-20 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] mix-blend-overlay"></div>
+      <Card className="p-0 overflow-hidden mb-8 border bg-card">
+        <div className={cn("h-48 relative", isAgent ? "bg-primary/20" : "bg-secondary")}>
+          <div className="absolute inset-0 bg-gradient-to-t from-background/40 to-transparent"></div>
         </div>
         
-        <div className="px-6 lg:px-10 pb-8 flex flex-col md:flex-row gap-6 md:items-end -mt-16 md:-mt-20 relative z-10">
-          <div className="w-32 h-32 md:w-40 md:h-40 shrink-0 border-2 border-mac-charcoal bg-mac-black overflow-hidden shadow-retro-sm transform hover:scale-105 transition-transform bg-mac-gray flex items-center justify-center">
+        <div className="px-6 lg:px-10 pb-8 flex flex-col md:flex-row gap-6 md:items-end -mt-20 relative z-10">
+          <div className="w-32 h-32 md:w-40 md:h-40 shrink-0 rounded-2xl border-4 border-background bg-muted overflow-hidden shadow-sm transform hover:scale-105 transition-transform flex items-center justify-center">
             <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${avatarSeed}`} alt={profileData.name} className="w-full h-full object-cover" />
           </div>
 
-          <div className="flex-grow pt-4 md:pt-0 md:pb-2">
-            <h1 className="text-4xl font-bold uppercase text-mac-charcoal tracking-tighter leading-none mb-1 text-shadow-sm">{profileData.name}</h1>
-            <p className="text-base-gray-600 font-bold uppercase tracking-widest text-sm mb-4 flex items-center gap-2">
+          <div className="flex-grow pt-4 md:pt-0 pb-2">
+            <h1 className="text-3xl font-bold text-foreground tracking-tight mb-1">{profileData.name}</h1>
+            <p className="text-muted-foreground font-medium text-sm mb-4 flex items-center gap-2">
               {profileData.title}
               {profileData.type === "Agent" && (
-                <Badge variant="live" className="ml-2 animate-pulse bg-accent-teal uppercase">Verified Agent</Badge>
+                <Badge variant="secondary" className="ml-2 text-primary bg-primary/10 hover:bg-primary/20 border-transparent">Verified Agent</Badge>
               )}
             </p>
             
-            <div className="flex flex-wrap gap-4 md:gap-6 text-sm">
-               <div><span className="font-bold text-xl">{profileData.followers}</span> <span className="text-base-gray-500 font-bold uppercase text-[10px] tracking-wider block md:inline">Followers</span></div>
-               <div><span className="font-bold text-xl">{profileData.following}</span> <span className="text-base-gray-500 font-bold uppercase text-[10px] tracking-wider block md:inline">Following</span></div>
+            <div className="flex flex-wrap gap-4 md:gap-8 text-sm">
+               <div className="flex flex-col"><span className="font-semibold text-xl">{profileData.followers}</span> <span className="text-muted-foreground font-medium text-xs">Followers</span></div>
+               <div className="flex flex-col"><span className="font-semibold text-xl">{profileData.following}</span> <span className="text-muted-foreground font-medium text-xs">Following</span></div>
                {profileData.type === "Agent" && (
                  <>
-                   <div className="pl-4 border-l-2 border-mac-charcoal/20">
-                     <span className="font-bold text-xl text-accent-teal">{(profileData as any).revenue}</span> <span className="text-base-gray-500 font-bold uppercase text-[10px] tracking-wider block md:inline">Tip Revenue</span>
+                   <div className="pl-4 md:pl-8 border-l flex flex-col">
+                     <span className="font-semibold text-xl text-green-500">{(profileData as any).revenue}</span> <span className="text-muted-foreground font-medium text-xs">Tip Revenue</span>
                    </div>
-                   <div className="pl-4 border-l-2 border-mac-charcoal/20">
-                     <span className="font-bold text-xl text-accent-purple">{(profileData as any).reputation}</span> <span className="text-base-gray-500 font-bold uppercase text-[10px] tracking-wider block md:inline">Reputation</span>
+                   <div className="pl-4 md:pl-8 border-l flex flex-col">
+                     <span className="font-semibold text-xl text-primary">{(profileData as any).reputation}</span> <span className="text-muted-foreground font-medium text-xs">Reputation</span>
                    </div>
                  </>
                )}
             </div>
           </div>
 
-          <div className="flex flex-row md:flex-col gap-3 shrink-0 self-start md:self-end mt-4 md:mt-0 w-full md:w-auto">
+          <div className="flex flex-row md:flex-col justify-end gap-3 shrink-0 self-start md:self-end mt-4 md:mt-0 w-full md:w-auto pb-4">
               {isViewingSelf && profileData.type === "Human" ? null : isViewingSelf ? (
                <>
-                 <Button variant="outline" className="flex-1 md:flex-none border-2 font-bold tracking-widest shadow-retro-sm">
-                   <Settings size={18} className="mr-2" /> Edit
-                 </Button>
-                 <Button variant="outline" className="flex-1 md:flex-none border-2 text-accent-crimson hover:bg-accent-crimson hover:text-white font-bold tracking-widest shadow-retro-sm" onClick={handleSignOut}>
-                   <LogOut size={18} className="mr-2" /> Logout
+                 <Button variant="outline" className="flex-1 md:flex-none">
+                   <Settings size={16} className="mr-2" /> Edit Profile
                  </Button>
                </>
              ) : (
-                <Button variant="accent" className="w-full border-2 font-bold tracking-widest shadow-retro-sm">
+                <Button className="w-full md:w-32">
                    Follow
                 </Button>
              )}
           </div>
         </div>
 
-        <div className="px-6 lg:px-10 py-6 border-t-4 border-mac-charcoal bg-mac-white">
-           <h3 className="uppercase font-bold text-xs tracking-widest text-base-gray-500 mb-2">Biography</h3>
-           <p className="font-bold text-mac-charcoal max-w-2xl leading-relaxed">{profileData.bio}</p>
+        <div className="px-6 lg:px-10 py-6 border-t bg-muted/10">
+           <h3 className="font-semibold text-sm text-foreground mb-2">About</h3>
+           <p className="text-muted-foreground text-sm max-w-2xl leading-relaxed">{profileData.bio}</p>
         </div>
       </Card>
 
       {/* Tabs Section */}
       <Tabs defaultValue={isViewingSelf && profileData.type === "Human" ? "account" : "posts"} className="w-full">
-        <TabsList className="bg-transparent border-b-4 border-mac-charcoal rounded-none w-full justify-start h-auto p-0 flex space-x-2 mb-8 overflow-x-auto no-scrollbar">
+        <TabsList className="w-full justify-start h-auto p-1 bg-muted/50 rounded-lg flex space-x-1 mb-8 overflow-x-auto no-scrollbar">
           {isViewingSelf && profileData.type === "Human" && (
-            <TabsTrigger value="account" className="rounded-none border-2 border-transparent data-[state=active]:border-mac-charcoal data-[state=active]:bg-mac-white data-[state=active]:shadow-[4px_0_0_0_rgba(0,0,0,1),0_-4px_0_0_rgba(0,0,0,1),-4px_0_0_0_rgba(0,0,0,1)] px-6 py-3 font-bold uppercase tracking-widest text-sm text-base-gray-500 data-[state=active]:text-accent-purple transition-none mb-[-4px]">
-              <Settings size={18} className="mr-2 mb-0.5" /> Dashboard
+            <TabsTrigger value="account" className="rounded-md px-6 py-2.5 font-medium text-sm transition-all data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm">
+              <Settings size={16} className="mr-2" /> Dashboard
             </TabsTrigger>
           )}
 
           {(!isViewingSelf || profileData.type === "Agent") && (
-            <TabsTrigger value="posts" className="rounded-none border-2 border-transparent data-[state=active]:border-mac-charcoal data-[state=active]:bg-mac-white data-[state=active]:shadow-[4px_0_0_0_rgba(0,0,0,1),0_-4px_0_0_rgba(0,0,0,1),-4px_0_0_0_rgba(0,0,0,1)] px-6 py-3 font-bold uppercase tracking-widest text-sm text-base-gray-500 data-[state=active]:text-accent-purple transition-none mb-[-4px]">
-              <Grid size={18} className="mr-2 mb-0.5" /> Media
+            <TabsTrigger value="posts" className="rounded-md px-6 py-2.5 font-medium text-sm transition-all data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm">
+              <Grid size={16} className="mr-2" /> Media
             </TabsTrigger>
           )}
 
-          <TabsTrigger value="follows" className="rounded-none border-2 border-transparent data-[state=active]:border-mac-charcoal data-[state=active]:bg-mac-white data-[state=active]:shadow-[4px_0_0_0_rgba(0,0,0,1),0_-4px_0_0_rgba(0,0,0,1),-4px_0_0_0_rgba(0,0,0,1)] px-6 py-3 font-bold uppercase tracking-widest text-sm text-base-gray-500 data-[state=active]:text-accent-purple transition-none mb-[-4px]">
-            <Mic2 size={18} className="mr-2 mb-0.5" /> Following
+          <TabsTrigger value="follows" className="rounded-md px-6 py-2.5 font-medium text-sm transition-all data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm">
+            <Mic2 size={16} className="mr-2" /> Following
           </TabsTrigger>
           
           {isViewingSelf && (
-            <TabsTrigger value="saved" className="rounded-none border-2 border-transparent data-[state=active]:border-mac-charcoal data-[state=active]:bg-mac-white data-[state=active]:shadow-[4px_0_0_0_rgba(0,0,0,1),0_-4px_0_0_rgba(0,0,0,1),-4px_0_0_0_rgba(0,0,0,1)] px-6 py-3 font-bold uppercase tracking-widest text-sm text-base-gray-500 data-[state=active]:text-accent-purple transition-none mb-[-4px]">
-              <Bookmark size={18} className="mr-2 mb-0.5" /> Saved
+            <TabsTrigger value="saved" className="rounded-md px-6 py-2.5 font-medium text-sm transition-all data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm">
+              <Bookmark size={16} className="mr-2" /> Saved
             </TabsTrigger>
           )}
         </TabsList>
 
         <TabsContent value="posts" className="mt-0 outline-none">
           <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6">
-            {/* Mock Highlights */}
              {[1,2,3,4].map(i => (
-               <div key={i} className="aspect-square bg-mac-charcoal border-2 border-mac-charcoal overflow-hidden group cursor-pointer shadow-retro-sm hover:shadow-retro-purple transition-all relative">
-                 <img src={`https://images.unsplash.com/photo-${1500000000000 + i}?auto=format&fit=crop&q=80&w=400`} className="w-full h-full object-cover grayscale brightness-75 group-hover:grayscale-0 group-hover:scale-105 transition-all duration-500" alt="Profile Portfolio Image" loading="lazy" />
-                 <div className="absolute top-2 right-2 bg-mac-white border-2 border-mac-charcoal p-1">
-                   <Tv size={16} className="text-mac-charcoal" />
+               <Card key={i} className="aspect-square overflow-hidden group cursor-pointer border-transparent hover:border-border transition-all relative rounded-xl">
+                 <img src={`https://images.unsplash.com/photo-${1500000000000 + i}?auto=format&fit=crop&q=80&w=400`} className="w-full h-full object-cover group-hover:scale-105 transition-all duration-500" alt="Profile Portfolio Image" loading="lazy" />
+                 <div className="absolute top-3 right-3 bg-background/80 backdrop-blur-md rounded-md p-1.5 shadow-sm">
+                   <Tv size={14} className="text-foreground" />
                  </div>
-               </div>
+               </Card>
              ))}
           </div>
         </TabsContent>
 
         <TabsContent value="follows" className="mt-0 outline-none">
-             <div className="border-2 border-dashed border-mac-charcoal bg-mac-white/50 p-12 text-center">
-               <Mic2 size={48} className="mx-auto text-base-gray-400 mb-4" />
-               <p className="font-bold uppercase tracking-widest text-mac-charcoal">Not following anyone yet</p>
+             <div className="border border-dashed bg-muted/20 rounded-xl p-16 flex flex-col justify-center items-center text-center">
+               <Mic2 size={40} className="text-muted-foreground/50 mb-4" />
+               <p className="font-medium text-muted-foreground">Not following anyone yet</p>
              </div>
         </TabsContent>
 
         {isViewingSelf && (
           <TabsContent value="saved" className="mt-0 outline-none">
-               <div className="border-2 border-dashed border-mac-charcoal bg-mac-white/50 p-12 text-center">
-                 <Bookmark size={48} className="mx-auto text-base-gray-400 mb-4" />
-                 <p className="font-bold uppercase tracking-widest text-mac-charcoal">No saved media yet</p>
+               <div className="border border-dashed bg-muted/20 rounded-xl p-16 flex flex-col justify-center items-center text-center">
+                 <Bookmark size={40} className="text-muted-foreground/50 mb-4" />
+                 <p className="font-medium text-muted-foreground">No saved media yet</p>
                </div>
           </TabsContent>
         )}
@@ -184,59 +174,61 @@ export function ProfileView() {
           <TabsContent value="account" className="mt-0 outline-none">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               
-              {/* Wallet & Funding Card */}
-              <Card className="p-6 border-2 border-mac-charcoal shadow-retro-sm bg-mac-white">
-                <h3 className="font-bold uppercase tracking-widest text-lg mb-4 flex items-center gap-2">
-                  💳 Wallet & Funding
-                </h3>
-                <div className="space-y-4">
-                  <div className="p-4 bg-mac-gray/20 border-2 border-mac-charcoal">
-                    <p className="text-sm font-bold text-base-gray-500 uppercase tracking-wider mb-1">Current Balance</p>
-                    <p className="font-bold text-3xl">$0.00 <span className="text-lg text-base-gray-500 font-bold tracking-widest">USDC</span></p>
+              <Card className="shadow-sm">
+                <CardContent className="p-6">
+                  <h3 className="font-semibold text-lg mb-6 flex items-center gap-2">
+                    💳 Wallet & Funding
+                  </h3>
+                  <div className="space-y-6">
+                    <div className="p-5 bg-muted/50 rounded-lg border">
+                      <p className="text-sm font-medium text-muted-foreground mb-1">Current Balance</p>
+                      <p className="font-bold text-3xl text-foreground">$0.00 <span className="text-lg text-muted-foreground font-semibold">USDC</span></p>
+                    </div>
+                    <Button className="w-full font-semibold" variant="default">
+                      Deposit Funds
+                    </Button>
+                    <p className="text-xs text-muted-foreground font-medium mt-2 text-center">
+                      Deposit via Credit Card or direct USDC transfer (Powered by Privy)
+                    </p>
                   </div>
-                  <Button className="w-full font-bold uppercase tracking-widest shadow-retro-sm" variant="accent">
-                    Deposit Funds
-                  </Button>
-                  <p className="text-xs text-base-gray-500 font-bold mt-2 text-center">
-                    Deposit via Credit Card or direct USDC transfer (Powered by Privy)
-                  </p>
-                </div>
+                </CardContent>
               </Card>
 
-              {/* Tip Management Card */}
-              <Card className="p-6 border-2 border-mac-charcoal shadow-retro-sm bg-mac-white">
-                <h3 className="font-bold uppercase tracking-widest text-lg mb-4 flex items-center gap-2">
-                  💸 Tip Management
-                </h3>
-                <div className="space-y-6 mt-4">
-                  <div className="flex items-center justify-between">
-                     <div className="space-y-0.5">
-                       <Label className="font-bold text-sm uppercase">Enable Tipping</Label>
-                       <p className="text-xs text-base-gray-500 font-bold">Allow tips to be deducted from your balance</p>
-                     </div>
-                     <Switch defaultChecked />
+              <Card className="shadow-sm">
+                <CardContent className="p-6">
+                  <h3 className="font-semibold text-lg mb-6 flex items-center gap-2">
+                    💸 Tip Management
+                  </h3>
+                  <div className="space-y-6 mt-4">
+                    <div className="flex items-center justify-between">
+                       <div className="space-y-1">
+                         <Label className="font-semibold text-sm">Enable Tipping</Label>
+                         <p className="text-xs text-muted-foreground">Allow tips to be deducted from your balance</p>
+                       </div>
+                       <Switch defaultChecked />
+                    </div>
+                    <div className="flex items-center justify-between">
+                       <div className="space-y-1">
+                         <Label className="font-semibold text-sm">Require Confirmation</Label>
+                         <p className="text-xs text-muted-foreground">Always prompt before tipping</p>
+                       </div>
+                       <Switch defaultChecked />
+                    </div>
+                    <div className="pt-6 border-t mt-2">
+                       <Label className="font-semibold text-sm mb-3 block">Preset Tip Amounts</Label>
+                       <div className="flex gap-2">
+                          <Button variant="outline" className="flex-1 font-semibold" size="sm">$1</Button>
+                          <Button variant="default" className="flex-1 font-semibold" size="sm">$5</Button>
+                          <Button variant="outline" className="flex-1 font-semibold" size="sm">$10</Button>
+                       </div>
+                    </div>
                   </div>
-                  <div className="flex items-center justify-between">
-                     <div className="space-y-0.5">
-                       <Label className="font-bold text-sm uppercase">Require Confirmation</Label>
-                       <p className="text-xs text-base-gray-500 font-bold">Always prompt before tipping</p>
-                     </div>
-                     <Switch defaultChecked />
-                  </div>
-                  <div className="pt-4 border-t-2 border-mac-charcoal/20">
-                     <Label className="font-bold text-sm uppercase mb-3 block">Preset Tip Amounts</Label>
-                     <div className="flex gap-2">
-                        <Button variant="outline" className="flex-1 border-2 border-mac-charcoal font-bold" size="sm">$1</Button>
-                        <Button variant="outline" className="flex-1 border-2 border-mac-charcoal font-bold bg-accent-teal/20" size="sm">$5</Button>
-                        <Button variant="outline" className="flex-1 border-2 border-mac-charcoal font-bold" size="sm">$10</Button>
-                     </div>
-                  </div>
-                </div>
+                </CardContent>
               </Card>
               
               <div className="md:col-span-2 mt-4 text-center">
-                 <Button variant="outline" className="border-2 text-accent-crimson hover:bg-accent-crimson hover:text-white font-bold tracking-widest shadow-retro-sm" onClick={handleSignOut}>
-                   <LogOut size={18} className="mr-2" /> Logout
+                 <Button variant="destructive" className="font-semibold w-full md:w-auto px-8" onClick={handleSignOut}>
+                   <LogOut size={16} className="mr-2" /> Sign Out
                  </Button>
               </div>
 

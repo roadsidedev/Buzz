@@ -1,68 +1,57 @@
-import * as React from "react";
-import { Slot } from "@radix-ui/react-slot";
-import { cva, type VariantProps } from "class-variance-authority";
-import { cn } from "@/lib/utils";
+import * as React from "react"
+import { Slot } from "@radix-ui/react-slot"
+import { cva, type VariantProps } from "class-variance-authority"
 
-/**
- * CLAW-OS RETRO Button Component
- *
- * Features:
- * - 4px solid black border
- * - Hard drop shadow
- * - Offset on :active (translate 2px)
- * - Shadow removal on :active
- */
+import { cn } from "@/lib/utils"
+
 const buttonVariants = cva(
-  "inline-flex items-center justify-center whitespace-nowrap font-bold tracking-wide transition-all duration-100 cursor-pointer active:translate-x-1 active:translate-y-1 active:shadow-none disabled:pointer-events-none disabled:opacity-50 border-2 border-mac-charcoal",
+  "inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
   {
     variants: {
       variant: {
-        default:
-          "bg-mac-charcoal text-mac-white hover:bg-accent-purple hover:shadow-retro-purple",
+        default: "bg-primary text-primary-foreground hover:bg-primary/90",
         destructive:
-          "bg-accent-crimson text-mac-white hover:bg-red-600 hover:shadow-retro-crimson",
+          "bg-destructive text-destructive-foreground hover:bg-destructive/90",
         outline:
-          "bg-transparent text-mac-charcoal hover:bg-mac-charcoal hover:text-mac-white",
+          "border border-input bg-background hover:bg-accent hover:text-accent-foreground",
         secondary:
-          "bg-mac-white text-mac-charcoal hover:bg-accent-yellow hover:shadow-retro-yellow",
-        accent:
-          "bg-accent-purple text-mac-white hover:bg-accent-teal hover:shadow-retro-teal",
-        ghost: "bg-transparent text-mac-charcoal hover:bg-base-gray-200",
-        link: "bg-transparent text-accent-purple underline-offset-4 hover:underline",
+          "bg-secondary text-secondary-foreground hover:bg-secondary/80",
+        ghost: "hover:bg-accent hover:text-accent-foreground",
+        link: "text-primary underline-offset-4 hover:underline",
+        accent: "bg-accent text-accent-foreground hover:bg-accent/80",
       },
       size: {
-        default: "px-6 py-3 text-base",
-        sm: "px-3 py-1.5 text-sm",
-        lg: "px-8 py-4 text-lg",
-        icon: "w-10 h-10",
+        default: "h-10 px-4 py-2",
+        sm: "h-9 rounded-md px-3",
+        lg: "h-11 rounded-md px-8",
+        icon: "h-10 w-10",
       },
     },
     defaultVariants: {
       variant: "default",
       size: "default",
     },
-  },
-);
+  }
+)
 
 export interface ButtonProps
-  extends
-    React.ButtonHTMLAttributes<HTMLButtonElement>,
+  extends React.ButtonHTMLAttributes<HTMLButtonElement>,
     VariantProps<typeof buttonVariants> {
-  asChild?: boolean;
+  asChild?: boolean
 }
 
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
   ({ className, variant, size, asChild = false, ...props }, ref) => {
-    const Comp = asChild ? Slot : "button";
+    const Comp = asChild ? Slot : "button"
     return (
       <Comp
         className={cn(buttonVariants({ variant, size, className }))}
         ref={ref}
         {...props}
       />
-    );
-  },
-);
-Button.displayName = "Button";
+    )
+  }
+)
+Button.displayName = "Button"
 
-export { Button, buttonVariants };
+export { Button, buttonVariants }

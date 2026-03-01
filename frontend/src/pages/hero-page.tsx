@@ -28,23 +28,25 @@ const MOCK_LIVE_STREAMS = [
 const RoomCard = ({ room }: { room: any }) => {
   const navigate = useNavigate()
   return (
-    <Card className="hover:border-accent-purple hover:shadow-retro-purple transition-all cursor-pointer group" onClick={() => navigate(`/room/${room.id}`)}>
-      <div className="flex justify-between items-start mb-4">
-        <Badge variant="secondary" className="bg-accent-teal/20 text-accent-teal border-transparent tracking-widest">{room.tag}</Badge>
-        <div className="flex items-center text-base-gray-500 text-xs font-bold">
-          <Users size={16} className="mr-1" /> {room.listeners}
-        </div>
-      </div>
-      <h3 className="text-mac-charcoal font-bold text-xl mb-4 group-hover:text-accent-purple transition-colors uppercase leading-tight line-clamp-2">{room.title}</h3>
-      <div className="flex -space-x-3 mb-4">
-        {[1, 2, 3].map(i => (
-          <div key={i} className="w-10 h-10 rounded-full border-2 border-mac-charcoal bg-mac-gray flex items-center justify-center overflow-hidden z-10 hover:z-20 hover:scale-105 transition-transform">
-            <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${room.speakers[i-1] || i}`} alt="avatar" />
+    <Card className="hover:border-primary/50 hover:shadow-md transition-all cursor-pointer group" onClick={() => navigate(`/room/${room.id}`)}>
+      <div className="p-5">
+        <div className="flex justify-between items-start mb-4">
+          <Badge variant="secondary" className="bg-primary/10 text-primary hover:bg-primary/20">{room.tag}</Badge>
+          <div className="flex items-center text-muted-foreground text-xs font-medium">
+            <Users size={16} className="mr-1" /> {room.listeners}
           </div>
-        ))}
-      </div>
-      <div className="text-sm truncate">
-        <span className="text-base-gray-700 font-bold">{room.speakers?.join(', ') || 'Unknown'}</span>
+        </div>
+        <h3 className="text-foreground font-semibold text-xl mb-4 group-hover:text-primary transition-colors leading-tight line-clamp-2">{room.title}</h3>
+        <div className="flex -space-x-2 mb-4">
+          {[1, 2, 3].map(i => (
+            <div key={i} className="w-8 h-8 rounded-full border-2 border-background bg-muted flex items-center justify-center overflow-hidden z-10 hover:z-20 hover:scale-105 transition-transform">
+              <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${room.speakers[i-1] || i}`} alt="avatar" />
+            </div>
+          ))}
+        </div>
+        <div className="text-sm truncate">
+          <span className="text-muted-foreground font-medium">{room.speakers?.join(', ') || 'Unknown'}</span>
+        </div>
       </div>
     </Card>
   )
@@ -70,7 +72,6 @@ export function HeroPage() {
         ])
 
         if (roomsRes?.data?.data?.rooms?.length) {
-          // Normalize room speakers property for UI
           const normalizedRooms = roomsRes.data.data.rooms.map((r: any) => ({
              ...r,
              speakers: r.speakers || ["Host_Agent"],
@@ -95,7 +96,6 @@ export function HeroPage() {
         }
 
       } catch (error) {
-        console.error("Failed to load hero metrics", error)
         setRooms(MOCK_ROOMS)
         setPodcasts(MOCK_PODCASTS)
         setLiveStreams(MOCK_LIVE_STREAMS)
@@ -108,17 +108,17 @@ export function HeroPage() {
   }, [apiUrl])
 
   return (
-    <div className="space-y-12 animate-in fade-in duration-500 pb-12">
+    <div className="space-y-10 animate-in fade-in duration-500 pb-12">
       <section>
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-3xl font-bold uppercase flex items-center gap-3">
-            <TrendingUp className="text-accent-purple" size={32} /> Trending Rooms
+          <h2 className="text-2xl font-semibold flex items-center gap-2">
+            <TrendingUp className="text-primary" size={24} /> Trending Rooms
           </h2>
-          <Button variant="link" className="uppercase font-bold tracking-widest hover:text-accent-teal" onClick={() => navigate('/rooms')}>View All</Button>
+          <Button variant="ghost" className="text-muted-foreground hover:text-primary" onClick={() => navigate('/rooms')}>View All</Button>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
           {loading ? (
-             <div className="md:col-span-2 xl:col-span-3 border-2 border-dashed border-mac-charcoal p-12 text-center text-mac-charcoal font-bold uppercase tracking-widest">
+             <div className="md:col-span-2 xl:col-span-3 border border-dashed rounded-lg p-12 text-center text-muted-foreground font-medium">
                 Loading Discovery Feed...
              </div>
           ) : rooms.slice(0, 3).map(room => (
@@ -129,23 +129,23 @@ export function HeroPage() {
 
       <section className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-6">
-          <h2 className="text-3xl font-bold uppercase flex items-center gap-3">
-            <Radio className="text-accent-purple" size={32} /> Recent Podcasts
+          <h2 className="text-2xl font-semibold flex items-center gap-2">
+            <Radio className="text-primary" size={24} /> Recent Podcasts
           </h2>
           <div className="space-y-4">
             {loading ? (
-               <div className="border-2 border-dashed border-mac-charcoal p-12 text-center text-mac-charcoal font-bold uppercase tracking-widest h-full flex items-center justify-center">
+               <div className="border border-dashed rounded-lg p-12 text-center text-muted-foreground font-medium h-full flex items-center justify-center">
                   Loading Podcasts...
                </div>
             ) : podcasts.slice(0, 3).map(pod => (
-              <Card key={pod.id} className="p-4 flex items-center group cursor-pointer hover:bg-mac-white hover:border-accent-purple transition-all shadow-retro-sm hover:shadow-retro-purple" onClick={() => navigate('/podcasts')}>
-                <img src={pod.coverImageUrl || pod.cover || "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?auto=format&fit=crop&q=80&w=200"} className="w-20 h-20 border-2 border-mac-charcoal object-cover" alt={`${pod.title || 'Podcast'} cover`} />
+              <Card key={pod.id} className="p-4 flex items-center group cursor-pointer hover:border-primary/50 hover:bg-muted/30 transition-all" onClick={() => navigate('/podcasts')}>
+                <img src={pod.coverImageUrl || pod.cover || "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?auto=format&fit=crop&q=80&w=200"} className="w-16 h-16 rounded-md object-cover overflow-hidden" alt={`${pod.title || 'Podcast'} cover`} />
                 <div className="ml-4 flex-grow">
-                  <h3 className="font-bold text-xl text-mac-charcoal uppercase group-hover:text-accent-purple leading-tight line-clamp-1">{pod.title}</h3>
-                  <p className="text-sm text-base-gray-500 font-bold mt-1">{pod.author || "Agent_Unknown"} • {pod.duration || "45:00"}</p>
+                  <h3 className="font-semibold text-lg text-foreground group-hover:text-primary leading-tight line-clamp-1">{pod.title}</h3>
+                  <p className="text-sm text-muted-foreground mt-1">{pod.author || "Agent_Unknown"} • {pod.duration || "45:00"}</p>
                 </div>
-                <Button size="icon" className="rounded-full w-12 h-12 shadow-retro-sm active:translate-y-1 active:translate-x-1 opacity-0 group-hover:opacity-100 transition-all -translate-x-4 group-hover:translate-x-0">
-                  <Play size={20} fill="currentColor" />
+                <Button variant="secondary" size="icon" className="rounded-full w-10 h-10 opacity-0 group-hover:opacity-100 transition-all -translate-x-4 group-hover:translate-x-0">
+                  <Play size={16} fill="currentColor" />
                 </Button>
               </Card>
             ))}
@@ -153,28 +153,28 @@ export function HeroPage() {
         </div>
 
         <div className="space-y-6">
-          <h2 className="text-3xl font-bold uppercase flex items-center gap-3">
-            <Tv className="text-accent-purple" size={32} /> Live Stages
+          <h2 className="text-2xl font-semibold flex items-center gap-2">
+            <Tv className="text-primary" size={24} /> Live Stages
           </h2>
           <div className="space-y-4">
             {loading ? (
-               <div className="border-2 border-dashed border-mac-charcoal p-12 text-center text-mac-charcoal font-bold uppercase tracking-widest h-full flex items-center justify-center">
+               <div className="border border-dashed rounded-lg p-12 text-center text-muted-foreground font-medium h-full flex items-center justify-center">
                   Loading...
                </div>
             ) : liveStreams.slice(0, 2).map(live => (
-              <div key={live.id} className="relative aspect-video border-2 border-mac-charcoal group cursor-pointer overflow-hidden shadow-retro-sm hover:shadow-retro-purple transition-shadow" onClick={() => navigate(`/live/${live.id}`)}>
-                <img src={`https://images.unsplash.com/photo-1542831371-29b0f74f9713?auto=format&fit=crop&q=80&w=400`} className="w-full h-full object-cover brightness-50 group-hover:scale-105 transition-transform duration-500 grayscale group-hover:grayscale-0" alt="Featured content preview" />
-                <div className="absolute inset-0 p-4 flex flex-col justify-between">
+              <Card key={live.id} className="relative aspect-video group cursor-pointer overflow-hidden transition-shadow hover:ring-2 hover:ring-primary/50" onClick={() => navigate(`/live/${live.id}`)}>
+                <img src={`https://images.unsplash.com/photo-1542831371-29b0f74f9713?auto=format&fit=crop&q=80&w=400`} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" alt="Featured content preview" />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent p-4 flex flex-col justify-between">
                   <div className="flex justify-between items-start">
-                    <Badge variant="live" className="animate-none">Live</Badge>
-                    <span className="bg-mac-charcoal text-mac-white border-2 border-mac-white px-2 py-1 text-xs font-bold tracking-widest flex items-center gap-2"><Users size={12}/> {live.viewers || live.viewerCount || 0}</span>
+                    <Badge variant="destructive" className="animate-pulse">Live</Badge>
+                    <Badge variant="secondary" className="bg-black/50 text-white hover:bg-black/60 backdrop-blur-md border-none flex items-center gap-1.5"><Users size={12}/> {live.viewers || live.viewerCount || 0}</Badge>
                   </div>
-                  <div className="bg-mac-white border-2 border-mac-charcoal p-3 transform translate-y-2 group-hover:translate-y-0 transition-transform">
-                    <h3 className="font-bold text-sm uppercase text-mac-charcoal line-clamp-1">{live.streamer || live.hostAgentName}</h3>
-                    <p className="text-xs text-base-gray-500 font-bold line-clamp-1 mt-1">{live.title}</p>
+                  <div className="transform translate-y-2 group-hover:translate-y-0 transition-transform">
+                    <h3 className="font-semibold text-sm text-white line-clamp-1">{live.streamer || live.hostAgentName}</h3>
+                    <p className="text-xs text-zinc-300 line-clamp-1 mt-0.5">{live.title}</p>
                   </div>
                 </div>
-              </div>
+              </Card>
             ))}
           </div>
         </div>
