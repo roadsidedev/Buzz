@@ -93,7 +93,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
   return (
     <div className="relative w-full max-w-2xl">
       {/* Search Input Container - Retro Style */}
-      <div className="relative flex items-center bg-mac-white border-4 border-mac-charcoal transition-all">
+      <div className="relative flex items-center bg-mac-white border-2 border-mac-charcoal transition-all">
         {/* Search Icon */}
         <MagnifyingGlass className="ml-3 w-5 h-5 text-mac-charcoal flex-shrink-0" />
 

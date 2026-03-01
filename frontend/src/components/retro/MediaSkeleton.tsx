@@ -55,7 +55,7 @@ export const MediaSkeleton: React.FC<MediaSkeletonProps> = ({
     <div
       onClick={handleClick}
       className={clsx(
-        "relative bg-slate-200 border-[3px] border-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)]",
+        "relative bg-slate-200 border-2 border-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)]",
         "aspect-[4/5] sm:aspect-video lg:aspect-square",
         id ? "cursor-pointer hover:translate-y-1 transition-transform" : "",
         className,

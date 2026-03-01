@@ -13,10 +13,11 @@ import type { CreateRoomRequest } from "../types/api.js";
 import {
   asyncHandler,
   requireAuth,
+  requireApiKey,
   roomCreationLimiter,
 } from "../middleware/index.js";
 import { validate, CreateRoomRequestSchema } from "../utils/validators.js";
-import { roomService, paymentService } from "../services/index.js";
+import { roomService, paymentService, orchestratorClient } from "../services/index.js";
 import { logger } from "../utils/logger.js";
 
 const router = Router();
@@ -34,11 +35,11 @@ const router = Router();
  */
 router.post(
   "/create",
-  requireAuth,
+  requireApiKey,
   roomCreationLimiter,
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const agent = req.agent!;
-    const authenticatedUser = (req as any).user; // From validateJWT middleware
+    const authenticatedUser = undefined; // No JWT for API Key auth
 
     // 1. VALIDATE REQUEST
     const input = validate(CreateRoomRequestSchema, req.body);
@@ -59,6 +60,17 @@ router.post(
       type: input.type,
       spawnFee: input.spawnFee,
     });
+
+    // Register room with Python orchestrator
+    try {
+      await orchestratorClient.registerRoom(room);
+    } catch (err) {
+      logger.error("Failed to register room with orchestrator", {
+        roomId: room.id,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      // Continue anyway, room was created in DB
+    }
 
     res.status(201).json({
       success: true,
@@ -143,7 +155,7 @@ router.get(
  */
 router.post(
   "/:id/join",
-  requireAuth,
+  requireApiKey,
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const { id } = req.params;
     const agent = req.agent!;
@@ -169,6 +181,17 @@ router.post(
       roomId: id,
       agentId: agent.agentId,
     });
+
+    // Start room in orchestrator if it's not already started
+    // (Orchestrator handles idempotency)
+    try {
+      await orchestratorClient.startRoom(id);
+    } catch (err) {
+      logger.warn("Failed to start room in orchestrator", {
+        roomId: id,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
 
     res.json({
       success: true,
@@ -197,7 +220,7 @@ router.post(
  */
 router.post(
   "/:id/close",
-  requireAuth,
+  requireApiKey,
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const { id } = req.params;
     const agent = req.agent!;

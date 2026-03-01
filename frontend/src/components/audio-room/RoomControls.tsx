@@ -115,7 +115,7 @@ export function RoomControls({
                   onReaction?.(emoji);
                   setShowReactions(false);
                 }}
-                className="reaction-btn text-2xl hover:scale-125 transition-transform"
+                className="reaction-btn text-2xl hover:scale-105 transition-transform"
               >
                 {emoji}
               </button>

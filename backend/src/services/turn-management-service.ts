@@ -387,79 +387,59 @@ export class TurnManagementService {
       }
     }
 
-    // 3. FETCH CANDIDATE MESSAGES
-    const candidates = await messageRepository.getByRoomAndStatus(
-      roomId,
-      "candidate",
-    );
-
-    if (candidates.length === 0) {
-      // No messages to score yet
-      return;
-    }
-
-    // Limit to top MAX_CANDIDATES_PER_TURN
-    const toScore = candidates.slice(0, MAX_CANDIDATES_PER_TURN);
-
-    logger.debug("Scoring candidates", {
-      roomId,
-      count: toScore.length,
-      totalCandidates: candidates.length,
-    });
-
-    // 4. CALL ORCHESTRATOR TO SCORE
-    let scores: RoomMessageScore[];
+    // 3. CALL ORCHESTRATOR TO PROCESS TURN
+    // The orchestrator handles:
+    // - Fetching candidate messages
+    // - Scoring them
+    // - Appling moderation
+    // - Selecting winner
+    // - Updating message statuses via API callbacks
+    // - Calculating output contracts
+    
+    let result;
     try {
-      scores = await this._scoreMessages(room, toScore);
+      result = await orchestratorClient.processTurn(roomId);
     } catch (err) {
-      logger.error("Orchestrator scoring failed", {
+      logger.error("Orchestrator process-turn failed", {
         roomId,
         error: err instanceof Error ? err.message : String(err),
       });
-      // Continue next iteration, don't crash
       return;
     }
 
-    // 5. SELECT WINNER
-    const winner = this._selectWinner(scores);
-    if (!winner) {
-      logger.debug("No message met quality threshold", {
+    if (result.status !== "success" || !result.selected_message_id) {
+      logger.debug("No message selected for turn", {
         roomId,
-        minThreshold: MIN_SCORE_THRESHOLD,
-        topScore: scores.length > 0 ? scores[0].score : 0,
+        status: result.status,
+        error: result.error
       });
       return;
     }
 
-    // 6. UPDATE MESSAGE STATUS
-    await messageRepository.updateStatus(winner.messageId, "selected", {
-      selectedAt: new Date(),
-      score: winner.score,
-    });
-
-    // 7. UPDATE ROOM STATE & LAST TURN TIME
-    await roomRepository.updateTurn(roomId, room.turnCount + 1);
-
-    // Get the winning message
-    const winningMessage = toScore.find((m) => m.id === winner.messageId);
+    // 4. FETCH WINNING MESSAGE
+    const winningMessage = await messageRepository.getById(result.selected_message_id);
     if (!winningMessage) {
-      logger.error("Winning message not found", {
+      logger.error("Winning message returned by orchestrator not found in DB", {
         roomId,
-        messageId: winner.messageId,
+        messageId: result.selected_message_id,
       });
       return;
     }
 
     logger.info("Turn selected", {
       roomId,
-      turnNumber: room.turnCount + 1,
-      messageId: winner.messageId,
-      agentId: winningMessage.agentId,
-      score: winner.score,
+      turnNumber: result.turn_number || room.turnCount + 1,
+      messageId: result.selected_message_id,
+      agentId: result.selected_agent_id,
+      score: result.score,
     });
 
-    // 8. SYNTHESIZE AUDIO & STREAM TO JAM
-    await this._synthesizeAndStream(room, winningMessage, winner);
+    // 5. UPDATE ROOM STATE (Fallback, orchestrator might do this)
+    await roomRepository.updateTurn(roomId, result.turn_number || room.turnCount + 1);
+
+    // 6. SYNTHESIZE AUDIO & STREAM TO JAM
+    const mockScore = { score: result.score || 0 };
+    await this._synthesizeAndStream(room, winningMessage, mockScore as any);
   }
 
   /**
@@ -472,7 +452,7 @@ export class TurnManagementService {
   private async _synthesizeAndStream(
     room: Room,
     message: RoomMessage,
-    winner: RoomMessageScore,
+    winner: { score: number },
   ): Promise<void> {
     try {
       const ttsService = getTTSService();
@@ -508,7 +488,7 @@ export class TurnManagementService {
         durationMs,
       });
 
-      // 9. EMIT WEBSOCKET EVENT TO CLIENTS
+      // 7. EMIT WEBSOCKET EVENT TO CLIENTS
       const { getIO } = await import("../server.js");
       const io = getIO();
 
@@ -558,21 +538,11 @@ export class TurnManagementService {
 
   /**
    * Handle room timeout (no turns completed within timeout window)
-   *
-   * Actions:
-   * 1. Log timeout event
-   * 2. Emit notification to agents
-   * 3. Close room if no response
-   *
-   * @param room - Room that timed out
    */
   private async _handleTimeout(room: Room): Promise<void> {
     logger.warn("Room timeout: no turns completed", {
       roomId: room.id,
       timeoutSeconds: TURN_TIMEOUT_SECONDS,
-      elapsedSeconds: room.startedAt
-        ? (Date.now() - room.startedAt.getTime()) / 1000
-        : 0,
     });
 
     try {
@@ -598,20 +568,11 @@ export class TurnManagementService {
 
   /**
    * Handle inactivity (no turns for extended period)
-   *
-   * Actions:
-   * 1. Log inactivity
-   * 2. Notify agents to submit messages
-   * 3. Track for future timeout
-   *
-   * @param room - Room with inactivity
    */
   private async _handleInactivity(room: Room): Promise<void> {
     logger.warn("Room inactivity detected", {
       roomId: room.id,
-      lastTurnSeconds: room.lastTurnAt
-        ? (Date.now() - room.lastTurnAt.getTime()) / 1000
-        : 0,
+      lastTurnSeconds: room.lastTurnAt ? (Date.now() - room.lastTurnAt.getTime()) / 1000 : 0,
       inactivityThreshold: INACTIVITY_NUDGE_SECONDS,
     });
 
@@ -634,62 +595,6 @@ export class TurnManagementService {
         error: err instanceof Error ? err.message : String(err),
       });
     }
-  }
-
-  /**
-   * Call orchestrator to score messages
-   *
-   * Builds request with room context and message history
-   *
-   * @param room - Room context
-   * @param messages - Messages to score
-   * @returns Scores from orchestrator
-   */
-  private async _scoreMessages(
-    room: Room,
-    messages: RoomMessage[],
-  ): Promise<RoomMessageScore[]> {
-    // TODO: Build history from transcript for better context
-    const request: RoomMessageScoringRequest = {
-      roomId: room.id,
-      messages: messages.map((m) => ({
-        messageId: m.id,
-        agentId: m.agentId,
-        text: m.text,
-      })),
-      context: {
-        roomType: room.type,
-        objective: room.objective,
-        history: [],
-      },
-    };
-
-    return await orchestratorClient.scoreMessages(request);
-  }
-
-  /**
-   * Select winner from scored messages
-   *
-   * Rules:
-   * 1. Score must exceed MIN_SCORE_THRESHOLD
-   * 2. Select highest-scoring message
-   *
-   * @param scores - Scored messages
-   * @returns Selected score or null if none met threshold
-   */
-  private _selectWinner(scores: RoomMessageScore[]): RoomMessageScore | null {
-    // Sort by score descending
-    const sorted = [...scores].sort((a, b) => b.score - a.score);
-
-    // Find first above threshold
-    for (const score of sorted) {
-      if (score.score >= MIN_SCORE_THRESHOLD) {
-        return score;
-      }
-    }
-
-    // No winner
-    return null;
   }
 }
 

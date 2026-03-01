@@ -24,7 +24,7 @@ import type {
   PodcastEpisode,
   PodcastDistribution,
 } from "../services/podcast-service.js";
-import { asyncHandler, requireAuth } from "../middleware/index.js";
+import { asyncHandler, requireAuth, requireApiKey } from "../middleware/index.js";
 import {
   validate,
   CreatePodcastRequestSchema,
@@ -61,7 +61,7 @@ const cache = getCacheService();
  */
 router.post(
   "/",
-  requireAuth,
+  requireApiKey,
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const agent = req.agent!;
 
@@ -173,7 +173,7 @@ router.get(
  */
 router.patch(
   "/:id",
-  requireAuth,
+  requireApiKey,
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const agent = req.agent!;
     const { id } = req.params;
@@ -239,7 +239,7 @@ router.patch(
  */
 router.post(
   "/:id/episodes",
-  requireAuth,
+  requireApiKey,
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const agent = req.agent!;
     const { id: podcastId } = req.params;
@@ -377,7 +377,7 @@ router.get(
  */
 router.post(
   "/episode/:id/distribute",
-  requireAuth,
+  requireApiKey,
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const agent = req.agent!;
     const { id: episodeId } = req.params;
@@ -438,7 +438,7 @@ router.post(
  */
 router.post(
   "/episode/:id/summarize",
-  requireAuth,
+  requireApiKey,
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const agent = req.agent!;
     const { id: episodeId } = req.params;

@@ -13,7 +13,7 @@
  */
 
 import React from "react";
-import { formatDistanceToNow } from "date-fns";
+import { formatDistanceToNow } from "../../utils/date-format";
 import { Play, Users, Radio } from "lucide-react";
 
 export interface RoomCardProps {
@@ -57,12 +57,12 @@ export const RoomCard: React.FC<RoomCardProps> = ({
   description,
   onJoin,
 }) => {
-  const createdTimeAgo = formatDistanceToNow(createdAt, { addSuffix: true });
+  const createdTimeAgo = formatDistanceToNow(createdAt);
 
   return (
     <div className="group relative flex h-full flex-col overflow-hidden rounded-lg border border-gray-200 bg-white transition-all hover:border-gray-300 hover:shadow-lg">
       {/* Header with Live Badge */}
-      <div className="relative h-40 bg-gradient-to-br from-slate-100 to-slate-200 p-4">
+      <div className="relative h-40 bg-mac-gray border-b-2 border-gray-200 p-4">
         {isLive && (
           <div className="absolute right-3 top-3 flex items-center gap-1.5 rounded-full bg-red-500 px-3 py-1.5">
             <div className="h-2 w-2 animate-pulse rounded-full bg-white" />
@@ -104,7 +104,7 @@ export const RoomCard: React.FC<RoomCardProps> = ({
               className="h-8 w-8 rounded-full bg-gray-200"
             />
           ) : (
-            <div className="h-8 w-8 rounded-full bg-gradient-to-br from-blue-400 to-purple-500" />
+            <div className="h-8 w-8 rounded-full border-2 border-black bg-accent-purple" />
           )}
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium text-gray-900 truncate">

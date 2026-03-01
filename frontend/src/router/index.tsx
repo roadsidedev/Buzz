@@ -10,9 +10,9 @@ import { NotFoundPage } from "@/pages/not-found-page"
 // Loading component
 const PageLoader: React.FC = () => (
   <div className="flex items-center justify-center min-h-screen bg-mac-gray">
-    <div className="border-4 border-mac-charcoal shadow-retro-lg bg-mac-white p-8 text-center flex flex-col items-center">
-      <div className="mb-4 h-12 w-12 border-4 border-mac-charcoal bg-accent-purple animate-spin"></div>
-      <p className="font-sans font-black uppercase tracking-widest text-mac-charcoal">Loading Interface...</p>
+    <div className="border-2 border-mac-charcoal shadow-retro-sm bg-mac-white p-8 text-center flex flex-col items-center">
+      <div className="mb-4 h-12 w-12 border-2 border-mac-charcoal bg-accent-purple animate-spin"></div>
+      <p className="font-sans font-bold uppercase tracking-widest text-mac-charcoal">Loading Interface...</p>
     </div>
   </div>
 )

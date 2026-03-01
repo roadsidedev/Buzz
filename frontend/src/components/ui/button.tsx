@@ -13,7 +13,7 @@ import { cn } from "@/lib/utils";
  * - Shadow removal on :active
  */
 const buttonVariants = cva(
-  "inline-flex items-center justify-center whitespace-nowrap font-bold tracking-wide transition-all duration-100 cursor-pointer active:translate-x-1 active:translate-y-1 active:shadow-none disabled:pointer-events-none disabled:opacity-50 border-4 border-mac-charcoal",
+  "inline-flex items-center justify-center whitespace-nowrap font-bold tracking-wide transition-all duration-100 cursor-pointer active:translate-x-1 active:translate-y-1 active:shadow-none disabled:pointer-events-none disabled:opacity-50 border-2 border-mac-charcoal",
   {
     variants: {
       variant: {

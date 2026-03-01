@@ -128,17 +128,17 @@ export const TipModal: React.FC<TipModalProps> = ({
       />
 
       {/* Modal */}
-      <div className="relative w-full max-w-sm bg-white border-[3px] border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]">
+      <div className="relative w-full max-w-sm bg-white border-2 border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]">
         {/* Header */}
         <div className="bg-black text-white px-4 py-2 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Coin className="w-5 h-5 text-[#FFE66D]" weight="fill" />
-            <span className="font-black text-sm uppercase">
+            <span className="font-bold text-sm uppercase">
               Tip @{agentName}
             </span>
           </div>
-          <button onClick={onClose} className="hover:bg-gray-700 p-1">
-            <X className="w-4 h-4" />
+          <button onClick={onClose} className="hover:bg-gray-700 p-2 w-11 h-11 flex items-center justify-center">
+            <X className="w-5 h-5" />
           </button>
         </div>
 
@@ -147,8 +147,8 @@ export const TipModal: React.FC<TipModalProps> = ({
           {/* Balance Display */}
           <div className="bg-[#E0E0E0] border-2 border-black p-3">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-black uppercase">Your Balance</span>
-              <span className="text-lg font-black">
+              <span className="text-xs font-bold uppercase">Your Balance</span>
+              <span className="text-lg font-bold">
                 ${usdcBalance.toFixed(2)} USDC
               </span>
             </div>
@@ -161,7 +161,7 @@ export const TipModal: React.FC<TipModalProps> = ({
                 className="w-12 h-12 text-orange-500 mx-auto mb-2"
                 weight="fill"
               />
-              <p className="font-black text-lg mb-2">CONFIRM TIP</p>
+              <p className="font-bold text-lg mb-2">CONFIRM TIP</p>
               <p className="text-sm font-bold text-gray-700 mb-4">
                 You are about to send{" "}
                 <span className="text-[#6C5CE7]">
@@ -173,14 +173,14 @@ export const TipModal: React.FC<TipModalProps> = ({
                 <button
                   onClick={handleCancelConfirmation}
                   disabled={isLoading}
-                  className="flex-1 py-2 border-2 border-black bg-white font-black text-xs uppercase hover:bg-gray-100"
+                  className="flex-1 py-2 border-2 border-black bg-white font-bold text-xs uppercase hover:bg-gray-100"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleConfirmTip}
                   disabled={isLoading}
-                  className="flex-1 py-2 border-2 border-black bg-[#4ECDC4] font-black text-xs uppercase flex items-center justify-center gap-1 hover:bg-[#3DBDB4]"
+                  className="flex-1 py-2 border-2 border-black bg-[#4ECDC4] font-bold text-xs uppercase flex items-center justify-center gap-1 hover:bg-[#3DBDB4]"
                 >
                   {isLoading ? (
                     <ArrowClockwise className="w-4 h-4 animate-spin" />
@@ -199,7 +199,7 @@ export const TipModal: React.FC<TipModalProps> = ({
                 className="w-12 h-12 text-green-500 mx-auto mb-2"
                 weight="fill"
               />
-              <p className="font-black text-lg">TIP SENT!</p>
+              <p className="font-bold text-lg">TIP SENT!</p>
               <p className="text-sm text-gray-500">
                 ${tipAmount.toFixed(2)} USDC
               </p>
@@ -208,7 +208,7 @@ export const TipModal: React.FC<TipModalProps> = ({
             <>
               {/* Preset Amounts */}
               <div>
-                <p className="text-xs font-black uppercase mb-2">
+                <p className="text-xs font-bold uppercase mb-2">
                   Select Amount
                 </p>
                 <div className="grid grid-cols-4 gap-2">
@@ -216,7 +216,7 @@ export const TipModal: React.FC<TipModalProps> = ({
                     <button
                       key={amount}
                       onClick={() => handlePresetClick(amount)}
-                      className={`py-2 border-[2px] border-black font-black text-sm transition-all ${
+                      className={`py-2 border-[2px] border-black font-bold text-sm transition-all ${
                         selectedAmount === amount
                           ? "bg-[#FFE66D] shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]"
                           : "bg-white hover:bg-gray-100"
@@ -230,9 +230,9 @@ export const TipModal: React.FC<TipModalProps> = ({
 
               {/* Custom Amount */}
               <div>
-                <p className="text-xs font-black uppercase mb-2">Or Custom</p>
+                <p className="text-xs font-bold uppercase mb-2">Or Custom</p>
                 <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 font-black text-lg">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 font-bold text-lg">
                     $
                   </span>
                   <input
@@ -240,7 +240,7 @@ export const TipModal: React.FC<TipModalProps> = ({
                     value={customAmount}
                     onChange={handleCustomAmountChange}
                     placeholder="0.00"
-                    className="w-full pl-8 pr-3 py-2 border-[2px] border-black font-black text-lg focus:outline-none focus:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]"
+                    className="w-full pl-8 pr-3 py-2 border-[2px] border-black font-bold text-lg focus:outline-none focus:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]"
                   />
                 </div>
               </div>
@@ -266,7 +266,7 @@ export const TipModal: React.FC<TipModalProps> = ({
                 <button
                   onClick={handleDeposit}
                   disabled={isLoading}
-                  className="flex-1 py-2 border-[2px] border-black bg-white font-black text-xs uppercase hover:bg-[#E0E0E0] flex items-center justify-center gap-1"
+                  className="flex-1 py-2 border-[2px] border-black bg-white font-bold text-xs uppercase hover:bg-[#E0E0E0] flex items-center justify-center gap-1"
                 >
                   <ArrowClockwise className="w-4 h-4" />
                   Deposit
@@ -274,7 +274,7 @@ export const TipModal: React.FC<TipModalProps> = ({
                 <button
                   onClick={handleTipClick}
                   disabled={!canTip || isLoading}
-                  className={`flex-1 py-2 border-[2px] border-black font-black text-xs uppercase flex items-center justify-center gap-1 ${
+                  className={`flex-1 py-2 border-[2px] border-black font-bold text-xs uppercase flex items-center justify-center gap-1 ${
                     canTip
                       ? "bg-[#FFE66D] hover:bg-[#FFD93D]"
                       : "bg-gray-300 text-gray-500 cursor-not-allowed"

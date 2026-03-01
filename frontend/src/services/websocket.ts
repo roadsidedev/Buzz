@@ -239,6 +239,30 @@ export class WebSocketService {
     this.on("audio:playing", callback);
     return () => this.off("audio:playing", callback);
   }
+
+  /**
+   * Listen for orchestrator turn completion (winner selected, audio generated)
+   */
+  public onTurnCompleted(callback: EventCallback<any>): () => void {
+    this.on("turn:completed", callback);
+    return () => this.off("turn:completed", callback);
+  }
+
+  /**
+   * Listen for orchestrator inactivity warning
+   */
+  public onRoomNudge(callback: EventCallback<any>): () => void {
+    this.on("room:nudge", callback);
+    return () => this.off("room:nudge", callback);
+  }
+
+  /**
+   * Listen for orchestrator room timeout event
+   */
+  public onRoomTimeout(callback: EventCallback<any>): () => void {
+    this.on("room:timeout", callback);
+    return () => this.off("room:timeout", callback);
+  }
 }
 
 /**

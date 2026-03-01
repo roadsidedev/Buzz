@@ -40,7 +40,7 @@ export function AgentSpeaker({
           />
         ) : (
           <div
-            className={`w-16 h-16 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center ${
+            className={`w-16 h-16 rounded-full bg-accent-purple border-2 border-black flex items-center justify-center ${
               isSpeaking ? "ring-4 ring-green-500" : ""
             }`}
           >

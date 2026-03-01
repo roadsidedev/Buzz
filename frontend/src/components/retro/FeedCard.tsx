@@ -126,7 +126,7 @@ export const FeedCard: React.FC<FeedCardProps> = ({ item, className }) => {
   return (
     <>
       <div
-        className={`relative aspect-[4/5] sm:aspect-video lg:aspect-square bg-slate-200 border-[3px] border-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] ${className || ""}`}
+        className={`relative aspect-[4/5] sm:aspect-video lg:aspect-square bg-slate-200 border-2 border-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] ${className || ""}`}
       >
         {/* Background Pattern */}
         <div className="absolute inset-0 bg-[repeating-linear-gradient(45deg,transparent,transparent_10px,rgba(0,0,0,0.05)_10px,rgba(0,0,0,0.05)_20px)]" />
@@ -134,7 +134,7 @@ export const FeedCard: React.FC<FeedCardProps> = ({ item, className }) => {
         {/* Content */}
         <div className="absolute inset-0 z-10 flex items-center justify-center">
           {/* Type Icon */}
-          <div className="p-6 bg-white border-[3px] border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] inline-block">
+          <div className="p-6 bg-white border-2 border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] inline-block">
             {item.type === "podcast" || item.type === "audio" ? (
               <svg
                 className="w-16 h-16"
@@ -165,14 +165,14 @@ export const FeedCard: React.FC<FeedCardProps> = ({ item, className }) => {
 
         {/* LIVE Badge */}
         {item.isLive && (
-          <div className="absolute top-3 left-3 bg-[#FF6B6B] border-2 border-black px-2 py-0.5 text-[10px] font-black uppercase animate-pulse">
+          <div className="absolute top-3 left-3 bg-[#FF6B6B] border-2 border-black px-2 py-0.5 text-[10px] font-bold uppercase animate-pulse">
             Live
           </div>
         )}
 
         {/* Category Badge */}
         {item.category && (
-          <div className="absolute top-3 right-3 bg-black text-white border-2 border-white px-2 py-0.5 text-[10px] font-black uppercase">
+          <div className="absolute top-3 right-3 bg-black text-white border-2 border-white px-2 py-0.5 text-[10px] font-bold uppercase">
             {item.category}
           </div>
         )}
@@ -242,9 +242,9 @@ export const FeedCard: React.FC<FeedCardProps> = ({ item, className }) => {
         >
           {/* Agent Info */}
           <div className="flex items-center gap-2 mb-1">
-            <span className="font-black text-sm">@{item.agentName}</span>
+            <span className="font-bold text-sm">@{item.agentName}</span>
             {item.agentVerified && (
-              <span className="text-[10px] font-black uppercase bg-[#6C5CE7] text-white px-1 italic">
+              <span className="text-[10px] font-bold uppercase bg-[#6C5CE7] text-white px-1 italic">
                 PRO
               </span>
             )}

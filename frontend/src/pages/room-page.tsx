@@ -96,10 +96,10 @@ export const RoomPage: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#A0A0A0] p-4 flex items-center justify-center">
+      <div className="min-h-screen bg-mac-gray p-4 flex items-center justify-center">
         <RetroWindow title="LOADING..." shadowColor="purple">
           <div className="p-8 text-center">
-            <div className="animate-pulse font-black text-lg">
+            <div className="animate-pulse font-bold text-lg">
               Fetching room data...
             </div>
           </div>
@@ -109,20 +109,20 @@ export const RoomPage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#A0A0A0] p-2 lg:p-4">
+    <div className="min-h-screen bg-mac-gray p-2 lg:p-4">
       {/* Header */}
-      <header className="bg-white border-[3px] border-black px-4 py-1.5 flex items-center justify-between shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] sticky top-0 z-50 mb-4">
+      <header className="bg-white border-2 border-black px-4 py-1.5 flex items-center justify-between shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] sticky top-0 z-50 mb-4">
         <div className="flex items-center gap-4">
           <button
             onClick={() => navigate(-1)}
-            className="flex items-center gap-2 font-black text-sm uppercase hover:text-[#6C5CE7]"
+            className="flex items-center gap-2 font-bold text-sm uppercase hover:text-accent-purple"
           >
             <ArrowLeft className="w-4 h-4" />
             Back
           </button>
           <button
             onClick={() => navigate("/")}
-            className="font-black text-xl text-[#6C5CE7] hover:opacity-80"
+            className="font-bold text-xl text-accent-purple hover:opacity-80"
           >
             CLAWZZ
           </button>
@@ -142,11 +142,11 @@ export const RoomPage: React.FC = () => {
             {/* Left: Room Details */}
             <div className="flex-1">
               <div className="flex items-center gap-2 mb-3">
-                <div className="w-12 h-12 bg-[#6C5CE7] border-[3px] border-black flex items-center justify-center">
+                <div className="w-12 h-12 bg-accent-purple border-2 border-black flex items-center justify-center">
                   <Users className="w-6 h-6 text-white" />
                 </div>
                 <div>
-                  <h1 className="text-xl font-black uppercase italic">
+                  <h1 className="text-xl font-bold uppercase italic">
                     {room?.title || "Untitled Room"}
                   </h1>
                   <div className="flex items-center gap-2 text-xs font-bold text-gray-500">
@@ -163,8 +163,8 @@ export const RoomPage: React.FC = () => {
               {/* Objective */}
               <div className="bg-black border-2 border-black p-3 mb-4">
                 <div className="flex items-center gap-2 mb-2">
-                  <Target className="w-4 h-4 text-[#FFE66D]" />
-                  <span className="text-xs font-black uppercase text-[#FFE66D]">
+                  <Target className="w-4 h-4 text-accent-yellow" />
+                  <span className="text-xs font-bold uppercase text-accent-yellow">
                     Objective
                   </span>
                 </div>
@@ -177,9 +177,9 @@ export const RoomPage: React.FC = () => {
               <div className="grid grid-cols-3 gap-3">
                 <div className="bg-white border-2 border-black p-3 text-center">
                   <div className="flex items-center justify-center gap-1 mb-1">
-                    <Users className="w-4 h-4 text-[#6C5CE7]" />
+                    <Users className="w-4 h-4 text-accent-purple" />
                   </div>
-                  <span className="text-lg font-black">
+                  <span className="text-lg font-bold">
                     {room?.participantCount || 0}
                   </span>
                   <span className="text-[10px] font-bold uppercase block text-gray-500">
@@ -188,9 +188,9 @@ export const RoomPage: React.FC = () => {
                 </div>
                 <div className="bg-white border-2 border-black p-3 text-center">
                   <div className="flex items-center justify-center gap-1 mb-1">
-                    <Users className="w-4 h-4 text-[#FF6B6B]" />
+                    <Users className="w-4 h-4 text-accent-crimson" />
                   </div>
-                  <span className="text-lg font-black">
+                  <span className="text-lg font-bold">
                     {room?.viewerCount?.toLocaleString() || 0}
                   </span>
                   <span className="text-[10px] font-bold uppercase block text-gray-500">
@@ -199,9 +199,9 @@ export const RoomPage: React.FC = () => {
                 </div>
                 <div className="bg-white border-2 border-black p-3 text-center">
                   <div className="flex items-center justify-center gap-1 mb-1">
-                    <Clock className="w-4 h-4 text-[#4ECDC4]" />
+                    <Clock className="w-4 h-4 text-accent-teal" />
                   </div>
-                  <span className="text-lg font-black">LIVE</span>
+                  <span className="text-lg font-bold">LIVE</span>
                   <span className="text-[10px] font-bold uppercase block text-gray-500">
                     Status
                   </span>

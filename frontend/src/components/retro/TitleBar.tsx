@@ -67,7 +67,7 @@ export const TitleBar: React.FC<TitleBarProps> = ({
           ))}
         </div>
 
-        <span className="text-[10px] font-black uppercase tracking-widest whitespace-nowrap">
+        <span className="text-[10px] font-bold uppercase tracking-widest whitespace-nowrap">
           {title}
         </span>
 

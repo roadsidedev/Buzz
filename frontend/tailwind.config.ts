@@ -17,16 +17,16 @@ const config: Config = {
   	extend: {
   		colors: {
   			mac: {
-  				gray: '#E0E0E0',
-  				charcoal: '#1A1A1A',
-  				white: '#FFFFFF'
+  				gray: '#EBEBE6', // Softer, warmer tinted gray
+  				charcoal: '#222222', // Slightly softer off-black
+  				white: '#FCFCFC'
   			},
   			accent: {
-  				purple: '#6C5CE7',
-  				teal: '#4ECDC4',
-  				yellow: '#FFE66D',
-  				crimson: '#FF6B6B',
-  				red: '#F87171',
+  				purple: '#7P6AF0', // Slightly desaturated
+  				teal: '#5CCACA',
+  				yellow: '#F5DB5D',
+  				crimson: '#F45D5D',
+  				red: '#E06565',
   				DEFAULT: 'hsl(var(--accent))',
   				foreground: 'hsl(var(--accent-foreground))'
   			},
@@ -121,22 +121,21 @@ const config: Config = {
   		},
   		fontFamily: {
   			sans: [
-  				'Inter',
-  				'Public Sans',
-  				'Helvetica Neue',
-  				'Arial',
+  				'Space Grotesk',
+  				'-apple-system',
+  				'BlinkMacSystemFont',
+  				'Segoe UI',
                     ...defaultTheme.fontFamily.sans
                 ],
   			mono: [
   				'JetBrains Mono',
-  				'Roboto Mono',
   				'Courier New',
                     ...defaultTheme.fontFamily.mono
                 ],
   			display: [
-  				'Inter',
-  				'Helvetica Neue',
-  				'Arial',
+  				'Space Grotesk',
+  				'-apple-system',
+  				'BlinkMacSystemFont',
                     ...defaultTheme.fontFamily.sans
                 ]
   		},
@@ -260,14 +259,14 @@ const config: Config = {
   			DEFAULT: '2px'
   		},
   		boxShadow: {
-  			'retro-sm': '2px 2px 0px 0px rgba(0,0,0,1)',
-  			'retro-md': '4px 4px 0px 0px rgba(0,0,0,1)',
-  			'retro-lg': '6px 6px 0px 0px rgba(0,0,0,1)',
-  			'retro-xl': '8px 8px 0px 0px rgba(0,0,0,1)',
-  			'retro-purple': '6px 6px 0px 0px #6C5CE7',
-  			'retro-teal': '6px 6px 0px 0px #4ECDC4',
-  			'retro-yellow': '6px 6px 0px 0px #FFE66D',
-  			'retro-crimson': '6px 6px 0px 0px #FF6B6B',
+  			'retro-sm': '2px 2px 0px 0px rgba(34,34,34,0.35)', // Softer shadows, not solid black
+  			'retro-md': '4px 4px 0px 0px rgba(34,34,34,0.35)',
+  			'retro-lg': '6px 6px 0px 0px rgba(34,34,34,0.35)',
+  			'retro-xl': '8px 8px 0px 0px rgba(34,34,34,0.35)',
+  			'retro-purple': '4px 4px 0px 0px rgba(126, 106, 240, 0.4)',
+  			'retro-teal': '4px 4px 0px 0px rgba(92, 202, 202, 0.4)',
+  			'retro-yellow': '4px 4px 0px 0px rgba(245, 219, 93, 0.4)',
+  			'retro-crimson': '4px 4px 0px 0px rgba(244, 93, 93, 0.4)',
   			none: 'none',
   			sm: '0 1px 2px 0 rgb(0 0 0 / 0.05)',
   			DEFAULT: 'none',
@@ -404,22 +403,22 @@ const config: Config = {
       addComponents({
         /* CLAW-OS Component Classes */
         ".retro-window": {
-          "@apply bg-mac-gray border-4 border-mac-charcoal shadow-retro-lg": "",
+          "@apply bg-mac-gray border-2 border-mac-charcoal shadow-retro-md": "",
         },
         ".retro-titlebar": {
           "@apply bg-mac-charcoal px-2 py-1 flex items-center justify-between":
             "",
         },
         ".btn-retro": {
-          "@apply px-6 py-3 bg-mac-charcoal text-mac-white border-4 border-mac-charcoal font-bold tracking-wide transition-all duration-100 hover:bg-accent-purple hover:shadow-retro-purple cursor-pointer active:translate-x-1 active:translate-y-1 active:shadow-none":
+          "@apply px-6 py-3 bg-mac-charcoal text-mac-white border-2 border-mac-charcoal font-bold tracking-wide transition duration-100 hover:bg-accent-purple hover:shadow-retro-purple cursor-pointer active:translate-x-1 active:translate-y-1 active:shadow-none":
             "",
         },
         ".btn-retro-secondary": {
-          "@apply px-6 py-3 bg-mac-white text-mac-charcoal border-4 border-mac-charcoal font-bold tracking-wide transition-all duration-100 hover:bg-accent-yellow hover:shadow-retro-yellow cursor-pointer active:translate-x-1 active:translate-y-1 active:shadow-none":
+          "@apply px-6 py-3 bg-mac-white text-mac-charcoal border-2 border-mac-charcoal font-bold tracking-wide transition duration-100 hover:bg-accent-yellow hover:shadow-retro-yellow cursor-pointer active:translate-x-1 active:translate-y-1 active:shadow-none":
             "",
         },
         ".btn-retro-accent": {
-          "@apply px-6 py-3 bg-accent-purple text-mac-white border-4 border-mac-charcoal font-bold tracking-wide transition-all duration-100 hover:bg-accent-teal hover:shadow-retro-teal cursor-pointer active:translate-x-1 active:translate-y-1 active:shadow-none":
+          "@apply px-6 py-3 bg-accent-purple text-mac-white border-2 border-mac-charcoal font-bold tracking-wide transition duration-100 hover:bg-accent-teal hover:shadow-retro-teal cursor-pointer active:translate-x-1 active:translate-y-1 active:shadow-none":
             "",
         },
 
@@ -448,15 +447,15 @@ const config: Config = {
       addUtilities({
         /* CLAW-OS Utility Classes */
         ".border-retro": {
-          borderColor: "#000000",
-          borderWidth: "4px",
+          borderColor: "#222222",
+          borderWidth: "2px",
         },
         ".border-retro-dashed": {
           borderStyle: "dashed",
-          borderColor: "#000000",
+          borderColor: "#222222",
         },
         ".text-shadow-retro": {
-          textShadow: "2px 2px 0px rgba(0, 0, 0, 1)",
+          textShadow: "1px 1px 0px rgba(34, 34, 34, 0.2)",
         },
 
         /* Legacy utilities */

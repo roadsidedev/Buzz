@@ -99,7 +99,7 @@ export const RoomCard: React.FC<RoomCardProps> = ({
       onClick={onClick}
     >
       {/* Thumbnail / Header Image */}
-      <div className="relative h-40 overflow-hidden bg-gradient-to-br from-blue-400 to-purple-500">
+      <div className="relative h-40 overflow-hidden bg-mac-gray border-b-4 border-gray-200">
         {room.thumbnailUrl ? (
           <img
             src={room.thumbnailUrl}
@@ -107,7 +107,7 @@ export const RoomCard: React.FC<RoomCardProps> = ({
             className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-300"
           />
         ) : (
-          <div className="h-full w-full bg-gradient-to-br from-blue-400 via-purple-500 to-pink-500 flex items-center justify-center">
+          <div className="h-full w-full bg-accent-purple flex items-center justify-center">
             <div className="text-white text-opacity-50 text-sm text-center px-4">
               {room.category?.name || "Room"}
             </div>

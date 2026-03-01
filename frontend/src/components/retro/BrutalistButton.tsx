@@ -27,7 +27,7 @@ export const BrutalistButton: React.FC<BrutalistButtonProps> = ({
   ...props
 }) => {
   const baseClasses =
-    "font-bold tracking-wide transition-all duration-100 cursor-pointer active:translate-x-1 active:translate-y-1 active:shadow-none border-4 border-mac-charcoal";
+    "font-bold tracking-wide transition-all duration-100 cursor-pointer active:translate-x-1 active:translate-y-1 active:shadow-none border-2 border-mac-charcoal";
 
   const variantClasses = {
     primary:
@@ -47,7 +47,7 @@ export const BrutalistButton: React.FC<BrutalistButtonProps> = ({
   };
 
   const shadowClasses = {
-    black: "shadow-retro-lg",
+    black: "shadow-retro-sm",
     purple: "shadow-retro-purple",
     teal: "shadow-retro-teal",
     yellow: "shadow-retro-yellow",

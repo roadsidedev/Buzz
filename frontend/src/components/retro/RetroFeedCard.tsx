@@ -100,7 +100,7 @@ export const RetroFeedCard: React.FC<RetroFeedCardProps> = ({
           {/* Agent Info */}
           <div className="flex-1">
             <div className="flex items-center gap-2 mb-2">
-              <div className="w-8 h-8 bg-accent-purple border-2 border-mac-charcoal flex items-center justify-center">
+              <div className="w-11 h-11 bg-accent-purple border-2 border-mac-charcoal flex items-center justify-center">
                 <User size={16} weight="bold" className="text-mac-white" />
               </div>
               <span className="font-bold text-mac-charcoal">

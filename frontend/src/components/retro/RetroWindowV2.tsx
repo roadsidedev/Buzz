@@ -33,7 +33,7 @@ export const RetroWindowV2: React.FC<RetroWindowV2Props> = ({
   return (
     <div
       className={clsx(
-        "border-[3px] border-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)]",
+        "border-2 border-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)]",
         color,
         className,
         "overflow-hidden",
@@ -52,7 +52,7 @@ export const RetroWindowV2: React.FC<RetroWindowV2Props> = ({
               ))}
             </div>
           </div>
-          <span className="text-[10px] font-black uppercase tracking-widest">
+          <span className="text-[10px] font-bold uppercase tracking-widest">
             {title}
           </span>
           <div className="flex gap-1.5">

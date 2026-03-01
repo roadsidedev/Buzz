@@ -94,11 +94,11 @@ export const DepositModal: React.FC<DepositModalProps> = ({
       />
 
       {/* Modal */}
-      <div className="relative w-full max-w-sm bg-white border-[3px] border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]">
+      <div className="relative w-full max-w-sm bg-white border-2 border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]">
         {/* Header */}
         <div className="bg-[#4ECDC4] px-4 py-2 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <span className="font-black text-sm uppercase">Deposit USDC</span>
+            <span className="font-bold text-sm uppercase">Deposit USDC</span>
           </div>
           <button onClick={onClose} className="hover:bg-white/30 p-1">
             <X className="w-4 h-4" />
@@ -110,10 +110,10 @@ export const DepositModal: React.FC<DepositModalProps> = ({
           {/* Current Balance */}
           <div className="bg-[#E0E0E0] border-2 border-black p-3">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-black uppercase">
+              <span className="text-xs font-bold uppercase">
                 Current Balance
               </span>
-              <span className="text-lg font-black">
+              <span className="text-lg font-bold">
                 ${usdcBalance.toFixed(2)} USDC
               </span>
             </div>
@@ -123,7 +123,7 @@ export const DepositModal: React.FC<DepositModalProps> = ({
           <div className="bg-black border-2 border-black p-3">
             <div className="flex items-center gap-2 mb-2">
               <Wallet className="w-4 h-4 text-[#4ECDC4]" />
-              <span className="text-xs font-black uppercase text-[#4ECDC4]">
+              <span className="text-xs font-bold uppercase text-[#4ECDC4]">
                 Your Wallet (Base)
               </span>
             </div>
@@ -181,7 +181,7 @@ export const DepositModal: React.FC<DepositModalProps> = ({
 
           {/* Instructions */}
           <div className="bg-[#FFE66D] border-2 border-black p-3">
-            <p className="text-xs font-black uppercase mb-1">How to Deposit</p>
+            <p className="text-xs font-bold uppercase mb-1">How to Deposit</p>
             <ol className="text-[10px] font-bold text-gray-700 space-y-1">
               <li>1. Send USDC to your wallet address above</li>
               <li>2. Wait for blockchain confirmation (~5-10 sec)</li>
@@ -195,7 +195,7 @@ export const DepositModal: React.FC<DepositModalProps> = ({
                 className="w-12 h-12 text-green-500 mx-auto mb-2"
                 weight="fill"
               />
-              <p className="font-black text-lg">DEPOSIT SUCCESS!</p>
+              <p className="font-bold text-lg">DEPOSIT SUCCESS!</p>
               <p className="text-sm text-gray-500">
                 Your balance has been updated
               </p>
@@ -204,7 +204,7 @@ export const DepositModal: React.FC<DepositModalProps> = ({
             <>
               {/* Preset Amounts */}
               <div>
-                <p className="text-xs font-black uppercase mb-2">
+                <p className="text-xs font-bold uppercase mb-2">
                   Quick Deposit (Demo)
                 </p>
                 <div className="grid grid-cols-4 gap-2">
@@ -213,7 +213,7 @@ export const DepositModal: React.FC<DepositModalProps> = ({
                       key={amount}
                       onClick={() => setSelectedAmount(amount)}
                       disabled={isLoading}
-                      className={`py-2 border-[2px] border-black font-black text-sm transition-all ${
+                      className={`py-2 border-[2px] border-black font-bold text-sm transition-all ${
                         selectedAmount === amount
                           ? "bg-[#FFE66D] shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]"
                           : "bg-white hover:bg-gray-100"
@@ -229,7 +229,7 @@ export const DepositModal: React.FC<DepositModalProps> = ({
               <button
                 onClick={() => selectedAmount && handleDeposit(selectedAmount)}
                 disabled={!selectedAmount || isLoading}
-                className={`w-full py-3 border-[2px] border-black font-black text-sm uppercase flex items-center justify-center gap-2 ${
+                className={`w-full py-3 border-[2px] border-black font-bold text-sm uppercase flex items-center justify-center gap-2 ${
                   selectedAmount
                     ? "bg-[#4ECDC4] hover:bg-[#3DBDB4]"
                     : "bg-gray-300 text-gray-500 cursor-not-allowed"

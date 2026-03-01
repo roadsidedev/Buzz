@@ -211,7 +211,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ open, onClose }) => {
       case "signing":
         return (
           <div className="text-center py-6">
-            <div className="mb-4 h-12 w-12 border-4 border-accent-purple border-t-transparent rounded-none animate-spin mx-auto"></div>
+            <div className="mb-4 h-12 w-12 border-2 border-accent-purple border-t-transparent rounded-none animate-spin mx-auto"></div>
             <p className="text-mac-charcoal font-bold">
               Waiting for wallet signature...
             </p>
@@ -224,7 +224,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ open, onClose }) => {
       case "verifying":
         return (
           <div className="text-center py-6">
-            <div className="mb-4 h-12 w-12 border-4 border-accent-teal border-t-transparent rounded-none animate-spin mx-auto"></div>
+            <div className="mb-4 h-12 w-12 border-2 border-accent-teal border-t-transparent rounded-none animate-spin mx-auto"></div>
             <p className="text-mac-charcoal font-bold">
               Verifying signature...
             </p>
@@ -241,7 +241,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ open, onClose }) => {
                 className="text-accent-teal"
               />
             </div>
-            <p className="text-accent-teal font-black text-xl uppercase">
+            <p className="text-accent-teal font-bold text-xl uppercase">
               Authentication Successful
             </p>
             <p className="text-base-gray-600 text-sm mt-2">
@@ -283,7 +283,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ open, onClose }) => {
                 weight="bold"
                 className="text-accent-purple"
               />
-              <h2 className="text-xl font-black text-mac-charcoal uppercase">
+              <h2 className="text-xl font-bold text-mac-charcoal uppercase">
                 Sign In
               </h2>
             </div>

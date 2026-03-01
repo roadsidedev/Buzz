@@ -24,7 +24,7 @@ export const GetStartedPage: React.FC = () => {
         <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
           <button
             onClick={() => navigate("/")}
-            className="font-black text-xl text-[#6C5CE7]"
+            className="font-bold text-xl text-[#6C5CE7]"
           >
             CLAWZZ
           </button>
@@ -38,7 +38,7 @@ export const GetStartedPage: React.FC = () => {
       <main className="max-w-2xl mx-auto px-4 py-4">
         {/* Hero */}
         <div className="text-center mb-4">
-          <h1 className="text-xl font-black text-gray-900 mb-1">
+          <h1 className="text-xl font-bold text-gray-900 mb-1">
             Welcome to <span className="text-[#6C5CE7]">ClawZz</span>
           </h1>
           <p className="text-xs text-gray-600">AI-first live streaming</p>
@@ -50,7 +50,7 @@ export const GetStartedPage: React.FC = () => {
           <div className="bg-white border-2 border-black p-3 shadow-[3px_3px_0px_0px_rgba(0,0,0,1)]">
             <div className="flex items-center gap-2 mb-2">
               <User size={16} weight="bold" className="text-[#4ECDC4]" />
-              <h2 className="font-black text-xs uppercase text-gray-900">
+              <h2 className="font-bold text-xs uppercase text-gray-900">
                 For Humans
               </h2>
             </div>
@@ -83,7 +83,7 @@ export const GetStartedPage: React.FC = () => {
           <div className="bg-white border-2 border-black p-3 shadow-[3px_3px_0px_0px_rgba(0,0,0,1)]">
             <div className="flex items-center gap-2 mb-2">
               <Robot size={16} weight="bold" className="text-[#6C5CE7]" />
-              <h2 className="font-black text-xs uppercase text-gray-900">
+              <h2 className="font-bold text-xs uppercase text-gray-900">
                 For Agents
               </h2>
             </div>
@@ -124,7 +124,7 @@ export const GetStartedPage: React.FC = () => {
 
         {/* API Quick Start for Agents */}
         <div className="mt-3 bg-white border-2 border-black p-3 shadow-[3px_3px_0px_0px_rgba(0,0,0,1)]">
-          <h3 className="font-black text-xs uppercase text-gray-900 mb-1">
+          <h3 className="font-bold text-xs uppercase text-gray-900 mb-1">
             🤖 Agent Quick Start
           </h3>
           <p className="text-xs text-gray-600 mb-2">

@@ -55,6 +55,7 @@ import discoveryRoutes from "./routes/discovery-routes.js";
 import podcastRoutes from "./routes/podcast-routes.js";
 import badgeRoutes from "./routes/badge-routes.js";
 import contentVerificationRoutes from "./routes/content-verification-routes.js";
+import livestreamRoutes from "./routes/livestream-routes.js";
 
 // ============================================================================
 // CRITICAL SECURITY VALIDATION (Must run before server starts)
@@ -262,6 +263,12 @@ app.get(
 app.use("/", skillRoutes);
 
 /**
+ * Message routes (Internal orchestrator callbacks)
+ */
+import messageRoutes from "./routes/message-routes.js";
+app.use(`/api/${apiVersion}/messages`, messageRoutes);
+
+/**
  * Authentication routes (API key + claim flow)
  */
 app.use(`/api/${apiVersion}/auth`, authRoutes);
@@ -295,6 +302,11 @@ app.use(`/api/${apiVersion}/discover`, discoveryRoutes);
  * Podcast routes
  */
 app.use(`/api/${apiVersion}/podcasts`, podcastRoutes);
+
+/**
+ * Livestream routes
+ */
+app.use(`/api/${apiVersion}/livestreams`, livestreamRoutes);
 
 // ============================================================================
 // WEBSOCKET SETUP
@@ -417,6 +429,8 @@ app.use(errorHandler);
 // SERVER STARTUP
 // ============================================================================
 
+import { roomOrchestrationService } from "./services/room-orchestration-service.js";
+
 server.listen(port, "0.0.0.0", () => {
   logger.info(`🚀 ClawZz API Gateway started`, {
     port,
@@ -426,6 +440,13 @@ server.listen(port, "0.0.0.0", () => {
   logger.info(`📡 WebSocket ready at /rooms/:roomId`, {
     port,
   });
+
+  // Start Orchestrator Loop if enabled
+  if (process.env.ORCHESTRATOR_URL) {
+    roomOrchestrationService.start().catch((err) => {
+      logger.error("Failed to start room orchestration service", { error: err });
+    });
+  }
 });
 
 /**

@@ -16,10 +16,10 @@ export const NotFoundPage: React.FC = () => {
       <div className="max-w-md mx-auto px-4">
         <RetroWindow title="ERROR 404" shadowColor="crimson">
           <div className="text-center py-8">
-            <div className="w-24 h-24 bg-accent-crimson border-4 border-mac-charcoal mx-auto mb-6 flex items-center justify-center">
+            <div className="w-24 h-24 bg-accent-crimson border-2 border-mac-charcoal mx-auto mb-6 flex items-center justify-center">
               <SmileySad size={48} weight="fill" className="text-mac-white" />
             </div>
-            <h1 className="text-6xl font-black text-mac-charcoal mb-2">404</h1>
+            <h1 className="text-6xl font-bold text-mac-charcoal mb-2">404</h1>
             <p className="text-xl font-bold text-mac-charcoal mb-2">
               Page Not Found
             </p>

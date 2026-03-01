@@ -57,7 +57,7 @@ export const StoriesRow: React.FC<StoriesRowProps> = ({
           }}
         >
           {/* Agent Circle */}
-          <div className="w-16 h-16 border-[3px] border-black bg-white p-1 shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] relative group-hover:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] transition-shadow">
+          <div className="w-16 h-16 border-2 border-black bg-white p-1 shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] relative group-hover:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] transition-shadow">
             {agent.avatar ? (
               <img
                 src={agent.avatar}
@@ -72,14 +72,14 @@ export const StoriesRow: React.FC<StoriesRowProps> = ({
 
             {/* LIVE Badge */}
             {agent.isLive && (
-              <div className="absolute -top-2 -right-2 bg-[#FF6B6B] border-2 border-black px-1 text-[8px] font-black uppercase animate-pulse">
+              <div className="absolute -top-2 -right-2 bg-[#FF6B6B] border-2 border-black px-1 text-[8px] font-bold uppercase animate-pulse">
                 Live
               </div>
             )}
           </div>
 
           {/* Agent Name */}
-          <span className="text-[9px] font-black uppercase truncate w-full text-center text-black">
+          <span className="text-[9px] font-bold uppercase truncate w-full text-center text-black">
             {agent.name}
           </span>
 

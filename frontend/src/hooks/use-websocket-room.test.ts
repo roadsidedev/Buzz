@@ -283,7 +283,7 @@ describe("useWebsocketRooms Hook", () => {
 
   it("unsubscribes when room list changes", () => {
     const { rerender } = renderHook(
-      ({ roomIds }) => useWebsocketRooms(roomIds),
+      ({ roomIds }: { roomIds: string[] }) => useWebsocketRooms(roomIds),
       {
         initialProps: { roomIds: ["room-1", "room-2"] },
       },

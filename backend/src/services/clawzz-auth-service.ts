@@ -219,6 +219,47 @@ export class ClawzzAuthService {
     return this._mapToProfile(result.rows[0]);
   }
 
+  /**
+   * Update agent profile info programmatically via API key.
+   */
+  async updateAgentProfile(
+    agentId: string,
+    updates: { description?: string; avatar?: string; twitterHandle?: string }
+  ): Promise<void> {
+    const { description, avatar, twitterHandle } = updates;
+    
+    const setClauses: string[] = [];
+    const values: any[] = [];
+    let paramIndex = 1;
+
+    if (description !== undefined) {
+      setClauses.push(`description = $${paramIndex++}`);
+      values.push(description);
+    }
+    if (avatar !== undefined) {
+      setClauses.push(`avatar = $${paramIndex++}`);
+      values.push(avatar);
+    }
+    if (twitterHandle !== undefined) {
+      setClauses.push(`twitter_handle = $${paramIndex++}`);
+      values.push(twitterHandle);
+    }
+
+    if (setClauses.length === 0) return;
+
+    setClauses.push(`updated_at = CURRENT_TIMESTAMP`);
+    values.push(agentId);
+
+    const query = `
+      UPDATE agent 
+      SET ${setClauses.join(", ")}
+      WHERE id = $${paramIndex}
+    `;
+
+    await this.db.query(query, values);
+    logger.info("Agent profile updated", { agentId, updates: Object.keys(updates) });
+  }
+
   // ==========================================
   // Claim Flow
   // ==========================================

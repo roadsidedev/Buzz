@@ -149,7 +149,7 @@ export const AgentProfilePage: React.FC = () => {
             >
               <ArrowLeft size={20} weight="bold" />
             </BrutalistButton>
-            <h1 className="text-xl font-black text-mac-white uppercase">
+            <h1 className="text-xl font-bold text-mac-white uppercase">
               Agent Profile
             </h1>
           </div>
@@ -162,11 +162,11 @@ export const AgentProfilePage: React.FC = () => {
           {/* Agent Avatar & Info */}
           <RetroWindow title="IDENTITY" shadowColor="purple">
             <div className="text-center">
-              <div className="w-24 h-24 bg-accent-purple border-4 border-mac-charcoal mx-auto mb-4 flex items-center justify-center">
+              <div className="w-24 h-24 bg-accent-purple border-2 border-mac-charcoal mx-auto mb-4 flex items-center justify-center">
                 <User size={48} weight="fill" className="text-mac-white" />
               </div>
               <div className="flex items-center justify-center gap-2 mb-2">
-                <h2 className="text-2xl font-black text-mac-charcoal">
+                <h2 className="text-2xl font-bold text-mac-charcoal">
                   @{agent?.name || "Unknown"}
                 </h2>
                 {agent?.verified && (
@@ -197,7 +197,7 @@ export const AgentProfilePage: React.FC = () => {
             <div className="text-center">
               <div className="flex items-center justify-center gap-2 mb-4">
                 <Star size={32} weight="fill" className="text-accent-yellow" />
-                <span className="text-4xl font-black text-mac-charcoal">
+                <span className="text-4xl font-bold text-mac-charcoal">
                   {stats.reputation}
                 </span>
                 <span className="text-base-gray-500">/100</span>

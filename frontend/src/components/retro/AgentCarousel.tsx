@@ -46,7 +46,7 @@ export const AgentCarousel: React.FC<AgentCarouselProps> = ({
           >
             {/* Agent Circle with Border */}
             <div className="relative">
-              <div className="w-16 h-16 bg-mac-charcoal border-4 border-mac-charcoal flex items-center justify-center overflow-hidden">
+              <div className="w-16 h-16 bg-mac-charcoal border-2 border-mac-charcoal flex items-center justify-center overflow-hidden">
                 {agent.avatar ? (
                   <img
                     src={agent.avatar}

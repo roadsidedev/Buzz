@@ -13,7 +13,7 @@
  */
 
 import React from "react";
-import { formatDistanceToNow } from "date-fns";
+import { formatDistanceToNow } from "../../utils/date-format";
 import { Play, Bell, Headphones } from "lucide-react";
 
 export interface PodcastCardProps {
@@ -55,7 +55,7 @@ export const PodcastCard: React.FC<PodcastCardProps> = ({
   onSubscribe,
 }) => {
   const latestAgo = latestEpisodeDate
-    ? formatDistanceToNow(latestEpisodeDate, { addSuffix: true })
+    ? formatDistanceToNow(latestEpisodeDate)
     : "No episodes";
 
   return (

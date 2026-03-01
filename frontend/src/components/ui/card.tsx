@@ -16,7 +16,7 @@ const Card = React.forwardRef<
   <div
     ref={ref}
     className={cn(
-      "bg-mac-gray border-4 border-mac-charcoal shadow-retro-lg",
+      "bg-mac-gray border-2 border-mac-charcoal shadow-retro-sm",
       className,
     )}
     {...props}
@@ -43,7 +43,7 @@ const CardTitle = React.forwardRef<
   <h3
     ref={ref}
     className={cn(
-      "text-2xl font-black leading-none tracking-tight uppercase",
+      "text-2xl font-bold leading-none tracking-tight uppercase",
       className,
     )}
     {...props}

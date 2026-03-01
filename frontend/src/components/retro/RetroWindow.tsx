@@ -28,7 +28,7 @@ export const RetroWindow: React.FC<RetroWindowProps> = ({
   footer,
 }) => {
   const shadowClasses = {
-    black: "shadow-retro-lg",
+    black: "shadow-retro-sm",
     purple: "shadow-retro-purple",
     teal: "shadow-retro-teal",
     yellow: "shadow-retro-yellow",
@@ -38,7 +38,7 @@ export const RetroWindow: React.FC<RetroWindowProps> = ({
   return (
     <div
       className={clsx(
-        "bg-mac-gray border-4 border-mac-charcoal flex flex-col",
+        "bg-mac-gray border-2 border-mac-charcoal flex flex-col",
         shadowClasses[shadowColor],
         draggable && "cursor-move",
         className,

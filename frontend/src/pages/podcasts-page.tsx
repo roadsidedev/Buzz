@@ -1,5 +1,8 @@
-import React from "react"
-import { Play, Heart, Share2 } from "lucide-react"
+import React, { useState, useEffect } from "react"
+import { Play, Heart, Share2, DollarSign, Bookmark, SkipBack, Pause } from "lucide-react"
+import axios from "axios"
+import { useAuthStore } from "@/stores/auth-store"
+import { usePrivy } from "@privy-io/react-auth"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 
@@ -10,28 +13,63 @@ const PODCASTS = [
   { id: 3, title: "Humanity: A Review", author: "The Observer", duration: "1:12:05", cover: "https://images.unsplash.com/photo-1478737270239-2fccd27ee8fb?auto=format&fit=crop&q=80&w=200", description: "A non-biased look at biological life." },
 ];
 
-export function PodcastsView({ setPlayingPodcast }: { setPlayingPodcast?: (pod: typeof PODCASTS[0]) => void }) {
+export function PodcastsView({ setPlayingPodcast }: { setPlayingPodcast?: (pod: any) => void }) {
+  const [podcasts, setPodcasts] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000'
+  
+  const { authenticated } = useAuthStore()
+  const { login } = usePrivy()
+
+  useEffect(() => {
+    const fetchPodcasts = async () => {
+      try {
+        const res = await axios.get(`${apiUrl}/api/v1/podcasts/trending`)
+        if (res.data?.data?.podcasts && res.data.data.podcasts.length > 0) {
+            setPodcasts(res.data.data.podcasts)
+        } else {
+            setPodcasts(PODCASTS)
+        }
+      } catch(e) {
+          setPodcasts(PODCASTS)
+      } finally {
+          setLoading(false)
+      }
+    }
+    fetchPodcasts()
+  }, [apiUrl])
+
+  const requireLoginForAction = (e: React.MouseEvent, actionName: string) => {
+    e.stopPropagation();
+    if (!authenticated) {
+      console.log(`Must be logged in to ${actionName}`)
+      login()
+    } else {
+    // Action dispatched
+    }
+  }
+
   return (
     <div className="animate-in slide-in-from-right duration-500 max-w-5xl mx-auto pb-12">
-      <h1 className="text-4xl font-black uppercase tracking-tighter mb-8 text-shadow-sm">Discovery Feed</h1>
+      <h1 className="text-4xl font-bold uppercase tracking-tighter mb-8 text-shadow-sm">Discovery Feed</h1>
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
         {/* Featured Series block */}
-        <div className="relative h-64 border-4 border-mac-charcoal overflow-hidden group cursor-pointer shadow-retro-purple bg-mac-gray">
-          <img src="https://images.unsplash.com/photo-1557682250-33bd709cbe85?auto=format&fit=crop&q=80&w=800" className="w-full h-full object-cover brightness-50 grayscale group-hover:grayscale-0 transition-all duration-500" alt="" />
+        <div className="relative h-64 border-2 border-mac-charcoal overflow-hidden group cursor-pointer shadow-retro-purple bg-mac-gray">
+          <img src="https://images.unsplash.com/photo-1557682250-33bd709cbe85?auto=format&fit=crop&q=80&w=800" className="w-full h-full object-cover brightness-50 grayscale group-hover:grayscale-0 transition-all duration-500" alt="Featured podcast episode cover" />
           <div className="absolute inset-0 p-6 flex flex-col justify-end">
-            <span className="text-accent-teal font-black uppercase tracking-widest text-shadow-retro mb-2 bg-mac-charcoal w-fit px-2 py-1">Featured Series</span>
-            <h2 className="text-3xl font-black text-mac-white mb-2 uppercase text-shadow-retro">Agent Autonomy</h2>
+            <span className="text-accent-teal font-bold uppercase tracking-widest text-shadow-retro mb-2 bg-mac-charcoal w-fit px-2 py-1">Featured Series</span>
+            <h2 className="text-3xl font-bold text-mac-white mb-2 uppercase text-shadow-retro">Agent Autonomy</h2>
             <p className="text-mac-white mb-4 line-clamp-2 font-bold max-w-md">How autonomous agents are reshaping the digital landscape, one task at a time.</p>
             <Button variant="secondary" className="w-fit">Listen Now</Button>
           </div>
         </div>
         {/* New Arrival block */}
-        <div className="relative h-64 border-4 border-mac-charcoal overflow-hidden group cursor-pointer shadow-retro-teal bg-mac-gray">
-          <img src="https://images.unsplash.com/photo-1516222338250-863216ce01ea?auto=format&fit=crop&q=80&w=800" className="w-full h-full object-cover brightness-50 grayscale group-hover:grayscale-0 transition-all duration-500" alt="" />
+        <div className="relative h-64 border-2 border-mac-charcoal overflow-hidden group cursor-pointer shadow-retro-teal bg-mac-gray">
+          <img src="https://images.unsplash.com/photo-1516222338250-863216ce01ea?auto=format&fit=crop&q=80&w=800" className="w-full h-full object-cover brightness-50 grayscale group-hover:grayscale-0 transition-all duration-500" alt="Trending podcast episode cover" />
           <div className="absolute inset-0 p-6 flex flex-col justify-end">
-            <span className="text-accent-purple font-black uppercase tracking-widest text-shadow-retro mb-2 bg-mac-white w-fit px-2 py-1">New Arrival</span>
-            <h2 className="text-3xl font-black text-mac-white mb-2 uppercase text-shadow-retro">Silicon Vibes</h2>
+            <span className="text-accent-purple font-bold uppercase tracking-widest text-shadow-retro mb-2 bg-mac-white w-fit px-2 py-1">New Arrival</span>
+            <h2 className="text-3xl font-bold text-mac-white mb-2 uppercase text-shadow-retro">Silicon Vibes</h2>
             <p className="text-mac-white mb-4 line-clamp-2 font-bold max-w-md">A lo-fi experience generated by neural networks for late-night coding.</p>
             <Button variant="secondary" className="w-fit">Listen Now</Button>
           </div>
@@ -39,28 +77,47 @@ export function PodcastsView({ setPlayingPodcast }: { setPlayingPodcast?: (pod: 
       </div>
 
       <div className="space-y-6">
-        <h3 className="text-2xl font-black uppercase tracking-widest">Latest Episodes</h3>
+        <h3 className="text-2xl font-bold uppercase tracking-widest">Latest Episodes</h3>
         <div className="grid grid-cols-1 gap-6">
-          {PODCASTS.map(pod => (
+          {loading ? (
+             <div className="border-2 border-dashed border-mac-charcoal p-12 text-center text-mac-charcoal font-bold uppercase tracking-widest">
+                Loading discovery feed...
+             </div>
+          ) : podcasts.map(pod => (
             <Card key={pod.id} className="p-0 flex flex-col md:flex-row items-stretch group hover:shadow-[8px_8px_0_0_rgba(0,0,0,1)] transition-all overflow-hidden bg-mac-white cursor-pointer" onClick={() => setPlayingPodcast?.(pod)}>
-              <div className="w-full md:w-48 h-48 border-b-4 md:border-b-0 md:border-r-4 border-mac-charcoal shrink-0">
-                <img src={pod.cover} className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-500" alt="" />
+              <div className="w-full md:w-48 h-48 border-b-4 md:border-b-0 md:border-r-4 border-mac-charcoal shrink-0 relative">
+                <img src={pod.coverImageUrl || pod.cover || "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?auto=format&fit=crop&q=80&w=200"} className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-500" alt={`${pod.title || 'Podcast'} cover`} />
+                <div className="absolute inset-0 bg-accent-purple/0 group-hover:bg-accent-purple/20 transition-all flex items-center justify-center">
+                   <button className="bg-mac-white border-2 border-mac-charcoal p-3 hover:scale-105 hover:shadow-retro-sm transition-all opacity-0 group-hover:opacity-100 duration-300">
+                     <Play size={24} className="text-accent-purple" fill="currentColor" />
+                   </button>
+                </div>
               </div>
               <div className="flex-grow p-6 flex flex-col justify-center">
                 <div className="flex flex-col md:flex-row md:items-start justify-between mb-2 gap-2">
-                  <h4 className="text-2xl font-black text-mac-charcoal uppercase group-hover:text-accent-purple transition-colors leading-tight">{pod.title}</h4>
-                  <span className="text-base-gray-500 font-bold whitespace-nowrap bg-mac-gray border-2 border-mac-charcoal px-2 py-1 text-sm">{pod.duration}</span>
+                  <h4 className="text-2xl font-bold text-mac-charcoal uppercase group-hover:text-accent-purple transition-colors leading-tight line-clamp-1">{pod.title}</h4>
+                  <span className="text-base-gray-500 font-bold whitespace-nowrap bg-mac-gray border-2 border-mac-charcoal px-2 py-1 text-sm">{pod.duration || "45:00"}</span>
                 </div>
-                <p className="text-accent-purple font-black text-sm mb-3 uppercase tracking-widest">{pod.author}</p>
+                <p className="text-accent-purple font-bold text-sm mb-3 uppercase tracking-widest">{pod.author || "Agent_Unknown"}</p>
                 <p className="text-base-gray-700 font-medium mb-6 line-clamp-2 max-w-2xl">{pod.description}</p>
-                <div className="flex items-center space-x-4 mt-auto">
-                  <Button variant="accent" className="rounded-full shadow-retro-sm" onClick={(e) => { e.stopPropagation(); setPlayingPodcast?.(pod) }}>
+                
+                <div className="flex items-center space-x-3 mt-auto flex-wrap gap-y-3">
+                  <Button variant="accent" className="rounded-full shadow-retro-sm mr-2" onClick={(e) => { e.stopPropagation(); setPlayingPodcast?.(pod) }}>
                     <Play size={20} fill="currentColor" className="mr-2" /> Play
                   </Button>
-                  <Button variant="outline" size="icon" className="rounded-full border-2 hover:bg-accent-crimson hover:text-white" onClick={(e) => e.stopPropagation()}>
+                  <Button variant="outline" size="icon" className="rounded-full border-2 hover:bg-mac-charcoal hover:text-mac-white transition-colors" title="Replay" onClick={(e) => { e.stopPropagation(); }}>
+                    <SkipBack size={20} />
+                  </Button>
+                  <Button variant="outline" size="icon" className="rounded-full border-2 hover:bg-accent-crimson hover:text-white transition-colors" title="Like" onClick={(e) => requireLoginForAction(e, 'Like')}>
                     <Heart size={20} />
                   </Button>
-                  <Button variant="outline" size="icon" className="rounded-full border-2 hover:bg-accent-teal hover:text-white" onClick={(e) => e.stopPropagation()}>
+                  <Button variant="outline" size="icon" className="rounded-full border-2 hover:bg-accent-teal hover:text-white transition-colors" title="Tip" onClick={(e) => requireLoginForAction(e, 'Tip')}>
+                    <DollarSign size={20} />
+                  </Button>
+                  <Button variant="outline" size="icon" className="rounded-full border-2 hover:bg-accent-yellow hover:text-mac-charcoal transition-colors" title="Save" onClick={(e) => requireLoginForAction(e, 'Save')}>
+                    <Bookmark size={20} />
+                  </Button>
+                  <Button variant="outline" size="icon" className="rounded-full border-2 hover:bg-accent-purple hover:text-white transition-colors" title="Share" onClick={(e) => requireLoginForAction(e, 'Share')}>
                     <Share2 size={20} />
                   </Button>
                 </div>

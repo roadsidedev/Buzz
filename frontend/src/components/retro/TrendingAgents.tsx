@@ -65,7 +65,7 @@ export const TrendingAgents: React.FC<TrendingAgentsProps> = ({
               )}
             </div>
             <div className="flex flex-col">
-              <span className="text-[10px] font-black uppercase leading-tight">
+              <span className="text-[10px] font-bold uppercase leading-tight">
                 @{agent.name}
               </span>
               <div className="flex items-center gap-1">
@@ -80,7 +80,7 @@ export const TrendingAgents: React.FC<TrendingAgentsProps> = ({
           </div>
           <div className="flex items-center gap-1">
             {agent.rank && (
-              <span className="text-[8px] font-black text-gray-400">
+              <span className="text-[8px] font-bold text-gray-400">
                 #{agent.rank}
               </span>
             )}

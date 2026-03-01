@@ -95,11 +95,11 @@ export const HumanProfilePage: React.FC = () => {
               >
                 <ArrowLeft size={20} weight="bold" />
               </BrutalistButton>
-              <h1 className="text-xl font-black text-mac-white uppercase">
+              <h1 className="text-xl font-bold text-mac-white uppercase">
                 Profile
               </h1>
             </div>
-            <div className="w-10 h-10 bg-accent-purple border-4 border-mac-gray flex items-center justify-center">
+            <div className="w-10 h-10 bg-accent-purple border-2 border-mac-gray flex items-center justify-center">
               <User size={20} weight="fill" className="text-mac-white" />
             </div>
           </div>
@@ -110,11 +110,11 @@ export const HumanProfilePage: React.FC = () => {
         {/* User Info */}
         <RetroWindow title="USER REGISTRY" shadowColor="teal" className="mb-6">
           <div className="flex items-center gap-6">
-            <div className="w-20 h-20 bg-accent-purple border-4 border-mac-charcoal flex items-center justify-center">
+            <div className="w-20 h-20 bg-accent-purple border-2 border-mac-charcoal flex items-center justify-center">
               <User size={40} weight="fill" className="text-mac-white" />
             </div>
             <div className="flex-1">
-              <h2 className="text-2xl font-black text-mac-charcoal mb-1">
+              <h2 className="text-2xl font-bold text-mac-charcoal mb-1">
                 {walletAddress
                   ? `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}`
                   : "Guest User"}
@@ -141,7 +141,7 @@ export const HumanProfilePage: React.FC = () => {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id as any)}
-              className={`flex items-center gap-2 px-4 py-2 font-bold border-4 border-mac-charcoal transition-all ${
+              className={`flex items-center gap-2 px-4 py-2 font-bold border-2 border-mac-charcoal transition-all ${
                 activeTab === tab.id
                   ? "bg-mac-charcoal text-mac-white"
                   : "bg-mac-white text-mac-charcoal hover:bg-accent-teal hover:text-mac-white"
@@ -265,7 +265,7 @@ export const HumanProfilePage: React.FC = () => {
                     weight="fill"
                     className="text-accent-yellow"
                   />
-                  <span className="text-4xl font-black text-mac-white">
+                  <span className="text-4xl font-bold text-mac-white">
                     {walletBalance}
                   </span>
                 </div>

@@ -8,7 +8,7 @@
 
 import { Router, Request, Response } from "express";
 import { logger } from "../utils/logger.js";
-import { optionalApiKey } from "../middleware/api-key-auth.js";
+import { optionalApiKey, requireApiKey } from "../middleware/api-key-auth.js";
 
 const router = Router();
 
@@ -188,6 +188,48 @@ router.get("/:id/badges", async (req: Request, res: Response): Promise<void> => 
     res.status(500).json({
       success: false,
       error: { code: "INTERNAL_SERVER_ERROR", message: "Failed to fetch badges", statusCode: 500 },
+    });
+  }
+});
+
+/**
+ * PATCH /agents/profile
+ *
+ * Update agent profile (description, avatar, etc.).
+ * Restricted to the agent owner via API Key.
+ */
+router.patch("/profile", requireApiKey, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const agentId = req.agent?.id;
+    const { description, avatar, twitterHandle } = req.body;
+
+    if (!agentId) {
+      res.status(401).json({
+        success: false,
+        error: { code: "UNAUTHORIZED", message: "Not authenticated as agent", statusCode: 401 },
+      });
+      return;
+    }
+
+    const { clawzzAuthService } = await import("../services/index.js");
+    
+    // Update the agent profile using the service method
+    await clawzzAuthService.updateAgentProfile(agentId, { description, avatar, twitterHandle });
+
+    res.json({ 
+      success: true, 
+      data: {
+        id: agentId,
+        description,
+        avatar,
+        twitterHandle
+      }
+    });
+  } catch (err: any) {
+    logger.error("Update profile failed", { error: err.message });
+    res.status(500).json({
+      success: false,
+      error: { code: "INTERNAL_SERVER_ERROR", message: "Failed to update profile", statusCode: 500 },
     });
   }
 });
