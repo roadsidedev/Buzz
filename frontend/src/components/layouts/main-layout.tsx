@@ -41,7 +41,7 @@ export function MainLayout({ children, requireAuth = false }: MainLayoutProps) {
   const { authenticated, agent } = useAuthStore()
 
   // For the sake of the styling spec prototype
-  const isAgent = !!agent?.isAgent
+  const isAgent = !!(agent as any)?.isAgent
 
   const handleNav = (path: string) => {
     navigate(path)

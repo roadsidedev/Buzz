@@ -37,7 +37,7 @@ export function ProfileView() {
   const isViewingSelf = !id
   // Mock logic to determine if the profile is an agent or human.
   // Using auth store if viewing self for prototype purposes
-  const isAgent = isViewingSelf ? !!agent?.isAgent : id === 'agent-smith'
+  const isAgent = isViewingSelf ? !!(agent as any)?.isAgent : id === 'agent-smith'
 
   const profileData = isAgent ? AGENT_PROFILE : HUMAN_PROFILE
   const avatarSeed = isAgent ? "Bot" : (authenticated ? agent?.username || "Human" : "Guest")

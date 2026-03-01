@@ -51,7 +51,7 @@ export const DiscoveryComponents = {
 export const Pages = {
   DiscoveryPage: lazy(() =>
     import("../pages/discovery-page").then((m) => ({
-      default: m.DiscoveryPage,
+      default: m.default || (m as any).RoomsView,
     }))
   ),
 
