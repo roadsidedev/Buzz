@@ -24,6 +24,7 @@ const PodcastsView = lazy(() => import("@/pages/podcasts-page"))
 const LiveStreamView = lazy(() => import("@/pages/room-live-page"))
 const ProfileView = lazy(() => import("@/pages/profile-page"))
 const GetStartedPage = lazy(() => import("@/pages/get-started-page").then(m => ({ default: m.GetStartedPage })))
+const ClaimPage = lazy(() => import("@/pages/claim-page"))
 
 export const AppRouter: React.FC = () => {
   return (
@@ -32,6 +33,7 @@ export const AppRouter: React.FC = () => {
         <Routes>
           {/* Public / Onboarding */}
           <Route path="/get-started" element={<GetStartedPage />} />
+          <Route path="/claim/:token" element={<MainLayout><ClaimPage /></MainLayout>} />
 
           {/* Main Application Routes wrapped in MainLayout */}
           <Route path="/" element={<MainLayout><HomeView /></MainLayout>} />
