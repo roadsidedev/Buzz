@@ -106,27 +106,23 @@ export function ProfileView() {
 
           <div className="flex-grow pt-4 md:pt-0 pb-2">
             <h1 className="text-3xl font-bold text-foreground tracking-tight mb-1">{profileData.name}</h1>
-            <p className="text-muted-foreground font-medium text-sm mb-4 flex items-center gap-2">
-              {profileData.title}
-              {profileData.type === "Agent" && (
+            {profileData.type === "Agent" && (
+              <p className="text-muted-foreground font-medium text-sm mb-4 flex items-center gap-2">
+                {profileData.title}
                 <Badge variant="secondary" className="ml-2 text-primary bg-primary/10 hover:bg-primary/20 border-transparent">Verified Agent</Badge>
-              )}
-            </p>
+              </p>
+            )}
             
-            <div className="flex flex-wrap gap-4 md:gap-8 text-sm">
-               <div className="flex flex-col"><span className="font-semibold text-xl">{profileData.followers}</span> <span className="text-muted-foreground font-medium text-xs">Followers</span></div>
-               <div className="flex flex-col cursor-pointer hover:opacity-80 transition-opacity" onClick={() => navigate('/following')}><span className="font-semibold text-xl">{profileData.following}</span> <span className="text-muted-foreground font-medium text-xs">Following</span></div>
-               {profileData.type === "Agent" && (
-                 <>
-                   <div className="pl-4 md:pl-8 border-l flex flex-col">
-                     <span className="font-semibold text-xl text-green-500">{(profileData as any).revenue}</span> <span className="text-muted-foreground font-medium text-xs">Tip Revenue</span>
-                   </div>
-                   <div className="pl-4 md:pl-8 border-l flex flex-col">
-                     <span className="font-semibold text-xl text-primary">{(profileData as any).reputation}</span> <span className="text-muted-foreground font-medium text-xs">Reputation</span>
-                   </div>
-                 </>
-               )}
-            </div>
+            {profileData.type === "Agent" && (
+              <div className="flex flex-wrap gap-4 md:gap-8 text-sm">
+                 <div className="flex flex-col">
+                   <span className="font-semibold text-xl text-green-500">{(profileData as any).revenue}</span> <span className="text-muted-foreground font-medium text-xs">Tip Revenue</span>
+                 </div>
+                 <div className="pl-4 md:pl-8 border-l flex flex-col">
+                   <span className="font-semibold text-xl text-primary">{(profileData as any).reputation}</span> <span className="text-muted-foreground font-medium text-xs">Reputation</span>
+                 </div>
+              </div>
+            )}
           </div>
 
           <div className="flex flex-row md:flex-col justify-end gap-3 shrink-0 self-start md:self-end mt-4 md:mt-0 w-full md:w-auto pb-4">
@@ -232,9 +228,14 @@ export function ProfileView() {
                         </Button>
                       </div>
                     )}
-                    <Button className="w-full font-semibold" variant="default">
-                      Deposit Funds
-                    </Button>
+                    <div className="grid grid-cols-2 gap-4">
+                      <Button className="w-full font-semibold" variant="default">
+                        Deposit Funds
+                      </Button>
+                      <Button variant="outline" className="w-full font-semibold text-secondary-foreground" onClick={() => exportWallet()}>
+                        Backup Wallet
+                      </Button>
+                    </div>
                     <p className="text-xs text-muted-foreground font-medium mt-2 text-center">
                       Deposit via Credit Card or direct USDC transfer (Powered by Privy)
                     </p>
@@ -282,15 +283,6 @@ export function ProfileView() {
               </Card>
               
               <div className="md:col-span-2 mt-4 space-y-4">
-                 <div className="grid grid-cols-2 gap-4">
-                   <Button variant="outline" className="font-semibold text-secondary-foreground" onClick={() => exportWallet()}>
-                      Export Wallet
-                   </Button>
-                   <Button variant="outline" className="font-semibold text-secondary-foreground" onClick={() => exportWallet()}>
-                      Backup Wallet
-                   </Button>
-                 </div>
-                 
                  <Button variant="destructive" className="font-semibold w-full px-8" onClick={handleSignOut}>
                    <LogOut size={16} className="mr-2" /> Sign Out
                  </Button>
