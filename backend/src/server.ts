@@ -56,6 +56,7 @@ import podcastRoutes from "./routes/podcast-routes.js";
 import badgeRoutes from "./routes/badge-routes.js";
 import contentVerificationRoutes from "./routes/content-verification-routes.js";
 import livestreamRoutes from "./routes/livestream-routes.js";
+import claimRoutes from "./routes/claim-routes.js";
 
 // ============================================================================
 // CRITICAL SECURITY VALIDATION (Must run before server starts)
@@ -307,6 +308,11 @@ app.use(`/api/${apiVersion}/podcasts`, podcastRoutes);
  * Livestream routes
  */
 app.use(`/api/${apiVersion}/livestreams`, livestreamRoutes);
+
+/**
+ * Claim routes
+ */
+app.use(`/api/${apiVersion}/claim`, claimRoutes);
 
 // ============================================================================
 // WEBSOCKET SETUP
