@@ -30,7 +30,7 @@ export const LoginButton: React.FC<LoginButtonProps> = ({
   className = "",
   onClick,
 }) => {
-  const { login, ready, user } = usePrivy();
+  const { login, ready, user, authenticated: privyAuthenticated } = usePrivy();
   const { setAuthenticated, setWalletAddress, setLoading } = useAuthStore();
 
   const handleLogin = async () => {
@@ -38,6 +38,19 @@ export const LoginButton: React.FC<LoginButtonProps> = ({
 
     if (!ready) {
       logger.warn("Privy not ready");
+      return;
+    }
+
+    if (privyAuthenticated) {
+      const walletAddress = user?.wallet?.address;
+      if (walletAddress) {
+        setWalletAddress(walletAddress);
+        setAuthenticated(true);
+        logger.info("Privy login synced user instead of calling login", {
+          walletAddress,
+          userId: user?.id,
+        });
+      }
       return;
     }
 

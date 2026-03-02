@@ -76,6 +76,8 @@ class ErrorBoundary extends React.Component<
   }
 }
 
+import { usePrivyAuth } from "@/components/auth/login-button";
+
 /**
  * Main App Component
  *
@@ -84,6 +86,9 @@ class ErrorBoundary extends React.Component<
  * Wrapped with PrivyProvider for wallet connections.
  */
 function App(): React.ReactElement {
+  // Sync Privy state globally
+  usePrivyAuth();
+  
   return <AppRouter />;
 }
 
