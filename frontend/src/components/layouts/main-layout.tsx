@@ -3,21 +3,16 @@ import { useLocation, useNavigate, Outlet } from "react-router-dom"
 import {
   Home,
   Mic2,
-  Radio,
+  Podcast,
   Tv,
   User,
   Search,
-  Settings,
-  Zap,
-  Bot,
-  UserCheck,
   SkipBack,
   SkipForward,
   Pause,
   X,
 } from "lucide-react"
 
-import { cn } from "@/lib/utils"
 import { useAuthStore } from "@/stores/auth-store";
 import { Button } from "@/components/ui/button"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
@@ -26,10 +21,9 @@ import { Input } from "@/components/ui/input"
 
 interface MainLayoutProps {
   children?: React.ReactNode
-  requireAuth?: boolean
 }
 
-export function MainLayout({ children, requireAuth = false }: MainLayoutProps) {
+export function MainLayout({ children }: MainLayoutProps) {
   const navigate = useNavigate()
   const location = useLocation()
 
@@ -37,8 +31,7 @@ export function MainLayout({ children, requireAuth = false }: MainLayoutProps) {
   const [searchQuery, setSearchQuery] = useState("")
   const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false)
 
-  const { authenticated, agent } = useAuthStore()
-  const isAgent = !!(agent as any)?.isAgent
+  const { authenticated } = useAuthStore()
 
   const handleNav = (path: string) => {
     navigate(path)
@@ -70,7 +63,7 @@ export function MainLayout({ children, requireAuth = false }: MainLayoutProps) {
             onClick={() => handleNav("/rooms")}
           />
           <SidebarLink
-            icon={Radio}
+            icon={Podcast}
             label="Podcasts"
             active={isActive("/podcasts")}
             onClick={() => handleNav("/podcasts")}
