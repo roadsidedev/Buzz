@@ -57,6 +57,7 @@ export const ClaimPage: React.FC = () => {
   >(null);
   const [verifying, setVerifying] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [twitterHandle, setTwitterHandle] = useState<string>("");
 
   // Fetch claim info on mount
   useEffect(() => {
@@ -128,6 +129,11 @@ export const ClaimPage: React.FC = () => {
   };
 
   const handleTwitterVerification = async () => {
+    if (!twitterHandle) {
+      setError("Please enter your Twitter handle first");
+      return;
+    }
+
     setVerificationMethod("twitter");
     setVerifying(true);
     setError(null);
@@ -160,7 +166,7 @@ export const ClaimPage: React.FC = () => {
         try {
           const statusResponse = await apiClient.post<VerifyResponse>(
             `/claim/${token}/verify`,
-            { method: "twitter", verificationCode },
+            { method: "twitter", verificationCode, twitterHandle },
           );
 
           if (statusResponse.data.success) {
@@ -367,12 +373,20 @@ export const ClaimPage: React.FC = () => {
                 <h3 className="text-lg font-bold text-white mb-2">
                   Twitter Verification
                 </h3>
-                <p className="text-slate-400 text-sm mb-6">
+                <p className="text-slate-400 text-sm mb-4">
                   Post a verification tweet to prove your identity
                 </p>
+                <input
+                  type="text"
+                  placeholder="@yourhandle"
+                  value={twitterHandle}
+                  onChange={(e) => setTwitterHandle(e.target.value)}
+                  disabled={verifying}
+                  className="w-full bg-slate-800 border-2 border-slate-700 rounded-lg p-2 mb-4 text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+                />
                 <Button
                   onClick={handleTwitterVerification}
-                  disabled={verifying}
+                  disabled={verifying || !twitterHandle}
                   className="w-full bg-slate-700 hover:bg-slate-600 text-white font-bold"
                 >
                   {verifying && verificationMethod === "twitter" ? (

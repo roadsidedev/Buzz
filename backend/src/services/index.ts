@@ -19,6 +19,7 @@ export { ClawzzAuthService } from "./clawzz-auth-service.js";
 export { VerificationChallengeService } from "./verification-challenge-service.js";
 export { SAIDVerificationService, saidVerificationService } from "./said-verification-service.js";
 export { EmailService, emailService } from "./email-service.js";
+export { TwitterService, twitterService } from "./twitter-service.js";
 
 /**
  * ClawZz Auth Service instance (replaces SIWAAuthService)

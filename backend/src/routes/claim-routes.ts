@@ -102,21 +102,40 @@ router.post("/:token/verify", async (req: Request, res: Response): Promise<void>
     const { id: agentId, twitter_verification_code } = result.rows[0];
 
     if (method === "twitter") {
-      // The frontend assumes success if no error is thrown...
-      // but in real flow we might query Twitter. Here we just assume verified since they provided matching code? Wait, the frontend sends the code itself, not a handle.
-      
-      // We will blindly trust the frontend for now, or check if the verification code matches what they sent
-      if (verificationCode !== twitter_verification_code) {
-        // Just mock success 
+      const handleToVerify = req.body.twitterHandle;
+      if (!handleToVerify) {
+        res.status(400).json({ success: false, error: { message: "Twitter handle is required for Twitter verification" } });
+        return;
       }
-      
-      // Set to claimed
-      await db.query(
-        `UPDATE agent SET claim_status = 'claimed', updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
-        [agentId]
-      );
-      
-      res.json({ success: true, message: "Agent successfully claimed via Twitter" });
+
+      const { twitterService } = await import("../services/index.js");
+
+      try {
+        const isVerified = await twitterService.verifyTweetCode(handleToVerify, verificationCode);
+        
+        if (!isVerified) {
+          res.status(400).json({ success: false, error: { message: "Verification tweet not found. Please try again or wait a few seconds." } });
+          return;
+        }
+
+        if (verificationCode !== twitter_verification_code) {
+           res.status(400).json({ success: false, error: { message: "Invalid verification code." } });
+           return;
+        }
+
+        // Set to claimed
+        await db.query(
+          `UPDATE agent SET claim_status = 'claimed', twitter_handle = $1, twitter_verified = true, updated_at = CURRENT_TIMESTAMP WHERE id = $2`,
+          [handleToVerify, agentId]
+        );
+        
+        res.json({ success: true, message: "Agent successfully claimed via Twitter" });
+      } catch (verifyErr: any) {
+        logger.error("Failed to verify twitter code via service", { error: verifyErr.message });
+        res.status(400).json({ success: false, error: { message: verifyErr.message } });
+        return;
+      }
+
     } else if (method === "wallet") {
       await db.query(
         `UPDATE agent SET claim_status = 'claimed', updated_at = CURRENT_TIMESTAMP WHERE id = $1`,

@@ -97,24 +97,7 @@ export class RoomService {
       throw new NotFoundError("agent", input.hostAgentId);
     }
 
-    // Enforce verification status for room creation
-    if (hostAgent.verification_status !== "verified") {
-      logger.warn("Room creation attempted by unverified agent", {
-        agentId: input.hostAgentId,
-        verificationStatus: hostAgent.verification_status,
-      });
-      throw new ValidationError(
-        "Agent must be verified to create rooms. Please verify your identity first.",
-        {
-          field: "hostAgentId",
-          agentId: input.hostAgentId,
-          currentStatus: hostAgent.verification_status,
-          code: "AGENT_NOT_VERIFIED",
-        },
-      );
-    }
-
-    logger.info("Host agent verification status confirmed", {
+    logger.info("Host agent verification status checked (not blocking)", {
       agentId: input.hostAgentId,
       status: hostAgent.verification_status,
     });
