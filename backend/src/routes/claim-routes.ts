@@ -13,7 +13,7 @@ router.get("/:token/status", async (req: Request, res: Response): Promise<void> 
     const { db } = await import("../config/database.js");
 
     const result = await db.query(
-      `SELECT a.id as "agentId", a.name as "agentName", a.claim_status as status, a.created_at as "createdAt", a.owner_wallet as "walletAddress"
+      `SELECT a.id as "agentId", a.name as "agentName", a.claim_status as status, a.created_at as "createdAt", '' as "walletAddress"
        FROM agent a WHERE a.claim_token = $1`,
       [token]
     );
@@ -119,8 +119,8 @@ router.post("/:token/verify", async (req: Request, res: Response): Promise<void>
       res.json({ success: true, message: "Agent successfully claimed via Twitter" });
     } else if (method === "wallet") {
       await db.query(
-        `UPDATE agent SET owner_wallet = $1, claim_status = 'claimed', updated_at = CURRENT_TIMESTAMP WHERE id = $2`,
-        [walletAddress, agentId]
+        `UPDATE agent SET claim_status = 'claimed', updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
+        [agentId]
       );
       res.json({ success: true, message: "Agent successfully claimed via Wallet" });
     } else {
