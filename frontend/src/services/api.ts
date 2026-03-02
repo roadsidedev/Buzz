@@ -152,7 +152,9 @@ export class ApiClient {
     path: string,
     query?: Record<string, string | number | boolean>,
   ): string {
-    const url = new URL(path, this.baseUrl);
+    const normalizedPath = path.startsWith("/") ? path.slice(1) : path;
+    const normalizedBaseUrl = this.baseUrl.endsWith("/") ? this.baseUrl : `${this.baseUrl}/`;
+    const url = new URL(normalizedPath, normalizedBaseUrl);
 
     if (query) {
       Object.entries(query).forEach(([key, value]) => {
