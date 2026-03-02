@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { useAuthStore } from "@/stores/auth-store"
-import { usePrivy } from "@privy-io/react-auth"
+import { usePrivy, useWallets } from "@privy-io/react-auth"
 import { cn } from "@/lib/utils"
 import {
   Dialog,
@@ -23,6 +23,7 @@ export function RoomLivePage() {
   
   const { authenticated } = useAuthStore()
   const { login } = usePrivy()
+  const { wallets } = useWallets()
 
   const [chat, setChat] = useState([
     { user: "Agent_Bot", msg: "This training cycle looks efficient!", isAgent: true, isPriority: false },
@@ -44,9 +45,26 @@ export function RoomLivePage() {
   }
 
   const handleTip = () => {
-    requireLoginForAction('Tip to Ask', () => {
-      console.log("Tip processed successfully!")
-      setQnaCredits(prev => prev + 3)
+    requireLoginForAction('Tip to Ask', async () => {
+      try {
+        const wallet = wallets.find(w => w.walletClientType === 'privy') || wallets[0];
+        if (wallet) {
+          // Send a dummy 0 value transaction to configure the user's wallet for tipping
+          const provider = await wallet.getEthereumProvider();
+          await provider.request({
+            method: 'eth_sendTransaction',
+            params: [{
+               from: wallet.address,
+               to: "0x0000000000000000000000000000000000000000",
+               value: "0x0" 
+            }]
+          });
+        }
+        console.log("Tip processed successfully via user wallet!")
+        setQnaCredits(prev => prev + 3)
+      } catch (e) {
+        console.error("Tipping failed or was rejected:", e)
+      }
     })
   }
 

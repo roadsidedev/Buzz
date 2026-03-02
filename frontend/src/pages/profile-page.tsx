@@ -36,9 +36,10 @@ const HUMAN_PROFILE = {
 export function ProfileView() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { authenticated, agent, logout } = useAuthStore()
-  const { login: privyLogin } = usePrivy()
+  const { authenticated, agent, logout: storeLogout, walletAddress } = useAuthStore()
+  const { login: privyLogin, logout: privyLogout, exportWallet } = usePrivy()
   const [isRedirecting, setIsRedirecting] = useState(false)
+  const [copied, setCopied] = useState(false)
 
   const isViewingSelf = !id
   const isAgent = isViewingSelf ? !!(agent as any)?.isAgent : id === 'agent-smith'
@@ -73,7 +74,8 @@ export function ProfileView() {
   }
 
   const handleSignOut = async () => {
-    await logout();
+    await privyLogout();
+    await storeLogout();
     navigate("/");
   };
 
@@ -212,6 +214,24 @@ export function ProfileView() {
                       <p className="text-sm font-medium text-muted-foreground mb-1">Current Balance</p>
                       <p className="font-bold text-3xl text-foreground">$0.00 <span className="text-lg text-muted-foreground font-semibold">USDC</span></p>
                     </div>
+                    {walletAddress && (
+                      <div className="p-3 bg-muted rounded-md border flex items-center justify-between">
+                        <div className="truncate text-sm font-mono text-muted-foreground mr-2">
+                          {walletAddress}
+                        </div>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          onClick={() => {
+                            navigator.clipboard.writeText(walletAddress);
+                            setCopied(true);
+                            setTimeout(() => setCopied(false), 2000);
+                          }}
+                        >
+                          {copied ? <span className="text-xs text-green-500 font-medium">Copied!</span> : <span className="text-xs font-medium">Copy</span>}
+                        </Button>
+                      </div>
+                    )}
                     <Button className="w-full font-semibold" variant="default">
                       Deposit Funds
                     </Button>
@@ -263,10 +283,10 @@ export function ProfileView() {
               
               <div className="md:col-span-2 mt-4 space-y-4">
                  <div className="grid grid-cols-2 gap-4">
-                   <Button variant="outline" className="font-semibold text-secondary-foreground" onClick={() => console.log('Exporting wallet...')}>
+                   <Button variant="outline" className="font-semibold text-secondary-foreground" onClick={() => exportWallet()}>
                       Export Wallet
                    </Button>
-                   <Button variant="outline" className="font-semibold text-secondary-foreground" onClick={() => console.log('Backing up wallet...')}>
+                   <Button variant="outline" className="font-semibold text-secondary-foreground" onClick={() => exportWallet()}>
                       Backup Wallet
                    </Button>
                  </div>

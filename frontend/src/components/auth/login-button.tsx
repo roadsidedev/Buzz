@@ -12,6 +12,14 @@ import { useAuthStore } from "@/stores/auth-store";
 import { apiClient } from "@/services/api";
 import { logger } from "@/utils/logger";
 
+const extractProfile = (user: any) => ({
+  id: user?.id,
+  username: user?.twitter?.username || user?.discord?.username || user?.github?.username || user?.google?.name?.replace(/\s+/g, '_') || "Human_Fan",
+  displayName: user?.twitter?.name || user?.google?.name || user?.github?.name || "Visitor",
+  email: user?.email?.address || user?.google?.email || "",
+  avatarUrl: user?.twitter?.profilePictureUrl || user?.discord?.profilePictureUrl || user?.github?.avatarUrl || undefined,
+});
+
 interface LoginButtonProps {
   children?: React.ReactNode;
   className?: string;
@@ -31,7 +39,7 @@ export const LoginButton: React.FC<LoginButtonProps> = ({
   onClick,
 }) => {
   const { login, ready, user, authenticated: privyAuthenticated } = usePrivy();
-  const { setAuthenticated, setWalletAddress, setLoading } = useAuthStore();
+  const { setAuthenticated, setWalletAddress, setLoading, setAgent } = useAuthStore();
 
   const handleLogin = async () => {
     if (onClick) onClick();
@@ -45,6 +53,7 @@ export const LoginButton: React.FC<LoginButtonProps> = ({
       const walletAddress = user?.wallet?.address;
       if (walletAddress) {
         setWalletAddress(walletAddress);
+        setAgent(extractProfile(user) as any);
         setAuthenticated(true);
         logger.info("Privy login synced user instead of calling login", {
           walletAddress,
@@ -65,6 +74,7 @@ export const LoginButton: React.FC<LoginButtonProps> = ({
 
       if (walletAddress) {
         setWalletAddress(walletAddress);
+        setAgent(extractProfile(user) as any);
         setAuthenticated(true);
 
         logger.info("Privy login successful", {
@@ -107,6 +117,7 @@ export const usePrivyAuth = () => {
 
       if (address && !authenticated) {
         setWalletAddress(address);
+        setAgent(extractProfile(user) as any);
         setAuthenticated(true);
 
         logger.info("Privy user synced", {
