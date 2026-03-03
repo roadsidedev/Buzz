@@ -115,17 +115,20 @@ export function createRateLimiter(config: RateLimitConfig) {
           resetTime,
         });
 
-        throw new RateLimitError(
+        // Use next(error) instead of throwing to prevent Unhandled Promise Rejection in Express
+        next(new RateLimitError(
           `Too many requests. Try again in ${resetTime} seconds.`,
           resetTime,
           { remaining: result.remaining, resetTime },
-        );
+        ));
+        return;
       }
 
       next();
     } catch (error) {
       if (error instanceof RateLimitError) {
-        throw error;
+        next(error);
+        return;
       }
 
       logger.error("Rate limit check error", {

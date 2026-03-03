@@ -138,6 +138,33 @@ export class AgentRepository {
   }
 
   /**
+   * Update agent fields
+   */
+  async update(id: string, data: Record<string, any>): Promise<void> {
+    const fields = [];
+    const values = [];
+    let paramIndex = 1;
+
+    for (const [key, value] of Object.entries(data)) {
+      fields.push(`${key} = $${paramIndex}`);
+      values.push(value);
+      paramIndex++;
+    }
+
+    if (fields.length === 0) return;
+
+    values.push(id);
+    const text = `
+      UPDATE agent
+      SET ${fields.join(", ")}, updated_at = NOW()
+      WHERE id = $${paramIndex}
+    `;
+
+    await query(text, values);
+    logger.debug("Agent updated", { agentId: id, fields: Object.keys(data) });
+  }
+
+  /**
    * Update agent verification status
    */
   async updateVerificationStatus(

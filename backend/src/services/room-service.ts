@@ -287,8 +287,8 @@ export class RoomService {
       });
 
       try {
-        await this.updateRoomStatus(roomId, "failed");
-        // Also rollback the room creation so we don't end up with dead rooms
+        // Rollback the room creation BEFORE updating status, because "failed" might not be a valid enum 
+        // throwing an error and bypassing the deletion entirely leaving dead rooms!
         await roomRepository.deleteRoom(roomId);
         logger.info("Rolled back room creation due to Jam failure", { roomId });
       } catch (updateErr) {

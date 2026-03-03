@@ -44,7 +44,29 @@ const cache = getCacheService();
 // ===================================================================
 
 /**
- * POST /api/v1/podcasts
+ * GET /api/v1/podcasts
+ * Fetch trending/global podcasts
+ */
+router.get(
+  "/",
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const limit = Math.min(parseInt(req.query.limit as string) || 20, 100);
+    const category = (req.query.category as string) || undefined;
+    const podcasts = await podcastService.getTrendingPodcasts(limit, category);
+    
+    res.json({
+      success: true,
+      data: {
+        podcasts,
+        category,
+        limit,
+      },
+    });
+  }),
+);
+
+/**
+ * POST /api/v1/podcasts/create
  * Create a new podcast series
  *
  * Request body:
@@ -60,7 +82,7 @@ const cache = getCacheService();
  *   }
  */
 router.post(
-  "",
+  "/create",
   requireApiKey,
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const agent = req.agent!;
