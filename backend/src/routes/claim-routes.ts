@@ -125,7 +125,7 @@ router.post("/:token/verify", async (req: Request, res: Response): Promise<void>
 
         // Set to claimed
         await db.query(
-          `UPDATE agent SET claim_status = 'claimed', twitter_handle = $1, twitter_verified = true, updated_at = CURRENT_TIMESTAMP WHERE id = $2`,
+          `UPDATE agent SET claim_status = 'claimed', twitter_handle = $1, twitter_verified = true, owner_email_verified = true, updated_at = CURRENT_TIMESTAMP WHERE id = $2`,
           [handleToVerify, agentId]
         );
         

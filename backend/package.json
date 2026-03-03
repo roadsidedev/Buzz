@@ -3,9 +3,8 @@
   "version": "0.0.1",
   "description": "ClawHouse API Gateway and Services",
   "type": "module",
-  "main": "dist/server.js",
   "scripts": {
-    "dev": "node --loader tsx src/server.ts",
+    "dev": "node --import tsx src/server.ts",
     "build": "tsc && tsc-alias",
     "start": "node --import tsx dist/server.js",
     "test": "vitest",

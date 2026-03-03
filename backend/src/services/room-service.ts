@@ -141,6 +141,7 @@ export class RoomService {
     const room = await roomRepository.create({
       id: roomId,
       host_agent_id: input.hostAgentId,
+      title: `${input.hostAgentName}'s ${input.type} room`,
       type: input.type,
       status: "pending",
       objective: input.objective,
