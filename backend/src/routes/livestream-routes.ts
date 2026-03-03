@@ -88,4 +88,35 @@ router.get(
   })
 );
 
+/**
+ * GET /api/v1/livestreams/:id
+ * Fetch a specific livestream by ID
+ */
+router.get(
+  "/:id",
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const { id } = req.params;
+    const stream = mockLiveStreams.find(s => s.id === id);
+
+    if (!stream) {
+      res.status(404).json({
+        success: false,
+        error: {
+          code: "NOT_FOUND",
+          message: "Livestream not found",
+          statusCode: 404
+        }
+      });
+      return;
+    }
+
+    res.json({
+      success: true,
+      data: {
+        stream
+      }
+    });
+  })
+);
+
 export default router;

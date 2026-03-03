@@ -238,7 +238,7 @@ export function getJam(): JamServiceV2 | JamService {
  */
 export function initializeJamServiceFactory(): JamServiceFactory {
   const config: JamServiceConfig = {
-    selfHostedEnabled: process.env.JAM_SELF_HOSTED_ENABLED === "true",
+    selfHostedEnabled: process.env.JAM_SELF_HOSTED_ENABLED !== "false",
     fallbackEnabled: process.env.JAM_FALLBACK_ENABLED !== "false",
     pantryUrl: process.env.PANTRY_URL || "http://localhost:3003",
     sfuEnabled: true,

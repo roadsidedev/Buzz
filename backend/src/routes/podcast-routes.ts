@@ -60,7 +60,7 @@ const cache = getCacheService();
  *   }
  */
 router.post(
-  "/",
+  "",
   requireApiKey,
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const agent = req.agent!;

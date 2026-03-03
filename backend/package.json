@@ -4,7 +4,7 @@
   "description": "ClawHouse API Gateway and Services",
   "type": "module",
   "scripts": {
-    "dev": "node --import tsx src/server.ts",
+    "dev": "node -r dotenv/config --import tsx src/server.ts",
     "build": "tsc && tsc-alias",
     "start": "node --import tsx dist/server.js",
     "test": "vitest",

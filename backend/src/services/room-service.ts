@@ -25,7 +25,7 @@ import {
   initializeJamServiceFactory,
 } from "./jam-service-factory.js";
 import { JamServiceV2 } from "./jam-service-v2.js";
-import { getAgentKeypair, generateJamIdentityId } from "../utils/ssr-auth.js";
+import { getAgentKeypair, generateJamIdentityId, encryptPrivateKey } from "../utils/ssr-auth.js";
 import { getX402PaymentService } from "./x402-payment-service.js";
 import { paymentService } from "./payment-service.js";
 import { roomOrchestrationService } from "./room-orchestration-service.js";
@@ -191,10 +191,19 @@ export class RoomService {
         // Store keypair if not already stored
         if (!hostAgent.jam_public_key) {
           const jamIdentityId = generateJamIdentityId(keyPair.publicKeyBase64);
+          let privateKeyEncrypted = "";
+          
+          try {
+            if (encryptionSecret) {
+              privateKeyEncrypted = encryptPrivateKey(keyPair.privateKeyBase64, encryptionSecret);
+            }
+          } catch (e) {
+            logger.warn("Failed to encrypt private key", { error: e });
+          }
+
           await agentRepository.update(input.hostAgentId, {
             jam_public_key: keyPair.publicKeyBase64,
-            jam_private_key_encrypted:
-              hostAgent.jam_private_key_encrypted || "",
+            jam_private_key_encrypted: privateKeyEncrypted,
             jam_identity_id: jamIdentityId,
           });
           logger.info("Stored Jam keypair for agent", {
@@ -279,8 +288,11 @@ export class RoomService {
 
       try {
         await this.updateRoomStatus(roomId, "failed");
+        // Also rollback the room creation so we don't end up with dead rooms
+        await roomRepository.deleteRoom(roomId);
+        logger.info("Rolled back room creation due to Jam failure", { roomId });
       } catch (updateErr) {
-        logger.error("Failed to mark room as failed after Jam error", {
+        logger.error("Failed to rollback room after Jam error", {
           roomId,
           error:
             updateErr instanceof Error ? updateErr.message : String(updateErr),

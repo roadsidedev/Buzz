@@ -94,6 +94,20 @@ export class RoomRepository {
   }
 
   /**
+   * Delete room by ID (hard delete)
+   */
+  async deleteRoom(id: string): Promise<void> {
+    const text = `
+      DELETE FROM room
+      WHERE id = $1
+    `;
+
+    await query(text, [id]);
+
+    logger.info("Room deleted from database", { roomId: id });
+  }
+
+  /**
    * Get live rooms (paginated)
    *
    * @param limit - Max results per page
