@@ -464,6 +464,14 @@ app.use(errorHandler);
 // ============================================================================
 
 import { roomOrchestrationService } from "./services/room-orchestration-service.js";
+import { runStartupMigrations } from "./config/database.js";
+
+// Apply idempotent schema migrations before accepting traffic
+runStartupMigrations().catch((err) => {
+  logger.warn("Startup migrations skipped due to error", {
+    error: err instanceof Error ? err.message : String(err),
+  });
+});
 
 server.listen(port, "0.0.0.0", () => {
   logger.info(`🚀 ClawZz API Gateway started`, {

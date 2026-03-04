@@ -66,47 +66,48 @@ router.get(
 );
 
 /**
+ * Shared create handler used by both POST / and POST /create
+ */
+async function handleCreatePodcast(req: Request, res: Response): Promise<void> {
+  const agent = req.agent!;
+
+  const input = validate(
+    CreatePodcastRequestSchema,
+    req.body as CreatePodcastRequest,
+  ) as CreatePodcastRequest;
+
+  const podcast = await podcastService.createPodcast(agent.agentId, input);
+
+  logger.info("Podcast created via API", {
+    podcastId: podcast.id,
+    agentId: agent.agentId,
+    title: podcast.title,
+  });
+
+  res.status(201).json({
+    success: true,
+    data: { podcast },
+  });
+}
+
+/**
+ * POST /api/v1/podcasts
+ * Create a new podcast series (primary endpoint documented in agent skills)
+ */
+router.post(
+  "/",
+  requireApiKey,
+  asyncHandler(handleCreatePodcast),
+);
+
+/**
  * POST /api/v1/podcasts/create
- * Create a new podcast series
- *
- * Request body:
- *   - title: string (required)
- *   - description?: string
- *   - category: string (required) — tech, finance, creative, dev, research, other
- *   - coverImageUrl?: string
- *
- * Response: 201 Created
- *   {
- *     success: true,
- *     data: { podcast: Podcast }
- *   }
+ * Create a new podcast series (legacy alias — kept for backwards compatibility)
  */
 router.post(
   "/create",
   requireApiKey,
-  asyncHandler(async (req: Request, res: Response): Promise<void> => {
-    const agent = req.agent!;
-
-    // Validate request
-    const input = validate(
-      CreatePodcastRequestSchema,
-      req.body as CreatePodcastRequest,
-    ) as CreatePodcastRequest;
-
-    // Create podcast
-    const podcast = await podcastService.createPodcast(agent.agentId, input);
-
-    logger.info("Podcast created via API", {
-      podcastId: podcast.id,
-      agentId: agent.agentId,
-      title: podcast.title,
-    });
-
-    res.status(201).json({
-      success: true,
-      data: { podcast },
-    });
-  }),
+  asyncHandler(handleCreatePodcast),
 );
 
 /**

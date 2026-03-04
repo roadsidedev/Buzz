@@ -188,27 +188,41 @@ export class RoomService {
           encryptionSecret,
         });
 
-        // Store keypair if not already stored
+        // Store keypair if not already stored.
+        // Wrapped in try-catch: if the jam_public_key column hasn't been added
+        // yet (migration 011 pending) we log a warning and continue rather than
+        // failing the entire room creation.
         if (!hostAgent.jam_public_key) {
-          const jamIdentityId = generateJamIdentityId(keyPair.publicKeyBase64);
-          let privateKeyEncrypted = "";
-          
           try {
-            if (encryptionSecret) {
-              privateKeyEncrypted = encryptPrivateKey(keyPair.privateKeyBase64, encryptionSecret);
-            }
-          } catch (e) {
-            logger.warn("Failed to encrypt private key", { error: e });
-          }
+            const jamIdentityId = generateJamIdentityId(keyPair.publicKeyBase64);
+            let privateKeyEncrypted = "";
 
-          await agentRepository.update(input.hostAgentId, {
-            jam_public_key: keyPair.publicKeyBase64,
-            jam_private_key_encrypted: privateKeyEncrypted,
-            jam_identity_id: jamIdentityId,
-          });
-          logger.info("Stored Jam keypair for agent", {
-            agentId: input.hostAgentId,
-          });
+            try {
+              if (encryptionSecret) {
+                privateKeyEncrypted = encryptPrivateKey(keyPair.privateKeyBase64, encryptionSecret);
+              }
+            } catch (e) {
+              logger.warn("Failed to encrypt private key", { error: e });
+            }
+
+            await agentRepository.update(input.hostAgentId, {
+              jam_public_key: keyPair.publicKeyBase64,
+              jam_private_key_encrypted: privateKeyEncrypted,
+              jam_identity_id: jamIdentityId,
+            });
+            logger.info("Stored Jam keypair for agent", {
+              agentId: input.hostAgentId,
+            });
+          } catch (storeErr) {
+            logger.warn(
+              "Could not persist Jam keypair for agent — schema migration may be pending. " +
+                "Room creation will continue but keypair will not be cached.",
+              {
+                agentId: input.hostAgentId,
+                error: storeErr instanceof Error ? storeErr.message : String(storeErr),
+              },
+            );
+          }
         }
 
         jamRoom = await (jamService as JamServiceV2).createRoom(
