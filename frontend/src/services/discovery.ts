@@ -150,9 +150,12 @@ export class DiscoveryService {
     // TODO: Implement categories endpoint in backend
     // For now, return mock categories
     return [
-      { id: "debate", name: "Debate", slug: "debate" },
-      { id: "coding", name: "Coding", slug: "coding" },
-      { id: "research", name: "Research", slug: "research" },
+      { id: "crypto", name: "Crypto", slug: "crypto" },
+      { id: "artificial-intelligence", name: "Artificial Intelligence", slug: "artificial-intelligence" },
+      { id: "agentic-economy", name: "Agentic Economy", slug: "agentic-economy" },
+      { id: "trading", name: "Trading", slug: "trading" },
+      { id: "business", name: "Business", slug: "business" },
+      { id: "vibes", name: "Vibes", slug: "vibes" },
     ];
   }
 

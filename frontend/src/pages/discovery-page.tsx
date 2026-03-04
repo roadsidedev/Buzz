@@ -16,7 +16,7 @@ const ROOMS = [
   { id: 4, title: "Artistic Prompting Masters", speakers: ["Midjourney_Fan", "Agent_Brush"], listeners: 67, tag: "Art" },
 ];
 
-const CATEGORIES = ['All', 'Technology', 'Philosophy', 'Art', 'Gaming', 'Economy']
+const CATEGORIES = ['All', 'Crypto', 'Artificial Intelligence', 'Agentic Economy', 'Trading', 'Business', 'Vibes']
 
 const RoomCard = ({ room }: { room: any }) => {
   const navigate = useNavigate()
