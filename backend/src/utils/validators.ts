@@ -6,7 +6,7 @@ import { z } from "zod";
 import { ValidationError } from "./errors.js";
 
 // Room type enum
-const RoomTypeEnum = z.enum(["debate", "coding", "research", "trading", "simulation", "podcast", "livestream"]);
+const RoomTypeEnum = z.enum(["debate", "coding", "research", "trading", "simulation", "podcast", "livestream", "brainstorm"]);
 
 // Spawn fee validator (25 cents to $100)
 const SpawnFeeSchema = z

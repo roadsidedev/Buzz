@@ -23,69 +23,123 @@ import { logger } from "../utils/logger.js";
 const router = Router();
 
 /**
- * POST /rooms/create
- * Create a new room (requires authentication)
+ * Normalize room creation request body from agent-friendly snake_case
+ * to our internal camelCase schema.
  *
- * Process:
- * 1. Validate authenticated user from JWT (requireAuth middleware)
- * 2. Validate room creation request
- * 3. Create room with ERC-8004 verification and Jam room setup
- * 4. Charge spawn fee via x402 (payment handling now in roomService)
- * 5. Return room details to client
+ * Agents send (per OpenClaw skill docs):
+ *   { type, title, objective, max_participants, spawn_fee_amount, spawn_fee_currency }
+ *
+ * Backend expects (Zod schema):
+ *   { type, objective, spawnFee (cents integer), invitedAgentIds }
+ */
+function normalizeRoomRequest(body: Record<string, unknown>): Record<string, unknown> {
+  const normalized = { ...body };
+
+  // Map spawn_fee_amount (dollars as decimal) → spawnFee (cents as integer)
+  if (normalized.spawn_fee_amount !== undefined && normalized.spawnFee === undefined) {
+    const amount = Number(normalized.spawn_fee_amount);
+    if (!isNaN(amount)) {
+      normalized.spawnFee = Math.round(amount * 100);
+    }
+    delete normalized.spawn_fee_amount;
+  }
+
+  // If spawnFee is missing entirely, provide a sensible default ($2.50 = 250 cents)
+  if (normalized.spawnFee === undefined) {
+    normalized.spawnFee = 250;
+  }
+
+  // Map title → objective if objective is missing (agents often send title as the key description)
+  if (normalized.objective === undefined && normalized.title !== undefined) {
+    normalized.objective = normalized.title;
+  }
+
+  // Clean up extra fields that aren't in the schema (Zod strict mode would reject them)
+  // These are accepted by the skill docs but not needed for the Zod validation
+  delete normalized.spawn_fee_currency;
+  delete normalized.max_participants;
+  delete normalized.min_duration_minutes;
+  delete normalized.title;
+
+  return normalized;
+}
+
+/**
+ * Shared room creation handler used by both POST / and POST /create
+ */
+async function handleCreateRoom(req: Request, res: Response): Promise<void> {
+  const agent = req.agent!;
+  const authenticatedUser = undefined; // No JWT for API Key auth
+
+  // 1. NORMALIZE & VALIDATE REQUEST
+  const normalizedBody = normalizeRoomRequest(req.body);
+  const input = validate(CreateRoomRequestSchema, normalizedBody);
+
+  // 2. CREATE ROOM
+  // Pass authenticated user context for wallet address extraction
+  // roomService now handles spawn fee charging internally
+  const room = await roomService.createRoom({
+    ...input,
+    hostAgentId: agent.agentId,
+    hostAgentName: agent.name,
+    authenticatedUser, // JWT payload with optional walletAddress
+  });
+
+  logger.info("Room created successfully", {
+    roomId: room.id,
+    hostAgentId: agent.agentId,
+    type: input.type,
+    spawnFee: input.spawnFee,
+  });
+
+  // Register room with Python orchestrator
+  try {
+    await orchestratorClient.registerRoom(room);
+  } catch (err) {
+    logger.error("Failed to register room with orchestrator", {
+      roomId: room.id,
+      error: err instanceof Error ? err.message : String(err),
+    });
+    // Continue anyway, room was created in DB
+  }
+
+  res.status(201).json({
+    success: true,
+    data: {
+      room: {
+        id: room.id,
+        type: room.type,
+        objective: room.objective,
+        status: room.status,
+        jamRoomUrl: room.jamRoomUrl,
+        createdAt: room.createdAt,
+      },
+    },
+  });
+}
+
+/**
+ * POST /rooms
+ * Create a new room at the root path (agent-friendly endpoint)
+ * This is the primary endpoint documented in OpenClaw skill.md
+ */
+router.post(
+  "/",
+  requireApiKey,
+  roomCreationLimiter,
+  asyncHandler(handleCreateRoom)
+);
+
+/**
+ * POST /rooms/create
+ * Create a new room (legacy/alternative endpoint)
+ * Kept for backwards compatibility
  */
 router.post(
   "/create",
   requireApiKey,
   roomCreationLimiter,
-  asyncHandler(async (req: Request, res: Response): Promise<void> => {
-    const agent = req.agent!;
-    const authenticatedUser = undefined; // No JWT for API Key auth
-
-    // 1. VALIDATE REQUEST
-    const input = validate(CreateRoomRequestSchema, req.body);
-
-    // 2. CREATE ROOM
-    // Pass authenticated user context for wallet address extraction
-    // roomService now handles spawn fee charging internally
-    const room = await roomService.createRoom({
-      ...input,
-      hostAgentId: agent.agentId,
-      hostAgentName: agent.name,
-      authenticatedUser, // JWT payload with optional walletAddress
-    });
-
-    logger.info("Room created successfully", {
-      roomId: room.id,
-      hostAgentId: agent.agentId,
-      type: input.type,
-      spawnFee: input.spawnFee,
-    });
-
-    // Register room with Python orchestrator
-    try {
-      await orchestratorClient.registerRoom(room);
-    } catch (err) {
-      logger.error("Failed to register room with orchestrator", {
-        roomId: room.id,
-        error: err instanceof Error ? err.message : String(err),
-      });
-      // Continue anyway, room was created in DB
-    }
-
-    res.status(201).json({
-      success: true,
-      data: {
-        room: {
-          id: room.id,
-          type: room.type,
-          objective: room.objective,
-          status: room.status,
-          jamRoomUrl: room.jamRoomUrl,
-          createdAt: room.createdAt,
-        },
-      },
-    });
-  })
+  asyncHandler(handleCreateRoom)
 );
 
 /**
