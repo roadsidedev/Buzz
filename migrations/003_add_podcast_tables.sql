@@ -23,12 +23,7 @@ CREATE TABLE podcast (
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   
   -- Foreign keys
-  FOREIGN KEY (agent_id) REFERENCES agent(id) ON DELETE CASCADE,
-  
-  -- Indexes
-  INDEX idx_podcast_agent (agent_id),
-  INDEX idx_podcast_category (category),
-  INDEX idx_podcast_created (created_at DESC)
+  FOREIGN KEY (agent_id) REFERENCES agent(id) ON DELETE CASCADE
 );
 
 -- ===================================================================
@@ -59,12 +54,7 @@ CREATE TABLE podcast_episode (
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   
   -- Foreign keys
-  FOREIGN KEY (podcast_id) REFERENCES podcast(id) ON DELETE CASCADE,
-  
-  -- Indexes
-  INDEX idx_episode_podcast (podcast_id),
-  INDEX idx_episode_status (status),
-  INDEX idx_episode_published (published_at DESC)
+  FOREIGN KEY (podcast_id) REFERENCES podcast(id) ON DELETE CASCADE
 );
 
 -- ===================================================================
@@ -96,14 +86,9 @@ CREATE TABLE podcast_distribution (
   
   -- Foreign keys
   FOREIGN KEY (episode_id) REFERENCES podcast_episode(id) ON DELETE CASCADE,
-  
+
   -- Constraints
-  UNIQUE(episode_id, platform),
-  
-  -- Indexes
-  INDEX idx_distribution_episode (episode_id),
-  INDEX idx_distribution_platform (platform),
-  INDEX idx_distribution_status (status)
+  UNIQUE(episode_id, platform)
 );
 
 -- ===================================================================
@@ -132,14 +117,9 @@ CREATE TABLE podcast_subscription (
   -- Foreign keys
   FOREIGN KEY (agent_id) REFERENCES agent(id) ON DELETE CASCADE,
   FOREIGN KEY (podcast_id) REFERENCES podcast(id) ON DELETE CASCADE,
-  
+
   -- Constraints
-  UNIQUE(agent_id, podcast_id),
-  
-  -- Indexes
-  INDEX idx_subscription_agent (agent_id),
-  INDEX idx_subscription_podcast (podcast_id),
-  INDEX idx_subscription_status (status)
+  UNIQUE(agent_id, podcast_id)
 );
 
 -- ===================================================================
@@ -168,11 +148,7 @@ CREATE TABLE podcast_generation_cost (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   
   -- Foreign keys
-  FOREIGN KEY (episode_id) REFERENCES podcast_episode(id) ON DELETE CASCADE,
-  
-  -- Indexes
-  INDEX idx_cost_episode (episode_id),
-  INDEX idx_cost_status (payment_status)
+  FOREIGN KEY (episode_id) REFERENCES podcast_episode(id) ON DELETE CASCADE
 );
 
 -- ===================================================================
@@ -200,11 +176,7 @@ CREATE TABLE podcast_analytics (
   recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   
   -- Foreign keys
-  FOREIGN KEY (episode_id) REFERENCES podcast_episode(id) ON DELETE CASCADE,
-  
-  -- Indexes
-  INDEX idx_analytics_episode (episode_id),
-  INDEX idx_analytics_recorded (recorded_at DESC)
+  FOREIGN KEY (episode_id) REFERENCES podcast_episode(id) ON DELETE CASCADE
 );
 
 -- ===================================================================
