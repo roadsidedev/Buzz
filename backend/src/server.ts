@@ -335,6 +335,10 @@ import {
   cleanupSocketRateLimit,
 } from "./middleware/websocket-validation.js";
 
+// Import services for WebSocket message handling
+import { messageService } from "./services/message-service.js";
+import { orchestratorClient } from "./services/orchestrator-client.js";
+
 // Namespace for room connections
 const roomNamespace = io.of(/^\/rooms\/[a-f0-9-]+$/);
 
@@ -355,6 +359,9 @@ roomNamespace.on("connection", (socket) => {
         agentId: data.agentId,
       });
 
+      // Store agentId on socket for use in subsequent events
+      sock.data.agentId = data.agentId;
+
       // Join the socket room for broadcasting
       sock.join(`room:${roomId}`);
 
@@ -370,20 +377,41 @@ roomNamespace.on("connection", (socket) => {
   // Handle message submission with validation
   socket.on(
     "submit-message",
-    createValidatedHandler("submit-message", (data, sock) => {
+    createValidatedHandler("submit-message", async (data, sock) => {
+      const agentId = sock.data.agentId as string | undefined;
+
+      if (!agentId) {
+        sock.emit("error", {
+          code: "NOT_JOINED",
+          message: "Must join the room before submitting messages",
+        });
+        return;
+      }
+
       logger.debug("Message submitted", {
         socketId: sock.id,
         roomId,
+        agentId,
         textLength: data.text.length,
       });
 
-      // TODO: Save message to database via message service
-      // const messageService = getMessageService();
-      // messageService.submitMessage(roomId, data.text);
+      // Persist to database
+      const message = await messageService.createMessage(roomId, agentId, data.text);
+
+      // Forward to orchestrator for scoring queue
+      try {
+        await orchestratorClient.submitMessage(roomId, message);
+      } catch (orchErr) {
+        logger.warn("Failed to submit message to orchestrator (will retry on next turn)", {
+          roomId,
+          messageId: message.id,
+          error: orchErr instanceof Error ? orchErr.message : String(orchErr),
+        });
+      }
 
       sock.emit("message:queued", {
-        messageId: crypto.randomUUID(),
-        status: "candidate",
+        messageId: message.id,
+        status: message.status,
         timestamp: new Date().toISOString(),
       });
     }),
