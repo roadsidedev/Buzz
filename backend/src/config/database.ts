@@ -185,6 +185,168 @@ export async function runStartupMigrations(): Promise<void> {
         ON room(pantry_room_id)
     `);
 
+    // ── Migration 003: podcast tables ────────────────────────────────────────
+    // The original SQL file used MySQL-style INDEX clauses inside CREATE TABLE
+    // blocks, which PostgreSQL rejects.  We create the tables here with valid
+    // PostgreSQL syntax so they exist regardless of whether the file was applied.
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS podcast (
+        id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        agent_id         UUID NOT NULL,
+        title            VARCHAR(255) NOT NULL,
+        description      TEXT,
+        category         VARCHAR(50),
+        cover_image_url  VARCHAR(2048),
+        status           VARCHAR(50) DEFAULT 'active',
+        created_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (agent_id) REFERENCES agent(id) ON DELETE CASCADE
+      )
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS podcast_episode (
+        id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        podcast_id          UUID NOT NULL,
+        title               VARCHAR(255) NOT NULL,
+        description         TEXT,
+        transcript          TEXT,
+        audio_url           VARCHAR(2048),
+        duration_seconds    INT,
+        audio_format        VARCHAR(20) DEFAULT 'mp3',
+        status              VARCHAR(50) DEFAULT 'draft',
+        generated_at        TIMESTAMP,
+        published_at        TIMESTAMP,
+        created_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (podcast_id) REFERENCES podcast(id) ON DELETE CASCADE
+      )
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS podcast_distribution (
+        id                   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        episode_id           UUID NOT NULL,
+        platform             VARCHAR(50) NOT NULL,
+        platform_episode_id  VARCHAR(255),
+        platform_url         VARCHAR(2048),
+        status               VARCHAR(50) DEFAULT 'pending',
+        error_message        TEXT,
+        distributed_at       TIMESTAMP,
+        updated_at           TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (episode_id) REFERENCES podcast_episode(id) ON DELETE CASCADE,
+        UNIQUE(episode_id, platform)
+      )
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS podcast_subscription (
+        id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        agent_id      UUID NOT NULL,
+        podcast_id    UUID NOT NULL,
+        tier          VARCHAR(50) DEFAULT 'free',
+        subscribed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        renewed_at    TIMESTAMP,
+        expires_at    TIMESTAMP,
+        status        VARCHAR(50) DEFAULT 'active',
+        FOREIGN KEY (agent_id)   REFERENCES agent(id)   ON DELETE CASCADE,
+        FOREIGN KEY (podcast_id) REFERENCES podcast(id) ON DELETE CASCADE,
+        UNIQUE(agent_id, podcast_id)
+      )
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS podcast_generation_cost (
+        id                    UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        episode_id            UUID NOT NULL,
+        generation_cost_usdc  DECIMAL(18,6) NOT NULL,
+        platform_fee_usdc     DECIMAL(18,6) DEFAULT 0,
+        platform_revenue_usdc DECIMAL(18,6) DEFAULT 0,
+        payment_status        VARCHAR(50) DEFAULT 'pending',
+        paid_at               TIMESTAMP,
+        created_at            TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (episode_id) REFERENCES podcast_episode(id) ON DELETE CASCADE
+      )
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS podcast_analytics (
+        id                          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        episode_id                  UUID NOT NULL,
+        total_listens               INT DEFAULT 0,
+        unique_listeners            INT DEFAULT 0,
+        completion_rate             DECIMAL(5,2) DEFAULT 0,
+        average_listen_time_seconds INT DEFAULT 0,
+        replays                     INT DEFAULT 0,
+        shares                      INT DEFAULT 0,
+        comments                    INT DEFAULT 0,
+        recorded_at                 TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (episode_id) REFERENCES podcast_episode(id) ON DELETE CASCADE
+      )
+    `);
+
+    // Podcast indexes
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_podcast_agent    ON podcast(agent_id)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_podcast_category  ON podcast(category)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_podcast_by_agent  ON podcast(agent_id, created_at DESC)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_episode_podcast   ON podcast_episode(podcast_id)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_episode_status    ON podcast_episode(status)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_episode_status_created ON podcast_episode(status, created_at ASC)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_distribution_episode  ON podcast_distribution(episode_id)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_distribution_platform ON podcast_distribution(platform)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_subscription_agent   ON podcast_subscription(agent_id)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_subscription_podcast ON podcast_subscription(podcast_id)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_cost_episode          ON podcast_generation_cost(episode_id)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_analytics_episode     ON podcast_analytics(episode_id)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_podcast_trending      ON podcast_analytics(recorded_at DESC)`);
+
+    // Podcast-related columns on existing tables
+    await client.query(`ALTER TABLE agent ADD COLUMN IF NOT EXISTS podcast_specialization VARCHAR(100)`);
+
+    // Podcast timestamp triggers
+    await client.query(`
+      CREATE OR REPLACE FUNCTION update_podcast_timestamp()
+      RETURNS TRIGGER AS $$
+      BEGIN
+        NEW.updated_at = CURRENT_TIMESTAMP;
+        RETURN NEW;
+      END;
+      $$ LANGUAGE plpgsql
+    `);
+    await client.query(`
+      DO $$ BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_trigger WHERE tgname = 'podcast_update_timestamp'
+        ) THEN
+          CREATE TRIGGER podcast_update_timestamp
+            BEFORE UPDATE ON podcast
+            FOR EACH ROW EXECUTE FUNCTION update_podcast_timestamp();
+        END IF;
+      END $$
+    `);
+
+    await client.query(`
+      CREATE OR REPLACE FUNCTION update_episode_timestamp()
+      RETURNS TRIGGER AS $$
+      BEGIN
+        NEW.updated_at = CURRENT_TIMESTAMP;
+        RETURN NEW;
+      END;
+      $$ LANGUAGE plpgsql
+    `);
+    await client.query(`
+      DO $$ BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_trigger WHERE tgname = 'episode_update_timestamp'
+        ) THEN
+          CREATE TRIGGER episode_update_timestamp
+            BEFORE UPDATE ON podcast_episode
+            FOR EACH ROW EXECUTE FUNCTION update_episode_timestamp();
+        END IF;
+      END $$
+    `);
+
     await client.query("COMMIT");
 
     logger.info("Startup schema migrations applied successfully");
