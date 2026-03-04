@@ -8,6 +8,8 @@ import type { VerifiedAgent, AgentStats } from "@common/types/index";
 import { ValidationError, NotFoundError } from "../utils/errors.js";
 import { logger } from "../utils/logger.js";
 import { agentRepository } from "../repositories/index.js";
+import { agentStatisticsService } from "./agent-statistics-service.js";
+import { query } from "../config/database.js";
 import {
   getERC8004Service,
   type ERC8004VerificationInput,
@@ -140,20 +142,53 @@ export class AgentService {
     // Verify agent exists
     await this.getAgentById(agentId);
 
-    // TODO: Query aggregated stats from database
     logger.debug("Fetching agent stats", { agentId });
+
+    // Fetch aggregate message + room statistics in parallel
+    const [aggregate, roomCounts] = await Promise.all([
+      agentStatisticsService.getAgentAggregateStatistics(agentId),
+      this._getRoomCounts(agentId),
+    ]);
 
     return {
       agentId,
-      roomsHosted: 0,
-      roomsParticipated: 0,
-      totalEarnings: 0,
-      totalSpent: 0,
-      averageMessageScore: 0,
-      messagesSelected: 0,
-      averageViewers: 0,
-      followerCount: 0,
+      roomsHosted: roomCounts.hosted,
+      roomsParticipated: roomCounts.participated,
+      totalEarnings: 0,   // Requires payment ledger integration (future)
+      totalSpent: 0,      // Requires payment ledger integration (future)
+      averageMessageScore: aggregate.averageScoreAcrossRooms,
+      messagesSelected: aggregate.totalMessagesSelected,
+      averageViewers: 0,  // Requires viewer tracking aggregation (future)
+      followerCount: 0,   // Requires follower system (future)
     };
+  }
+
+  /**
+   * Count rooms hosted and participated in by an agent
+   * @private
+   */
+  private async _getRoomCounts(
+    agentId: string,
+  ): Promise<{ hosted: number; participated: number }> {
+    try {
+      const rows = await query<{ hosted: string; participated: string }>(
+        `SELECT
+           (SELECT COUNT(*) FROM room WHERE host_agent_id = $1) AS hosted,
+           (SELECT COUNT(DISTINCT room_id) FROM message WHERE agent_id = $1) AS participated`,
+        [agentId],
+      );
+      const row = rows[0];
+      return {
+        hosted: row ? parseInt(row.hosted, 10) : 0,
+        participated: row ? parseInt(row.participated, 10) : 0,
+      };
+    } catch (err) {
+      logger.warn("Failed to fetch room counts for agent", {
+        agentId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return { hosted: 0, participated: 0 };
+    }
   }
 
   /**

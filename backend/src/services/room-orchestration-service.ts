@@ -19,6 +19,7 @@ import { outputContractService } from "./output-contract-service.js";
 import { agentStatisticsService } from "./agent-statistics-service.js";
 import { revenueDistributionService } from "./revenue-distribution-service.js";
 import { logger } from "../utils/logger.js";
+import { paymentService } from "./payment-service.js";
 
 // ===================================================================
 // Configuration
@@ -286,8 +287,7 @@ export class RoomOrchestrationService {
             timeoutSeconds: ROOM_TIMEOUT_SECONDS,
           });
 
-          // TODO: Handle timeout (refund, close room, notify)
-          // await this._handleRoomTimeout(roomId);
+          await this._handleRoomTimeout(roomId);
           return;
         }
       }
@@ -296,17 +296,33 @@ export class RoomOrchestrationService {
       const completion = await outputContractService.checkCompletion(roomId);
 
       // 4. UPDATE PROGRESS
-      if (
-        completion.completionPercentage !==
-        (this.activeRooms.get(roomId)?.completionPercentage || 0)
-      ) {
+      const currentPct = this.activeRooms.get(roomId)?.completionPercentage ?? 0;
+      if (completion.completionPercentage !== currentPct) {
+        // Persist to database
         await roomRepository.updateCompletionPercentage(
           roomId,
           completion.completionPercentage,
         );
 
-        // TODO: Emit WebSocket event
-        // emitRoomCompletion(io, roomId, completion);
+        // Update in-memory tracking
+        const activeRoom = this.activeRooms.get(roomId);
+        if (activeRoom) {
+          activeRoom.completionPercentage = completion.completionPercentage;
+        }
+
+        // Emit progress event via WebSocket
+        try {
+          const { getIO } = await import("../server.js");
+          const io = getIO();
+          io.to(`room:${roomId}`).emit("room:progress", {
+            roomId,
+            completionPercentage: completion.completionPercentage,
+            completionLevel: completion.completionLevel,
+            timestamp: new Date().toISOString(),
+          });
+        } catch (wsErr) {
+          logger.warn("Failed to emit room:progress event", { roomId });
+        }
       }
 
       // 5. CHECK IF COMPLETE
@@ -393,15 +409,40 @@ export class RoomOrchestrationService {
       // 4. UPDATE ROOM STATUS
       await roomRepository.updateStatus(roomId, "completed");
 
-      // 5. TODO: EMIT ROOM COMPLETED EVENT
-      // const room = await roomRepository.getById(roomId);
-      // const messages = await messageRepository.getByRoom(roomId);
-      // emitRoomCompleted(io, roomId, {
-      //   roomId,
-      //   completionLevel,
-      //   totalTurns: room?.turnCount || 0,
-      //   transcript: messages.filter(m => m.status === 'played'),
-      // });
+      // 5. EMIT ROOM COMPLETED EVENT via WebSocket
+      try {
+        const { getIO } = await import("../server.js");
+        const io = getIO();
+
+        const completedRoom = await roomRepository.getById(roomId);
+        const allMessages = await messageRepository.getByRoom(roomId);
+        const transcript = allMessages.filter(
+          (m) => m.status === "played" || m.status === "selected",
+        );
+
+        io.to(`room:${roomId}`).emit("room:completed", {
+          roomId,
+          completionLevel,
+          totalTurns: completedRoom?.turnCount ?? 0,
+          transcript: transcript.map((m) => ({
+            messageId: m.id,
+            agentId: m.agentId,
+            text: m.text,
+            score: m.score ?? null,
+            audioUrl: m.audioUrl ?? null,
+            playedAt: m.playedAt?.toISOString() ?? null,
+          })),
+          timestamp: new Date().toISOString(),
+        });
+
+        logger.info("room:completed event emitted", { roomId, completionLevel });
+      } catch (wsErr) {
+        logger.error("Failed to emit room:completed event", {
+          roomId,
+          error: wsErr instanceof Error ? wsErr.message : String(wsErr),
+        });
+        // Non-fatal — room is already closed
+      }
 
       logger.info("Room closed successfully", {
         roomId,
@@ -430,11 +471,42 @@ export class RoomOrchestrationService {
       // 2. UPDATE ROOM STATUS
       await roomRepository.updateStatus(roomId, "failed");
 
-      // 3. TODO: ISSUE REFUND
-      // await paymentService.issueRefund(roomId);
+      // 3. ISSUE REFUND via payment service (uses spawn fee payment ID)
+      try {
+        const room = await roomRepository.getById(roomId);
+        if (room?.spawnFeePaymentId) {
+          await paymentService.refundPayment(
+            room.spawnFeePaymentId,
+            "Room timed out before any turns completed",
+          );
+          logger.info("Spawn fee refunded on timeout", {
+            roomId,
+            paymentId: room.spawnFeePaymentId,
+          });
+        }
+      } catch (refundErr) {
+        logger.error("Failed to issue refund on timeout", {
+          roomId,
+          error: refundErr instanceof Error ? refundErr.message : String(refundErr),
+        });
+        // Non-fatal — room is already marked failed
+      }
 
-      // 4. TODO: NOTIFY AGENTS
-      // emitRoomTimeout(io, roomId);
+      // 4. NOTIFY CONNECTED CLIENTS via WebSocket
+      try {
+        const { getIO } = await import("../server.js");
+        const io = getIO();
+        io.to(`room:${roomId}`).emit("room:timeout", {
+          roomId,
+          reason: "No agent activity within the allowed timeframe",
+          timeoutSeconds: ROOM_TIMEOUT_SECONDS,
+          refundIssued: true,
+          timestamp: new Date().toISOString(),
+        });
+        logger.info("room:timeout event emitted", { roomId });
+      } catch (wsErr) {
+        logger.error("Failed to emit room:timeout event", { roomId });
+      }
 
       logger.info("Room timeout handled", { roomId });
     } catch (err) {

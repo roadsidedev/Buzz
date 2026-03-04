@@ -16,6 +16,7 @@
 import { logger } from "../utils/logger.js";
 import { ValidationError, ServiceUnavailableError } from "../utils/errors.js";
 import { getJamService } from "./jam-service.js";
+import { TTS_CONFIG } from "../config/media-config.js";
 
 // Voice configuration
 const DEFAULT_VOICE_ID = "21m00Tcm4TlvDq8ikWAM"; // ElevenLabs default voice
@@ -51,15 +52,24 @@ export class TTSService {
 
   constructor() {
     this.config = {
-      apiKey: process.env.ELEVENLABS_API_KEY || "",
-      baseUrl: "https://api.elevenlabs.io/v1",
-      defaultVoiceId: process.env.ELEVENLABS_VOICE_ID || DEFAULT_VOICE_ID,
-      defaultModelId: DEFAULT_MODEL_ID,
+      apiKey: TTS_CONFIG.apiKey || process.env.ELEVENLABS_API_KEY || "",
+      baseUrl: TTS_CONFIG.baseUrl,
+      defaultVoiceId: TTS_CONFIG.defaultVoiceId,
+      defaultModelId: TTS_CONFIG.defaultModelId,
     };
 
-    if (!this.config.apiKey) {
+    if (!TTS_CONFIG.enabled) {
+      logger.warn("TTS Service disabled via ENABLE_TTS=false");
+    } else if (!this.config.apiKey) {
       logger.warn("TTS Service initialized without ElevenLabs API key");
     }
+  }
+
+  /**
+   * Returns true if TTS is enabled and configured.
+   */
+  isEnabled(): boolean {
+    return TTS_CONFIG.enabled && !!this.config.apiKey;
   }
 
   /**
@@ -221,7 +231,7 @@ export class TTSService {
     text: string,
     messageId: string,
     voiceId?: string,
-  ): Promise<{ durationMs: number }> {
+  ): Promise<{ audioBuffer: Buffer; durationMs: number }> {
     const synthesis = await this.synthesize({
       text,
       voiceId,
@@ -229,7 +239,7 @@ export class TTSService {
 
     await this.streamToJam(jamRoomId, synthesis.audioBuffer, messageId);
 
-    return { durationMs: synthesis.durationMs };
+    return { audioBuffer: synthesis.audioBuffer, durationMs: synthesis.durationMs };
   }
 
   /**

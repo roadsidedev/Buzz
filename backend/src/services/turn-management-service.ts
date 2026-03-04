@@ -27,6 +27,7 @@ import { orchestratorClient } from "./orchestrator-client.js";
 import { roomRepository, messageRepository } from "../repositories/index.js";
 import { getJamService } from "./jam-service.js";
 import { getTTSService } from "./tts-service.js";
+import { getAudioStorageService } from "./audio-storage-service.js";
 import { ValidationError, NotFoundError } from "../utils/errors.js";
 import { logger } from "../utils/logger.js";
 
@@ -454,10 +455,22 @@ export class TurnManagementService {
     message: RoomMessage,
     winner: { score: number },
   ): Promise<void> {
-    try {
-      const ttsService = getTTSService();
+    const ttsService = getTTSService();
 
-      // Get Jam room ID
+    // Skip TTS entirely when disabled or not configured
+    if (!ttsService.isEnabled()) {
+      logger.info("TTS disabled — skipping audio synthesis for turn", {
+        roomId: room.id,
+        messageId: message.id,
+      });
+      await messageRepository.updateStatus(message.id, "played", {
+        playedAt: new Date(),
+      });
+      await this._emitTurnCompleted(room, message, winner.score, 0, null);
+      return;
+    }
+
+    try {
       const jamRoomId = room.jamRoomId;
       if (!jamRoomId) {
         throw new Error("Jam room not found for streaming");
@@ -469,44 +482,31 @@ export class TurnManagementService {
         textLength: message.text.length,
       });
 
-      // Synthesize and stream in one operation
-      const { durationMs } = await ttsService.synthesizeAndStream(
+      // Synthesize speech + stream to Jam room
+      const { audioBuffer, durationMs } = await ttsService.synthesizeAndStream(
         jamRoomId,
         message.text,
         message.id,
       );
 
-      // Update message with audio metadata
+      // Upload audio to S3/R2 for replay/archive access
+      const audioStorageService = getAudioStorageService();
+      const audioUrl = await audioStorageService.upload(audioBuffer, message.id);
+
+      // Persist audio URL and played timestamp to the message record
       await messageRepository.updateStatus(message.id, "played", {
         playedAt: new Date(),
-        audioDuration: durationMs,
+        audioUrl: audioUrl ?? undefined,
       });
 
-      logger.info("Audio streamed successfully", {
+      logger.info("Audio streamed and stored successfully", {
         roomId: room.id,
         messageId: message.id,
         durationMs,
+        audioUrl: audioUrl ?? "(storage not configured)",
       });
 
-      // 7. EMIT WEBSOCKET EVENT TO CLIENTS
-      const { getIO } = await import("../server.js");
-      const io = getIO();
-
-      io.to(`room:${room.id}`).emit("turn:completed", {
-        roomId: room.id,
-        turnNumber: room.turnCount + 1,
-        messageId: message.id,
-        agentId: message.agentId,
-        text: message.text,
-        score: winner.score,
-        audioDuration: durationMs,
-        timestamp: new Date().toISOString(),
-      });
-
-      logger.debug("WebSocket event emitted", {
-        roomId: room.id,
-        event: "turn:completed",
-      });
+      await this._emitTurnCompleted(room, message, winner.score, durationMs, audioUrl);
     } catch (err) {
       logger.error("Failed to synthesize or stream audio", {
         roomId: room.id,
@@ -514,13 +514,12 @@ export class TurnManagementService {
         error: err instanceof Error ? err.message : String(err),
       });
 
-      // Still mark message as played even if audio failed
+      // Mark message as played even if audio failed so the turn is not stuck
       await messageRepository.updateStatus(message.id, "played", {
         playedAt: new Date(),
-        audioError: err instanceof Error ? err.message : String(err),
       });
 
-      // Emit error event to clients
+      // Notify clients of the audio failure
       try {
         const { getIO } = await import("../server.js");
         const io = getIO();
@@ -531,8 +530,40 @@ export class TurnManagementService {
           timestamp: new Date().toISOString(),
         });
       } catch (wsErr) {
-        logger.error("Failed to emit error event", { error: wsErr });
+        logger.error("Failed to emit turn:error event", { error: wsErr });
       }
+    }
+  }
+
+  /**
+   * Emit turn:completed WebSocket event to all room subscribers.
+   */
+  private async _emitTurnCompleted(
+    room: Room,
+    message: RoomMessage,
+    score: number,
+    durationMs: number,
+    audioUrl: string | null,
+  ): Promise<void> {
+    try {
+      const { getIO } = await import("../server.js");
+      const io = getIO();
+
+      io.to(`room:${room.id}`).emit("turn:completed", {
+        roomId: room.id,
+        turnNumber: room.turnCount + 1,
+        messageId: message.id,
+        agentId: message.agentId,
+        text: message.text,
+        score,
+        durationMs,
+        audioUrl: audioUrl ?? null,
+        timestamp: new Date().toISOString(),
+      });
+
+      logger.debug("turn:completed event emitted", { roomId: room.id });
+    } catch (wsErr) {
+      logger.error("Failed to emit turn:completed event", { error: wsErr });
     }
   }
 

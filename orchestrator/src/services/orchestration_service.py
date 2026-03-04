@@ -341,3 +341,148 @@ class OrchestrationService:
         if not room_state:
             raise ValueError(f"Room {room_id} not found")
         return room_state
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # Podcast / content-generation helpers
+    # ──────────────────────────────────────────────────────────────────────────
+
+    async def generate_podcast_script(
+        self,
+        podcast_id: str,
+        episode_id: str,
+        title: str,
+        source_urls: list[str] | None = None,
+    ) -> dict:
+        """
+        Generate a podcast episode script via the configured LLM.
+
+        Returns a dict compatible with GeneratePodcastResponse.
+        Falls back to a structured placeholder when LLM is unavailable.
+        """
+        sources_text = ""
+        if source_urls:
+            sources_text = "\n".join(f"- {u}" for u in source_urls[:5])
+            sources_text = f"\n\nReference sources:\n{sources_text}"
+
+        prompt = (
+            f"You are an expert podcast scriptwriter. Write a compelling, engaging podcast "
+            f"script for an episode titled: \"{title}\".{sources_text}\n\n"
+            "Requirements:\n"
+            "- Natural conversational tone\n"
+            "- Clear introduction, body, and conclusion\n"
+            "- Duration target: 3-5 minutes when spoken aloud (~450-750 words)\n"
+            "- No stage directions, only spoken content\n\n"
+            "Write only the script text, nothing else."
+        )
+
+        script = await self._call_llm(
+            system="You are a professional podcast scriptwriter producing high-quality AI content.",
+            user_content=prompt,
+            max_tokens=1200,
+            fallback=(
+                f"Welcome to this episode: {title}. "
+                "Today we explore this fascinating topic in depth. "
+                "Stay tuned for more insights from the ClawZz AI network."
+            ),
+        )
+
+        # Estimate duration: ~150 words per minute
+        word_count = len(script.split())
+        estimated_seconds = max(60, int(word_count / 150 * 60))
+
+        # Cache status in Redis (48h TTL) if state manager is ready
+        if self.room_state_manager:
+            try:
+                import json
+                await self.room_state_manager.redis.setex(
+                    f"podcast_episode:{episode_id}",
+                    172800,  # 48h
+                    json.dumps({"status": "ready", "script": script, "episode_id": episode_id}),
+                )
+            except Exception as cache_err:
+                logger.warning("Failed to cache podcast episode: %s", cache_err)
+
+        logger.info(
+            "Podcast script generated",
+            extra={"episode_id": episode_id, "word_count": word_count},
+        )
+
+        return {
+            "episode_id": episode_id,
+            "status": "ready",
+            "script": script,
+            "estimated_duration_seconds": estimated_seconds,
+            "estimated_cost_usdc": round(word_count * 0.000_01, 4),  # rough token cost
+            "estimated_time_seconds": 5,
+        }
+
+    async def get_podcast_episode_status(self, episode_id: str) -> dict | None:
+        """
+        Return cached episode status/script from Redis, or None if not found.
+        """
+        if not self.room_state_manager:
+            return None
+        try:
+            import json
+            raw = await self.room_state_manager.redis.get(f"podcast_episode:{episode_id}")
+            if raw is None:
+                return None
+            return json.loads(raw)
+        except Exception as err:
+            logger.warning("Failed to retrieve episode status from Redis: %s", err)
+            return None
+
+    async def generate_summary(self, transcript: str) -> str:
+        """
+        Produce a concise 3-5 sentence summary of the provided transcript.
+
+        Truncates input to 5 000 characters before sending to LLM.
+        Falls back to the first 500 characters of the transcript on failure.
+        """
+        truncated = transcript[:5000]
+
+        summary = await self._call_llm(
+            system="You are a precise summariser. Respond only with the summary text, no preamble.",
+            user_content=(
+                f"Summarise the following transcript in 3-5 sentences. "
+                f"Be concise and capture the key insights:\n\n{truncated}"
+            ),
+            max_tokens=300,
+            fallback=transcript[:500] + ("..." if len(transcript) > 500 else ""),
+        )
+        return summary
+
+    async def _call_llm(
+        self,
+        system: str,
+        user_content: str,
+        max_tokens: int = 500,
+        fallback: str = "",
+    ) -> str:
+        """
+        Internal helper: call the LLM provider and return the text response.
+
+        Returns `fallback` if the provider is unavailable or the call fails.
+        """
+        client = getattr(self.scoring_engine, "client", None)
+        if client is None:
+            logger.warning("LLM client not available, returning fallback")
+            return fallback
+
+        try:
+            response = client.messages_create(
+                model=settings.SCORING_MODEL,
+                max_tokens=max_tokens,
+                messages=[
+                    {"role": "user", "content": user_content},
+                ],
+            )
+            # Handle both Anthropic-style and OpenAI-style response objects
+            if hasattr(response, "content") and response.content:
+                return response.content[0].text.strip()
+            if hasattr(response, "choices") and response.choices:
+                return response.choices[0].message.content.strip()
+            return fallback
+        except Exception as err:
+            logger.error("LLM call failed in _call_llm: %s", err)
+            return fallback
