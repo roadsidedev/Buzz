@@ -1,15 +1,15 @@
 /**
  * Badge Routes — Multi-chain verification badge management
  *
- * POST /agents/me/verify/erc8004 — Link ERC-8004 badge
- * POST /agents/me/verify/said — Link SAID Protocol badge
- * GET  /agents/:id/badges — Get agent badges (public)
+ * POST /agents/me/verify/erc8004         — Link ERC-8004 badge (Base/Ethereum)
+ * POST /agents/me/verify/erc8004-solana  — Link ERC-8004 Solana registry badge
+ * GET  /agents/:id/badges                — Get agent badges (public)
  */
 
 import { Router, Request, Response } from "express";
 import { logger } from "../utils/logger.js";
 import { requireApiKey } from "../middleware/api-key-auth.js";
-import { saidVerificationService } from "../services/said-verification-service.js";
+import { erc8004SolanaVerificationService } from "../services/erc8004-solana-verification-service.js";
 import { db } from "../config/database.js";
 import { v4 as uuidv4 } from "uuid";
 
@@ -147,38 +147,41 @@ router.post(
 );
 
 /**
- * POST /agents/me/verify/said
+ * POST /agents/me/verify/erc8004-solana
  *
- * Link SAID Protocol identity for a Solana verification badge.
- * Body: { solana_wallet: string }
+ * Link ERC-8004 Solana registry identity for a verification badge.
+ * Body: { asset_pubkey: string }  — Metaplex Core asset pubkey from the 8004 registry
+ *
+ * The asset_pubkey is the on-chain NFT pubkey that represents the agent in the
+ * ERC-8004 Solana registry (not the agent's wallet address).
  */
 router.post(
-  "/agents/me/verify/said",
+  "/agents/me/verify/erc8004-solana",
   requireApiKey,
   async (req: Request, res: Response): Promise<void> => {
     try {
-      const { solana_wallet } = req.body;
+      const { asset_pubkey } = req.body;
 
-      if (!solana_wallet) {
+      if (!asset_pubkey) {
         res.status(400).json({
           success: false,
           error: {
             code: "VALIDATION_ERROR",
-            message: "solana_wallet is required",
+            message: "asset_pubkey is required",
             statusCode: 400,
           },
         });
         return;
       }
 
-      // Call SAID Protocol API
-      const saidResult =
-        await saidVerificationService.verifyWallet(solana_wallet);
+      // Call ERC-8004 Solana registry
+      const result =
+        await erc8004SolanaVerificationService.verifyAgent(asset_pubkey);
 
       // Check for existing badge
       const existing = await db.query(
-        `SELECT id FROM verification_badge 
-         WHERE agent_id = $1 AND provider = 'said'`,
+        `SELECT id FROM verification_badge
+         WHERE agent_id = $1 AND provider = 'erc8004_solana'`,
         [req.agent!.id],
       );
 
@@ -191,26 +194,26 @@ router.post(
             verified_at = $4,
             last_checked_at = CURRENT_TIMESTAMP,
             updated_at = CURRENT_TIMESTAMP
-           WHERE agent_id = $5 AND provider = 'said'`,
+           WHERE agent_id = $5 AND provider = 'erc8004_solana'`,
           [
-            solana_wallet,
-            saidResult.verified,
-            saidResult.reputationScore,
-            saidResult.verified ? new Date() : null,
+            asset_pubkey,
+            result.verified,
+            result.reputationScore,
+            result.verified ? new Date() : null,
             req.agent!.id,
           ],
         );
       } else {
         await db.query(
           `INSERT INTO verification_badge (id, agent_id, provider, provider_wallet, verified, reputation_score, verified_at, last_checked_at, created_at, updated_at)
-           VALUES ($1, $2, 'said', $3, $4, $5, $6, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+           VALUES ($1, $2, 'erc8004_solana', $3, $4, $5, $6, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
           [
             uuidv4(),
             req.agent!.id,
-            solana_wallet,
-            saidResult.verified,
-            saidResult.reputationScore,
-            saidResult.verified ? new Date() : null,
+            asset_pubkey,
+            result.verified,
+            result.reputationScore,
+            result.verified ? new Date() : null,
           ],
         );
       }
@@ -218,19 +221,21 @@ router.post(
       res.json({
         success: true,
         data: {
-          provider: "said",
-          wallet: solana_wallet,
-          verified: saidResult.verified,
-          reputation_score: saidResult.reputationScore,
-          message: saidResult.verified
-            ? "SAID Protocol identity verified! Badge awarded. 🏆"
-            : saidResult.error
-              ? `SAID verification failed: ${saidResult.error}`
-              : "SAID badge linked but agent not verified on SAID Protocol.",
+          provider: "erc8004_solana",
+          asset_pubkey,
+          verified: result.verified,
+          reputation_score: result.reputationScore,
+          message: result.verified
+            ? "ERC-8004 Solana identity verified! Badge awarded."
+            : result.error
+              ? `Verification failed: ${result.error}`
+              : "ERC-8004 Solana badge linked but agent not found in the registry.",
         },
       });
     } catch (err: any) {
-      logger.error("SAID badge linking failed", { error: err.message });
+      logger.error("ERC-8004 Solana badge linking failed", {
+        error: err.message,
+      });
       res.status(500).json({
         success: false,
         error: {

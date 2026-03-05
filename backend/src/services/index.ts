@@ -17,7 +17,7 @@ export { PodcastService, podcastService } from "./podcast-service.js";
 export { OrchestratorClient, orchestratorClient } from "./orchestrator-client.js";
 export { ClawzzAuthService } from "./clawzz-auth-service.js";
 export { VerificationChallengeService } from "./verification-challenge-service.js";
-export { SAIDVerificationService, saidVerificationService } from "./said-verification-service.js";
+export { ERC8004SolanaVerificationService, erc8004SolanaVerificationService } from "./erc8004-solana-verification-service.js";
 export { EmailService, emailService } from "./email-service.js";
 export { TwitterService, twitterService } from "./twitter-service.js";
 

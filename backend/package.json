@@ -13,6 +13,7 @@
     "format": "prettier --write \"src/**/*.ts\""
   },
   "dependencies": {
+    "8004-solana": "latest",
     "@buildersgarden/siwa": "^0.0.20",
     "@circle-fin/developer-controlled-wallets": "^10.1.0",
     "@noble/ed25519": "^3.0.0",
