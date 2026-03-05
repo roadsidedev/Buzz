@@ -756,7 +756,7 @@ export class PodcastService {
     category?: string,
   ): Promise<Podcast[]> {
     let query = `
-      SELECT 
+      SELECT
         p.*,
         COUNT(DISTINCT pe.id) as episode_count,
         MAX(pe.published_at) as latest_episode_date,
@@ -764,8 +764,8 @@ export class PodcastService {
       FROM podcast p
       LEFT JOIN podcast_episode pe ON p.id = pe.podcast_id
       LEFT JOIN podcast_analytics pa ON pe.id = pa.episode_id
-      WHERE p.status = 'active'
         AND pa.recorded_at >= NOW() - INTERVAL '7 days'
+      WHERE p.status = 'active'
     `;
 
     const params: any[] = [];
