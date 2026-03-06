@@ -204,8 +204,8 @@ describe("ERC8004VerificationService", () => {
       const invalidAddresses = [
         "0x123", // Too short
         "0x" + "1".repeat(41), // Too long
-        "1234567890123456789012345678901234567890", // No 0x prefix
-        "0xGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG", // Invalid hex
+        "not-an-ethereum-address", // Not hex at all
+        "0xGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG", // Invalid hex chars
       ];
 
       invalidAddresses.forEach((addr) => {

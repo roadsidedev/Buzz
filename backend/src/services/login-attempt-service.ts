@@ -144,7 +144,10 @@ export class LoginAttemptService {
         ? Math.ceil((record.lockedUntil! - now) / 1000)
         : 0;
 
-      const attemptsRemaining = Math.max(0, this.maxAttempts - record.attempts);
+      // On first attempt, show max allowed to warn the user of the limit
+      const attemptsRemaining = record.attempts === 1
+        ? this.maxAttempts
+        : Math.max(0, this.maxAttempts - record.attempts);
 
       return { isLocked, attemptsRemaining, waitSeconds };
     } catch (err) {

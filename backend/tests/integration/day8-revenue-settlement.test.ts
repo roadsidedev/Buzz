@@ -228,7 +228,7 @@ describe("Day 8: Revenue Distribution & Settlement", () => {
 
       // Validation logic
       const isValidWallet = (wallet: string): boolean => {
-        return wallet.startsWith("0x") && wallet.length === 42;
+        return wallet.startsWith("0x") && wallet.length === 42 && /^0x[0-9a-fA-F]{40}$/.test(wallet);
       };
 
       for (const wallet of validWallets) {

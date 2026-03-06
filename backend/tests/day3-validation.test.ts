@@ -12,6 +12,31 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+
+// Mock Redis to avoid requiring a real Redis connection in tests
+// Use vi.hoisted so the store is available inside the hoisted vi.mock factory
+const { redisStore } = vi.hoisted(() => ({
+  redisStore: new Map<string, string>(),
+}));
+
+vi.mock("redis", () => ({
+  createClient: vi.fn(() => ({
+    isOpen: true,
+    on: vi.fn(),
+    connect: vi.fn().mockResolvedValue(undefined),
+    disconnect: vi.fn().mockResolvedValue(undefined),
+    get: vi.fn((key: string) => Promise.resolve(redisStore.get(key) ?? null)),
+    setEx: vi.fn((key: string, _ttl: number, value: string) => {
+      redisStore.set(key, value);
+      return Promise.resolve("OK");
+    }),
+    del: vi.fn((key: string) => {
+      redisStore.delete(key);
+      return Promise.resolve(1);
+    }),
+  })),
+}));
+
 import {
   recordFailedAttempt,
   clearFailedAttempts,
@@ -150,6 +175,8 @@ describe("LoginAttemptService (Redis)", () => {
   let service: LoginAttemptService;
 
   beforeEach(async () => {
+    // Clear mock Redis store between tests
+    redisStore.clear();
     service = getLoginAttemptService();
     await service.connect();
   });

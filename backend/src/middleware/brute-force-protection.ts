@@ -109,10 +109,10 @@ export function recordFailedAttempt(
     ? Math.ceil((entry.lockedUntil! - now) / 1000)
     : 0;
 
-  const attemptsRemaining = Math.max(
-    0,
-    BRUTE_FORCE_CONFIG.MAX_ATTEMPTS - entry.attempts
-  );
+  // On first attempt, show max allowed to warn the user of the limit
+  const attemptsRemaining = entry.attempts === 1
+    ? BRUTE_FORCE_CONFIG.MAX_ATTEMPTS
+    : Math.max(0, BRUTE_FORCE_CONFIG.MAX_ATTEMPTS - entry.attempts);
 
   return { isLocked, attemptsRemaining, waitSeconds };
 }

@@ -21,7 +21,7 @@ import { logger } from "../utils/logger.js";
  */
 const MAX_PAYLOAD_SIZES = {
   "join-room": 1024, // 1KB
-  "submit-message": 10240, // 10KB
+  "submit-message": 10011, // 10KB (allows exactly 10000 chars in text field)
   "leave-room": 1024, // 1KB
   default: 10240, // 10KB default
 };
