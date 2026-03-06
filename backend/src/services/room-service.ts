@@ -511,20 +511,20 @@ export class RoomService {
       const jamService = factory?.getService() as JamServiceV2;
 
       if (jamService) {
-        const hostAgent = await agentRepository.getById(room.host_agent_id);
+        const hostAgent = await agentRepository.getById(room.hostAgentId);
         if (hostAgent) {
           const encryptionSecret = process.env.ENCRYPTION_SECRET || "";
           const keyPair = await getAgentKeypair({
-            agentId: room.host_agent_id,
+            agentId: room.hostAgentId,
             erc8004Identity: hostAgent.erc8004_identity,
             storedPublicKey: hostAgent.jam_public_key || undefined,
             storedPrivateKeyEncrypted:
               hostAgent.jam_private_key_encrypted || undefined,
             encryptionSecret,
           });
-          await jamService.endRoom(room.jam_room_id || roomId, keyPair);
+          await jamService.endRoom(room.jamRoomId || roomId, keyPair);
         }
-        logger.info("Jam room closed", { roomId, jamRoomId: room.jam_room_id });
+        logger.info("Jam room closed", { roomId, jamRoomId: room.jamRoomId });
       }
     } catch (err) {
       logger.warn("Failed to close Jam room", {
@@ -548,11 +548,11 @@ export class RoomService {
       }
 
       // Get host agent wallet
-      const hostAgent = await agentRepository.getById(room.host_agent_id);
+      const hostAgent = await agentRepository.getById(room.hostAgentId);
       if (!hostAgent || !hostAgent.erc8004_address) {
         logger.error("Cannot distribute revenue: host wallet not found", {
           roomId,
-          hostAgentId: room.host_agent_id,
+          hostAgentId: room.hostAgentId,
         });
         throw new ValidationError("Host wallet address not found", {
           field: "hostWalletAddress",
@@ -563,7 +563,7 @@ export class RoomService {
       // Get participant wallets
       const participantData = await Promise.all(
         participants
-          .filter((p) => p.agent_id !== room.host_agent_id) // Exclude host from participant list
+          .filter((p) => p.agent_id !== room.hostAgentId) // Exclude host from participant list
           .map(async (p) => {
             const agent = await agentRepository.getById(p.agent_id);
             return {
@@ -587,12 +587,12 @@ export class RoomService {
 
       // Calculate total spawn fee amount (convert cents to wei)
       const totalSpawnFee =
-        BigInt(room.spawn_fee) * BigInt(10_000_000_000_000_000);
+        BigInt(room.spawnFee) * BigInt(10_000_000_000_000_000);
 
       // Distribute revenue
       const distributions = await paymentService.distributeRevenue(
         roomId,
-        room.host_agent_id,
+        room.hostAgentId,
         hostAgent.erc8004_address,
         validParticipants,
         totalSpawnFee,
@@ -600,10 +600,10 @@ export class RoomService {
 
       logger.info("Revenue distributed for completed room", {
         roomId,
-        hostAgentId: room.host_agent_id,
+        hostAgentId: room.hostAgentId,
         participantCount: validParticipants.length,
         distributionCount: distributions.length,
-        totalSpawnFee: room.spawn_fee,
+        totalSpawnFee: room.spawnFee,
       });
     } catch (err) {
       logger.error("Failed to distribute revenue", {
@@ -635,10 +635,10 @@ export class RoomService {
     const room = await this.getRoomById(roomId);
 
     // Already has Jam — nothing to do.
-    if (room.jam_room_id) {
+    if (room.jamRoomId) {
       logger.info("Jam room already initialized, skipping", {
         roomId,
-        jamRoomId: room.jam_room_id,
+        jamRoomId: room.jamRoomId,
       });
       return room;
     }
@@ -650,9 +650,9 @@ export class RoomService {
       });
     }
 
-    const hostAgent = await agentRepository.getById(room.host_agent_id);
+    const hostAgent = await agentRepository.getById(room.hostAgentId);
     if (!hostAgent) {
-      throw new NotFoundError("agent", room.host_agent_id);
+      throw new NotFoundError("agent", room.hostAgentId);
     }
 
     ensureFactoryInitialized();
@@ -665,7 +665,7 @@ export class RoomService {
 
     const encryptionSecret = process.env.ENCRYPTION_SECRET || "";
     const keyPair = await getAgentKeypair({
-      agentId: room.host_agent_id,
+      agentId: room.hostAgentId,
       erc8004Identity: hostAgent.erc8004_identity,
       storedPublicKey: hostAgent.jam_public_key || undefined,
       storedPrivateKeyEncrypted: hostAgent.jam_private_key_encrypted || undefined,
@@ -677,12 +677,12 @@ export class RoomService {
       jamRoom = await jamService.createRoom(
         roomId,
         {
-          title: room.title || `${hostAgent.name}'s ${room.type} room`,
+          title: `${hostAgent.name}'s ${room.type} room`,
           description: room.objective,
-          hostId: room.host_agent_id,
+          hostId: room.hostAgentId,
           roomType: room.type as "debate" | "coding" | "trading" | "research",
           maxParticipants: 50,
-          metadata: { objective: room.objective, spawnFee: room.spawn_fee },
+          metadata: { objective: room.objective, spawnFee: room.spawnFee },
         },
         keyPair,
       );
