@@ -287,40 +287,52 @@ describe("WebSocket Input Validation", () => {
       expect(typeof wrappedHandler).toBe("function");
     });
 
-    it("should validate data before calling handler", (done) => {
-      const mockSocket = {
-        id: "test-socket",
-        emit: (event: string, data: any) => {
-          if (event === "error") {
-            expect(data.code).toBe("VALIDATION_ERROR");
-            done();
-          }
-        },
-        join: () => {},
-        leave: () => {},
-      };
+    it("should validate data before calling handler", () => {
+      return new Promise<void>((resolve, reject) => {
+        const mockSocket = {
+          id: "test-socket",
+          emit: (event: string, data: any) => {
+            if (event === "error") {
+              try {
+                expect(data.code).toBe("VALIDATION_ERROR");
+                resolve();
+              } catch (err) {
+                reject(err);
+              }
+            }
+          },
+          join: () => {},
+          leave: () => {},
+        };
 
-      const handler = createValidatedHandler("submit-message", () => {
-        done(new Error("Handler should not be called with invalid data"));
+        const handler = createValidatedHandler("submit-message", () => {
+          reject(new Error("Handler should not be called with invalid data"));
+        });
+
+        handler.call(mockSocket as any, { text: "" });
       });
-
-      handler.call(mockSocket as any, { text: "" });
     });
 
-    it("should call handler with valid data", (done) => {
-      const mockSocket = {
-        id: "test-socket",
-        emit: () => {},
-        join: () => {},
-        leave: () => {},
-      };
+    it("should call handler with valid data", () => {
+      return new Promise<void>((resolve, reject) => {
+        const mockSocket = {
+          id: "test-socket",
+          emit: () => {},
+          join: () => {},
+          leave: () => {},
+        };
 
-      const handler = createValidatedHandler("submit-message", (data) => {
-        expect(data.text).toBe("Valid message");
-        done();
+        const handler = createValidatedHandler("submit-message", (data) => {
+          try {
+            expect(data.text).toBe("Valid message");
+            resolve();
+          } catch (err) {
+            reject(err);
+          }
+        });
+
+        handler.call(mockSocket as any, { text: "Valid message" });
       });
-
-      handler.call(mockSocket as any, { text: "Valid message" });
     });
   });
 });

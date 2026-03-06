@@ -101,7 +101,7 @@ describe("CSRF Protection", () => {
         method: "POST",
         headers: {},
         cookies: {},
-        path: "/api/test",
+        path: "/web/test",
         ip: "127.0.0.1",
       } as any;
 

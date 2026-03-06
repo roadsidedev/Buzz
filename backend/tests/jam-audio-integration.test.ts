@@ -12,7 +12,7 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { getJamService } from "../src/services/jam-service.js";
 import { getTTSService } from "../src/services/tts-service.js";
-import { JAM_CONFIG, TTS_CONFIG } from "../src/config/media-config.js";
+import { JAM_CONFIG, TTS_CONFIG, validateJamConfig, validateTTSConfig, getMediaServicesStatus } from "../src/config/media-config.js";
 
 describe("Jam Audio Streaming Integration", () => {
   beforeEach(() => {
@@ -307,8 +307,6 @@ describe("Jam Audio Streaming Integration", () => {
 
   describe("Configuration", () => {
     it("should validate Jam configuration", () => {
-      const { validateJamConfig } = require("../src/config/media-config.js");
-
       process.env.JAM_API_KEY = "test-key";
       process.env.JAM_WEBHOOK_SECRET = "test-secret";
 
@@ -316,18 +314,12 @@ describe("Jam Audio Streaming Integration", () => {
     });
 
     it("should validate TTS configuration", () => {
-      const { validateTTSConfig } = require("../src/config/media-config.js");
-
       process.env.ELEVENLABS_API_KEY = "test-key";
 
       expect(() => validateTTSConfig()).not.toThrow();
     });
 
     it("should report media services status", () => {
-      const {
-        getMediaServicesStatus,
-      } = require("../src/config/media-config.js");
-
       process.env.JAM_API_KEY = "test-key";
       process.env.JAM_WEBHOOK_SECRET = "test-secret";
       process.env.ELEVENLABS_API_KEY = "test-key";

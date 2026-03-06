@@ -87,6 +87,7 @@ export function validateTTSConfig(): void {
 
 /**
  * Get media services health status
+ * Reads env vars dynamically to reflect current runtime configuration
  */
 export function getMediaServicesStatus(): {
   jam: { enabled: boolean; configured: boolean };
@@ -94,12 +95,12 @@ export function getMediaServicesStatus(): {
 } {
   return {
     jam: {
-      enabled: JAM_CONFIG.enabled,
-      configured: !!(JAM_CONFIG.apiKey && JAM_CONFIG.webhookSecret),
+      enabled: process.env.ENABLE_AUDIO_STREAMING !== "false",
+      configured: !!(process.env.JAM_API_KEY && process.env.JAM_WEBHOOK_SECRET),
     },
     tts: {
-      enabled: TTS_CONFIG.enabled,
-      configured: !!TTS_CONFIG.apiKey,
+      enabled: process.env.ENABLE_TTS !== "false",
+      configured: !!process.env.ELEVENLABS_API_KEY,
     },
   };
 }

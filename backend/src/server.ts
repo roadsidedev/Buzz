@@ -13,6 +13,7 @@ dotenv.config();
 import { initializeOTel } from "./config/otel-config.js";
 initializeOTel();
 
+import crypto from "crypto";
 import express, { Express, Request, Response, NextFunction } from "express";
 import http from "http";
 import { Server as SocketIOServer } from "socket.io";
@@ -212,6 +213,7 @@ app.use(rateLimiterGuard);
 app.get("/health", (req: Request, res: Response): void => {
   res.json({
     status: "ok",
+    requestId: crypto.randomUUID(),
     timestamp: new Date().toISOString(),
     service: "clawzz-api",
     version: "0.0.1",

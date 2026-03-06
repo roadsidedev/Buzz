@@ -251,7 +251,7 @@ export class JamService {
           "Jam webhook validation failed: JAM_WEBHOOK_SECRET not configured",
         );
         throw new X402Error(
-          "Webhook secret not configured",
+          "JAM_WEBHOOK_SECRET_MISSING: Webhook secret not configured",
           "JAM_WEBHOOK_SECRET_MISSING",
           { action: "configure JAM_WEBHOOK_SECRET environment variable" },
         );
