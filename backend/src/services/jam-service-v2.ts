@@ -8,7 +8,6 @@
  * - Room creation with SSR auth
  * - WebSocket connections for real-time
  * - ICE server configuration
- * - Fallback to V1 (API-key) service
  */
 
 import WebSocket, { type Data as WebSocketData } from "ws";
@@ -25,7 +24,7 @@ import {
   TurnCredentials,
 } from "../utils/turn-credentials.js";
 import logger from "../utils/logger.js";
-import { JamService, JamRoomConfig, JamRoomResponse } from "./jam-service.js";
+import type { JamRoomConfig, JamRoomResponse } from "./jam-service.js";
 
 export interface JamRoomV2 {
   id: string;
@@ -59,14 +58,9 @@ export interface WebSocketMessage {
 export class JamServiceV2 {
   private config: JamConfigV2;
   private wsConnections: Map<string, WebSocket> = new Map();
-  private fallbackService: JamService | null = null;
 
-  constructor(config: JamConfigV2, fallbackService?: JamService) {
+  constructor(config: JamConfigV2) {
     this.config = config;
-
-    if (fallbackService) {
-      this.fallbackService = fallbackService;
-    }
 
     logger.info("JamServiceV2 initialized", {
       pantryUrl: config.pantryUrl,
@@ -122,12 +116,6 @@ export class JamServiceV2 {
           error,
         });
 
-        // Try fallback if available
-        if (this.fallbackService) {
-          logger.info("Attempting fallback to V1 service");
-          return this.fallbackService.createRoom(roomId, config);
-        }
-
         throw new Error(
           `Failed to create Jam room: ${response.status} - ${error}`,
         );
@@ -152,12 +140,6 @@ export class JamServiceV2 {
         roomId,
         error: error instanceof Error ? error.message : String(error),
       });
-
-      // Try fallback if available
-      if (this.fallbackService) {
-        logger.info("Falling back to V1 service due to error");
-        return this.fallbackService.createRoom(roomId, config);
-      }
 
       throw error;
     }
@@ -199,11 +181,6 @@ export class JamServiceV2 {
           error,
         });
 
-        // Try fallback
-        if (this.fallbackService) {
-          return this.fallbackService.endRoom(roomId);
-        }
-
         throw new Error(`Failed to end Jam room: ${response.status}`);
       }
 
@@ -213,10 +190,6 @@ export class JamServiceV2 {
         roomId,
         error: error instanceof Error ? error.message : String(error),
       });
-
-      if (this.fallbackService) {
-        return this.fallbackService.endRoom(roomId);
-      }
 
       throw error;
     }
@@ -381,27 +354,11 @@ export class JamServiceV2 {
     }
   }
 
-  /**
-   * Check if fallback is available
-   */
-  hasFallback(): boolean {
-    return this.fallbackService !== null;
-  }
-
-  /**
-   * Get fallback service
-   */
-  getFallback(): JamService | null {
-    return this.fallbackService;
-  }
 }
 
 /**
  * Create Jam Service V2
  */
-export function createJamServiceV2(
-  config: JamConfigV2,
-  fallbackService?: JamService,
-): JamServiceV2 {
-  return new JamServiceV2(config, fallbackService);
+export function createJamServiceV2(config: JamConfigV2): JamServiceV2 {
+  return new JamServiceV2(config);
 }

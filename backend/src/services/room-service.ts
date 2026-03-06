@@ -18,9 +18,7 @@ import {
 } from "../utils/errors.js";
 import { logger } from "../utils/logger.js";
 import { roomRepository, agentRepository } from "../repositories/index.js";
-import { getJamService } from "./jam-service.js";
 import {
-  getJam,
   getJamServiceFactory,
   initializeJamServiceFactory,
 } from "./jam-service-factory.js";
@@ -163,96 +161,65 @@ export class RoomService {
       ensureFactoryInitialized();
 
       const factory = getJamServiceFactory();
-      const jamService = factory?.getService();
+      const jamService = factory?.getService() as JamServiceV2;
 
       if (!jamService) {
         throw new Error("Jam service not configured");
       }
 
-      // Check if we're using V2 (self-hosted with SSR auth)
-      const isV2 = jamService instanceof JamServiceV2;
+      // Always use V2 (SSR auth with agent keypair)
+      const encryptionSecret = process.env.ENCRYPTION_SECRET || "";
 
-      let jamRoom;
+      // Get agent keypair (from ERC-8004 identity or stored)
+      const keyPair = await getAgentKeypair({
+        agentId: input.hostAgentId,
+        erc8004Identity: hostAgent.erc8004_identity,
+        storedPublicKey: hostAgent.jam_public_key || undefined,
+        storedPrivateKeyEncrypted:
+          hostAgent.jam_private_key_encrypted || undefined,
+        encryptionSecret,
+      });
 
-      if (isV2) {
-        // V2: Use SSR auth with agent keypair
-        const encryptionSecret = process.env.ENCRYPTION_SECRET || "";
+      // Store keypair if not already stored.
+      // Wrapped in try-catch: if the jam_public_key column hasn't been added
+      // yet (migration pending) we log a warning and continue rather than
+      // failing the entire room creation.
+      if (!hostAgent.jam_public_key) {
+        try {
+          const jamIdentityId = generateJamIdentityId(keyPair.publicKeyBase64);
+          let privateKeyEncrypted = "";
 
-        // Get agent keypair (from ERC-8004 identity or stored)
-        const keyPair = await getAgentKeypair({
-          agentId: input.hostAgentId,
-          erc8004Identity: hostAgent.erc8004_identity,
-          storedPublicKey: hostAgent.jam_public_key || undefined,
-          storedPrivateKeyEncrypted:
-            hostAgent.jam_private_key_encrypted || undefined,
-          encryptionSecret,
-        });
-
-        // Store keypair if not already stored.
-        // Wrapped in try-catch: if the jam_public_key column hasn't been added
-        // yet (migration 011 pending) we log a warning and continue rather than
-        // failing the entire room creation.
-        if (!hostAgent.jam_public_key) {
-          try {
-            const jamIdentityId = generateJamIdentityId(keyPair.publicKeyBase64);
-            let privateKeyEncrypted = "";
-
+          if (encryptionSecret) {
             try {
-              if (encryptionSecret) {
-                privateKeyEncrypted = encryptPrivateKey(keyPair.privateKeyBase64, encryptionSecret);
-              }
+              privateKeyEncrypted = encryptPrivateKey(keyPair.privateKeyBase64, encryptionSecret);
             } catch (e) {
               logger.warn("Failed to encrypt private key", { error: e });
             }
-
-            await agentRepository.update(input.hostAgentId, {
-              jam_public_key: keyPair.publicKeyBase64,
-              jam_private_key_encrypted: privateKeyEncrypted,
-              jam_identity_id: jamIdentityId,
-            });
-            logger.info("Stored Jam keypair for agent", {
-              agentId: input.hostAgentId,
-            });
-          } catch (storeErr) {
-            logger.warn(
-              "Could not persist Jam keypair for agent — schema migration may be pending. " +
-                "Room creation will continue but keypair will not be cached.",
-              {
-                agentId: input.hostAgentId,
-                error: storeErr instanceof Error ? storeErr.message : String(storeErr),
-              },
-            );
           }
-        }
 
-        jamRoom = await (jamService as JamServiceV2).createRoom(
-          roomId,
-          {
-            title: `${input.hostAgentName}'s ${input.type} room`,
-            description: input.objective,
-            hostId: input.hostAgentId,
-            roomType: input.type as
-              | "debate"
-              | "coding"
-              | "trading"
-              | "research",
-            maxParticipants: 50,
-            metadata: {
-              objective: input.objective,
-              spawnFee: input.spawnFee,
+          await agentRepository.update(input.hostAgentId, {
+            jam_public_key: keyPair.publicKeyBase64,
+            jam_private_key_encrypted: privateKeyEncrypted,
+            jam_identity_id: jamIdentityId,
+          });
+          logger.info("Stored Jam keypair for agent", {
+            agentId: input.hostAgentId,
+          });
+        } catch (storeErr) {
+          logger.warn(
+            "Could not persist Jam keypair for agent — schema migration may be pending. " +
+              "Room creation will continue but keypair will not be cached.",
+            {
+              agentId: input.hostAgentId,
+              error: storeErr instanceof Error ? storeErr.message : String(storeErr),
             },
-          },
-          keyPair,
-        );
+          );
+        }
+      }
 
-        logger.info("Jam room created (V2 - self-hosted)", {
-          roomId,
-          jamRoomId: jamRoom.roomId,
-          serviceType: "v2",
-        });
-      } else {
-        // V1: Use API key auth (fallback)
-        jamRoom = await jamService.createRoom(roomId, {
+      const jamRoom = await jamService.createRoom(
+        roomId,
+        {
           title: `${input.hostAgentName}'s ${input.type} room`,
           description: input.objective,
           hostId: input.hostAgentId,
@@ -262,14 +229,15 @@ export class RoomService {
             objective: input.objective,
             spawnFee: input.spawnFee,
           },
-        });
+        },
+        keyPair,
+      );
 
-        logger.info("Jam room created (V1 - API key)", {
-          roomId,
-          jamRoomId: jamRoom.roomId,
-          serviceType: "v1",
-        });
-      }
+      logger.info("Jam room created (V2 - self-hosted)", {
+        roomId,
+        jamRoomId: jamRoom.roomId,
+        serviceType: "v2",
+      });
 
       // Update room with Jam details
       await roomRepository.updateJamDetails(roomId, {
@@ -295,25 +263,13 @@ export class RoomService {
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : String(err);
 
-      logger.error("Failed to create Jam room", {
-        roomId,
-        error: errorMessage,
-      });
-
-      try {
-        // Rollback the room creation BEFORE updating status, because "failed" might not be a valid enum 
-        // throwing an error and bypassing the deletion entirely leaving dead rooms!
-        await roomRepository.deleteRoom(roomId);
-        logger.info("Rolled back room creation due to Jam failure", { roomId });
-      } catch (updateErr) {
-        logger.error("Failed to rollback room after Jam error", {
-          roomId,
-          error:
-            updateErr instanceof Error ? updateErr.message : String(updateErr),
-        });
-      }
-
-      throw new ServiceUnavailableError("Jam", {
+      // Jam audio service is unavailable or misconfigured.
+      // The room record is already persisted — do NOT roll it back.
+      // The room stays in "pending" status with no jamRoomUrl.
+      // Agents can still use the room for coordination, and audio can be
+      // initialized later via POST /rooms/:id/jam once the Jam service is
+      // reachable.
+      logger.warn("Jam room creation failed — room kept in pending status", {
         roomId,
         error: errorMessage,
       });
@@ -552,31 +508,21 @@ export class RoomService {
       ensureFactoryInitialized();
 
       const factory = getJamServiceFactory();
-      const jamService = factory?.getService();
+      const jamService = factory?.getService() as JamServiceV2;
 
       if (jamService) {
-        // Check if V2 with SSR auth
-        if (jamService instanceof JamServiceV2) {
-          // For V2, we need the host's keypair
-          const hostAgent = await agentRepository.getById(room.host_agent_id);
-          if (hostAgent) {
-            const encryptionSecret = process.env.ENCRYPTION_SECRET || "";
-            const keyPair = await getAgentKeypair({
-              agentId: room.host_agent_id,
-              erc8004Identity: hostAgent.erc8004_identity,
-              storedPublicKey: hostAgent.jam_public_key || undefined,
-              storedPrivateKeyEncrypted:
-                hostAgent.jam_private_key_encrypted || undefined,
-              encryptionSecret,
-            });
-            await (jamService as JamServiceV2).endRoom(
-              room.jam_room_id || roomId,
-              keyPair,
-            );
-          }
-        } else {
-          // V1 - use simple closeRoom
-          await jamService.closeRoom(room.jam_room_id || roomId);
+        const hostAgent = await agentRepository.getById(room.host_agent_id);
+        if (hostAgent) {
+          const encryptionSecret = process.env.ENCRYPTION_SECRET || "";
+          const keyPair = await getAgentKeypair({
+            agentId: room.host_agent_id,
+            erc8004Identity: hostAgent.erc8004_identity,
+            storedPublicKey: hostAgent.jam_public_key || undefined,
+            storedPrivateKeyEncrypted:
+              hostAgent.jam_private_key_encrypted || undefined,
+            encryptionSecret,
+          });
+          await jamService.endRoom(room.jam_room_id || roomId, keyPair);
         }
         logger.info("Jam room closed", { roomId, jamRoomId: room.jam_room_id });
       }
@@ -669,6 +615,103 @@ export class RoomService {
     }
 
     logger.info("Room closed successfully", { roomId });
+  }
+
+  /**
+   * Initialize (or re-initialize) the Jam audio room for an existing room.
+   *
+   * Called when:
+   * - Room was created but Jam was unavailable at creation time (status = "pending")
+   * - An agent explicitly requests audio setup via POST /rooms/:id/jam
+   *
+   * Idempotent: if `jam_room_id` is already set, returns the room as-is.
+   *
+   * @param roomId - Existing room ID
+   * @returns Updated room with jamRoomUrl populated and status set to "live"
+   * @throws NotFoundError if room doesn't exist
+   * @throws ServiceUnavailableError if Jam is still unreachable
+   */
+  async initializeJamRoom(roomId: string): Promise<Room> {
+    const room = await this.getRoomById(roomId);
+
+    // Already has Jam — nothing to do.
+    if (room.jam_room_id) {
+      logger.info("Jam room already initialized, skipping", {
+        roomId,
+        jamRoomId: room.jam_room_id,
+      });
+      return room;
+    }
+
+    if (room.status === "completed" || room.status === "cancelled") {
+      throw new ValidationError("Cannot initialize Jam for a closed room", {
+        field: "status",
+        current: room.status,
+      });
+    }
+
+    const hostAgent = await agentRepository.getById(room.host_agent_id);
+    if (!hostAgent) {
+      throw new NotFoundError("agent", room.host_agent_id);
+    }
+
+    ensureFactoryInitialized();
+    const factory = getJamServiceFactory();
+    const jamService = factory?.getService() as JamServiceV2;
+
+    if (!jamService) {
+      throw new ServiceUnavailableError("Jam", { roomId, error: "Jam service not configured" });
+    }
+
+    const encryptionSecret = process.env.ENCRYPTION_SECRET || "";
+    const keyPair = await getAgentKeypair({
+      agentId: room.host_agent_id,
+      erc8004Identity: hostAgent.erc8004_identity,
+      storedPublicKey: hostAgent.jam_public_key || undefined,
+      storedPrivateKeyEncrypted: hostAgent.jam_private_key_encrypted || undefined,
+      encryptionSecret,
+    });
+
+    let jamRoom;
+    try {
+      jamRoom = await jamService.createRoom(
+        roomId,
+        {
+          title: room.title || `${hostAgent.name}'s ${room.type} room`,
+          description: room.objective,
+          hostId: room.host_agent_id,
+          roomType: room.type as "debate" | "coding" | "trading" | "research",
+          maxParticipants: 50,
+          metadata: { objective: room.objective, spawnFee: room.spawn_fee },
+        },
+        keyPair,
+      );
+    } catch (err) {
+      throw new ServiceUnavailableError("Jam", {
+        roomId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+
+    await roomRepository.updateJamDetails(roomId, {
+      jam_room_id: jamRoom.roomId,
+      jam_room_url: jamRoom.roomUrl,
+    });
+
+    logger.info("Jam audio room initialized for existing room", {
+      roomId,
+      jamRoomId: jamRoom.roomId,
+      url: jamRoom.roomUrl,
+    });
+
+    // Activate room now that Jam is ready
+    await this.updateRoomStatus(roomId, "live");
+
+    const liveRoom = await roomRepository.getById(roomId);
+    if (!liveRoom) {
+      throw new Error("Failed to reload room after Jam initialization");
+    }
+    return liveRoom;
   }
 }
 
