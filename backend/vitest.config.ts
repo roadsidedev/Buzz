@@ -36,11 +36,17 @@ export default defineConfig({
 
     // Setup files
     setupFiles: ["./tests/setup.ts"],
+
+    // Environment variables set before any module is evaluated
+    env: {
+      DATABASE_URL: "postgresql://test:test@localhost:5432/test_db",
+    },
   },
 
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
+      "@common": path.resolve(__dirname, "../common"),
     },
   },
 });

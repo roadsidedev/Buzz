@@ -326,7 +326,7 @@ describe("Day 6: x402 Payment Integration", () => {
   });
 
   describe("Payment Service Singleton", () => {
-    it("should return same instance for multiple calls", () => {
+    it("should return same instance for multiple calls", async () => {
       // Act
       const { getX402PaymentService } = await import(
         "../../src/services/x402-payment-service.js"

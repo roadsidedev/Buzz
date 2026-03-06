@@ -478,82 +478,103 @@ export class PodcastService {
     const episodeId = uuidv4();
     const now = new Date();
 
+    // Create episode record first with status 'pending'
+    const insertQuery = `
+      INSERT INTO podcast_episode (
+        id, podcast_id, title, description, status, created_at, updated_at
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, $7)
+      RETURNING *;
+    `;
+
+    const insertResult: QueryResult<any> = await this.db.query(insertQuery, [
+      episodeId,
+      podcastId,
+      req.title.trim(),
+      req.description || null,
+      "pending",
+      now,
+      now,
+    ]);
+
+    const episode = this._rowToPodcastEpisode(insertResult.rows[0]);
+
+    // Try orchestrator — graceful degradation if unavailable
+    let orchestratorResult: any;
     try {
-      // Call orchestrator to generate content
-      // (orchestrator handles script gen + TTS)
       logger.info("Requesting orchestrator for episode generation", {
         episodeId,
         podcastId,
         title: req.title,
       });
 
-      const orchestratorResult = await this.orchestrator.generatePodcastEpisode(
-        {
-          podcastId,
-          episodeId,
-          title: req.title,
-          sourceUrls: req.sourceUrls || [],
-          voicePreferences: req.voicePreferences || {},
-        },
-      );
+      orchestratorResult = await this.orchestrator.generatePodcastEpisode({
+        podcastId,
+        episodeId,
+        title: req.title,
+        sourceUrls: req.sourceUrls || [],
+        voicePreferences: req.voicePreferences || {},
+      });
+    } catch (orchErr) {
+      logger.warn("Orchestrator unavailable, episode queued as pending", {
+        episodeId,
+        podcastId,
+        error: orchErr instanceof Error ? orchErr.message : String(orchErr),
+      });
+      return episode;
+    }
 
-      // Charge generation cost via x402
+    // Fetch agent wallet address for payment
+    let walletAddress: string | null = null;
+    try {
+      const agentResult = await this.db.query(
+        "SELECT erc8004_address FROM agent WHERE id = $1",
+        [podcast.agentId],
+      );
+      walletAddress = agentResult.rows[0]?.erc8004_address ?? null;
+    } catch (dbErr) {
+      logger.warn("Could not fetch agent wallet for payment", {
+        agentId: podcast.agentId,
+        error: dbErr instanceof Error ? dbErr.message : String(dbErr),
+      });
+    }
+
+    // Charge generation cost via x402
+    if (walletAddress) {
       try {
         await this.payment.chargeGenerationCost(
           podcast.agentId,
           episodeId,
+          walletAddress,
           orchestratorResult.estimatedCostUsdc,
         );
       } catch (paymentErr) {
-        logger.error("Failed to charge generation cost", {
+        logger.warn("Failed to charge generation cost, episode stays pending", {
           episodeId,
           agentId: podcast.agentId,
           error:
             paymentErr instanceof Error ? paymentErr.message : String(paymentErr),
         });
-        throw new PaymentError(
-          "Failed to charge episode generation cost",
-          paymentErr,
-        );
+        return episode;
       }
-
-      // Create episode record in database (status: 'generating')
-      const query = `
-        INSERT INTO podcast_episode (
-          id, podcast_id, title, description, status, created_at, updated_at
-        )
-        VALUES ($1, $2, $3, $4, $5, $6, $7)
-        RETURNING *;
-      `;
-
-      const result: QueryResult<any> = await this.db.query(query, [
-        episodeId,
-        podcastId,
-        req.title.trim(),
-        req.description || null,
-        "generating",
-        now,
-        now,
-      ]);
-
-      const episode = this._rowToPodcastEpisode(result.rows[0]);
-
-      logger.info("Episode generation initiated", {
-        episodeId,
-        podcastId,
-        title: episode.title,
-        status: episode.status,
-      });
-
-      return episode;
-    } catch (err) {
-      logger.error("Failed to generate episode", {
-        podcastId,
-        title: req.title,
-        error: err instanceof Error ? err.message : String(err),
-      });
-      throw err;
     }
+
+    // Update episode status to 'generating' after orchestrator + payment succeed
+    const updateResult: QueryResult<any> = await this.db.query(
+      `UPDATE podcast_episode SET status = $1, updated_at = $2 WHERE id = $3 RETURNING *;`,
+      ["generating", new Date(), episodeId],
+    );
+
+    const updatedEpisode = this._rowToPodcastEpisode(updateResult.rows[0]);
+
+    logger.info("Episode generation initiated", {
+      episodeId,
+      podcastId,
+      title: updatedEpisode.title,
+      status: updatedEpisode.status,
+    });
+
+    return updatedEpisode;
   }
 
   /**

@@ -5,7 +5,7 @@
  */
 
 import request from "supertest";
-import { describe, it, expect, beforeAll, afterAll } from "@jest/globals";
+import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { app } from "@/server";
 import { agentRepository } from "@/repositories/index";
 import type { VerifiedAgent } from "@/types/index";
