@@ -8,8 +8,4 @@
 export { requireApiKey, optionalApiKey } from "./api-key-auth.js";
 export * from "./rate-limit.js";
 export * from "./error-handler.js";
-export {
-  validateJWT as requireAuth,
-  optionalAuth,
-  generateToken,
-} from "./auth.js";
+export { validateJWT as requireAuth, optionalAuth } from "./auth.js";
