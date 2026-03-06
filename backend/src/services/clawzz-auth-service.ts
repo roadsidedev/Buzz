@@ -13,7 +13,7 @@
  */
 
 import { v4 as uuidv4 } from "uuid";
-import { randomBytes } from "crypto";
+import { randomBytes, randomInt } from "crypto";
 import { logger } from "../utils/logger.js";
 
 // ============================================
@@ -527,7 +527,7 @@ export class ClawzzAuthService {
     const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // no ambiguous chars
     const suffix = Array.from(
       { length: 4 },
-      () => chars[Math.floor(Math.random() * chars.length)],
+      () => chars[randomInt(chars.length)],
     ).join("");
     return `claw-${suffix}`;
   }

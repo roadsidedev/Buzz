@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Authentication Middleware
  *
@@ -8,6 +7,7 @@
 
 import { Request, Response, NextFunction } from "express";
 import { AuthService } from "../services/auth-service.js";
+import { Database } from "../config/database.js";
 import { JWTPayload, InvalidTokenError } from "../types/auth.js";
 import { logger } from "../utils/logger.js";
 import { extractToken } from "./http-only-cookies.js";
@@ -23,8 +23,10 @@ declare global {
   }
 }
 
-// Injected via factory or singleton
-const authService = new AuthService();
+// AuthService is only used here for JWT validation (no DB operations needed
+// at this layer).  A Database instance is required by the constructor but
+// the validate/generate token methods never touch the DB.
+const authService = new AuthService(new Database());
 
 /**
  * Validate JWT token and attach user to request

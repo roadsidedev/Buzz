@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     SERVICE_NAME: str = "ClawZz Orchestrator"
     SERVICE_VERSION: str = "0.1.0"
     ENVIRONMENT: Literal["development", "staging", "production", "test"] = "development"
-    DEBUG: bool = True
+    DEBUG: bool = False
 
     # FastAPI - Use Railway's PORT if available
     FASTAPI_HOST: str = "0.0.0.0"

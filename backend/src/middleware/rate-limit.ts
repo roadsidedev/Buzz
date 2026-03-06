@@ -109,6 +109,9 @@ export function createRateLimiter(config: RateLimitConfig) {
       res.setHeader("X-RateLimit-Reset", resetTime);
 
       if (!result.allowed) {
+        // RFC 6585 §4: Retry-After header on 429 responses
+        res.setHeader("Retry-After", resetTime);
+
         logger.warn("Rate limit exceeded", {
           key,
           limit: maxRequests,

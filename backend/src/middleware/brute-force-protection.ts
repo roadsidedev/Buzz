@@ -164,12 +164,12 @@ export function getBruteForceStatus(
  *
  * Apply to login endpoint:
  * ```typescript
- * router.post("/auth/login", bruteForcePprotection("email"), loginHandler);
+ * router.post("/auth/login", bruteForceProtection("email"), loginHandler);
  * ```
  *
  * @param identifierField - Which field to use as identifier (email, username, etc.)
  */
-export function bruteForcePprotection(identifierField: string = "email") {
+export function bruteForceProtection(identifierField: string = "email") {
   return (req: Request, res: Response, next: NextFunction): void => {
     const identifier = (req.body as any)[identifierField];
     const ip = req.ip || req.get("x-forwarded-for");
