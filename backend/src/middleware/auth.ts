@@ -140,10 +140,3 @@ export const optionalAuth = (
   }
 };
 
-/**
- * Legacy support/helper for generating tokens
- * (Move to AuthService in production)
- */
-export const generateToken = (payload: any): string => {
-  return authService.generateAccessToken(payload);
-};
