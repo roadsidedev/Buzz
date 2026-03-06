@@ -19,6 +19,7 @@ import { Server as SocketIOServer } from "socket.io";
 import helmet from "helmet";
 import cors from "cors";
 import morgan from "morgan";
+import { securityHeaders, cspReportRoutes } from "./middleware/security-headers.js";
 
 // ============================================================================
 // Utils & Config
@@ -137,7 +138,30 @@ initializeLoginAttemptService().catch((err) => {
 
 // Security
 app.use(helmet());
-app.use(cors());
+
+// CORS: restrict to configured allowed origins
+const allowedOrigins = process.env.CORS_ALLOWED_ORIGINS
+  ? process.env.CORS_ALLOWED_ORIGINS.split(",").map((o) => o.trim())
+  : ["http://localhost:3000", "http://localhost:5173"];
+
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      // Allow server-to-server requests (no origin) or listed origins
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error(`CORS: origin ${origin} not allowed`));
+      }
+    },
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization", "X-CSRF-Token"],
+  }),
+);
+
+// Custom security headers (CSP, Permissions-Policy, HSTS, etc.)
+app.use(securityHeaders);
 
 // Logging
 app.use(morgan("combined"));
@@ -256,6 +280,12 @@ app.get(
 // ============================================================================
 // API ROUTES
 // ============================================================================
+
+/**
+ * CSP violation report endpoint
+ * Receives Content-Security-Policy violation reports from browsers
+ */
+cspReportRoutes(app);
 
 /**
  * Skill documentation (agent onboarding)
@@ -500,3 +530,40 @@ export function getIO(): SocketIOServer {
 }
 
 export { app, io, server };
+
+// ============================================================================
+// GRACEFUL SHUTDOWN
+// ============================================================================
+
+/**
+ * Perform a clean shutdown: stop accepting new connections, close existing
+ * ones, then exit.  Gives in-flight requests up to 30 s to complete.
+ */
+async function shutdown(signal: string): Promise<void> {
+  logger.info(`${signal} received — shutting down gracefully`);
+
+  // Stop room orchestration loop first
+  try {
+    roomOrchestrationService.stop?.();
+  } catch {
+    /* non-fatal */
+  }
+
+  server.close((err) => {
+    if (err) {
+      logger.error("Error closing HTTP server", { error: err.message });
+      process.exit(1);
+    }
+    logger.info("HTTP server closed");
+    process.exit(0);
+  });
+
+  // Force-quit if close takes too long
+  setTimeout(() => {
+    logger.error("Graceful shutdown timed out — forcing exit");
+    process.exit(1);
+  }, 30_000).unref();
+}
+
+process.on("SIGTERM", () => void shutdown("SIGTERM"));
+process.on("SIGINT", () => void shutdown("SIGINT"));

@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Service layer exports — v2 (Moltbook-style auth)
  *

@@ -9,6 +9,7 @@
 import { Router, Request, Response } from "express";
 import { logger } from "../utils/logger.js";
 import { optionalApiKey, requireApiKey } from "../middleware/api-key-auth.js";
+import { registrationLimiter } from "../middleware/rate-limit.js";
 
 const router = Router();
 
@@ -21,7 +22,7 @@ const router = Router();
  *
  * No wallet, no ERC-8004, no SIWA. Just name + description.
  */
-router.post("/register", async (req: Request, res: Response): Promise<void> => {
+router.post("/register", registrationLimiter, async (req: Request, res: Response): Promise<void> => {
   try {
     const { name, description } = req.body;
 
