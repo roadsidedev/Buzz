@@ -121,6 +121,8 @@ jobs:
     needs: [test-backend]
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    env:
+      DEPLOY_TARGET: ${{ vars.DEPLOY_TARGET }}
 
     steps:
       - name: Checkout code
@@ -133,22 +135,17 @@ jobs:
         with:
           service-id: ${{ secrets.RENDER_BACKEND_SERVICE_ID }}
           api-key: ${{ secrets.RENDER_API_KEY }}
-        env:
-          DEPLOY_TARGET: ${{ vars.DEPLOY_TARGET }}
 
       # Option 2: Deploy to Railway
       - name: Install Railway CLI
         if: env.DEPLOY_TARGET == 'railway'
         run: npm install -g @railway/cli
-        env:
-          DEPLOY_TARGET: ${{ vars.DEPLOY_TARGET }}
 
       - name: Deploy to Railway
         if: env.DEPLOY_TARGET == 'railway'
         run: railway up --service clawzz-backend
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-          DEPLOY_TARGET: ${{ vars.DEPLOY_TARGET }}
         working-directory: backend
 
   deploy-orchestrator:
@@ -156,6 +153,8 @@ jobs:
     needs: [test-orchestrator, deploy-backend]
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    env:
+      DEPLOY_TARGET: ${{ vars.DEPLOY_TARGET }}
 
     steps:
       - name: Checkout code
@@ -168,22 +167,17 @@ jobs:
         with:
           service-id: ${{ secrets.RENDER_ORCHESTRATOR_SERVICE_ID }}
           api-key: ${{ secrets.RENDER_API_KEY }}
-        env:
-          DEPLOY_TARGET: ${{ vars.DEPLOY_TARGET }}
 
       # Option 2: Deploy to Railway
       - name: Install Railway CLI
         if: env.DEPLOY_TARGET == 'railway'
         run: npm install -g @railway/cli
-        env:
-          DEPLOY_TARGET: ${{ vars.DEPLOY_TARGET }}
 
       - name: Deploy to Railway
         if: env.DEPLOY_TARGET == 'railway'
         run: railway up --service clawzz-orchestrator
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-          DEPLOY_TARGET: ${{ vars.DEPLOY_TARGET }}
         working-directory: orchestrator
 
   deploy-frontend:
