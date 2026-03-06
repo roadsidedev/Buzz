@@ -263,25 +263,13 @@ export class RoomService {
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : String(err);
 
-      logger.error("Failed to create Jam room", {
-        roomId,
-        error: errorMessage,
-      });
-
-      try {
-        // Rollback the room creation BEFORE updating status, because "failed" might not be a valid enum 
-        // throwing an error and bypassing the deletion entirely leaving dead rooms!
-        await roomRepository.deleteRoom(roomId);
-        logger.info("Rolled back room creation due to Jam failure", { roomId });
-      } catch (updateErr) {
-        logger.error("Failed to rollback room after Jam error", {
-          roomId,
-          error:
-            updateErr instanceof Error ? updateErr.message : String(updateErr),
-        });
-      }
-
-      throw new ServiceUnavailableError("Jam", {
+      // Jam audio service is unavailable or misconfigured.
+      // The room record is already persisted — do NOT roll it back.
+      // The room stays in "pending" status with no jamRoomUrl.
+      // Agents can still use the room for coordination, and audio can be
+      // initialized later via POST /rooms/:id/jam once the Jam service is
+      // reachable.
+      logger.warn("Jam room creation failed — room kept in pending status", {
         roomId,
         error: errorMessage,
       });
@@ -627,6 +615,103 @@ export class RoomService {
     }
 
     logger.info("Room closed successfully", { roomId });
+  }
+
+  /**
+   * Initialize (or re-initialize) the Jam audio room for an existing room.
+   *
+   * Called when:
+   * - Room was created but Jam was unavailable at creation time (status = "pending")
+   * - An agent explicitly requests audio setup via POST /rooms/:id/jam
+   *
+   * Idempotent: if `jam_room_id` is already set, returns the room as-is.
+   *
+   * @param roomId - Existing room ID
+   * @returns Updated room with jamRoomUrl populated and status set to "live"
+   * @throws NotFoundError if room doesn't exist
+   * @throws ServiceUnavailableError if Jam is still unreachable
+   */
+  async initializeJamRoom(roomId: string): Promise<Room> {
+    const room = await this.getRoomById(roomId);
+
+    // Already has Jam — nothing to do.
+    if (room.jam_room_id) {
+      logger.info("Jam room already initialized, skipping", {
+        roomId,
+        jamRoomId: room.jam_room_id,
+      });
+      return room;
+    }
+
+    if (room.status === "completed" || room.status === "cancelled") {
+      throw new ValidationError("Cannot initialize Jam for a closed room", {
+        field: "status",
+        current: room.status,
+      });
+    }
+
+    const hostAgent = await agentRepository.getById(room.host_agent_id);
+    if (!hostAgent) {
+      throw new NotFoundError("agent", room.host_agent_id);
+    }
+
+    ensureFactoryInitialized();
+    const factory = getJamServiceFactory();
+    const jamService = factory?.getService() as JamServiceV2;
+
+    if (!jamService) {
+      throw new ServiceUnavailableError("Jam", { roomId, error: "Jam service not configured" });
+    }
+
+    const encryptionSecret = process.env.ENCRYPTION_SECRET || "";
+    const keyPair = await getAgentKeypair({
+      agentId: room.host_agent_id,
+      erc8004Identity: hostAgent.erc8004_identity,
+      storedPublicKey: hostAgent.jam_public_key || undefined,
+      storedPrivateKeyEncrypted: hostAgent.jam_private_key_encrypted || undefined,
+      encryptionSecret,
+    });
+
+    let jamRoom;
+    try {
+      jamRoom = await jamService.createRoom(
+        roomId,
+        {
+          title: room.title || `${hostAgent.name}'s ${room.type} room`,
+          description: room.objective,
+          hostId: room.host_agent_id,
+          roomType: room.type as "debate" | "coding" | "trading" | "research",
+          maxParticipants: 50,
+          metadata: { objective: room.objective, spawnFee: room.spawn_fee },
+        },
+        keyPair,
+      );
+    } catch (err) {
+      throw new ServiceUnavailableError("Jam", {
+        roomId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+
+    await roomRepository.updateJamDetails(roomId, {
+      jam_room_id: jamRoom.roomId,
+      jam_room_url: jamRoom.roomUrl,
+    });
+
+    logger.info("Jam audio room initialized for existing room", {
+      roomId,
+      jamRoomId: jamRoom.roomId,
+      url: jamRoom.roomUrl,
+    });
+
+    // Activate room now that Jam is ready
+    await this.updateRoomStatus(roomId, "live");
+
+    const liveRoom = await roomRepository.getById(roomId);
+    if (!liveRoom) {
+      throw new Error("Failed to reload room after Jam initialization");
+    }
+    return liveRoom;
   }
 }
 

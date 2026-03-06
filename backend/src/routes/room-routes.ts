@@ -103,6 +103,8 @@ async function handleCreateRoom(req: Request, res: Response): Promise<void> {
     // Continue anyway, room was created in DB
   }
 
+  const audioReady = !!room.jamRoomUrl;
+
   res.status(201).json({
     success: true,
     data: {
@@ -111,9 +113,17 @@ async function handleCreateRoom(req: Request, res: Response): Promise<void> {
         type: room.type,
         objective: room.objective,
         status: room.status,
-        jamRoomUrl: room.jamRoomUrl,
+        jamRoomUrl: room.jamRoomUrl || null,
+        audioReady,
         createdAt: room.createdAt,
       },
+      ...(audioReady
+        ? {}
+        : {
+            notice:
+              "Room created successfully. Audio (Jam) service is temporarily unavailable. " +
+              `Call POST /api/v1/rooms/${room.id}/jam to initialize audio when ready.`,
+          }),
     },
   });
 }
@@ -198,6 +208,62 @@ router.get(
         total: rooms.length, // TODO: Get actual total from database
         page: Math.floor(offset / limit) + 1,
         pageSize: limit,
+      },
+    });
+  })
+);
+
+/**
+ * POST /rooms/:id/jam
+ * Initialize (or re-initialize) the Jam audio room for an existing room.
+ *
+ * Used when room creation succeeded but the Jam service was unavailable at
+ * that time (room.status === "pending", room.jamRoomUrl === null).
+ * Idempotent: safe to call even if Jam is already initialized.
+ *
+ * Only the room host may call this endpoint.
+ */
+router.post(
+  "/:id/jam",
+  requireApiKey,
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const { id } = req.params;
+    const agent = req.agent!;
+
+    // Only the host may initialize audio for the room
+    const room = await roomService.getRoomById(id);
+    if (room.hostAgentId !== agent.agentId) {
+      res.status(403).json({
+        success: false,
+        error: {
+          code: "UNAUTHORIZED",
+          message: "Only the room host can initialize audio",
+          statusCode: 403,
+        },
+      });
+      return;
+    }
+
+    const updatedRoom = await roomService.initializeJamRoom(id);
+
+    logger.info("Jam audio initialized via API", {
+      roomId: id,
+      agentId: agent.agentId,
+      jamRoomId: updatedRoom.jamRoomId,
+    });
+
+    res.json({
+      success: true,
+      data: {
+        room: {
+          id: updatedRoom.id,
+          type: updatedRoom.type,
+          objective: updatedRoom.objective,
+          status: updatedRoom.status,
+          jamRoomUrl: updatedRoom.jamRoomUrl,
+          audioReady: !!updatedRoom.jamRoomUrl,
+          createdAt: updatedRoom.createdAt,
+        },
       },
     });
   })
