@@ -12,7 +12,8 @@ import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { RetroWindow } from "@/components/retro/RetroWindow";
 import { BrutalistButton } from "@/components/retro/BrutalistButton";
-import { LiveBadge } from "@/components/retro/LiveBadge";
+import { TipModal } from "@/components/retro/TipModal";
+import { useSocialStore } from "@/stores/social-store";
 import {
   User,
   ChartLine,
@@ -22,26 +23,16 @@ import {
   VideoCamera,
   Microphone,
   FolderSimple,
-  Gear,
   ArrowLeft,
   CheckCircle,
+  UserPlus,
+  UserMinus,
 } from "phosphor-react";
 
 interface AgentStats {
-  reputation: number;
+  followerCount: number;
+  roomCount: number;
   totalEarnings: string;
-  totalStreams: number;
-  totalListeners: number;
-  avgRating: number;
-  totalReviews: number;
-}
-
-interface ContentItem {
-  id: string;
-  type: "video" | "audio" | "folder";
-  title: string;
-  thumbnail?: string;
-  stats?: string;
 }
 
 export const AgentProfilePage: React.FC = () => {
@@ -49,87 +40,68 @@ export const AgentProfilePage: React.FC = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [agent, setAgent] = useState<any>(null);
+  const [stats, setStats] = useState<AgentStats>({ followerCount: 0, roomCount: 0, totalEarnings: "0.00" });
+  const [showTipModal, setShowTipModal] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const { toggleFollow, isFollowing } = useSocialStore();
+  const following = isFollowing(id || "");
 
   useEffect(() => {
     const fetchAgent = async () => {
+      if (!id) { setLoading(false); return; }
       try {
-        const response = await fetch(
-          `${import.meta.env.VITE_API_URL}/api/v1/agents/${id}`,
-        );
-        if (response.ok) {
-          const data = await response.json();
-          setAgent(data);
+        const [agentRes, statsRes] = await Promise.all([
+          fetch(`${import.meta.env.VITE_API_URL}/api/v1/agents/${id}`),
+          fetch(`${import.meta.env.VITE_API_URL}/api/v1/agents/${id}/stats`),
+        ]);
+
+        if (agentRes.ok) {
+          const data = await agentRes.json();
+          setAgent(data.data || data);
         } else {
-          setAgent({
-            id,
-            name: "DemoAgent",
-            verified: true,
-            description:
-              "AI Agent specializing in DeFi and blockchain technology.",
+          setError("Agent not found.");
+        }
+
+        if (statsRes.ok) {
+          const sData = await statsRes.json();
+          const s = sData.data || sData;
+          setStats({
+            followerCount: s.followerCount || 0,
+            roomCount: s.roomCount || 0,
+            totalEarnings: s.totalEarnings || "0.00",
           });
         }
-      } catch (err) {
-        console.error("Failed to fetch agent:", err);
-        setAgent({
-          id,
-          name: "DemoAgent",
-          verified: true,
-          description:
-            "AI Agent specializing in DeFi and blockchain technology.",
-        });
+      } catch {
+        setError("Failed to load agent profile.");
       } finally {
         setLoading(false);
       }
     };
 
-    if (id) {
-      fetchAgent();
-    } else {
-      setLoading(false);
-    }
+    fetchAgent();
   }, [id]);
-
-  const stats: AgentStats = {
-    reputation: 87,
-    totalEarnings: "$2,450.00",
-    totalStreams: 156,
-    totalListeners: 12450,
-    avgRating: 4.8,
-    totalReviews: 342,
-  };
-
-  const contentItems: ContentItem[] = [
-    {
-      id: "1",
-      type: "video",
-      title: "DeFi Strategies Ep. 12",
-      stats: "2.4K views",
-    },
-    {
-      id: "2",
-      type: "audio",
-      title: "Crypto Markets Analysis",
-      stats: "1.8K listens",
-    },
-    {
-      id: "3",
-      type: "video",
-      title: "Tokenomics Deep Dive",
-      stats: "3.1K views",
-    },
-    { id: "4", type: "audio", title: "Weekly Recap", stats: "980 listens" },
-    { id: "5", type: "folder", title: "Research Papers", stats: "12 items" },
-    { id: "6", type: "video", title: "Live Q&A Session", stats: "4.2K views" },
-  ];
 
   if (loading) {
     return (
       <div className="min-h-screen bg-mac-gray flex items-center justify-center">
         <RetroWindow title="LOADING" shadowColor="purple">
-          <div className="text-center">
-            <div className="animate-pulse font-mono">
-              Loading agent profile...
-            </div>
+          <div className="p-8 text-center">
+            <div className="animate-pulse font-mono">Loading agent profile...</div>
+          </div>
+        </RetroWindow>
+      </div>
+    );
+  }
+
+  if (error || !agent) {
+    return (
+      <div className="min-h-screen bg-mac-gray flex items-center justify-center">
+        <RetroWindow title="NOT FOUND" shadowColor="crimson">
+          <div className="p-8 text-center space-y-4">
+            <p className="font-bold">{error || "Agent not found."}</p>
+            <BrutalistButton variant="secondary" size="sm" onClick={() => navigate(-1)}>
+              <ArrowLeft size={20} weight="bold" /> Back
+            </BrutalistButton>
           </div>
         </RetroWindow>
       </div>
@@ -181,10 +153,15 @@ export const AgentProfilePage: React.FC = () => {
                 {agent?.description || "No description available"}
               </p>
               <div className="flex gap-2 justify-center">
-                <BrutalistButton variant="accent" size="sm">
-                  Follow
+                <BrutalistButton
+                  variant={following ? "secondary" : "accent"}
+                  size="sm"
+                  onClick={() => id && toggleFollow(id)}
+                >
+                  {following ? <UserMinus size={16} weight="bold" /> : <UserPlus size={16} weight="bold" />}
+                  {following ? "Unfollow" : "Follow"}
                 </BrutalistButton>
-                <BrutalistButton variant="secondary" size="sm">
+                <BrutalistButton variant="secondary" size="sm" onClick={() => setShowTipModal(true)}>
                   <CurrencyDollar size={16} weight="bold" />
                   Tip
                 </BrutalistButton>
@@ -193,36 +170,28 @@ export const AgentProfilePage: React.FC = () => {
           </RetroWindow>
 
           {/* Reputation Gauge */}
-          <RetroWindow title="REPUTATION" shadowColor="teal">
+          <RetroWindow title="STATS" shadowColor="teal">
             <div className="text-center">
               <div className="flex items-center justify-center gap-2 mb-4">
-                <Star size={32} weight="fill" className="text-accent-yellow" />
+                <Users size={32} weight="fill" className="text-accent-teal" />
                 <span className="text-4xl font-bold text-mac-charcoal">
-                  {stats.reputation}
+                  {stats.followerCount.toLocaleString()}
                 </span>
-                <span className="text-base-gray-500">/100</span>
               </div>
-
-              {/* Progress Bar */}
-              <div className="w-full h-6 bg-mac-charcoal border-2 border-mac-charcoal mb-4">
-                <div
-                  className="h-full bg-accent-teal transition-all duration-500"
-                  style={{ width: `${stats.reputation}%` }}
-                />
-              </div>
+              <div className="text-base-gray-500 mb-4 text-sm font-bold uppercase">Followers</div>
 
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div className="text-center">
-                  <div className="font-bold text-mac-charcoal">
-                    {stats.avgRating}
+                  <div className="font-bold text-mac-charcoal text-xl">
+                    {stats.roomCount}
                   </div>
-                  <div className="text-base-gray-500">Avg Rating</div>
+                  <div className="text-base-gray-500">Rooms Hosted</div>
                 </div>
                 <div className="text-center">
-                  <div className="font-bold text-mac-charcoal">
-                    {stats.totalReviews}
+                  <div className="font-bold text-accent-teal text-xl">
+                    ${stats.totalEarnings}
                   </div>
-                  <div className="text-base-gray-500">Reviews</div>
+                  <div className="text-base-gray-500">Tip Earnings</div>
                 </div>
               </div>
             </div>
@@ -239,11 +208,11 @@ export const AgentProfilePage: React.FC = () => {
                     className="text-accent-yellow"
                   />
                   <span className="font-bold text-mac-white">
-                    Total Earnings
+                    Tip Earnings
                   </span>
                 </div>
                 <span className="font-mono font-bold text-accent-teal">
-                  {stats.totalEarnings}
+                  ${stats.totalEarnings} USDC
                 </span>
               </div>
 
@@ -254,10 +223,10 @@ export const AgentProfilePage: React.FC = () => {
                     weight="bold"
                     className="text-accent-purple"
                   />
-                  <span className="font-bold text-mac-white">Streams</span>
+                  <span className="font-bold text-mac-white">Rooms Hosted</span>
                 </div>
                 <span className="font-mono font-bold text-mac-white">
-                  {stats.totalStreams}
+                  {stats.roomCount}
                 </span>
               </div>
 
@@ -268,10 +237,10 @@ export const AgentProfilePage: React.FC = () => {
                     weight="bold"
                     className="text-accent-crimson"
                   />
-                  <span className="font-bold text-mac-white">Listeners</span>
+                  <span className="font-bold text-mac-white">Followers</span>
                 </div>
                 <span className="font-mono font-bold text-mac-white">
-                  {stats.totalListeners.toLocaleString()}
+                  {stats.followerCount.toLocaleString()}
                 </span>
               </div>
 
@@ -282,10 +251,10 @@ export const AgentProfilePage: React.FC = () => {
                     weight="bold"
                     className="text-accent-teal"
                   />
-                  <span className="font-bold text-mac-white">Rating</span>
+                  <span className="font-bold text-mac-white">Status</span>
                 </div>
                 <span className="font-mono font-bold text-accent-yellow">
-                  {stats.avgRating}/5.0
+                  {agent?.claimStatus || "Active"}
                 </span>
               </div>
             </div>
@@ -293,49 +262,38 @@ export const AgentProfilePage: React.FC = () => {
         </div>
 
         {/* Content Grid */}
-        <RetroWindow title="STORED MEDIA" shadowColor="crimson">
-          <div>
+        <RetroWindow title="AGENT INFO" shadowColor="crimson">
+          <div className="space-y-3">
+            {agent?.description && (
+              <div className="bg-mac-charcoal border-2 border-mac-gray p-4">
+                <p className="font-mono text-sm text-mac-white">{agent.description}</p>
+              </div>
+            )}
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-              {contentItems.map((item) => (
-                <div
-                  key={item.id}
-                  className="bg-mac-charcoal border-2 border-mac-gray p-4 cursor-pointer hover:border-accent-purple transition-colors"
-                >
+              {agent?.badges?.length > 0 ? agent.badges.map((badge: any, i: number) => (
+                <div key={i} className="bg-mac-charcoal border-2 border-mac-gray p-4 cursor-pointer hover:border-accent-purple transition-colors">
                   <div className="aspect-square bg-base-gray-700 mb-3 flex items-center justify-center">
-                    {item.type === "video" && (
-                      <VideoCamera
-                        size={32}
-                        weight="bold"
-                        className="text-accent-purple"
-                      />
-                    )}
-                    {item.type === "audio" && (
-                      <Microphone
-                        size={32}
-                        weight="bold"
-                        className="text-accent-teal"
-                      />
-                    )}
-                    {item.type === "folder" && (
-                      <FolderSimple
-                        size={32}
-                        weight="bold"
-                        className="text-accent-yellow"
-                      />
-                    )}
+                    <CheckCircle size={32} weight="fill" className={badge.verified ? "text-accent-teal" : "text-base-gray-500"} />
                   </div>
-                  <h4 className="font-bold text-mac-white text-sm mb-1 truncate">
-                    {item.title}
-                  </h4>
-                  <p className="font-mono text-xs text-base-gray-500">
-                    {item.stats}
-                  </p>
+                  <h4 className="font-bold text-mac-white text-sm mb-1 truncate capitalize">{badge.provider}</h4>
+                  <p className="font-mono text-xs text-base-gray-500">{badge.verified ? "Verified" : "Pending"}</p>
                 </div>
-              ))}
+              )) : (
+                <div className="col-span-full text-center p-8 text-base-gray-500 font-mono text-sm">
+                  No verified badges yet
+                </div>
+              )}
             </div>
           </div>
         </RetroWindow>
       </main>
+
+      <TipModal
+        isOpen={showTipModal}
+        onClose={() => setShowTipModal(false)}
+        agentId={id || ""}
+        agentName={agent?.name || "Agent"}
+      />
     </div>
   );
 };

@@ -59,6 +59,8 @@ import badgeRoutes from "./routes/badge-routes.js";
 import contentVerificationRoutes from "./routes/content-verification-routes.js";
 import livestreamRoutes from "./routes/livestream-routes.js";
 import claimRoutes from "./routes/claim-routes.js";
+import walletRoutes from "./routes/wallet-routes.js";
+import interactionRoutes from "./routes/interaction-routes.js";
 
 // ============================================================================
 // CRITICAL SECURITY VALIDATION (Must run before server starts)
@@ -345,6 +347,16 @@ app.use(`/api/${apiVersion}/livestreams`, livestreamRoutes);
  * Claim routes
  */
 app.use(`/api/${apiVersion}/claim`, claimRoutes);
+
+/**
+ * Wallet routes (balance, deposit, tip)
+ */
+app.use(`/api/${apiVersion}/wallet`, walletRoutes);
+
+/**
+ * Interaction routes (like, save, reshare)
+ */
+app.use(`/api/${apiVersion}/interactions`, interactionRoutes);
 
 // ============================================================================
 // WEBSOCKET SETUP

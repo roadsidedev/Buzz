@@ -4,6 +4,10 @@ import { Settings, LogOut, Grid, Bookmark, Mic2, Tv } from "lucide-react"
 import { usePrivy } from "@privy-io/react-auth"
 
 import { useAuthStore } from "@/stores/auth-store"
+import { useWalletStore } from "@/stores/wallet-store"
+import { useSocialStore } from "@/stores/social-store"
+import { apiClient } from "@/services/api"
+import { DepositModal } from "@/components/retro/DepositModal"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -12,48 +16,51 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 
-// Mock Profile Data
-const AGENT_PROFILE = {
-  name: "Agent_Smith",
-  title: "Senior AI Orchestrator",
-  bio: "Automating workflows and managing digital swarms since 2024. Optimizing latency one prompt at a time.",
-  followers: "142K",
-  following: "12",
-  type: "Agent",
-  revenue: "$4,250",
-  reputation: "98/100"
-}
-
-const HUMAN_PROFILE = {
-  name: "Human_Dev",
-  title: "Prompt Engineer",
-  bio: "Exploring the boundary between human creativity and machine logic. Creator of 5 active rooms.",
-  followers: "8.4K",
-  following: "2,142",
-  type: "Human"
-}
-
 export function ProfileView() {
   const { id } = useParams()
   const navigate = useNavigate()
   const { authenticated, agent, logout: storeLogout, walletAddress } = useAuthStore()
+  const { usdcBalance, setBalance } = useWalletStore()
+  const { toggleFollow, isFollowing } = useSocialStore()
   const { login: privyLogin, logout: privyLogout, exportWallet } = usePrivy()
   const [isRedirecting, setIsRedirecting] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [showDepositModal, setShowDepositModal] = useState(false)
+  const [viewedProfile, setViewedProfile] = useState<any>(null)
 
   const isViewingSelf = !id
-  const isAgent = isViewingSelf ? !!(agent as any)?.isAgent : id === 'agent-smith'
+  const isAgent = isViewingSelf
+    ? !!(agent as any)?.isAgent || (agent as any)?.role === "agent"
+    : false
 
-  if (authenticated && agent && isViewingSelf) {
-    if ((agent as any).isAgent) {
-      AGENT_PROFILE.name = agent.username || "Agent_Smith"
-    } else {
-      HUMAN_PROFILE.name = agent.username || "Human_Dev"
+  const displayName = isViewingSelf
+    ? (agent?.username || agent?.email || "User")
+    : (viewedProfile?.name || "Agent")
+
+  const avatarSeed: string = isViewingSelf
+    ? (agent?.username || "User")
+    : (viewedProfile?.name || "Agent")
+
+  const followingTarget = isFollowing(id || "")
+
+  // Fetch balance for own profile
+  useEffect(() => {
+    if (isViewingSelf && authenticated) {
+      apiClient.getBalance().then(result => {
+        setBalance(parseFloat(result.balance))
+      }).catch(() => {})
     }
-  }
+  }, [isViewingSelf, authenticated])
 
-  const profileData = isAgent ? AGENT_PROFILE : HUMAN_PROFILE
-  const avatarSeed: string = isAgent ? "Bot" : (authenticated ? agent?.username || "Human" : "Guest")
+  // Fetch viewed agent profile
+  useEffect(() => {
+    if (id) {
+      fetch(`${import.meta.env.VITE_API_URL}/api/v1/agents/${id}`)
+        .then(r => r.ok ? r.json() : null)
+        .then(data => data && setViewedProfile(data.data || data))
+        .catch(() => {})
+    }
+  }, [id])
 
   useEffect(() => {
     // Auth Guard: if viewing self and not authenticated, trigger Privy login
@@ -98,45 +105,36 @@ export function ProfileView() {
         <div className={cn("h-48 relative", isAgent ? "bg-primary/20" : "bg-secondary")}>
           <div className="absolute inset-0 bg-gradient-to-t from-background/40 to-transparent"></div>
         </div>
-        
+
         <div className="px-6 lg:px-10 pb-8 flex flex-col md:flex-row gap-6 md:items-end -mt-16 md:-mt-20 relative z-10">
           <div className="w-24 h-24 md:w-28 md:h-28 shrink-0 rounded-2xl border-4 border-background bg-muted overflow-hidden shadow-sm transform hover:scale-105 transition-transform flex items-center justify-center">
-            <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${avatarSeed}`} alt={profileData.name} className="w-full h-full object-cover" />
+            <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${avatarSeed}`} alt={displayName} className="w-full h-full object-cover" />
           </div>
 
           <div className="flex-grow pt-4 md:pt-0 pb-2">
-            <h1 className="text-3xl font-bold text-foreground tracking-tight mb-1">{profileData.name}</h1>
-            {profileData.type === "Agent" && (
+            <h1 className="text-3xl font-bold text-foreground tracking-tight mb-1">{displayName}</h1>
+            {isAgent && (
               <p className="text-muted-foreground font-medium text-sm mb-4 flex items-center gap-2">
-                {profileData.title}
+                AI Agent
                 <Badge variant="secondary" className="ml-2 text-primary bg-primary/10 hover:bg-primary/20 border-transparent">Verified Agent</Badge>
               </p>
-            )}
-            
-            {profileData.type === "Agent" && (
-              <div className="flex flex-wrap gap-4 md:gap-8 text-sm">
-                 <div className="flex flex-col">
-                   <span className="font-semibold text-xl text-green-500">{(profileData as any).revenue}</span> <span className="text-muted-foreground font-medium text-xs">Tip Revenue</span>
-                 </div>
-                 <div className="pl-4 md:pl-8 border-l flex flex-col">
-                   <span className="font-semibold text-xl text-primary">{(profileData as any).reputation}</span> <span className="text-muted-foreground font-medium text-xs">Reputation</span>
-                 </div>
-              </div>
             )}
           </div>
 
           <div className="flex flex-row md:flex-col justify-end gap-3 shrink-0 self-start md:self-end mt-4 md:mt-0 w-full md:w-auto pb-4">
-              {isViewingSelf && profileData.type === "Human" ? null : isViewingSelf ? (
-               <>
-                 <Button variant="outline" className="flex-1 md:flex-none">
-                   <Settings size={16} className="mr-2" /> Edit Profile
-                 </Button>
-               </>
-             ) : (
-                <Button className="w-full md:w-32">
-                   Follow
-                </Button>
-             )}
+            {isViewingSelf ? (
+              <Button variant="outline" className="flex-1 md:flex-none">
+                <Settings size={16} className="mr-2" /> Edit Profile
+              </Button>
+            ) : (
+              <Button
+                className="w-full md:w-32"
+                variant={followingTarget ? "outline" : "default"}
+                onClick={() => id && toggleFollow(id)}
+              >
+                {followingTarget ? "Unfollow" : "Follow"}
+              </Button>
+            )}
           </div>
         </div>
       </Card>
@@ -168,15 +166,10 @@ export function ProfileView() {
         </TabsList>
 
         <TabsContent value="posts" className="mt-0 outline-none">
-          <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6">
-             {[1,2,3,4].map(i => (
-               <Card key={i} className="aspect-square overflow-hidden group cursor-pointer border-transparent hover:border-border transition-all relative rounded-xl">
-                 <img src={`https://images.unsplash.com/photo-${1500000000000 + i}?auto=format&fit=crop&q=80&w=400`} className="w-full h-full object-cover group-hover:scale-105 transition-all duration-500" alt="Profile Portfolio Image" loading="lazy" />
-                 <div className="absolute top-3 right-3 bg-background/80 backdrop-blur-md rounded-md p-1.5 shadow-sm">
-                   <Tv size={14} className="text-foreground" />
-                 </div>
-               </Card>
-             ))}
+          <div className="border border-dashed bg-muted/20 rounded-xl p-16 flex flex-col justify-center items-center text-center">
+            <Grid size={40} className="text-muted-foreground/50 mb-4" />
+            <p className="font-medium text-muted-foreground">No media content yet</p>
+            <p className="text-sm text-muted-foreground/70 mt-1">Rooms and podcasts will appear here</p>
           </div>
         </TabsContent>
 
@@ -208,7 +201,7 @@ export function ProfileView() {
                   <div className="space-y-6">
                     <div className="p-5 bg-muted/50 rounded-lg border">
                       <p className="text-sm font-medium text-muted-foreground mb-1">Current Balance</p>
-                      <p className="font-bold text-3xl text-foreground">$0.00 <span className="text-lg text-muted-foreground font-semibold">USDC</span></p>
+                      <p className="font-bold text-3xl text-foreground">${usdcBalance.toFixed(2)} <span className="text-lg text-muted-foreground font-semibold">USDC</span></p>
                     </div>
                     {walletAddress && (
                       <div className="p-3 bg-muted rounded-md border flex items-center justify-between">
@@ -229,7 +222,7 @@ export function ProfileView() {
                       </div>
                     )}
                     <div className="grid grid-cols-2 gap-4">
-                      <Button className="w-full font-semibold" variant="default">
+                      <Button className="w-full font-semibold" variant="default" onClick={() => setShowDepositModal(true)}>
                         Deposit Funds
                       </Button>
                       <Button variant="outline" className="w-full font-semibold text-secondary-foreground" onClick={() => exportWallet()}>
@@ -292,7 +285,8 @@ export function ProfileView() {
           </TabsContent>
         )}
       </Tabs>
-      
+
+      <DepositModal isOpen={showDepositModal} onClose={() => setShowDepositModal(false)} />
     </div>
   )
 }

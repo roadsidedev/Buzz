@@ -8,7 +8,7 @@
  * - Join live session button
  */
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { RetroWindow } from "@/components/retro/RetroWindow";
 import { BrutalistButton } from "@/components/retro/BrutalistButton";
@@ -36,50 +36,53 @@ export const RoomPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [room, setRoom] = useState<RoomDetails | null>(null);
+  const [participants, setParticipants] = useState<StoryAgent[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [linkCopied, setLinkCopied] = useState(false);
+
+  const handleCopyLink = useCallback(() => {
+    navigator.clipboard.writeText(window.location.href);
+    setLinkCopied(true);
+    setTimeout(() => setLinkCopied(false), 2000);
+  }, []);
 
   useEffect(() => {
     const fetchRoom = async () => {
       setLoading(true);
+      setError(null);
       try {
         const response = await fetch(
           `${import.meta.env.VITE_API_URL}/api/v1/rooms/${id}`,
         );
         if (response.ok) {
           const data = await response.json();
-          setRoom(data);
+          const roomData = data.data || data;
+          setRoom(roomData);
+
+          // Fetch real participants
+          try {
+            const participantsRes = await fetch(
+              `${import.meta.env.VITE_API_URL}/api/v1/rooms/${id}/participants`,
+            );
+            if (participantsRes.ok) {
+              const pData = await participantsRes.json();
+              const pList = pData.data?.participants || pData.participants || [];
+              setParticipants(pList.map((p: any) => ({
+                id: p.id || p.agentId,
+                name: p.name || p.username || "Agent",
+                isLive: roomData.status === "live",
+                viewerCount: p.viewerCount || 0,
+              })));
+            }
+          } catch {
+            // Participants are optional — no error shown
+          }
         } else {
-          // Demo data for when API is not available
-          setRoom({
-            id: id || "demo",
-            title: "DeFi Alpha Session",
-            objective: "Analyze Q1 agent trends and discuss DeFi protocols",
-            status: "live",
-            hostAgent: {
-              id: "defi-alpha",
-              name: "DEFI_ALPHA",
-            },
-            participantCount: 3,
-            viewerCount: 1240,
-            category: "CRYPTO",
-            createdAt: new Date().toISOString(),
-          });
+          setError("Room not found or unavailable.");
         }
-      } catch (err) {
-        setRoom({
-          id: id || "demo",
-          title: "DeFi Alpha Session",
-          objective: "Analyze Q1 agent trends and discuss DeFi protocols",
-          status: "live",
-          hostAgent: {
-            id: "defi-alpha",
-            name: "DEFI_ALPHA",
-          },
-          participantCount: 3,
-          viewerCount: 1240,
-          category: "CRYPTO",
-          createdAt: new Date().toISOString(),
-        });
+      } catch {
+        setError("Unable to load room. Please check your connection.");
       } finally {
         setLoading(false);
       }
@@ -87,12 +90,6 @@ export const RoomPage: React.FC = () => {
 
     fetchRoom();
   }, [id]);
-
-  const demoAgents: StoryAgent[] = [
-    { id: "1", name: "DEFI_ALPHA", isLive: true, viewerCount: 840 },
-    { id: "2", name: "CRYPTOBOT", isLive: true, viewerCount: 320 },
-    { id: "3", name: "TOKENLOGIC", isLive: false },
-  ];
 
   if (loading) {
     return (
@@ -102,6 +99,22 @@ export const RoomPage: React.FC = () => {
             <div className="animate-pulse font-bold text-lg">
               Fetching room data...
             </div>
+          </div>
+        </RetroWindow>
+      </div>
+    );
+  }
+
+  if (error || !room) {
+    return (
+      <div className="min-h-screen bg-mac-gray p-4 flex items-center justify-center">
+        <RetroWindow title="ROOM NOT FOUND" shadowColor="crimson">
+          <div className="p-8 text-center space-y-4">
+            <p className="font-bold text-lg">{error || "This room does not exist."}</p>
+            <BrutalistButton variant="secondary" onClick={() => navigate(-1)}>
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Go Back
+            </BrutalistButton>
           </div>
         </RetroWindow>
       </div>
@@ -220,9 +233,9 @@ export const RoomPage: React.FC = () => {
                 Join Live
               </BrutalistButton>
 
-              <BrutalistButton variant="secondary" className="w-full">
+              <BrutalistButton variant="secondary" className="w-full" onClick={handleCopyLink}>
                 <Hash className="w-4 h-4 mr-2" />
-                Copy Link
+                {linkCopied ? "Copied!" : "Copy Link"}
               </BrutalistButton>
             </div>
           </div>
@@ -230,7 +243,13 @@ export const RoomPage: React.FC = () => {
 
         {/* Participants */}
         <RetroWindow title="PARTICIPANTS" shadowColor="teal">
-          <StoriesRow agents={demoAgents} />
+          {participants.length > 0 ? (
+            <StoriesRow agents={participants} />
+          ) : (
+            <div className="p-6 text-center text-sm font-bold text-gray-500 uppercase">
+              No participants yet
+            </div>
+          )}
         </RetroWindow>
       </main>
     </div>

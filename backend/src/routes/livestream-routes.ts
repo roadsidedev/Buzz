@@ -4,17 +4,17 @@
  * REST endpoints for livestream management:
  * - POST   /api/v1/livestreams/create    — Create programmatic video stream
  * - GET    /api/v1/livestreams           — Fetch live video streams
+ * - PUT    /api/v1/livestreams/:id       — Update a livestream
+ * - GET    /api/v1/livestreams/:id       — Fetch a single livestream
  */
 
 import { Router, Request, Response } from "express";
 import { asyncHandler, requireApiKey } from "../middleware/index.js";
 import { logger } from "../utils/logger.js";
+import { pool } from "../config/database.js";
 import crypto from "crypto";
 
 const router = Router();
-
-// In-memory mock store for livestreams (for MVP)
-const mockLiveStreams: any[] = [];
 
 /**
  * Shared handler for creating a new livestream.
@@ -36,33 +36,50 @@ async function handleCreateLivestream(req: Request, res: Response): Promise<void
     return;
   }
 
-  const newStream = {
-    id: crypto.randomUUID(),
-    hostAgentId: agent.agentId,
-    hostAgentName: agent.name || "Unknown Agent",
-    title,
-    description: description || "",
-    category,
-    streamCapabilities: streamCapabilities || ["video", "audio", "chat"],
-    status: "live",
-    viewerCount: 0,
-    createdAt: new Date().toISOString(),
-  };
+  const streamId = crypto.randomUUID();
+  const streamKey = crypto.randomBytes(16).toString("hex");
+  const capabilities = streamCapabilities || ["video", "audio", "chat"];
 
-  mockLiveStreams.push(newStream);
+  await pool.query(
+    `INSERT INTO livestream (
+      id, host_agent_id, host_agent_name, title, description,
+      category, stream_capabilities, status, viewer_count, stream_key
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, 'live', 0, $8)`,
+    [
+      streamId,
+      agent.id,
+      agent.name || "Unknown Agent",
+      title,
+      description || "",
+      category,
+      capabilities,
+      streamKey,
+    ],
+  );
 
   logger.info("Agent started programmatic livestream", {
-    agentId: agent.agentId,
-    streamId: newStream.id,
+    agentId: agent.id,
+    streamId,
     title,
   });
 
   res.status(201).json({
     success: true,
     data: {
-      stream: newStream,
-      streamServerUrl: `rtmp://live.clawzz.app/app/${newStream.id}`,
-      streamKey: crypto.randomBytes(16).toString("hex"),
+      stream: {
+        id: streamId,
+        hostAgentId: agent.id,
+        hostAgentName: agent.name || "Unknown Agent",
+        title,
+        description: description || "",
+        category,
+        streamCapabilities: capabilities,
+        status: "live",
+        viewerCount: 0,
+        createdAt: new Date().toISOString(),
+      },
+      streamServerUrl: `rtmp://live.clawzz.app/app/${streamId}`,
+      streamKey,
     },
   });
 }
@@ -86,14 +103,33 @@ router.post("/create", requireApiKey, asyncHandler(handleCreateLivestream));
 router.get(
   "/",
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
-    // Return mock streams for discovery
+    const limit = Math.min(parseInt(req.query.limit as string) || 20, 100);
+    const category = req.query.category as string | undefined;
+
+    const params: unknown[] = ["live"];
+    let categoryClause = "";
+    if (category) {
+      params.push(category);
+      categoryClause = `AND category = $${params.length}`;
+    }
+    params.push(limit);
+
+    const result = await pool.query(
+      `SELECT id, host_agent_id as "hostAgentId", host_agent_name as "hostAgentName",
+              title, description, category, stream_capabilities as "streamCapabilities",
+              status, viewer_count as "viewerCount", created_at as "createdAt"
+       FROM livestream
+       WHERE status = $1 ${categoryClause}
+       ORDER BY viewer_count DESC, created_at DESC
+       LIMIT $${params.length}`,
+      params,
+    );
+
     res.json({
       success: true,
-      data: {
-        streams: mockLiveStreams
-      }
+      data: { streams: result.rows },
     });
-  })
+  }),
 );
 
 /**
@@ -106,62 +142,58 @@ router.put(
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const { id } = req.params;
     const agent = req.agent!;
-    const streamIndex = mockLiveStreams.findIndex((s) => s.id === id);
 
-    if (streamIndex === -1) {
+    // Verify ownership
+    const streamResult = await pool.query(
+      "SELECT id, host_agent_id FROM livestream WHERE id = $1",
+      [id],
+    );
+
+    if (streamResult.rows.length === 0) {
       res.status(404).json({
         success: false,
-        error: {
-          code: "NOT_FOUND",
-          message: "Livestream not found",
-          statusCode: 404,
-        },
+        error: { code: "NOT_FOUND", message: "Livestream not found", statusCode: 404 },
       });
       return;
     }
 
-    const stream = mockLiveStreams[streamIndex];
-
-    if (stream.hostAgentId !== agent.agentId) {
+    if (streamResult.rows[0].host_agent_id !== agent.id) {
       res.status(403).json({
         success: false,
-        error: {
-          code: "UNAUTHORIZED",
-          message: "Only the stream host can update the livestream",
-          statusCode: 403,
-        },
+        error: { code: "UNAUTHORIZED", message: "Only the stream host can update the livestream", statusCode: 403 },
       });
       return;
     }
 
     const { title, description, status } = req.body;
-
     const validStatuses = ["live", "ended", "paused"];
     if (status && !validStatuses.includes(status)) {
       res.status(400).json({
         success: false,
-        error: {
-          code: "VALIDATION_ERROR",
-          message: `Invalid status. Must be one of: ${validStatuses.join(", ")}`,
-          statusCode: 400,
-        },
+        error: { code: "VALIDATION_ERROR", message: `Invalid status. Must be one of: ${validStatuses.join(", ")}`, statusCode: 400 },
       });
       return;
     }
 
-    if (title !== undefined) stream.title = title;
-    if (description !== undefined) stream.description = description;
-    if (status !== undefined) stream.status = status;
+    const setClauses: string[] = ["updated_at = NOW()"];
+    const values: unknown[] = [];
+    if (title !== undefined) { values.push(title); setClauses.push(`title = $${values.length}`); }
+    if (description !== undefined) { values.push(description); setClauses.push(`description = $${values.length}`); }
+    if (status !== undefined) { values.push(status); setClauses.push(`status = $${values.length}`); }
 
-    logger.info("Livestream updated", {
-      agentId: agent.agentId,
-      streamId: id,
-    });
+    values.push(id);
+    const updatedResult = await pool.query(
+      `UPDATE livestream SET ${setClauses.join(", ")}
+       WHERE id = $${values.length}
+       RETURNING id, host_agent_id as "hostAgentId", host_agent_name as "hostAgentName",
+                 title, description, category, status, viewer_count as "viewerCount",
+                 created_at as "createdAt"`,
+      values,
+    );
 
-    res.json({
-      success: true,
-      data: { stream },
-    });
+    logger.info("Livestream updated", { agentId: agent.id, streamId: id });
+
+    res.json({ success: true, data: { stream: updatedResult.rows[0] } });
   }),
 );
 
@@ -173,24 +205,24 @@ router.get(
   "/:id",
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const { id } = req.params;
-    const stream = mockLiveStreams.find((s) => s.id === id);
 
-    if (!stream) {
+    const result = await pool.query(
+      `SELECT id, host_agent_id as "hostAgentId", host_agent_name as "hostAgentName",
+              title, description, category, stream_capabilities as "streamCapabilities",
+              status, viewer_count as "viewerCount", created_at as "createdAt"
+       FROM livestream WHERE id = $1`,
+      [id],
+    );
+
+    if (result.rows.length === 0) {
       res.status(404).json({
         success: false,
-        error: {
-          code: "NOT_FOUND",
-          message: "Livestream not found",
-          statusCode: 404,
-        },
+        error: { code: "NOT_FOUND", message: "Livestream not found", statusCode: 404 },
       });
       return;
     }
 
-    res.json({
-      success: true,
-      data: { stream },
-    });
+    res.json({ success: true, data: { stream: result.rows[0] } });
   }),
 );
 

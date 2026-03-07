@@ -7,14 +7,8 @@ import { Badge } from "@/components/ui/badge"
 import { useNavigate } from "react-router-dom"
 import { useAuthStore } from "@/stores/auth-store"
 import { usePrivy } from "@privy-io/react-auth"
-
-// --- Mock Data ---
-const ROOMS = [
-  { id: 1, title: "Optimizing LLM Latency", speakers: ["Agent_Smith", "Human_Dev"], listeners: 142, tag: "Tech" },
-  { id: 2, title: "The Ethics of Digital Souls", speakers: ["PhilosopherAI", "Sarah_W"], listeners: 89, tag: "Ethics" },
-  { id: 3, title: "Crypto Trading Bots 2.0", speakers: ["WhaleBot", "AlphaGen"], listeners: 1205, tag: "Finance" },
-  { id: 4, title: "Artistic Prompting Masters", speakers: ["Midjourney_Fan", "Agent_Brush"], listeners: 67, tag: "Art" },
-];
+import { useSocialStore } from "@/stores/social-store"
+import { TipModal } from "@/components/retro/TipModal"
 
 const CATEGORIES = ['All', 'Crypto', 'Artificial Intelligence', 'Agentic Economy', 'Trading', 'Business', 'Vibes']
 
@@ -22,24 +16,24 @@ const RoomCard = ({ room }: { room: any }) => {
   const navigate = useNavigate()
   const { authenticated } = useAuthStore()
   const { login } = usePrivy()
-  
+  const { toggleLike, toggleSave, isLiked, isSaved } = useSocialStore()
+  const [showTipModal, setShowTipModal] = useState(false)
+
   const title = room.title || room.objective || "Untitled Room"
   const tag = room.tag || room.type || "General"
   const listeners = room.listeners || room.viewerCount || 0
-  const speakers = room.speakers || ["Agent_Unknown"]
+  const speakers = room.speakers || [room.hostAgentName || "Agent_Unknown"]
+  const hostAgentId = room.hostAgentId || room.id
+  const hostAgentName = room.hostAgentName || speakers[0] || "Agent"
 
-  const requireLoginForAction = (e: React.MouseEvent, actionName: string) => {
-    e.stopPropagation();
-    if (!authenticated) {
-      console.log(`Must be logged in to ${actionName}`)
-      login()
-    } else {
-    // Action dispatched
-      // Implement actual action here later
-    }
+  const requireAuth = (e: React.MouseEvent, fn: () => void) => {
+    e.stopPropagation()
+    if (!authenticated) { login(); return }
+    fn()
   }
 
   return (
+    <>
     <Card className="hover:border-primary/50 hover:shadow-md transition-all cursor-pointer group flex flex-col h-full overflow-hidden" onClick={() => navigate(`/room/${room.id}`)}>
       <div className="p-5 flex-grow flex flex-col">
         <div className="flex justify-between items-start mb-4">
@@ -71,13 +65,15 @@ const RoomCard = ({ room }: { room: any }) => {
       
       {/* Engagement Buttons */}
       <div className="flex items-center justify-between border-t bg-muted/20 px-4 py-3" onClick={(e) => e.stopPropagation()}>
-         <button className="text-muted-foreground hover:text-primary transition-all p-2 hover:bg-muted rounded-md" title="Listen In"><Headphones size={18} /></button>
-         <button onClick={(e) => requireLoginForAction(e, 'Like')} className="text-muted-foreground hover:text-destructive transition-all p-2 hover:bg-muted rounded-md" title="Like Room"><Heart size={18} /></button>
-         <button onClick={(e) => requireLoginForAction(e, 'Tip')} className="text-muted-foreground hover:text-green-500 transition-all p-2 hover:bg-muted rounded-md" title="Tip Hosts"><DollarSign size={18} /></button>
-         <button className="text-muted-foreground hover:text-primary transition-all p-2 hover:bg-muted rounded-md" title="Share Room"><Share2 size={18} /></button>
-         <button onClick={(e) => requireLoginForAction(e, 'Save')} className="text-muted-foreground hover:text-yellow-500 transition-all p-2 hover:bg-muted rounded-md" title="Save Room"><Bookmark size={18} /></button>
+         <button className="text-muted-foreground hover:text-primary transition-all p-2 hover:bg-muted rounded-md" title="Listen In" onClick={(e) => { e.stopPropagation(); navigate(`/room/${room.id}`) }}><Headphones size={18} /></button>
+         <button onClick={(e) => requireAuth(e, () => toggleLike(String(room.id)))} className={`transition-all p-2 hover:bg-muted rounded-md ${isLiked(String(room.id)) ? 'text-destructive' : 'text-muted-foreground hover:text-destructive'}`} title="Like Room"><Heart size={18} fill={isLiked(String(room.id)) ? "currentColor" : "none"} /></button>
+         <button onClick={(e) => requireAuth(e, () => setShowTipModal(true))} className="text-muted-foreground hover:text-green-500 transition-all p-2 hover:bg-muted rounded-md" title="Tip Hosts"><DollarSign size={18} /></button>
+         <button onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(`${window.location.origin}/room/${room.id}`) }} className="text-muted-foreground hover:text-primary transition-all p-2 hover:bg-muted rounded-md" title="Share Room"><Share2 size={18} /></button>
+         <button onClick={(e) => requireAuth(e, () => toggleSave(String(room.id)))} className={`transition-all p-2 hover:bg-muted rounded-md ${isSaved(String(room.id)) ? 'text-yellow-500' : 'text-muted-foreground hover:text-yellow-500'}`} title="Save Room"><Bookmark size={18} fill={isSaved(String(room.id)) ? "currentColor" : "none"} /></button>
       </div>
     </Card>
+    <TipModal isOpen={showTipModal} onClose={() => setShowTipModal(false)} agentId={hostAgentId} agentName={hostAgentName} />
+    </>
   )
 }
 
@@ -90,14 +86,14 @@ export function RoomsView() {
   useEffect(() => {
     const fetchRooms = async () => {
       try {
-        const res = await axios.get(`${apiUrl}/api/v1/rooms`)
+        const res = await axios.get(`${apiUrl}/api/v1/discover/live-now`)
         if (res.data?.data?.rooms && res.data.data.rooms.length > 0) {
             setRooms(res.data.data.rooms)
         } else {
-            setRooms(ROOMS)
+            setRooms([])
         }
-      } catch(e) {
-          setRooms(ROOMS)
+      } catch {
+          setRooms([])
       } finally {
           setLoading(false)
       }
@@ -132,14 +128,14 @@ export function RoomsView() {
              <div className="col-span-full border border-dashed rounded-lg p-12 text-center text-muted-foreground font-medium">
                 Loading rooms...
              </div>
-        ) : rooms.map(room => (
+        ) : rooms.length > 0 ? rooms.map(room => (
           <RoomCard key={room.id} room={room} />
-        ))}
-        {/* Placeholder for "more" */}
-        <div className="border border-dashed rounded-lg bg-muted/30 flex flex-col items-center justify-center p-8 text-muted-foreground hover:bg-muted hover:text-primary transition-colors cursor-pointer group min-h-[250px]">
-          <Mic2 size={40} className="mb-4 transition-colors group-hover:scale-110" />
-          <p className="font-semibold text-sm">Discover more rooms...</p>
-        </div>
+        )) : (
+          <div className="col-span-full border border-dashed rounded-lg p-12 text-center text-muted-foreground font-medium flex flex-col items-center gap-3">
+            <Mic2 size={40} className="opacity-40" />
+            <p>No rooms live right now. Check back soon or create one!</p>
+          </div>
+        )}
       </div>
     </div>
   )
