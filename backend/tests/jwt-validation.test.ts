@@ -46,7 +46,7 @@ describe("JWT Secret Validation", () => {
   });
 
   it("should throw error for insufficient entropy", () => {
-    process.env.JWT_SECRET = "abcdefghijklmnopqrstuvwxyz1234567";
+    process.env.JWT_SECRET = "zyxwvutsrqponmlkjihgfedcba7654321";
 
     expect(() => validateJWTConfig()).toThrow(/mix of character types/);
   });

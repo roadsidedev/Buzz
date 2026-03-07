@@ -782,6 +782,78 @@ export class X402PaymentService {
   }
 
   /**
+   * Refund a payment — marks payment as refunded
+   */
+  async refundPayment(paymentId: string, _reason?: string): Promise<boolean> {
+    logger.info("Refunding payment", { paymentId });
+    await this._updatePaymentStatus(paymentId, PaymentStatus.REFUNDED);
+    return true;
+  }
+
+  /**
+   * Issue a refund for a payment (idempotent — no-op if already refunded)
+   */
+  async issueRefund(paymentId: string, _reason?: string): Promise<void> {
+    const payment = await this._getPaymentFromDatabase(paymentId);
+
+    if (!payment) {
+      throw new X402Error("Payment not found", "PAYMENT_NOT_FOUND", {
+        paymentId,
+      });
+    }
+
+    if (payment.status === PaymentStatus.REFUNDED) {
+      logger.info("Payment already refunded, skipping", { paymentId });
+      return;
+    }
+
+    if (payment.status === PaymentStatus.CONFIRMED) {
+      throw new X402Error(
+        `Cannot refund payment with status ${payment.status}`,
+        "REFUND_NOT_ALLOWED",
+        { paymentId, status: payment.status },
+      );
+    }
+
+    await this._updatePaymentStatus(paymentId, PaymentStatus.REFUNDED);
+    logger.info("Payment refunded", { paymentId });
+  }
+
+  /**
+   * Auto-refund expired pending payments
+   */
+  async refundExpiredPayments(expiryMinutes: number): Promise<number> {
+    try {
+      const sql = `
+        SELECT * FROM payment
+        WHERE status = $1
+        AND created_at < NOW() - INTERVAL '${expiryMinutes} minutes'
+      `;
+
+      const expiredPayments = await query(sql, [PaymentStatus.PENDING]);
+
+      let refundedCount = 0;
+      for (const row of expiredPayments) {
+        try {
+          await this._updatePaymentStatus(row.id, PaymentStatus.REFUNDED);
+          refundedCount++;
+        } catch (err) {
+          logger.error("Failed to refund expired payment", {
+            id: row.id,
+            error: err,
+          });
+        }
+      }
+
+      logger.info("Expired payments auto-refunded", { count: refundedCount });
+      return refundedCount;
+    } catch (err) {
+      logger.error("Error during expired payment refund job", { error: err });
+      return 0;
+    }
+  }
+
+  /**
    * Get total revenue for a room
    */
   async getRoomRevenue(roomId: string): Promise<bigint> {

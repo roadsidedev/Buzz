@@ -10,6 +10,16 @@ import crypto from "crypto";
 import { getJamWebhookHandler } from "../src/services/jam-webhook-handler.js";
 import { getJamService } from "../src/services/jam-service.js";
 
+// Mock room-service to prevent real DB calls during webhook processing
+vi.mock("../src/services/room-service.js", () => ({
+  roomService: {
+    updateRoomStatus: vi.fn().mockResolvedValue(undefined),
+    closeRoom: vi.fn().mockResolvedValue(undefined),
+    addParticipant: vi.fn().mockResolvedValue(undefined),
+    removeParticipant: vi.fn().mockResolvedValue(undefined),
+  },
+}));
+
 describe("JamWebhookHandler", () => {
   beforeEach(() => {
     process.env.JAM_WEBHOOK_SECRET = "test-webhook-secret";
