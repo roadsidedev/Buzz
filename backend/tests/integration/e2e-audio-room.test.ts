@@ -33,31 +33,77 @@ import {
 const mockFetch = vi.fn();
 global.fetch = mockFetch;
 
-// Mock WebSocket
-class MockWebSocket {
-  static CONNECTING = 0;
-  static OPEN = 1;
-  static CLOSING = 2;
-  static CLOSED = 3;
+// Mock WebSocket classes defined in vi.hoisted so they are available to vi.mock factories
+const { MockWebSocket, FailingWebSocket, wsImpl } = vi.hoisted(() => {
+  class MockWebSocket {
+    static CONNECTING = 0;
+    static OPEN = 1;
+    static CLOSING = 2;
+    static CLOSED = 3;
 
-  readyState = MockWebSocket.OPEN;
-  onopen: (() => void) | null = null;
-  onerror: ((error: Error) => void) | null = null;
-  onclose: (() => void) | null = null;
-  onmessage: ((data: { data: string }) => void) | null = null;
+    readyState = 1; // OPEN
+    // DOM-style handlers
+    onopen: (() => void) | null = null;
+    onerror: ((error: Error) => void) | null = null;
+    onclose: (() => void) | null = null;
+    onmessage: ((data: { data: string }) => void) | null = null;
 
-  constructor(url: string) {
-    setTimeout(() => this.onopen?.(), 0);
+    // EventEmitter-style (used by jam-service-v2.ts via ws.on("open", ...))
+    private _listeners: Record<string, Array<(...args: any[]) => void>> = {};
+    protected _shouldOpen = true;
+
+    constructor(_url: string) {
+      setTimeout(() => {
+        if (!this._shouldOpen) return;
+        this._listeners["open"]?.forEach((fn) => fn());
+        this.onopen?.();
+      }, 0);
+    }
+
+    on(event: string, listener: (...args: any[]) => void) {
+      if (!this._listeners[event]) this._listeners[event] = [];
+      this._listeners[event].push(listener);
+      return this;
+    }
+
+    off(event: string, listener: (...args: any[]) => void) {
+      if (this._listeners[event]) {
+        this._listeners[event] = this._listeners[event].filter(
+          (fn) => fn !== listener,
+        );
+      }
+      return this;
+    }
+
+    emit(event: string, ...args: any[]) {
+      this._listeners[event]?.forEach((fn) => fn(...args));
+    }
+
+    send(_data: string) {}
+    close() {
+      this.readyState = MockWebSocket.CLOSED;
+      this._listeners["close"]?.forEach((fn) => fn());
+      this.onclose?.();
+    }
   }
 
-  send(data: string) {}
-  close() {
-    this.readyState = MockWebSocket.CLOSED;
-    this.onclose?.();
+  class FailingWebSocket extends MockWebSocket {
+    constructor(url: string) {
+      super(url);
+      this._shouldOpen = false; // Prevent "open" event from firing
+      setTimeout(() => {
+        const err = new Error("Connection refused");
+        this.emit("error", err);
+        this.onerror?.(err);
+      }, 0);
+    }
   }
-}
 
-vi.mock("ws", () => ({ default: MockWebSocket }));
+  const wsImpl = { current: MockWebSocket as any };
+  return { MockWebSocket, FailingWebSocket, wsImpl };
+});
+
+vi.mock("ws", () => ({ get default() { return wsImpl.current; } }));
 
 // Mock ioredis
 const mockRedis = {
@@ -287,21 +333,15 @@ describe("E2E: Audio Room Flow", () => {
     });
 
     it("should handle WebSocket connection failure", async () => {
-      // Mock WebSocket that fails to connect
-      class FailingWebSocket extends MockWebSocket {
-        constructor(url: string) {
-          super(url);
-          setTimeout(() => {
-            this.onerror?.(new Error("Connection refused"));
-          }, 0);
-        }
+      // Switch to FailingWebSocket for this test
+      wsImpl.current = FailingWebSocket;
+      try {
+        await expect(
+          service.connectAgent("fail-room", hostKeypair),
+        ).rejects.toThrow();
+      } finally {
+        wsImpl.current = MockWebSocket;
       }
-
-      vi.mock("ws", () => ({ default: FailingWebSocket }));
-
-      await expect(
-        service.connectAgent("fail-room", hostKeypair),
-      ).rejects.toThrow();
     });
   });
 

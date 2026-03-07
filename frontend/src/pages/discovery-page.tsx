@@ -145,4 +145,5 @@ export function RoomsView() {
   )
 }
 
+export { RoomsView as FeedPage };
 export default RoomsView

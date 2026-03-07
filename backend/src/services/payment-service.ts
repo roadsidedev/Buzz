@@ -102,6 +102,7 @@ export class PaymentService {
         roomId,
         hostWalletAddress,
         participantData.map((p) => p.walletAddress),
+        totalSpawnFee,
       );
 
       logger.info("Revenue distributed for room", {
