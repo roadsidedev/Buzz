@@ -111,6 +111,44 @@ router.post(
 );
 
 /**
+ * GET /api/v1/podcasts/trending
+ * Get trending podcasts (global discovery) — must be before /:id to avoid shadowing
+ *
+ * Cached at Redis level (5 min TTL)
+ *
+ * Query params:
+ *   - limit?: number (default 20, max 100)
+ *   - category?: string — tech, finance, creative, dev, research, other
+ */
+router.get(
+  "/trending",
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const limit = Math.min(parseInt(req.query.limit as string) || 20, 100);
+    const category = (req.query.category as string) || undefined;
+
+    await cache.initialize();
+    const cacheKey = `trending:podcasts:${category || "all"}:${limit}`;
+
+    let cached = false;
+    let podcasts: Podcast[] | null = await cache.get<Podcast[]>(cacheKey);
+
+    if (podcasts) {
+      cached = true;
+      logger.info("Trending podcasts served from cache", { cacheKey, count: podcasts.length });
+    } else {
+      podcasts = await podcastService.getTrendingPodcasts(limit, category);
+      await cache.set(cacheKey, podcasts, 300);
+      logger.info("Trending podcasts cached", { cacheKey, count: podcasts.length, ttl: 300 });
+    }
+
+    res.json({
+      success: true,
+      data: { podcasts, category, limit, cached },
+    });
+  }),
+);
+
+/**
  * GET /api/v1/podcasts/:id
  * Fetch podcast by ID
  *
@@ -520,76 +558,6 @@ router.post(
       data: {
         episode: updated,
         summary,
-      },
-    });
-  }),
-);
-
-// ===================================================================
-// Discovery Endpoints
-// ===================================================================
-
-/**
- * GET /api/v1/podcasts/trending
- * Get trending podcasts (global discovery)
- *
- * Cached at Redis level (5 min TTL)
- *
- * Query params:
- *   - limit?: number (default 20, max 100)
- *   - category?: string — tech, finance, creative, dev, research, other
- *
- * Response: 200 OK
- *   {
- *     success: true,
- *     data: {
- *       podcasts: Podcast[],
- *       category?: string,
- *       limit: number,
- *       cached?: boolean
- *     }
- *   }
- */
-router.get(
-  "/trending",
-  asyncHandler(async (req: Request, res: Response): Promise<void> => {
-    const limit = Math.min(parseInt(req.query.limit as string) || 20, 100);
-    const category = (req.query.category as string) || undefined;
-
-    // Initialize cache and check for cached result
-    await cache.initialize();
-    const cacheKey = `trending:podcasts:${category || "all"}:${limit}`;
-    
-    let cached = false;
-    let podcasts: Podcast[] | null = await cache.get<Podcast[]>(cacheKey);
-    
-    if (podcasts) {
-      cached = true;
-      logger.info("Trending podcasts served from cache", {
-        cacheKey,
-        count: podcasts.length,
-      });
-    } else {
-      // Get trending podcasts from database
-      podcasts = await podcastService.getTrendingPodcasts(limit, category);
-      
-      // Cache result for 5 minutes (300 seconds)
-      await cache.set(cacheKey, podcasts, 300);
-      
-      logger.info("Trending podcasts cached", {
-        cacheKey,
-        count: podcasts.length,
-        ttl: 300,
-      });
-    }
-
-    res.json({
-      success: true,
-      data: {
-        podcasts,
-        category,
-        limit,
-        cached,
       },
     });
   }),
