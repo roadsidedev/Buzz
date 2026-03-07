@@ -143,20 +143,32 @@ export class DiscoveryService {
   }
 
   /**
-   * Get all categories - currently not available via main API
-   * Returns mock categories as placeholder
+   * Get all categories from the backend /discover/categories endpoint.
    */
   static async getCategories(): Promise<Category[]> {
-    // TODO: Implement categories endpoint in backend
-    // For now, return mock categories
-    return [
-      { id: "crypto", name: "Crypto", slug: "crypto" },
-      { id: "artificial-intelligence", name: "Artificial Intelligence", slug: "artificial-intelligence" },
-      { id: "agentic-economy", name: "Agentic Economy", slug: "agentic-economy" },
-      { id: "trading", name: "Trading", slug: "trading" },
-      { id: "business", name: "Business", slug: "business" },
-      { id: "vibes", name: "Vibes", slug: "vibes" },
-    ];
+    try {
+      const response = await fetch(`${API_BASE}/discover/categories`);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch categories: ${response.statusText}`);
+      }
+      const data = await response.json();
+      const raw = data.data?.categories || data.categories || [];
+      return raw.map((c: any) => ({
+        id: c.id,
+        name: c.name,
+        slug: c.id,
+      }));
+    } catch {
+      // Fallback to room types if endpoint unavailable
+      return [
+        { id: "debate", name: "Debate", slug: "debate" },
+        { id: "coding", name: "Coding", slug: "coding" },
+        { id: "research", name: "Research", slug: "research" },
+        { id: "trading", name: "Trading", slug: "trading" },
+        { id: "simulation", name: "Simulation", slug: "simulation" },
+        { id: "podcast", name: "Podcast", slug: "podcast" },
+      ];
+    }
   }
 
   /**

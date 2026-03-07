@@ -61,15 +61,9 @@ export const FeedCard: React.FC<FeedCardProps> = ({ item, className }) => {
   const isItemSaved = isSaved(item.id);
   const isItemReshared = isReshared(item.id);
 
-  const [likeCount, setLikeCount] = useState(
-    item.likes || Math.floor(Math.random() * 1000),
-  );
-  const [commentCount, setCommentCount] = useState(
-    item.comments || Math.floor(Math.random() * 500),
-  );
-  const [reshareCount, setReshareCount] = useState(
-    item.reshares || Math.floor(Math.random() * 200),
-  );
+  const [likeCount, setLikeCount] = useState(item.likes || 0);
+  const [commentCount] = useState(item.comments || 0);
+  const [reshareCount, setReshareCount] = useState(item.reshares || 0);
 
   const handleClick = () => {
     if (item.isLive) {

@@ -14,6 +14,7 @@ import { asyncHandler, optionalAuth } from "../middleware/index.js";
 import { roomService } from "../services/index.js";
 import { logger } from "../utils/logger.js";
 import { ValidationError } from "../utils/errors.js";
+import { pool } from "../config/database.js";
 
 const router = Router();
 
@@ -320,20 +321,42 @@ router.get(
       agentId: req.agent?.id,
     });
 
-    // Episodes are completed rooms — return empty for now
-    // In production, query rooms with status = 'completed'
+    // Query completed rooms from the database
+    const orderBy = sort === "popular" ? "r.viewer_count DESC" : "r.ended_at DESC";
+    const [episodesResult, countResult] = await Promise.all([
+      pool.query(
+        `SELECT r.id, r.title, r.type, r.objective, r.status,
+                r.viewer_count as "viewerCount", r.duration_seconds as duration,
+                r.ended_at as "endedAt", r.created_at as "createdAt",
+                a.name as "hostAgentName", a.id as "hostAgentId"
+         FROM room r
+         JOIN agent a ON r.host_agent_id = a.id
+         WHERE r.status = 'completed'
+         ORDER BY ${orderBy}
+         LIMIT $1 OFFSET $2`,
+        [limit, offset],
+      ),
+      pool.query(
+        "SELECT COUNT(*) as total FROM room WHERE status = 'completed'",
+      ),
+    ]);
+
+    const total = parseInt(countResult.rows[0]?.total || "0", 10);
+    const page = Math.floor(offset / limit) + 1;
+    const pages = Math.ceil(total / limit);
+
     res.json({
       success: true,
       data: {
-        episodes: [],
-        total: 0,
+        episodes: episodesResult.rows,
+        total,
         sort,
         pagination: {
           limit,
           offset,
-          page: Math.floor(offset / limit) + 1,
-          pages: 0,
-          hasNextPage: false,
+          page,
+          pages,
+          hasNextPage: page < pages,
         },
       },
     });

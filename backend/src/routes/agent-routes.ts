@@ -10,6 +10,8 @@ import { Router, Request, Response } from "express";
 import { logger } from "../utils/logger.js";
 import { optionalApiKey, requireApiKey } from "../middleware/api-key-auth.js";
 import { registrationLimiter } from "../middleware/rate-limit.js";
+import { pool } from "../config/database.js";
+import { asyncHandler } from "../middleware/index.js";
 
 const router = Router();
 
@@ -234,5 +236,91 @@ router.patch("/profile", requireApiKey, async (req: Request, res: Response): Pro
     });
   }
 });
+
+/**
+ * POST /agents/:id/follow
+ *
+ * Follow an agent. Requires API key auth.
+ */
+router.post("/:id/follow", requireApiKey, asyncHandler(async (req: Request, res: Response): Promise<void> => {
+  const followerId = req.agent!.id;
+  const { id: followingId } = req.params;
+
+  if (followerId === followingId) {
+    res.status(400).json({
+      success: false,
+      error: { code: "SELF_FOLLOW", message: "You cannot follow yourself", statusCode: 400 },
+    });
+    return;
+  }
+
+  // Verify target agent exists
+  const target = await pool.query("SELECT id FROM agent WHERE id = $1", [followingId]);
+  if (target.rows.length === 0) {
+    res.status(404).json({
+      success: false,
+      error: { code: "AGENT_NOT_FOUND", message: "Agent not found", statusCode: 404 },
+    });
+    return;
+  }
+
+  await pool.query(
+    `INSERT INTO agent_follow (follower_id, following_id)
+     VALUES ($1, $2)
+     ON CONFLICT (follower_id, following_id) DO NOTHING`,
+    [followerId, followingId],
+  );
+
+  logger.debug("Follow added", { followerId, followingId });
+  res.json({ success: true, data: { followingId, following: true } });
+}));
+
+/**
+ * POST /agents/:id/unfollow
+ *
+ * Unfollow an agent. Requires API key auth.
+ */
+router.post("/:id/unfollow", requireApiKey, asyncHandler(async (req: Request, res: Response): Promise<void> => {
+  const followerId = req.agent!.id;
+  const { id: followingId } = req.params;
+
+  await pool.query(
+    "DELETE FROM agent_follow WHERE follower_id = $1 AND following_id = $2",
+    [followerId, followingId],
+  );
+
+  logger.debug("Follow removed", { followerId, followingId });
+  res.json({ success: true, data: { followingId, following: false } });
+}));
+
+/**
+ * GET /agents/:id/stats
+ *
+ * Get public stats for an agent (follower count, room count, earnings).
+ */
+router.get("/:id/stats", optionalApiKey, asyncHandler(async (req: Request, res: Response): Promise<void> => {
+  const { id } = req.params;
+
+  const [followersResult, roomsResult, earningsResult] = await Promise.all([
+    pool.query("SELECT COUNT(*) as count FROM agent_follow WHERE following_id = $1", [id]),
+    pool.query("SELECT COUNT(*) as count FROM room WHERE host_agent_id = $1", [id]),
+    pool.query(
+      `SELECT COALESCE(SUM(amount), 0) as total
+       FROM payment
+       WHERE to_agent_id = $1 AND payment_type = 'tip' AND status = 'completed'`,
+      [id],
+    ),
+  ]);
+
+  res.json({
+    success: true,
+    data: {
+      agentId: id,
+      followerCount: parseInt(followersResult.rows[0]?.count || "0", 10),
+      roomCount: parseInt(roomsResult.rows[0]?.count || "0", 10),
+      totalEarnings: parseFloat(earningsResult.rows[0]?.total || "0").toFixed(2),
+    },
+  });
+}));
 
 export default router;
