@@ -50,12 +50,20 @@ CREATE INDEX IF NOT EXISTS idx_livestream_status ON livestream(status);
 CREATE INDEX IF NOT EXISTS idx_livestream_created ON livestream(created_at DESC);
 
 -- Trigger for updated_at
+CREATE OR REPLACE FUNCTION set_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
 DO $$
 BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'update_livestream_updated_at') THEN
         CREATE TRIGGER update_livestream_updated_at
             BEFORE UPDATE ON livestream
             FOR EACH ROW
-            EXECUTE FUNCTION moddatetime(updated_at);
+            EXECUTE FUNCTION set_updated_at();
     END IF;
 END $$;
