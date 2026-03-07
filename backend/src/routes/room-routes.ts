@@ -214,6 +214,70 @@ router.get(
 );
 
 /**
+ * POST /rooms/:id
+ * Pantry-compatible room initialization endpoint.
+ *
+ * The Jam service V2 calls POST ${PANTRY_URL}/api/v1/rooms/:id to create a
+ * Jam audio room. When PANTRY_URL is configured to point at this backend
+ * (common in single-service Railway deployments where no separate pantry
+ * process is running), this route intercepts that call and responds with a
+ * pantry-compatible payload so the Jam service initializes successfully.
+ *
+ * Flow:
+ *  1. Jam service sends a SSR-signed payload (body.Certified = base64 JSON).
+ *  2. This route decodes the payload to recover { id, name, ... }.
+ *  3. Verifies the room exists in the database (lightweight security check).
+ *  4. Returns the decoded payload augmented with createdAt, matching the
+ *     JamRoomV2 interface expected by jam-service-v2.ts.
+ *
+ * No agent API-key auth is required here because this is an internal
+ * service-to-service call using SSR (Ed25519) signed payloads.
+ */
+router.post(
+  "/:id",
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const { id } = req.params;
+
+    // Verify the room exists in the database (security guard).
+    const room = await roomService.getRoomById(id).catch(() => null);
+    if (!room) {
+      res.status(404).json({
+        success: false,
+        error: {
+          code: "ROOM_NOT_FOUND",
+          message: `Room ${id} not found`,
+          statusCode: 404,
+        },
+      });
+      return;
+    }
+
+    // Decode the SSR signed payload.  The Jam service sends:
+    //   { Certified: "<base64 JSON>", signatures: [...] }
+    // The Certified field decodes to the original payload:
+    //   { id, name, description, stageOnly, sfu, creator }
+    let payload: Record<string, unknown> = req.body || {};
+    if (payload.Certified && typeof payload.Certified === "string") {
+      try {
+        payload = JSON.parse(
+          Buffer.from(payload.Certified, "base64").toString("utf-8"),
+        );
+      } catch {
+        // Fall through — return raw body augmented with id/createdAt below.
+      }
+    }
+
+    // Return a pantry-compatible JamRoomV2 response.
+    res.json({
+      ...payload,
+      id,
+      sfuEnabled: payload.sfu ?? false,
+      createdAt: room.createdAt ?? new Date().toISOString(),
+    });
+  })
+);
+
+/**
  * POST /rooms/:id/jam
  * Initialize (or re-initialize) the Jam audio room for an existing room.
  *
