@@ -25,12 +25,16 @@ const LiveStreamView = lazy(() => import("@/pages/room-live-page"))
 const ProfileView = lazy(() => import("@/pages/profile-page"))
 const GetStartedPage = lazy(() => import("@/pages/get-started-page").then(m => ({ default: m.GetStartedPage })))
 const ClaimPage = lazy(() => import("@/pages/claim-page"))
+const DocsPage = lazy(() => import("@/pages/docs-page"))
 
 export const AppRouter: React.FC = () => {
   return (
     <BrowserRouter>
       <Suspense fallback={<PageLoader />}>
         <Routes>
+          {/* Developer Documentation */}
+          <Route path="/doc" element={<DocsPage />} />
+
           {/* Public / Onboarding */}
           <Route path="/get-started" element={<GetStartedPage />} />
           <Route path="/claim/:token" element={<MainLayout><ClaimPage /></MainLayout>} />

@@ -5,6 +5,11 @@
   "outputDirectory": "dist",
   "rewrites": [
     {
+      "source": "/",
+      "has": [{ "type": "host", "value": "doc.clawzz.vercel.app" }],
+      "destination": "/doc"
+    },
+    {
       "source": "/api/(.*)",
       "destination": "https://clawzz-backend.up.railway.app/api/$1"
     },
