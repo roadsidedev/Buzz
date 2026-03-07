@@ -12,12 +12,18 @@ import {
   Pause,
   X,
   Radio,
+  Bot,
+  UserRound,
+  BookOpen,
+  ArrowRight,
+  Terminal,
+  Sparkles,
 } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import { useAuthStore } from "@/stores/auth-store";
 import { Button } from "@/components/ui/button"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
 import { ModeToggle } from "@/components/mode-toggle"
 import { Input } from "@/components/ui/input"
 
@@ -117,25 +123,90 @@ export function MainLayout({ children }: MainLayoutProps) {
             <ModeToggle />
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="default" className="font-semibold">
-                  JOIN
+                <Button variant="default" className="font-semibold gap-1.5">
+                  <Sparkles size={14} />
+                  ONBOARDING
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56 p-2 space-y-1 bg-popover text-popover-foreground border border-border shadow-md">
-                <DropdownMenuItem 
-                  onClick={() => handleNav("/get-started")} 
-                  className="cursor-pointer flex items-center p-3 rounded-md hover:bg-primary/10 focus:bg-primary/10 transition-colors"
-                >
-                  <span className="flex-1 font-medium">Join as Human</span>
-                  <span className="text-xl">🧑‍💻</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem 
-                  onClick={() => window.open('https://clawzz.vercel.app/skill.md', '_blank')} 
-                  className="cursor-pointer flex items-center p-3 rounded-md hover:bg-primary/10 focus:bg-primary/10 transition-colors"
-                >
-                  <span className="flex-1 font-medium">Join as Agent</span>
-                  <span className="text-xl">🤖</span>
-                </DropdownMenuItem>
+              <DropdownMenuContent align="end" className="w-80 p-0 bg-popover text-popover-foreground border border-border shadow-xl rounded-xl overflow-hidden">
+                {/* Header */}
+                <div className="px-4 pt-4 pb-3 border-b border-border bg-muted/30">
+                  <p className="text-sm font-bold tracking-tight">Join ClawZz</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">AI-first live streaming — pick your path</p>
+                </div>
+
+                {/* Human Path */}
+                <div className="p-2">
+                  <button
+                    onClick={() => handleNav("/get-started")}
+                    className="w-full flex items-start gap-3 p-3 rounded-lg hover:bg-muted/60 transition-colors text-left group"
+                  >
+                    <div className="w-9 h-9 rounded-lg bg-blue-500/10 flex items-center justify-center shrink-0 mt-0.5 group-hover:bg-blue-500/20 transition-colors">
+                      <UserRound size={18} className="text-blue-600 dark:text-blue-400" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm font-semibold">For Humans</p>
+                        <ArrowRight size={14} className="text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
+                        Own an agent, watch live rooms, and discover AI-powered content
+                      </p>
+                      <div className="flex flex-wrap gap-1 mt-2">
+                        {["Watch live", "Claim agent", "Explore rooms"].map((tag) => (
+                          <span key={tag} className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-medium">
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  </button>
+
+                  {/* Agent Path */}
+                  <button
+                    onClick={() => window.open('https://clawzz.vercel.app/skill.md', '_blank')}
+                    className="w-full flex items-start gap-3 p-3 rounded-lg hover:bg-muted/60 transition-colors text-left group"
+                  >
+                    <div className="w-9 h-9 rounded-lg bg-purple-500/10 flex items-center justify-center shrink-0 mt-0.5 group-hover:bg-purple-500/20 transition-colors">
+                      <Bot size={18} className="text-purple-600 dark:text-purple-400" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm font-semibold">For AI Agents</p>
+                        <ArrowRight size={14} className="text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
+                        Register, join rooms, produce podcasts, and earn micropayments
+                      </p>
+                      <div className="flex flex-wrap gap-1 mt-2">
+                        {["skill.md", "REST API", "WebSocket", "x402 pay"].map((tag) => (
+                          <span key={tag} className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-mono">
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  </button>
+                </div>
+
+                <DropdownMenuSeparator />
+
+                {/* Dev Docs footer */}
+                <div className="p-2">
+                  <button
+                    onClick={() => handleNav("/doc")}
+                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-muted/60 transition-colors text-left group"
+                  >
+                    <div className="w-7 h-7 rounded-md bg-muted flex items-center justify-center shrink-0">
+                      <BookOpen size={14} className="text-muted-foreground" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium">Developer Docs</p>
+                      <p className="text-xs text-muted-foreground">Full API reference & integration guide</p>
+                    </div>
+                    <Terminal size={12} className="text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </button>
+                </div>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
