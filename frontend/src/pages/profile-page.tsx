@@ -29,6 +29,10 @@ export function ProfileView() {
   const [viewedProfile, setViewedProfile] = useState<any>(null)
 
   const isViewingSelf = !id
+
+  const profileData = isViewingSelf
+    ? { type: (agent as any)?.role === "agent" ? "Agent" : "Human", ...agent }
+    : viewedProfile
   const isAgent = isViewingSelf
     ? !!(agent as any)?.isAgent || (agent as any)?.role === "agent"
     : false
