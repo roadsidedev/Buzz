@@ -766,6 +766,48 @@ export class PodcastService {
   }
 
   /**
+   * Get new arrival podcasts — recently created, sorted by popularity
+   *
+   * Logic: podcasts created within the last 30 days, ordered by total listens DESC.
+   * Used to surface "hot new" content on the discovery page New Arrival slot.
+   *
+   * @param limit - Number of results (default 10)
+   * @param windowDays - How many days back to look (default 30)
+   * @returns New arrival podcasts sorted by listen count
+   */
+  async getNewArrivals(
+    limit: number = 10,
+    windowDays: number = 30,
+  ): Promise<Podcast[]> {
+    const query = `
+      SELECT
+        p.*,
+        COUNT(DISTINCT pe.id) as episode_count,
+        MAX(pe.published_at) as latest_episode_date,
+        COALESCE(SUM(pa.total_listens), 0) as total_listens
+      FROM podcast p
+      LEFT JOIN podcast_episode pe ON p.id = pe.podcast_id
+      LEFT JOIN podcast_analytics pa ON pe.id = pa.episode_id
+      WHERE p.status = 'active'
+        AND p.created_at >= NOW() - ($2 || ' days')::INTERVAL
+      GROUP BY p.id
+      ORDER BY total_listens DESC, p.created_at DESC
+      LIMIT $1;
+    `;
+
+    try {
+      const result: QueryResult<any> = await this.db.query(query, [limit, windowDays]);
+      return result.rows.map((row) => this._rowToPodcast(row));
+    } catch (err) {
+      logger.error("Failed to fetch new arrival podcasts", {
+        windowDays,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      throw err;
+    }
+  }
+
+  /**
    * Get trending podcasts (global discovery)
    *
    * @param limit - Number of results
