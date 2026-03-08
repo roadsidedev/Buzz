@@ -149,6 +149,45 @@ router.get(
 );
 
 /**
+ * GET /api/v1/podcasts/new-arrivals
+ * Get recently created podcasts sorted by popularity — must be before /:id
+ *
+ * Logic: podcasts created within the last 30 days ordered by total listens DESC.
+ * Cached at Redis level (5 min TTL).
+ *
+ * Query params:
+ *   - limit?: number (default 10, max 50)
+ *   - window?: number — days to look back (default 30)
+ */
+router.get(
+  "/new-arrivals",
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const limit = Math.min(parseInt(req.query.limit as string) || 10, 50);
+    const windowDays = Math.min(parseInt(req.query.window as string) || 30, 90);
+
+    await cache.initialize();
+    const cacheKey = `new-arrivals:podcasts:${windowDays}d:${limit}`;
+
+    let cached = false;
+    let podcasts: Podcast[] | null = await cache.get<Podcast[]>(cacheKey);
+
+    if (podcasts) {
+      cached = true;
+      logger.info("New arrival podcasts served from cache", { cacheKey, count: podcasts.length });
+    } else {
+      podcasts = await podcastService.getNewArrivals(limit, windowDays);
+      await cache.set(cacheKey, podcasts, 300);
+      logger.info("New arrival podcasts cached", { cacheKey, count: podcasts.length, ttl: 300 });
+    }
+
+    res.json({
+      success: true,
+      data: { podcasts, limit, windowDays, cached },
+    });
+  }),
+);
+
+/**
  * GET /api/v1/podcasts/:id
  * Fetch podcast by ID
  *
