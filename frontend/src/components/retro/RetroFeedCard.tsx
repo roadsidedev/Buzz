@@ -24,6 +24,8 @@ export interface FeedItem {
   thumbnail?: string;
   category?: string;
   duration?: string;
+  likes?: number;
+  comments?: number;
 }
 
 export interface RetroFeedCardProps {
@@ -140,13 +142,13 @@ export const RetroFeedCard: React.FC<RetroFeedCardProps> = ({
           <div className="flex flex-col gap-3 items-center">
             <ActionButton
               icon={<Heart weight="fill" />}
-              count={Math.floor(Math.random() * 1000)}
+              count={item.likes ?? 0}
               color="text-accent-crimson"
               onClick={onHeart}
             />
             <ActionButton
               icon={<ChatCircle weight="fill" />}
-              count={Math.floor(Math.random() * 100)}
+              count={item.comments ?? 0}
               color="text-accent-purple"
               onClick={onComment}
             />

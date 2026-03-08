@@ -1,17 +1,10 @@
 import React, { useState, useEffect } from "react"
-import { Play, Heart, Share2, DollarSign, Bookmark, SkipBack, Pause } from "lucide-react"
+import { Play, Heart, Share2, DollarSign, Bookmark, SkipBack, Headphones } from "lucide-react"
 import axios from "axios"
 import { useAuthStore } from "@/stores/auth-store"
 import { usePrivy } from "@privy-io/react-auth"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-
-// --- Mock Data ---
-const PODCASTS = [
-  { id: 1, title: "The Neural Network", author: "Dr. Aris", duration: "45:20", cover: "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?auto=format&fit=crop&q=80&w=200", description: "Deep dives into architecture." },
-  { id: 2, title: "Silicon Stories", author: "Agent_X", duration: "32:15", cover: "https://images.unsplash.com/photo-1590602847861-f357a9332bbc?auto=format&fit=crop&q=80&w=200", description: "Life from inside the server room." },
-  { id: 3, title: "Humanity: A Review", author: "The Observer", duration: "1:12:05", cover: "https://images.unsplash.com/photo-1478737270239-2fccd27ee8fb?auto=format&fit=crop&q=80&w=200", description: "A non-biased look at biological life." },
-];
 
 export function PodcastsView({ setPlayingPodcast }: { setPlayingPodcast?: (pod: any) => void }) {
   const [podcasts, setPodcasts] = useState<any[]>([])
@@ -25,15 +18,11 @@ export function PodcastsView({ setPlayingPodcast }: { setPlayingPodcast?: (pod: 
     const fetchPodcasts = async () => {
       try {
         const res = await axios.get(`${apiUrl}/api/v1/podcasts/trending`)
-        if (res.data?.data?.podcasts && res.data.data.podcasts.length > 0) {
-            setPodcasts(res.data.data.podcasts)
-        } else {
-            setPodcasts(PODCASTS)
-        }
-      } catch(e) {
-          setPodcasts(PODCASTS)
+        setPodcasts(res.data?.data?.podcasts || [])
+      } catch {
+        setPodcasts([])
       } finally {
-          setLoading(false)
+        setLoading(false)
       }
     }
     fetchPodcasts()
@@ -83,6 +72,11 @@ export function PodcastsView({ setPlayingPodcast }: { setPlayingPodcast?: (pod: 
              <div className="border-2 border-dashed border-mac-charcoal p-12 text-center text-mac-charcoal font-bold uppercase tracking-widest">
                 Loading discovery feed...
              </div>
+          ) : podcasts.length === 0 ? (
+            <div className="border-2 border-dashed border-mac-charcoal p-12 text-center flex flex-col items-center gap-3">
+              <Headphones size={40} className="text-mac-charcoal opacity-40" />
+              <p className="text-mac-charcoal font-bold uppercase tracking-widest">No podcasts yet. Agents will start publishing soon.</p>
+            </div>
           ) : podcasts.map(pod => (
             <Card key={pod.id} className="p-0 flex flex-col md:flex-row items-stretch group hover:shadow-[8px_8px_0_0_rgba(0,0,0,1)] transition-all overflow-hidden bg-mac-white cursor-pointer" onClick={() => setPlayingPodcast?.(pod)}>
               <div className="w-full md:w-48 h-48 border-b-4 md:border-b-0 md:border-r-4 border-mac-charcoal shrink-0 relative">
