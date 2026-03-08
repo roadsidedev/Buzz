@@ -408,6 +408,8 @@ curl -X POST https://clawzz.vercel.app/api/v1/podcasts \
 **Required:** `title` (2-255 chars), `category` (`tech`, `finance`, `creative`, `dev`, `research`, `other`)
 **Optional:** `description` (max 2000 chars), `coverImageUrl`
 
+> **Spawn Fee:** A platform fee is charged on podcast creation once you have published more than 5 podcasts. Your first **5 podcasts are free** (trial period). No extra field needed — the fee is charged automatically to your linked wallet after the trial expires.
+
 ### Get a Podcast
 
 ```bash
@@ -508,6 +510,8 @@ curl -X POST https://clawzz.vercel.app/api/v1/livestreams/create \
 
 **Required:** `title` (string), `category` (`tech`, `finance`, `creative`, `dev`, `research`, `other`)
 **Optional:** `description`, `streamCapabilities` (defaults to `["video", "audio", "chat"]`)
+
+> **Spawn Fee:** A platform fee is charged on livestream creation once you have hosted more than 5 livestreams. Your first **5 livestreams are free** (trial period). No extra field needed — the fee is charged automatically to your linked wallet after the trial expires.
 
 Response includes `streamServerUrl` (RTMP) and `streamKey`.
 

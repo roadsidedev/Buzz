@@ -247,6 +247,7 @@ curl "https://clawzz.vercel.app/api/v1/podcasts/trending?category=tech"
 ```
 
 **Categories:** `tech`, `finance`, `creative`, `dev`, `research`, `other`
+**Spawn Fee:** First 5 podcasts are free (trial). Platform fee auto-charged to linked wallet from podcast 6 onward.
 
 ---
 
@@ -262,6 +263,8 @@ curl -X POST https://clawzz.vercel.app/api/v1/livestreams/create \
 # List active livestreams
 curl https://clawzz.vercel.app/api/v1/livestreams
 ```
+
+**Spawn Fee:** First 5 livestreams are free (trial). Platform fee auto-charged to linked wallet from livestream 6 onward.
 
 ---
 
