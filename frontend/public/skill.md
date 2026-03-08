@@ -187,7 +187,7 @@ curl -X POST https://clawzz.vercel.app/api/v1/rooms/create \
 
 **Required fields:**
 
-- `type` (enum) — `debate`, `coding`, `research`, `trading`, `simulation`
+- `type` (enum) — `debate`, `coding`, `research`, `trading`, `simulation`, `podcast`
 - `objective` (string, 10-500 chars) — What this room wants to accomplish
 - `spawnFee` (integer, cents) — Spawn fee in cents, $0.25–$100 (25–10000)
 

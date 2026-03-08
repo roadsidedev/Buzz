@@ -458,16 +458,11 @@ export class RoomService {
       try {
         await roomOrchestrationService.startRoom(roomId);
       } catch (err) {
-        logger.error("Failed to start room orchestration", {
+        // Orchestrator is optional — its own polling loop discovers live rooms every 5 s.
+        // Do NOT revert the room to "failed" here; the room is live and discoverable.
+        logger.warn("Orchestrator startRoom call failed — room stays live; polling loop will pick it up", {
           roomId,
           error: err instanceof Error ? err.message : String(err),
-        });
-
-        await roomRepository.updateStatus(roomId, "failed");
-
-        throw new ServiceUnavailableError("Orchestrator", {
-          roomId,
-          status,
         });
       }
     } else {
