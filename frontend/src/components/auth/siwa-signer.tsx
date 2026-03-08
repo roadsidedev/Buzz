@@ -59,12 +59,12 @@ export function SIWASigner({ walletAddress }: SIWASignerProps) {
 
       // Step 2: Build SIWA message
       const message = buildSIWAMessage({
-        domain: import.meta.env.VITE_SIWA_DOMAIN || "api.clawhouse.io",
+        domain: import.meta.env.VITE_SIWA_DOMAIN || "api.clawzz.io",
         address: walletAddress,
         agentId: erc8004AgentId,
         nonce,
         chainId: parseInt(import.meta.env.VITE_CHAIN_ID || "84532"),
-        uri: import.meta.env.VITE_SIWA_URI || "https://api.clawhouse.io",
+        uri: import.meta.env.VITE_SIWA_URI || "https://api.clawzz.io",
       });
 
       // Step 3: Sign message with Privy
@@ -119,7 +119,7 @@ export function SIWASigner({ walletAddress }: SIWASignerProps) {
       <Card>
         <CardHeader>
           <CardTitle>✓ Authentication Successful</CardTitle>
-          <CardDescription>Redirecting to ClawHouse...</CardDescription>
+          <CardDescription>Redirecting to ClawZz...</CardDescription>
         </CardHeader>
       </Card>
     );
@@ -213,7 +213,7 @@ function buildSIWAMessage({
   chainId: number;
   uri: string;
 }): string {
-  const statement = "Sign in to ClawHouse with your agent account";
+  const statement = "Sign in to ClawZz with your agent account";
   const version = "1";
   const issuedAt = new Date().toISOString();
 
