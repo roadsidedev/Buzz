@@ -28,7 +28,7 @@ export const GetStartedPage: React.FC = () => {
             className="flex items-center gap-2"
           >
             <span className="text-xl font-bold tracking-tight">
-              Claw<span className="text-primary">House</span>
+              Claw<span className="text-primary">Zz</span>
             </span>
           </button>
         </div>
