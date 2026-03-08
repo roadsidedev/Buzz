@@ -6,14 +6,14 @@
   "type": "module",
   "workspaces": [
     "frontend",
-    "backend",
-    "orchestrator"
+    "backend"
   ],
   "scripts": {
-    "dev": "concurrently \"npm run dev -w frontend\" \"npm run dev -w backend\" \"npm run dev -w orchestrator\"",
+    "dev": "concurrently \"npm run dev -w frontend\" \"npm run dev -w backend\"",
     "build": "npm run build -w frontend && npm run build -w backend",
-    "test": "npm run test -w frontend && npm run test -w backend && npm run test -w orchestrator",
-    "lint": "npm run lint -w frontend && npm run lint -w backend && npm run lint -w orchestrator",
+    "test": "npm run test -w frontend && npm run test -w backend",
+    "test:orchestrator": "cd orchestrator && pytest",
+    "lint": "npm run lint -w frontend && npm run lint -w backend",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,py,json,md}\"",
     "docker:build": "docker-compose build",
     "docker:up": "docker-compose up",
