@@ -1,9 +1,9 @@
 /**
  * Badge Routes — Multi-chain verification badge management
  *
- * POST /agents/me/verify/erc8004 — Link ERC-8004 badge
- * POST /agents/me/verify/said — Link SAID Protocol badge
- * GET  /agents/:id/badges — Get agent badges (public)
+ * POST /agents/me/verify/erc8004 — Link ERC-8004 badge (Base / EVM)
+ * POST /agents/me/verify/said    — Link 8004-Solana badge (Solana)
+ * GET  /agents/:id/badges        — Get agent badges (public)
  */
 
 import { Router, Request, Response } from "express";
@@ -149,7 +149,9 @@ router.post(
 /**
  * POST /agents/me/verify/said
  *
- * Link SAID Protocol identity for a Solana verification badge.
+ * Link a Solana 8004-Solana identity (QuantuLabs) for a verified badge.
+ * This is the Solana-native equivalent of ERC-8004.
+ *
  * Body: { solana_wallet: string }
  */
 router.post(
@@ -171,14 +173,27 @@ router.post(
         return;
       }
 
-      // Call SAID Protocol API
-      const saidResult =
-        await saidVerificationService.verifyWallet(solana_wallet);
+      // Validate basic Solana address format (Base58, 32-44 chars)
+      if (!/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(solana_wallet)) {
+        res.status(400).json({
+          success: false,
+          error: {
+            code: "VALIDATION_ERROR",
+            message: "Invalid Solana address format (expected Base58, 32-44 chars)",
+            statusCode: 400,
+          },
+        });
+        return;
+      }
 
-      // Check for existing badge
+      // Query the 8004-Solana indexer
+      const sol8004Result =
+        await saidVerificationService.verifyAgent(solana_wallet);
+
+      // Upsert badge — provider stored as 'sol8004' to distinguish from legacy SAID
       const existing = await db.query(
-        `SELECT id FROM verification_badge 
-         WHERE agent_id = $1 AND provider = 'said'`,
+        `SELECT id FROM verification_badge
+         WHERE agent_id = $1 AND provider = 'sol8004'`,
         [req.agent!.id],
       );
 
@@ -186,31 +201,35 @@ router.post(
         await db.query(
           `UPDATE verification_badge SET
             provider_wallet = $1,
-            verified = $2,
-            reputation_score = $3,
-            verified_at = $4,
+            provider_agent_id = $2,
+            verified = $3,
+            reputation_score = $4,
+            verified_at = $5,
             last_checked_at = CURRENT_TIMESTAMP,
             updated_at = CURRENT_TIMESTAMP
-           WHERE agent_id = $5 AND provider = 'said'`,
+           WHERE agent_id = $6 AND provider = 'sol8004'`,
           [
             solana_wallet,
-            saidResult.verified,
-            saidResult.reputationScore,
-            saidResult.verified ? new Date() : null,
+            sol8004Result.agentAssetId || null,
+            sol8004Result.verified,
+            sol8004Result.reputationScore,
+            sol8004Result.verified ? new Date() : null,
             req.agent!.id,
           ],
         );
       } else {
         await db.query(
-          `INSERT INTO verification_badge (id, agent_id, provider, provider_wallet, verified, reputation_score, verified_at, last_checked_at, created_at, updated_at)
-           VALUES ($1, $2, 'said', $3, $4, $5, $6, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+          `INSERT INTO verification_badge
+            (id, agent_id, provider, provider_wallet, provider_agent_id, verified, reputation_score, verified_at, last_checked_at, created_at, updated_at)
+           VALUES ($1, $2, 'sol8004', $3, $4, $5, $6, $7, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
           [
             uuidv4(),
             req.agent!.id,
             solana_wallet,
-            saidResult.verified,
-            saidResult.reputationScore,
-            saidResult.verified ? new Date() : null,
+            sol8004Result.agentAssetId || null,
+            sol8004Result.verified,
+            sol8004Result.reputationScore,
+            sol8004Result.verified ? new Date() : null,
           ],
         );
       }
@@ -218,19 +237,20 @@ router.post(
       res.json({
         success: true,
         data: {
-          provider: "said",
+          provider: "sol8004",
           wallet: solana_wallet,
-          verified: saidResult.verified,
-          reputation_score: saidResult.reputationScore,
-          message: saidResult.verified
-            ? "SAID Protocol identity verified! Badge awarded. 🏆"
-            : saidResult.error
-              ? `SAID verification failed: ${saidResult.error}`
-              : "SAID badge linked but agent not verified on SAID Protocol.",
+          agent_asset_id: sol8004Result.agentAssetId || null,
+          verified: sol8004Result.verified,
+          reputation_score: sol8004Result.reputationScore,
+          message: sol8004Result.verified
+            ? "8004-Solana identity verified! Badge awarded."
+            : sol8004Result.error
+              ? `8004-Solana verification failed: ${sol8004Result.error}`
+              : "Solana wallet linked but agent not yet registered on 8004-Solana. Complete on-chain registration at https://8004.qnt.sh",
         },
       });
     } catch (err: any) {
-      logger.error("SAID badge linking failed", { error: err.message });
+      logger.error("8004-Solana badge linking failed", { error: err.message });
       res.status(500).json({
         success: false,
         error: {

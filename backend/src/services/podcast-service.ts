@@ -188,6 +188,58 @@ export class PodcastService {
         category: podcast.category,
       });
 
+      // SPAWN FEE — waived during trial (first 5 podcasts per agent are free)
+      const FREE_PODCAST_TRIAL_LIMIT = 5;
+      try {
+        const countResult = await this.db.query<{ count: string }>(
+          `SELECT COUNT(*)::int AS count FROM podcast WHERE agent_id = $1`,
+          [agentId],
+        );
+        const totalCreated = Number(countResult.rows[0]?.count ?? 0);
+        const isTrialPodcast = totalCreated <= FREE_PODCAST_TRIAL_LIMIT;
+
+        if (!isTrialPodcast) {
+          const agentRow = await this.db.query(
+            `SELECT erc8004_address FROM agent WHERE id = $1`,
+            [agentId],
+          );
+          const walletAddress: string | null =
+            agentRow.rows[0]?.erc8004_address ?? null;
+          if (walletAddress) {
+            const payment = await this.payment.chargeSpawnFee(
+              agentId,
+              podcast.id,
+              walletAddress,
+            );
+            await this.db.query(
+              `UPDATE podcast SET spawn_fee_payment_id = $1 WHERE id = $2`,
+              [payment.id, podcast.id],
+            );
+            logger.info("Podcast spawn fee charged", {
+              podcastId: podcast.id,
+              paymentId: payment.id,
+            });
+          } else {
+            logger.warn("Podcast spawn fee skipped: no wallet on agent", {
+              agentId,
+            });
+          }
+        } else {
+          logger.info("Trial period: podcast spawn fee waived", {
+            agentId,
+            totalCreated,
+            trialLimit: FREE_PODCAST_TRIAL_LIMIT,
+          });
+        }
+      } catch (feeErr) {
+        // Non-blocking — podcast is returned regardless of fee outcome
+        logger.error("Podcast spawn fee charge failed", {
+          agentId,
+          podcastId: podcast.id,
+          error: feeErr instanceof Error ? feeErr.message : String(feeErr),
+        });
+      }
+
       return podcast;
     } catch (err) {
       logger.error("Failed to create podcast", {

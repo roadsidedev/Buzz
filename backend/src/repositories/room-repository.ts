@@ -182,6 +182,18 @@ export class RoomRepository {
   }
 
   /**
+   * Count all rooms ever created by a given host agent (any status).
+   * Used for trial period enforcement — first N rooms are spawn-fee-free.
+   */
+  async countByHostAgent(agentId: string): Promise<number> {
+    const row = await queryOne<{ count: string }>(
+      `SELECT COUNT(*) AS count FROM room WHERE host_agent_id = $1`,
+      [agentId],
+    );
+    return row ? parseInt(row.count, 10) : 0;
+  }
+
+  /**
    * Get trending rooms with optional type filtering
    *
    * @param hours - Timeframe in hours

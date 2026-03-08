@@ -32,6 +32,7 @@ import type { JWTPayload } from "../types/auth.js";
 
 const MIN_SPAWN_FEE = 25; // $0.25 in cents
 const MAX_SPAWN_FEE = 10000; // $100 in cents
+const FREE_ROOM_TRIAL_LIMIT = 5; // first N rooms per agent are spawn-fee-free
 
 interface CreateRoomInput extends CreateRoomRequest {
   hostAgentId: string;
@@ -155,6 +156,20 @@ export class RoomService {
       spawnFee: input.spawnFee,
     });
 
+    // 4b. TRIAL PERIOD CHECK
+    // Count includes the room just inserted; rooms 1–FREE_ROOM_TRIAL_LIMIT are free.
+    const totalRoomsCreated = await roomRepository.countByHostAgent(input.hostAgentId);
+    const isTrialRoom = totalRoomsCreated <= FREE_ROOM_TRIAL_LIMIT;
+
+    if (isTrialRoom) {
+      logger.info("Trial period: spawn fee waived", {
+        roomId,
+        agentId: input.hostAgentId,
+        totalRoomsCreated,
+        trialLimit: FREE_ROOM_TRIAL_LIMIT,
+      });
+    }
+
     // 5. CREATE JAM AUDIO ROOM
     try {
       // Ensure factory is initialized
@@ -275,56 +290,58 @@ export class RoomService {
       });
     }
 
-    // 6. CHARGE SPAWN FEE VIA x402
-    try {
-      // Get agent wallet address from authenticated user or fetch from database
-      let hostWalletAddress: string | null =
-        input.authenticatedUser?.walletAddress || null;
+    // 6. CHARGE SPAWN FEE VIA x402 (skipped during trial period)
+    if (!isTrialRoom) {
+      try {
+        // Get agent wallet address from authenticated user or fetch from database
+        let hostWalletAddress: string | null =
+          input.authenticatedUser?.walletAddress || null;
 
-      if (!hostWalletAddress) {
-        // Fallback: fetch agent from database
-        const agent = await agentRepository.getById(input.hostAgentId);
-        hostWalletAddress = agent?.erc8004_address || null;
-      }
+        if (!hostWalletAddress) {
+          // Fallback: fetch agent from database
+          const agent = await agentRepository.getById(input.hostAgentId);
+          hostWalletAddress = agent?.erc8004_address || null;
+        }
 
-      if (!hostWalletAddress) {
-        logger.error("Cannot charge spawn fee: no wallet address", {
+        if (!hostWalletAddress) {
+          logger.error("Cannot charge spawn fee: no wallet address", {
+            roomId,
+            agentId: input.hostAgentId,
+          });
+          throw new ValidationError("Agent wallet address not found", {
+            field: "hostWalletAddress",
+            agentId: input.hostAgentId,
+            code: "WALLET_NOT_FOUND",
+          });
+        }
+
+        const payment = await paymentService.chargeSpawnFee(
+          input.hostAgentId,
+          roomId,
+          hostWalletAddress,
+        );
+
+        // Link payment to room
+        await roomRepository.updateSpawnFeePaymentId(roomId, payment.id);
+
+        logger.info("Spawn fee charge initiated", {
+          roomId,
+          paymentId: payment.id,
+          agentId: input.hostAgentId,
+          amount: input.spawnFee,
+          walletAddress: `${hostWalletAddress.slice(0, 6)}...${hostWalletAddress.slice(-4)}`,
+        });
+
+        // Room is live as soon as Jam is ready; payment confirmation is tracked separately
+      } catch (err) {
+        logger.error("Failed to charge spawn fee", {
           roomId,
           agentId: input.hostAgentId,
+          error: err instanceof Error ? err.message : String(err),
         });
-        throw new ValidationError("Agent wallet address not found", {
-          field: "hostWalletAddress",
-          agentId: input.hostAgentId,
-          code: "WALLET_NOT_FOUND",
-        });
+        // Continue - room created but payment failed
+        // Note: Implement refund logic and room cleanup in error handler
       }
-
-      const payment = await paymentService.chargeSpawnFee(
-        input.hostAgentId,
-        roomId,
-        hostWalletAddress,
-      );
-
-      // Link payment to room
-      await roomRepository.updateSpawnFeePaymentId(roomId, payment.id);
-
-      logger.info("Spawn fee charge initiated", {
-        roomId,
-        paymentId: payment.id,
-        agentId: input.hostAgentId,
-        amount: input.spawnFee,
-        walletAddress: `${hostWalletAddress.slice(0, 6)}...${hostWalletAddress.slice(-4)}`,
-      });
-
-      // Room is live as soon as Jam is ready; payment confirmation is tracked separately
-    } catch (err) {
-      logger.error("Failed to charge spawn fee", {
-        roomId,
-        agentId: input.hostAgentId,
-        error: err instanceof Error ? err.message : String(err),
-      });
-      // Continue - room created but payment failed
-      // Note: Implement refund logic and room cleanup in error handler
     }
 
     return updatedRoom;
@@ -458,16 +475,11 @@ export class RoomService {
       try {
         await roomOrchestrationService.startRoom(roomId);
       } catch (err) {
-        logger.error("Failed to start room orchestration", {
+        // Orchestrator is optional — its own polling loop discovers live rooms every 5 s.
+        // Do NOT revert the room to "failed" here; the room is live and discoverable.
+        logger.warn("Orchestrator startRoom call failed — room stays live; polling loop will pick it up", {
           roomId,
           error: err instanceof Error ? err.message : String(err),
-        });
-
-        await roomRepository.updateStatus(roomId, "failed");
-
-        throw new ServiceUnavailableError("Orchestrator", {
-          roomId,
-          status,
         });
       }
     } else {
