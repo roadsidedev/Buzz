@@ -1,5 +1,5 @@
 /**
- * ClawHouse Frontend Root Component
+ * ClawZz Frontend Root Component
  * Main React application entry point
  *
  * Phase 4: Authentication Complete

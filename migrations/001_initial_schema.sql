@@ -1,4 +1,4 @@
--- ClawHouse Initial Database Schema
+-- ClawZz Initial Database Schema
 -- Version: 1.0
 -- Date: February 12, 2026
 
