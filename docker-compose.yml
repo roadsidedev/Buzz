@@ -27,7 +27,7 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - clawhouse-network
+      - clawzz-network
 
   # ============================================
   # API GATEWAY (Node.js Express)
@@ -75,7 +75,7 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - clawhouse-network
+      - clawzz-network
 
   # ============================================
   # ORCHESTRATOR (Python FastAPI)
@@ -109,7 +109,7 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - clawhouse-network
+      - clawzz-network
 
   # ============================================
   # JAM STACK - SELF HOSTED AUDIO ROOMS
@@ -137,7 +137,7 @@ services:
       timeout: 10s
       retries: 3
     networks:
-      - clawhouse-network
+      - clawzz-network
 
   # Pantry-SFU - Mediasoup SFU for Large Rooms
   pantry-sfu:
@@ -179,7 +179,7 @@ services:
       - "5349:5349/tcp"
       - "49152-65535:49152-65535/udp"
     networks:
-      - clawhouse-network
+      - clawzz-network
     restart: unless-stopped
 
   # ============================================
@@ -200,7 +200,7 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - clawhouse-network
+      - clawzz-network
     profiles:
       - legacy-jam
 
@@ -225,7 +225,7 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - clawhouse-network
+      - clawzz-network
 
   # ============================================
   # REDIS (Shared Cache & Event Bus)
@@ -244,12 +244,12 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - clawhouse-network
+      - clawzz-network
 
 volumes:
   postgres_data:
   redis_data:
 
 networks:
-  clawhouse-network:
+  clawzz-network:
     driver: bridge

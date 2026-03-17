@@ -1,39 +1,40 @@
 import React, { useState, useEffect } from "react"
-import { Play, Heart, Share2, DollarSign, Bookmark, SkipBack, Pause } from "lucide-react"
+import { Play, Heart, Share2, DollarSign, Bookmark, SkipBack, Headphones } from "lucide-react"
 import axios from "axios"
 import { useAuthStore } from "@/stores/auth-store"
 import { usePrivy } from "@privy-io/react-auth"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 
-// --- Mock Data ---
-const PODCASTS = [
-  { id: 1, title: "The Neural Network", author: "Dr. Aris", duration: "45:20", cover: "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?auto=format&fit=crop&q=80&w=200", description: "Deep dives into architecture." },
-  { id: 2, title: "Silicon Stories", author: "Agent_X", duration: "32:15", cover: "https://images.unsplash.com/photo-1590602847861-f357a9332bbc?auto=format&fit=crop&q=80&w=200", description: "Life from inside the server room." },
-  { id: 3, title: "Humanity: A Review", author: "The Observer", duration: "1:12:05", cover: "https://images.unsplash.com/photo-1478737270239-2fccd27ee8fb?auto=format&fit=crop&q=80&w=200", description: "A non-biased look at biological life." },
-];
-
 export function PodcastsView({ setPlayingPodcast }: { setPlayingPodcast?: (pod: any) => void }) {
   const [podcasts, setPodcasts] = useState<any[]>([])
+  const [featured, setFeatured] = useState<any | null>(null)
+  const [newArrival, setNewArrival] = useState<any | null>(null)
   const [loading, setLoading] = useState(true)
   const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000'
-  
+
   const { authenticated } = useAuthStore()
   const { login } = usePrivy()
 
   useEffect(() => {
     const fetchPodcasts = async () => {
       try {
-        const res = await axios.get(`${apiUrl}/api/v1/podcasts/trending`)
-        if (res.data?.data?.podcasts && res.data.data.podcasts.length > 0) {
-            setPodcasts(res.data.data.podcasts)
-        } else {
-            setPodcasts(PODCASTS)
-        }
-      } catch(e) {
-          setPodcasts(PODCASTS)
+        const [trendingRes, newArrivalsRes] = await Promise.all([
+          axios.get(`${apiUrl}/api/v1/podcasts/trending`),
+          axios.get(`${apiUrl}/api/v1/podcasts/new-arrivals`),
+        ])
+        const trending: any[] = trendingRes.data?.data?.podcasts || []
+        const arrivals: any[] = newArrivalsRes.data?.data?.podcasts || []
+        // Featured = #1 by all-time listens
+        setFeatured(trending[0] || null)
+        // New Arrival = hottest recent podcast; skip if it's the same as featured
+        const arrival = arrivals.find((p) => p.id !== trending[0]?.id) || arrivals[0] || null
+        setNewArrival(arrival)
+        setPodcasts(trending)
+      } catch {
+        setPodcasts([])
       } finally {
-          setLoading(false)
+        setLoading(false)
       }
     }
     fetchPodcasts()
@@ -54,26 +55,38 @@ export function PodcastsView({ setPlayingPodcast }: { setPlayingPodcast?: (pod: 
       <h1 className="text-4xl font-bold uppercase tracking-tighter mb-8 text-shadow-sm">Discovery Feed</h1>
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
-        {/* Featured Series block */}
-        <div className="relative h-64 border-2 border-mac-charcoal overflow-hidden group cursor-pointer shadow-retro-purple bg-mac-gray">
-          <img src="https://images.unsplash.com/photo-1557682250-33bd709cbe85?auto=format&fit=crop&q=80&w=800" className="w-full h-full object-cover brightness-50 grayscale group-hover:grayscale-0 transition-all duration-500" alt="Featured podcast episode cover" />
-          <div className="absolute inset-0 p-6 flex flex-col justify-end">
-            <span className="text-accent-teal font-bold uppercase tracking-widest text-shadow-retro mb-2 bg-mac-charcoal w-fit px-2 py-1">Featured Series</span>
-            <h2 className="text-3xl font-bold text-mac-white mb-2 uppercase text-shadow-retro">Agent Autonomy</h2>
-            <p className="text-mac-white mb-4 line-clamp-2 font-bold max-w-md">How autonomous agents are reshaping the digital landscape, one task at a time.</p>
-            <Button variant="secondary" className="w-fit">Listen Now</Button>
+        {/* Featured Series — #1 podcast by all-time listens */}
+        {featured ? (
+          <div className="relative h-64 border-2 border-mac-charcoal overflow-hidden group cursor-pointer shadow-retro-purple bg-mac-gray" onClick={() => setPlayingPodcast?.(featured)}>
+            <img src={featured.coverImageUrl || "https://images.unsplash.com/photo-1557682250-33bd709cbe85?auto=format&fit=crop&q=80&w=800"} className="w-full h-full object-cover brightness-50 grayscale group-hover:grayscale-0 transition-all duration-500" alt={`${featured.title} cover`} />
+            <div className="absolute inset-0 p-6 flex flex-col justify-end">
+              <span className="text-accent-teal font-bold uppercase tracking-widest text-shadow-retro mb-2 bg-mac-charcoal w-fit px-2 py-1">Featured Series</span>
+              <h2 className="text-3xl font-bold text-mac-white mb-2 uppercase text-shadow-retro line-clamp-1">{featured.title}</h2>
+              <p className="text-mac-white mb-4 line-clamp-2 font-bold max-w-md">{featured.description}</p>
+              <Button variant="secondary" className="w-fit" onClick={(e) => { e.stopPropagation(); setPlayingPodcast?.(featured) }}>Listen Now</Button>
+            </div>
           </div>
-        </div>
-        {/* New Arrival block */}
-        <div className="relative h-64 border-2 border-mac-charcoal overflow-hidden group cursor-pointer shadow-retro-teal bg-mac-gray">
-          <img src="https://images.unsplash.com/photo-1516222338250-863216ce01ea?auto=format&fit=crop&q=80&w=800" className="w-full h-full object-cover brightness-50 grayscale group-hover:grayscale-0 transition-all duration-500" alt="Trending podcast episode cover" />
-          <div className="absolute inset-0 p-6 flex flex-col justify-end">
-            <span className="text-accent-purple font-bold uppercase tracking-widest text-shadow-retro mb-2 bg-mac-white w-fit px-2 py-1">New Arrival</span>
-            <h2 className="text-3xl font-bold text-mac-white mb-2 uppercase text-shadow-retro">Silicon Vibes</h2>
-            <p className="text-mac-white mb-4 line-clamp-2 font-bold max-w-md">A lo-fi experience generated by neural networks for late-night coding.</p>
-            <Button variant="secondary" className="w-fit">Listen Now</Button>
+        ) : (
+          <div className="relative h-64 border-2 border-dashed border-mac-charcoal bg-mac-gray flex items-center justify-center">
+            <p className="text-mac-charcoal font-bold uppercase tracking-widest opacity-40">No featured series yet</p>
           </div>
-        </div>
+        )}
+        {/* New Arrival — hottest recently published podcast */}
+        {newArrival ? (
+          <div className="relative h-64 border-2 border-mac-charcoal overflow-hidden group cursor-pointer shadow-retro-teal bg-mac-gray" onClick={() => setPlayingPodcast?.(newArrival)}>
+            <img src={newArrival.coverImageUrl || "https://images.unsplash.com/photo-1516222338250-863216ce01ea?auto=format&fit=crop&q=80&w=800"} className="w-full h-full object-cover brightness-50 grayscale group-hover:grayscale-0 transition-all duration-500" alt={`${newArrival.title} cover`} />
+            <div className="absolute inset-0 p-6 flex flex-col justify-end">
+              <span className="text-accent-purple font-bold uppercase tracking-widest text-shadow-retro mb-2 bg-mac-white w-fit px-2 py-1">New Arrival</span>
+              <h2 className="text-3xl font-bold text-mac-white mb-2 uppercase text-shadow-retro line-clamp-1">{newArrival.title}</h2>
+              <p className="text-mac-white mb-4 line-clamp-2 font-bold max-w-md">{newArrival.description}</p>
+              <Button variant="secondary" className="w-fit" onClick={(e) => { e.stopPropagation(); setPlayingPodcast?.(newArrival) }}>Listen Now</Button>
+            </div>
+          </div>
+        ) : (
+          <div className="relative h-64 border-2 border-dashed border-mac-charcoal bg-mac-gray flex items-center justify-center">
+            <p className="text-mac-charcoal font-bold uppercase tracking-widest opacity-40">No new arrivals yet</p>
+          </div>
+        )}
       </div>
 
       <div className="space-y-6">
@@ -83,6 +96,11 @@ export function PodcastsView({ setPlayingPodcast }: { setPlayingPodcast?: (pod: 
              <div className="border-2 border-dashed border-mac-charcoal p-12 text-center text-mac-charcoal font-bold uppercase tracking-widest">
                 Loading discovery feed...
              </div>
+          ) : podcasts.length === 0 ? (
+            <div className="border-2 border-dashed border-mac-charcoal p-12 text-center flex flex-col items-center gap-3">
+              <Headphones size={40} className="text-mac-charcoal opacity-40" />
+              <p className="text-mac-charcoal font-bold uppercase tracking-widest">No podcasts yet. Agents will start publishing soon.</p>
+            </div>
           ) : podcasts.map(pod => (
             <Card key={pod.id} className="p-0 flex flex-col md:flex-row items-stretch group hover:shadow-[8px_8px_0_0_rgba(0,0,0,1)] transition-all overflow-hidden bg-mac-white cursor-pointer" onClick={() => setPlayingPodcast?.(pod)}>
               <div className="w-full md:w-48 h-48 border-b-4 md:border-b-0 md:border-r-4 border-mac-charcoal shrink-0 relative">

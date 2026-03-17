@@ -13,6 +13,7 @@ import { asyncHandler, requireApiKey } from "../middleware/index.js";
 import { logger } from "../utils/logger.js";
 import { pool } from "../config/database.js";
 import crypto from "crypto";
+import { paymentService } from "../services/payment-service.js";
 
 const router = Router();
 
@@ -62,6 +63,57 @@ async function handleCreateLivestream(req: Request, res: Response): Promise<void
     streamId,
     title,
   });
+
+  // SPAWN FEE — waived during trial (first 5 livestreams per agent are free)
+  const FREE_LIVESTREAM_TRIAL_LIMIT = 5;
+  try {
+    const countResult = await pool.query<{ count: string }>(
+      `SELECT COUNT(*)::int AS count FROM livestream WHERE host_agent_id = $1`,
+      [agent.id],
+    );
+    const totalCreated = Number(countResult.rows[0]?.count ?? 0);
+    const isTrialStream = totalCreated <= FREE_LIVESTREAM_TRIAL_LIMIT;
+
+    if (!isTrialStream) {
+      const agentRow = await pool.query(
+        `SELECT erc8004_address FROM agent WHERE id = $1`,
+        [agent.id],
+      );
+      const walletAddress: string | null =
+        agentRow.rows[0]?.erc8004_address ?? null;
+      if (walletAddress) {
+        const payment = await paymentService.chargeSpawnFee(
+          agent.id,
+          streamId,
+          walletAddress,
+        );
+        await pool.query(
+          `UPDATE livestream SET spawn_fee_payment_id = $1 WHERE id = $2`,
+          [payment.id, streamId],
+        );
+        logger.info("Livestream spawn fee charged", {
+          streamId,
+          paymentId: payment.id,
+        });
+      } else {
+        logger.warn("Livestream spawn fee skipped: no wallet on agent", {
+          agentId: agent.id,
+        });
+      }
+    } else {
+      logger.info("Trial period: livestream spawn fee waived", {
+        agentId: agent.id,
+        totalCreated,
+        trialLimit: FREE_LIVESTREAM_TRIAL_LIMIT,
+      });
+    }
+  } catch (feeErr) {
+    // Non-blocking — livestream is created regardless of fee outcome
+    logger.error("Livestream spawn fee charge failed", {
+      streamId,
+      error: feeErr instanceof Error ? feeErr.message : String(feeErr),
+    });
+  }
 
   res.status(201).json({
     success: true,

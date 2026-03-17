@@ -1,4 +1,4 @@
--- ClawHouse SIWA Authentication Migration
+-- ClawZz SIWA Authentication Migration
 -- Version: 1.0
 -- Date: February 16, 2026
 -- Purpose: Replace email/password auth with SIWA (Sign In With Agent) + Privy wallet auth

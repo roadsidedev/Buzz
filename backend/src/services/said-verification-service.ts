@@ -1,45 +1,73 @@
 /**
- * SAID Protocol Verification Service
+ * 8004-Solana Verification Service
  *
- * Integration with SAID Protocol for Solana-based agent identity verification.
- * Agents can optionally link their Solana wallet to get a "SAID verified" badge.
+ * Integration with the 8004-Solana standard by QuantuLabs — the Solana port of ERC-8004.
+ * Provides on-chain agent identity and reputation via Metaplex Core NFTs and an
+ * event-based indexer with cryptographic integrity (SEAL v1).
  *
- * API docs: https://www.saidprotocol.com/docs/integrate
+ * On-chain programs:
+ *   Devnet:  8oo4J9tBB3Hna1jRQ3rWvJjojqM5DYTDJo5cejUuJy3C
+ *   Mainnet: 8oo4dC4JvBLwy5tGgiH3WwK4B9PWxL9Z4XjA2jzkQMbQ
+ *
+ * The indexer REST API aggregates on-chain events and exposes agent registration
+ * and reputation data without requiring raw RPC calls.
+ *
+ * Docs: https://8004.qnt.sh
+ * GitHub: https://github.com/QuantuLabs/8004-solana
  */
 
 import { logger } from "../utils/logger.js";
 
-const SAID_API_BASE = process.env.SAID_API_URL || "https://api.saidprotocol.com";
+const SOL8004_API_BASE =
+  process.env.SOL8004_API_URL || "https://api.8004.qnt.sh";
 
-export interface SAIDVerificationResult {
+export interface Sol8004VerificationResult {
   verified: boolean;
   wallet: string;
+  /** Metaplex Core NFT asset ID (primary on-chain identifier) */
+  agentAssetId?: string;
   agentName?: string;
   reputationScore: number;
   registeredAt?: string;
   error?: string;
 }
 
-export class SAIDVerificationService {
+export class Sol8004VerificationService {
+  private headers(): Record<string, string> {
+    return {
+      Accept: "application/json",
+      ...(process.env.SOL8004_API_KEY
+        ? { Authorization: `Bearer ${process.env.SOL8004_API_KEY}` }
+        : {}),
+    };
+  }
+
   /**
-   * Verify a Solana wallet via SAID Protocol.
+   * Verify a Solana agent via the 8004-Solana indexer.
+   *
+   * Looks up the agent by their Solana wallet address. The indexer resolves
+   * the associated Metaplex Core asset ID and returns registration status plus
+   * aggregated reputation score from on-chain feedback events.
    */
-  async verifyWallet(solanaWallet: string): Promise<SAIDVerificationResult> {
+  async verifyAgent(solanaWallet: string): Promise<Sol8004VerificationResult> {
     try {
       const response = await fetch(
-        `${SAID_API_BASE}/api/verify/${solanaWallet}`,
-        {
-          headers: {
-            Accept: "application/json",
-            ...(process.env.SAID_API_KEY
-              ? { Authorization: `Bearer ${process.env.SAID_API_KEY}` }
-              : {}),
-          },
-        },
+        `${SOL8004_API_BASE}/v1/agents/by-wallet/${solanaWallet}`,
+        { headers: this.headers() },
       );
 
+      if (response.status === 404) {
+        // Wallet not registered on 8004-Solana
+        return {
+          verified: false,
+          wallet: solanaWallet,
+          reputationScore: 0,
+          error: "Wallet not registered on 8004-Solana",
+        };
+      }
+
       if (!response.ok) {
-        logger.warn("SAID verification failed", {
+        logger.warn("8004-Solana verification failed", {
           wallet: solanaWallet,
           status: response.status,
         });
@@ -47,21 +75,39 @@ export class SAIDVerificationService {
           verified: false,
           wallet: solanaWallet,
           reputationScore: 0,
-          error: `SAID API returned ${response.status}`,
+          error: `8004-Solana indexer returned ${response.status}`,
         };
       }
 
       const data: any = await response.json();
 
+      // The indexer returns the Metaplex Core asset ID alongside agent metadata
+      const assetId: string | undefined =
+        data.asset_id || data.agentAssetId || data.agent_asset_id;
+
+      let reputationScore: number =
+        data.reputation_score ?? data.score ?? 0;
+
+      // If a separate reputation endpoint exists, fetch it for accuracy
+      if (assetId && reputationScore === 0) {
+        reputationScore = await this.fetchReputation(assetId);
+      }
+
+      const verified =
+        data.registered === true ||
+        data.verified === true ||
+        data.status === "active";
+
       return {
-        verified: data.verified || false,
+        verified,
         wallet: solanaWallet,
-        agentName: data.agent_name || data.name,
-        reputationScore: data.reputation_score || data.score || 0,
-        registeredAt: data.registered_at,
+        agentAssetId: assetId,
+        agentName: data.name || data.agent_name,
+        reputationScore,
+        registeredAt: data.registered_at || data.created_at,
       };
     } catch (err: any) {
-      logger.error("SAID verification error", {
+      logger.error("8004-Solana verification error", {
         wallet: solanaWallet,
         error: err.message,
       });
@@ -75,53 +121,22 @@ export class SAIDVerificationService {
   }
 
   /**
-   * Get agent data from SAID Protocol.
+   * Fetch aggregated reputation score from on-chain feedback events.
+   * Returns 0 on failure (non-fatal).
    */
-  async getAgentData(solanaWallet: string): Promise<SAIDVerificationResult> {
+  private async fetchReputation(assetId: string): Promise<number> {
     try {
       const response = await fetch(
-        `${SAID_API_BASE}/api/agents/${solanaWallet}`,
-        {
-          headers: {
-            Accept: "application/json",
-            ...(process.env.SAID_API_KEY
-              ? { Authorization: `Bearer ${process.env.SAID_API_KEY}` }
-              : {}),
-          },
-        },
+        `${SOL8004_API_BASE}/v1/agents/${assetId}/reputation`,
+        { headers: this.headers() },
       );
-
-      if (!response.ok) {
-        return {
-          verified: false,
-          wallet: solanaWallet,
-          reputationScore: 0,
-          error: `SAID API returned ${response.status}`,
-        };
-      }
-
+      if (!response.ok) return 0;
       const data: any = await response.json();
-
-      return {
-        verified: data.registered || data.verified || false,
-        wallet: solanaWallet,
-        agentName: data.name || data.agent_name,
-        reputationScore: data.reputation_score || data.score || 0,
-        registeredAt: data.registered_at || data.created_at,
-      };
-    } catch (err: any) {
-      logger.error("SAID agent data fetch error", {
-        wallet: solanaWallet,
-        error: err.message,
-      });
-      return {
-        verified: false,
-        wallet: solanaWallet,
-        reputationScore: 0,
-        error: err.message,
-      };
+      return data.average_score ?? data.reputation_score ?? data.score ?? 0;
+    } catch {
+      return 0;
     }
   }
 }
 
-export const saidVerificationService = new SAIDVerificationService();
+export const saidVerificationService = new Sol8004VerificationService();
