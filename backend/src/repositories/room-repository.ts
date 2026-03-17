@@ -194,6 +194,84 @@ export class RoomRepository {
   }
 
   /**
+   * Get discoverable rooms (live + pending) for public listing.
+   *
+   * Rooms with status 'pending' (Jam unavailable at creation) are still
+   * valid — agents can join them and trigger audio initialization.
+   * Live rooms sort first, then by viewer count and creation date.
+   *
+   * @param limit - Max results per page
+   * @param offset - Pagination offset
+   * @param type - Optional room type filter
+   * @returns Array of discoverable rooms
+   */
+  async getDiscoverableRooms(
+    limit: number,
+    offset: number,
+    type?: string,
+  ): Promise<Room[]> {
+    let text = `
+      SELECT id, host_agent_id, type, status, objective, spawn_fee, jam_room_id, jam_room_url, spawn_fee_payment_id, viewer_count, participant_count, completion_level, created_at, started_at, ended_at, updated_at
+      FROM room
+      WHERE status IN ('live', 'pending')
+    `;
+
+    const params: any[] = [];
+
+    if (type) {
+      text += ` AND type = $${params.length + 1}`;
+      params.push(type);
+    }
+
+    text += `
+      ORDER BY (CASE WHEN status = 'live' THEN 0 ELSE 1 END), viewer_count DESC, created_at DESC
+      LIMIT $${params.length + 1} OFFSET $${params.length + 2}
+    `;
+
+    params.push(limit, offset);
+
+    const rows = await query<RoomRow>(text, params);
+
+    logger.debug("Fetched discoverable rooms", {
+      count: rows.length,
+      limit,
+      offset,
+      type,
+    });
+
+    return rows.map((row) => this.mapRowToRoom(row));
+  }
+
+  /**
+   * Get total count of discoverable rooms (live + pending)
+   *
+   * @param type - Optional room type filter for count
+   * @returns Total count of rooms matching criteria
+   */
+  async getDiscoverableRoomCount(type?: string): Promise<number> {
+    let text = `
+      SELECT COUNT(*) as count
+      FROM room
+      WHERE status IN ('live', 'pending')
+    `;
+
+    const params: any[] = [];
+
+    if (type) {
+      text += ` AND type = $${params.length + 1}`;
+      params.push(type);
+    }
+
+    const row = await queryOne<{ count: string }>(text, params);
+
+    const count = row ? parseInt(row.count, 10) : 0;
+
+    logger.debug("Counted discoverable rooms", { count, type });
+
+    return count;
+  }
+
+  /**
    * Get trending rooms with optional type filtering
    *
    * @param hours - Timeframe in hours

@@ -41,13 +41,13 @@ async function handleLiveRooms(req: Request, res: Response): Promise<void> {
     return;
   }
 
-  // Fetch rooms and total count
+  // Fetch discoverable rooms (live + pending) and total count
   const [rooms, total] = await Promise.all([
-    roomService.getLiveRooms(limit, offset, type),
-    roomService.getLiveRoomCount(type),
+    roomService.getDiscoverableRooms(limit, offset, type),
+    roomService.getDiscoverableRoomCount(type),
   ]);
 
-  logger.debug("Discovery: live rooms", {
+  logger.debug("Discovery: discoverable rooms", {
     limit,
     offset,
     type,
@@ -69,6 +69,7 @@ async function handleLiveRooms(req: Request, res: Response): Promise<void> {
         status: room.status,
         viewerCount: room.viewerCount,
         participantCount: room.participantCount,
+        hostAgentId: room.hostAgentId,
       })),
       pagination: {
         total,
@@ -388,10 +389,10 @@ router.get(
       return;
     }
 
-    // Fetch rooms filtered by type and total count
+    // Fetch discoverable rooms filtered by type and total count
     const [rooms, total] = await Promise.all([
-      roomService.getLiveRooms(limit, offset, type),
-      roomService.getLiveRoomCount(type),
+      roomService.getDiscoverableRooms(limit, offset, type),
+      roomService.getDiscoverableRoomCount(type),
     ]);
 
     logger.debug("Discovery: by-type", {

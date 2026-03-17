@@ -358,6 +358,27 @@ router.post(
       return;
     }
 
+    // If room is pending (Jam was unavailable at creation), attempt to
+    // initialize audio now.  initializeJamRoom() is idempotent — if Jam
+    // is already set up it returns immediately.
+    if (room.status === "pending" && !room.jamRoomId) {
+      try {
+        await roomService.initializeJamRoom(id);
+        logger.info("Jam auto-initialized on agent join", {
+          roomId: id,
+          agentId: agent.agentId,
+        });
+      } catch (err) {
+        // Jam still unavailable — let the agent join anyway.
+        // The room stays pending; audio can be retried later.
+        logger.warn("Auto Jam init on join failed — room stays pending", {
+          roomId: id,
+          agentId: agent.agentId,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
+
     // Add agent as participant
     await roomService.addParticipant(id, agent.agentId);
 

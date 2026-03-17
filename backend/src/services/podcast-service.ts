@@ -1047,6 +1047,112 @@ export class PodcastService {
   }
 
   // ===================================================================
+  // Episode Retry & Status Methods
+  // ===================================================================
+
+  /**
+   * Retry generation for a stalled episode.
+   *
+   * If the orchestrator was unavailable when the episode was first created,
+   * the episode stays in 'pending' status with no audio. This method
+   * re-invokes the orchestrator and transitions the episode to 'generating'
+   * on success, or 'failed' if the orchestrator is still unreachable.
+   *
+   * @param episodeId - Episode ID to retry
+   * @returns Updated episode
+   * @throws NotFoundError if episode not found
+   * @throws ValidationError if episode is not in a retryable state
+   */
+  async retryEpisodeGeneration(episodeId: string): Promise<PodcastEpisode> {
+    const episode = await this.getEpisodeById(episodeId);
+
+    // Only retry episodes stuck in 'pending' or 'failed'
+    if (!["pending", "failed"].includes(episode.status)) {
+      throw new ValidationError(
+        "Episode is not in a retryable state",
+        {
+          episodeId,
+          currentStatus: episode.status,
+          retryableStatuses: ["pending", "failed"],
+          code: "EPISODE_NOT_RETRYABLE",
+        },
+      );
+    }
+
+    const podcast = await this.getPodcast(episode.podcastId);
+
+    // Attempt orchestrator call
+    try {
+      logger.info("Retrying episode generation via orchestrator", {
+        episodeId,
+        podcastId: episode.podcastId,
+        previousStatus: episode.status,
+      });
+
+      await this.orchestrator.generatePodcastEpisode({
+        podcastId: episode.podcastId,
+        episodeId,
+        title: episode.title,
+        sourceUrls: [],
+        voicePreferences: {},
+      });
+
+      // Orchestrator accepted — move to 'generating'
+      const updated = await this.updateEpisodeStatus(episodeId, "generating");
+
+      logger.info("Episode generation retry succeeded", {
+        episodeId,
+        newStatus: "generating",
+      });
+
+      return updated;
+    } catch (err) {
+      // Orchestrator still unavailable — mark as 'failed' so agents
+      // have visibility, but allow future retries.
+      logger.warn("Episode generation retry failed — marking as failed", {
+        episodeId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+
+      const failed = await this.updateEpisodeStatus(episodeId, "failed");
+      return failed;
+    }
+  }
+
+  /**
+   * Get generation status for an episode.
+   *
+   * Returns the current status along with timing metadata so agents
+   * can poll for completion.
+   *
+   * @param episodeId - Episode ID
+   * @returns Status details
+   */
+  async getEpisodeGenerationStatus(episodeId: string): Promise<{
+    episodeId: string;
+    status: string;
+    createdAt: Date;
+    updatedAt: Date;
+    generatedAt?: Date;
+    audioUrl?: string;
+    durationSeconds?: number;
+    canRetry: boolean;
+  }> {
+    const episode = await this.getEpisodeById(episodeId);
+
+    return {
+      episodeId: episode.id,
+      status: episode.status,
+      createdAt: episode.createdAt,
+      updatedAt: episode.updatedAt,
+      generatedAt: episode.generatedAt,
+      audioUrl: episode.audioUrl,
+      durationSeconds: episode.durationSeconds,
+      canRetry: ["pending", "failed"].includes(episode.status),
+    };
+  }
+
+  // ===================================================================
   // Private Helper Methods
   // ===================================================================
 

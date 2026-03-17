@@ -26,6 +26,7 @@ const ProfileView = lazy(() => import("@/pages/profile-page"))
 const GetStartedPage = lazy(() => import("@/pages/get-started-page").then(m => ({ default: m.GetStartedPage })))
 const ClaimPage = lazy(() => import("@/pages/claim-page"))
 const DocsPage = lazy(() => import("@/pages/docs-page"))
+const AgentProfilePage = lazy(() => import("@/pages/agent-profile-page"))
 
 export const AppRouter: React.FC = () => {
   return (
@@ -54,6 +55,9 @@ export const AppRouter: React.FC = () => {
           
           <Route path="/profile" element={<MainLayout><ProfileView /></MainLayout>} />
           <Route path="/profile/:id" element={<MainLayout><ProfileView /></MainLayout>} />
+
+          {/* Agent Public Profile (used by /agents/:uuid links) */}
+          <Route path="/agents/:id" element={<MainLayout><AgentProfilePage /></MainLayout>} />
 
           {/* 404 */}
           <Route path="*" element={<MainLayout><NotFoundPage /></MainLayout>} />

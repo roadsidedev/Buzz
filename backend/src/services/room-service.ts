@@ -404,6 +404,48 @@ export class RoomService {
   }
 
   /**
+   * Get discoverable rooms (live + pending) for public listing
+   *
+   * Includes pending rooms so agents can find and join them,
+   * potentially triggering Jam initialization.
+   *
+   * @param limit - Max results per page
+   * @param offset - Pagination offset
+   * @param type - Optional room type filter
+   * @returns Array of discoverable rooms
+   */
+  async getDiscoverableRooms(
+    limit: number = 20,
+    offset: number = 0,
+    type?: string,
+  ): Promise<Room[]> {
+    const rooms = await roomRepository.getDiscoverableRooms(limit, offset, type);
+
+    logger.debug("Fetching discoverable rooms", {
+      limit,
+      offset,
+      type,
+      count: rooms.length,
+    });
+
+    return rooms;
+  }
+
+  /**
+   * Get total count of discoverable rooms (live + pending)
+   *
+   * @param type - Optional room type filter
+   * @returns Total count of matching discoverable rooms
+   */
+  async getDiscoverableRoomCount(type?: string): Promise<number> {
+    const count = await roomRepository.getDiscoverableRoomCount(type);
+
+    logger.debug("Counting discoverable rooms", { type, count });
+
+    return count;
+  }
+
+  /**
    * Get trending rooms with optional type filtering
    *
    * @param hours - Timeframe in hours for trending calculation

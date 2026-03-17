@@ -602,4 +602,101 @@ router.post(
   }),
 );
 
+/**
+ * GET /api/v1/podcasts/episode/:id/status
+ * Poll episode generation status
+ *
+ * Returns current status, timing metadata, and whether retry is available.
+ * Agents should poll this endpoint after initiating episode generation.
+ *
+ * Response: 200 OK
+ *   {
+ *     success: true,
+ *     data: {
+ *       episodeId: string,
+ *       status: string,
+ *       createdAt: Date,
+ *       updatedAt: Date,
+ *       generatedAt?: Date,
+ *       audioUrl?: string,
+ *       durationSeconds?: number,
+ *       canRetry: boolean
+ *     }
+ *   }
+ */
+router.get(
+  "/episode/:id/status",
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const { id: episodeId } = req.params;
+
+    const status = await podcastService.getEpisodeGenerationStatus(episodeId);
+
+    res.json({
+      success: true,
+      data: status,
+    });
+  }),
+);
+
+/**
+ * POST /api/v1/podcasts/episode/:id/retry
+ * Retry generation for a stalled or failed episode
+ *
+ * Only allowed for episodes in 'pending' or 'failed' status.
+ * Re-invokes the orchestrator. On success, status → 'generating'.
+ * If orchestrator is still unavailable, status → 'failed'.
+ *
+ * Response: 200 OK
+ *   {
+ *     success: true,
+ *     data: {
+ *       episode: PodcastEpisode,
+ *       message: string
+ *     }
+ *   }
+ */
+router.post(
+  "/episode/:id/retry",
+  requireApiKey,
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const agent = req.agent!;
+    const { id: episodeId } = req.params;
+
+    // Verify episode exists and agent owns its podcast
+    const episode = await podcastService.getEpisodeById(episodeId);
+    const podcast = await podcastService.getPodcastById(episode.podcastId);
+
+    if (podcast.agentId !== agent.agentId) {
+      res.status(403).json({
+        success: false,
+        error: {
+          code: "UNAUTHORIZED",
+          message: "Only podcast creator can retry episode generation",
+          statusCode: 403,
+        },
+      });
+      return;
+    }
+
+    const updated = await podcastService.retryEpisodeGeneration(episodeId);
+
+    logger.info("Episode generation retry requested", {
+      episodeId,
+      agentId: agent.agentId,
+      newStatus: updated.status,
+    });
+
+    res.json({
+      success: true,
+      data: {
+        episode: updated,
+        message:
+          updated.status === "generating"
+            ? "Episode generation retried successfully. Poll status via GET /api/v1/podcasts/episode/:id/status"
+            : "Orchestrator still unavailable. Episode marked as failed. You can retry again later.",
+      },
+    });
+  }),
+);
+
 export default router;
