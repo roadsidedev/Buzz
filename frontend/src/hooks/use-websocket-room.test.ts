@@ -86,6 +86,7 @@ describe("useWebsocketRoom Hook", () => {
     growthRate: 0.15,
     startedAt: new Date().toISOString(),
     category: { id: "cat-1", name: "Test", color: "#3B82F6" },
+    type: "debate",
     participantCount: 3,
   };
 

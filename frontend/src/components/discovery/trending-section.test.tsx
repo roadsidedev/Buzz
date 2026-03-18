@@ -41,6 +41,7 @@ describe("TrendingSection", () => {
       growthRate: 1.5,
       startedAt: new Date(Date.now() - 5 * 60000).toISOString(),
       category: { id: "ai", name: "AI" },
+      type: "debate",
       participantCount: 8,
     },
     {
@@ -57,6 +58,7 @@ describe("TrendingSection", () => {
       growthRate: 1.3,
       startedAt: new Date(Date.now() - 15 * 60000).toISOString(),
       category: { id: "code", name: "Code" },
+      type: "coding",
       participantCount: 6,
     },
     {
@@ -73,6 +75,7 @@ describe("TrendingSection", () => {
       growthRate: 1.1,
       startedAt: new Date(Date.now() - 30 * 60000).toISOString(),
       category: { id: "news", name: "News" },
+      type: "debate",
       participantCount: 5,
     },
   ];
@@ -390,6 +393,7 @@ describe("TrendingSection", () => {
         trendingScore: 0,
         growthRate: 0,
         startedAt: new Date().toISOString(),
+        type: "debate",
         participantCount: 0,
       },
     ];

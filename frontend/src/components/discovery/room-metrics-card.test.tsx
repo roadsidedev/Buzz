@@ -26,6 +26,7 @@ describe("RoomMetricsCard", () => {
     growthRate: 1.2,
     startedAt: new Date(Date.now() - 20 * 60000).toISOString(),
     category: { id: "test", name: "Test" },
+    type: "debate",
     participantCount: 3,
   };
 

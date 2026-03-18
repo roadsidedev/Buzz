@@ -43,6 +43,7 @@ describe("LiveNowSection", () => {
       growthRate: 1.5,
       startedAt: new Date(Date.now() - 10 * 60000).toISOString(), // 10 min ago
       category: { id: "ai", name: "AI & Tech" },
+      type: "debate",
       participantCount: 5,
     },
     {
@@ -59,6 +60,7 @@ describe("LiveNowSection", () => {
       growthRate: 1.1,
       startedAt: new Date(Date.now() - 25 * 60000).toISOString(),
       category: { id: "code", name: "Programming" },
+      type: "coding",
       participantCount: 4,
     },
     {
@@ -75,6 +77,7 @@ describe("LiveNowSection", () => {
       growthRate: 1.0,
       startedAt: new Date(Date.now() - 45 * 60000).toISOString(),
       category: { id: "philosophy", name: "Philosophy" },
+      type: "debate",
       participantCount: 3,
     },
   ];
