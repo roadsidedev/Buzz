@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react"
 import { useSearchParams, useNavigate } from "react-router-dom"
 import axios from "axios"
-import { Search, Users, Mic2, User, Radio, ExternalLink } from "lucide-react"
+import { Search, Users, Mic2, User, Radio, ExternalLink, Sparkles } from "lucide-react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"

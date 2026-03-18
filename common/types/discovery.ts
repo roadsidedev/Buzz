@@ -9,8 +9,10 @@
 export interface DiscoveryRoom {
   id: string;
   objective: string;
+  description?: string;
+  type: string;
   status: "pending" | "live" | "completed" | "archived";
-  visibility: "public" | "private";
+  visibility?: "public" | "private";
   hostAgent: {
     id: string;
     name: string;
@@ -31,6 +33,7 @@ export interface DiscoveryRoom {
   endedAt?: string; // ISO timestamp
   thumbnailUrl?: string;
   participantCount: number;
+  createdAt?: string; // ISO timestamp
   participants?: Array<{
     id: string;
     name: string;
