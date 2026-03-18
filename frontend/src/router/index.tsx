@@ -18,14 +18,18 @@ const PageLoader: React.FC = () => (
 )
 
 // View Components (Lazy Loaded)
-const HomeView = lazy(() => import("@/pages/hero-page"))
+const HomeView = lazy(() => import("@/pages/home-page"))
 const RoomsView = lazy(() => import("@/pages/discovery-page"))
+const RoomDetailsView = lazy(() => import("@/pages/room-page"))
+const RoomLiveView = lazy(() => import("@/pages/room-live-page"))
 const PodcastsView = lazy(() => import("@/pages/podcasts-page"))
+const EpisodePlayerPage = lazy(() => import("@/pages/episode-player-page").then(m => ({ default: m.EpisodePlayerPage })))
 const LiveStreamView = lazy(() => import("@/pages/room-live-page"))
 const ProfileView = lazy(() => import("@/pages/profile-page"))
-const GetStartedPage = lazy(() => import("@/pages/get-started-page").then(m => ({ default: m.GetStartedPage })))
+const OnboardingView = lazy(() => import("@/pages/get-started-page"))
 const ClaimPage = lazy(() => import("@/pages/claim-page"))
 const DocsPage = lazy(() => import("@/pages/docs-page"))
+const NotFoundView = lazy(() => import("@/pages/not-found-page"))
 const AgentProfilePage = lazy(() => import("@/pages/agent-profile-page"))
 const SearchPage = lazy(() => import("@/pages/search-page"))
 
@@ -38,18 +42,21 @@ export const AppRouter: React.FC = () => {
           <Route path="/doc" element={<DocsPage />} />
 
           {/* Public / Onboarding */}
-          <Route path="/get-started" element={<GetStartedPage />} />
+          <Route path="/get-started" element={<OnboardingView />} />
           <Route path="/claim/:token" element={<MainLayout><ClaimPage /></MainLayout>} />
 
           {/* Main Application Routes wrapped in MainLayout */}
           <Route path="/" element={<MainLayout><HomeView /></MainLayout>} />
           <Route path="/home" element={<Navigate to="/" replace />} />
           <Route path="/feed" element={<Navigate to="/" replace />} />
+          <Route path="/trending" element={<MainLayout><HomeView /></MainLayout>} />
           
           <Route path="/rooms" element={<MainLayout><RoomsView /></MainLayout>} />
-          <Route path="/room/:id" element={<MainLayout><RoomsView /></MainLayout>} /> {/* In a real app this would be a specific room view */}
+          <Route path="/room/:id" element={<MainLayout><RoomDetailsView /></MainLayout>} />
+          <Route path="/room/:id/live" element={<MainLayout><RoomLiveView /></MainLayout>} />
           
           <Route path="/podcasts" element={<MainLayout><PodcastsView /></MainLayout>} />
+          <Route path="/podcasts/:id" element={<MainLayout><EpisodePlayerPage /></MainLayout>} />
           
           <Route path="/live" element={<MainLayout><LiveStreamView /></MainLayout>} />
           <Route path="/live/:id" element={<MainLayout><LiveStreamView /></MainLayout>} />

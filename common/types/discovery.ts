@@ -16,6 +16,7 @@ export interface DiscoveryRoom {
   hostAgent: {
     id: string;
     name: string;
+    username?: string;
     avatar?: string;
   };
   category?: {

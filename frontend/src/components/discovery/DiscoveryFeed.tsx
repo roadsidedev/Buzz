@@ -16,19 +16,7 @@ import { AlertCircle, Loader } from "lucide-react";
 import axios from "axios";
 import { RoomCard } from "./RoomCard";
 import { PodcastCard } from "./PodcastCard";
-
-// Type definitions
-interface Room {
-  id: string;
-  title: string;
-  type: "debate" | "coding" | "research" | "trading" | "simulation";
-  hostName: string;
-  hostAvatar?: string;
-  listenerCount: number;
-  isLive: boolean;
-  createdAt: Date;
-  description?: string;
-}
+import type { DiscoveryRoom } from "common/types/discovery";
 
 interface Podcast {
   id: string;
@@ -45,6 +33,7 @@ interface Podcast {
 
 export interface DiscoveryFeedProps {
   onRoomJoin?: (roomId: string) => void;
+  onWatchStream?: (roomId: string) => void;
   onPodcastPlay?: (podcastId: string) => void;
   onPodcastSubscribe?: (podcastId: string) => void;
 }
@@ -60,14 +49,15 @@ const CATEGORIES = [
 
 export const DiscoveryFeed: React.FC<DiscoveryFeedProps> = ({
   onRoomJoin,
+  onWatchStream,
   onPodcastPlay,
   onPodcastSubscribe,
 }) => {
   // State
   const [selectedCategory, setSelectedCategory] = useState("all");
-  const [liveRooms, setLiveRooms] = useState<Room[]>([]);
+  const [liveRooms, setLiveRooms] = useState<DiscoveryRoom[]>([]);
   const [trendingPodcasts, setTrendingPodcasts] = useState<Podcast[]>([]);
-  const [trendingRooms, setTrendingRooms] = useState<Room[]>([]);
+  const [trendingRooms, setTrendingRooms] = useState<DiscoveryRoom[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -92,15 +82,21 @@ export const DiscoveryFeed: React.FC<DiscoveryFeedProps> = ({
         ]);
 
         const rawLiveRooms = liveRes?.data?.data?.rooms || [];
-        const mappedLiveRooms: Room[] = rawLiveRooms.map((r: any) => ({
+        const mappedLiveRooms: DiscoveryRoom[] = rawLiveRooms.map((r: any) => ({
           id: r.id,
           title: r.title || r.objective || "Untitled Room",
           type: r.type || "debate",
-          hostName: `@${r.hostAgentName || r.speakers?.[0] || "Agent_Unknown"}`,
-          hostAvatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${r.hostAgentId || r.id}`,
+          hostAgent: {
+            id: r.hostAgentId || r.id,
+            name: r.hostAgentName || r.speakers?.[0] || "Agent_Unknown",
+            avatar: r.hostAgentAvatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${r.hostAgentId || r.id}`,
+          },
           listenerCount: r.viewerCount || r.listeners || 0,
+          viewerCount: r.viewerCount || 0,
           isLive: r.status === "live",
+          status: r.status || "live",
           createdAt: new Date(r.createdAt || Date.now()),
+          objective: r.objective || "",
           description: r.objective,
         }));
 
@@ -119,15 +115,21 @@ export const DiscoveryFeed: React.FC<DiscoveryFeedProps> = ({
         }));
 
         const rawTrendingRooms = trendingRes?.data?.data?.rooms || [];
-        const mappedTrendingRooms: Room[] = rawTrendingRooms.map((r: any) => ({
+        const mappedTrendingRooms: DiscoveryRoom[] = rawTrendingRooms.map((r: any) => ({
           id: r.id,
           title: r.title || r.objective || "Untitled Room",
           type: r.type || "debate",
-          hostName: `@${r.hostAgentName || r.speakers?.[0] || "Agent_Unknown"}`,
-          hostAvatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${r.hostAgentId || r.id}`,
+          hostAgent: {
+            id: r.hostAgentId || r.id,
+            name: r.hostAgentName || r.speakers?.[0] || "Agent_Unknown",
+            avatar: r.hostAgentAvatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${r.hostAgentId || r.id}`,
+          },
           listenerCount: r.viewerCount || r.listeners || 0,
+          viewerCount: r.viewerCount || 0,
           isLive: r.status === "live",
+          status: r.status || "live",
           createdAt: new Date(r.createdAt || Date.now()),
+          objective: r.objective || "",
           description: r.objective,
         }));
 
@@ -219,8 +221,9 @@ export const DiscoveryFeed: React.FC<DiscoveryFeedProps> = ({
                   {liveRooms.map((room) => (
                     <RoomCard
                       key={room.id}
-                      {...room}
-                      onJoin={onRoomJoin}
+                      room={room}
+                      onJoin={onRoomJoin || (() => {})}
+                      onWatch={onWatchStream}
                     />
                   ))}
                 </div>
@@ -256,8 +259,9 @@ export const DiscoveryFeed: React.FC<DiscoveryFeedProps> = ({
                   {trendingRooms.map((room) => (
                     <RoomCard
                       key={room.id}
-                      {...room}
-                      onJoin={onRoomJoin}
+                      room={room}
+                      onJoin={onRoomJoin || (() => {})}
+                      onWatch={onWatchStream}
                     />
                   ))}
                 </div>
