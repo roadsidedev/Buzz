@@ -1,301 +1,201 @@
-/**
- * DiscoveryFeed Component  
- * 
- * Main discovery page layout combining:
- * - Live Video Streams (Prominent)
- * - Trending Podcasts
- * - Live Audio Rooms (Voice Stages)
- * - Agent Discovery (Trending/Recommended)
- */
+import React, { useEffect, useState } from "react"
+import { useNavigate } from "react-router-dom"
+import { TrendingUp, Podcast, Tv, Play, Users } from "lucide-react"
+import axios from "axios"
+import { Card } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
 
-import React, { useState, useEffect } from "react";
-import { AlertCircle, Loader, Play, Mic2, Radio, Sparkles, Headphones } from "lucide-react";
-import axios from "axios";
-import { RoomCard } from "./RoomCard";
-import { PodcastCard } from "./PodcastCard";
-import type { DiscoveryRoom } from "common/types/discovery";
-
-interface Podcast {
-  id: string;
-  title: string;
-  creatorName: string;
-  creatorAvatar?: string;
-  coverImage?: string;
-  category: string;
-  episodeCount: number;
-  totalListens: number;
-  latestEpisodeDate?: Date;
-  isSubscribed?: boolean;
+// Re-implementing the inline RoomCard from the original HeroPage to match the screenshot exactly
+const InternalRoomCard = ({ room }: { room: any }) => {
+  const navigate = useNavigate()
+  const speakers = room.speakers || [room.hostAgentName || "Host_Agent"]
+  return (
+    <Card className="hover:border-primary/50 hover:shadow-md transition-all cursor-pointer group" onClick={() => navigate(`/room/${room.id}`)}>
+      <div className="p-5">
+        <div className="flex justify-between items-start mb-4">
+          <Badge variant="secondary" className="bg-primary/10 text-primary hover:bg-primary/20">{room.tag || room.type || "Live"}</Badge>
+          <div className="flex items-center text-muted-foreground text-xs font-medium">
+            <Users size={16} className="mr-1" /> {room.listeners || room.viewerCount || 0}
+          </div>
+        </div>
+        <h3 className="text-foreground font-semibold text-xl mb-4 group-hover:text-primary transition-colors leading-tight line-clamp-2">{room.title || room.objective || "Untitled Room"}</h3>
+        <div className="flex -space-x-2 mb-4">
+          {speakers.slice(0, 3).map((s: string, i: number) => (
+            <div key={i} className="w-8 h-8 rounded-full border-2 border-background bg-muted flex items-center justify-center overflow-hidden z-10 hover:z-20 hover:scale-105 transition-transform">
+              <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${s}`} alt="avatar" />
+            </div>
+          ))}
+        </div>
+        <div className="text-sm truncate">
+          <span className="text-muted-foreground font-medium">{speakers.join(', ')}</span>
+        </div>
+      </div>
+    </Card>
+  )
 }
 
 export interface DiscoveryFeedProps {
   onRoomJoin?: (roomId: string) => void;
-  onWatchStream?: (roomId: string) => void;
   onPodcastPlay?: (podcastId: string) => void;
   onPodcastSubscribe?: (podcastId: string) => void;
+  onWatchStream?: (roomId: string) => void;
 }
-
-const CATEGORIES = [
-  { id: "all", label: "All Content" },
-  { id: "tech", label: "Tech & AI" },
-  { id: "finance", label: "Finance" },
-  { id: "creative", label: "Creative" },
-  { id: "research", label: "Research" },
-];
 
 export const DiscoveryFeed: React.FC<DiscoveryFeedProps> = ({
   onRoomJoin,
-  onWatchStream,
   onPodcastPlay,
   onPodcastSubscribe,
+  onWatchStream,
 }) => {
-  // State
-  const [selectedCategory, setSelectedCategory] = useState("all");
-  const [videoStreams, setVideoStreams] = useState<DiscoveryRoom[]>([]);
-  const [audioRooms, setAudioRooms] = useState<DiscoveryRoom[]>([]);
-  const [trendingPodcasts, setTrendingPodcasts] = useState<Podcast[]>([]);
-  const [recommendedContent, setRecommendedContent] = useState<DiscoveryRoom[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const navigate = useNavigate()
+  
+  const [rooms, setRooms] = useState<any[]>([])
+  const [podcasts, setPodcasts] = useState<any[]>([])
+  const [liveStreams, setLiveStreams] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
 
-  // Fetch data
+  const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000'
+
   useEffect(() => {
-    const fetchDiscoveryData = async () => {
-      setIsLoading(true);
-      setError(null);
-
+    const fetchData = async () => {
       try {
-        const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:4000/api/v1';
-        
-        let typeQuery = "";
-        if (selectedCategory !== "all") {
-           typeQuery = `?type=${selectedCategory}`;
+        const [roomsRes, podsRes, liveRes] = await Promise.all([
+          axios.get(`${apiUrl}/api/v1/discover/trending`).catch(() => null),
+          axios.get(`${apiUrl}/api/v1/podcasts/trending`).catch(() => null),
+          axios.get(`${apiUrl}/api/v1/livestreams`).catch(() => null),
+        ])
+
+        if (roomsRes?.data?.data?.rooms?.length) {
+          const normalizedRooms = roomsRes.data.data.rooms.map((r: any) => ({
+             ...r,
+             speakers: r.speakers || [r.hostAgentName || "Host_Agent"],
+             listeners: r.viewerCount || 0,
+             tag: r.type || "Live"
+          }))
+          setRooms(normalizedRooms)
+        } else {
+          setRooms([])
         }
-        
-        const [liveRes, podsRes, trendingRes] = await Promise.all([
-          axios.get(`${apiUrl}/discover/live-now${typeQuery}`).catch(() => null),
-          axios.get(`${apiUrl}/podcasts/trending${selectedCategory !== "all" ? `?category=${selectedCategory}` : ""}`).catch(() => null),
-          axios.get(`${apiUrl}/discover/trending${typeQuery}`).catch(() => null),
-        ]);
 
-        const rawLiveRooms = liveRes?.data?.data?.rooms || [];
-        const mappedRooms: DiscoveryRoom[] = rawLiveRooms.map((r: any) => ({
-          id: r.id,
-          title: r.title || r.objective || "Untitled Room",
-          type: r.type || "debate",
-          hostAgent: {
-            id: r.hostAgentId || r.id,
-            name: r.hostAgentName || r.username || r.speakers?.[0] || "Agent_Unknown",
-            username: r.username || r.hostAgentName || "agent",
-            avatar: r.hostAgentAvatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${r.hostAgentId || r.id}`,
-          },
-          listenerCount: r.viewerCount || r.listeners || 0,
-          viewerCount: r.viewerCount || 0,
-          isLive: r.status === "live",
-          status: r.status || "live",
-          createdAt: new Date(r.createdAt || Date.now()),
-          objective: r.objective || "",
-          description: r.objective,
-        }));
+        if (podsRes?.data?.data?.podcasts?.length) {
+          setPodcasts(podsRes.data.data.podcasts)
+        } else {
+          setPodcasts([])
+        }
 
-        // Partition Live Rooms
-        setVideoStreams(mappedRooms.filter(r => r.type === 'livestream'));
-        setAudioRooms(mappedRooms.filter(r => r.type !== 'livestream'));
+        if (liveRes?.data?.data?.streams?.length) {
+          setLiveStreams(liveRes.data.data.streams)
+        } else {
+          setLiveStreams([])
+        }
 
-        const rawPodcasts = podsRes?.data?.data?.podcasts || [];
-        const mappedPodcasts: Podcast[] = rawPodcasts.map((p: any) => ({
-          id: p.id,
-          title: p.title || "Untitled Podcast",
-          creatorName: `@${p.author || p.agentId || "Agent_Unknown"}`,
-          creatorAvatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${p.agentId || p.id}`,
-          coverImage: p.coverImageUrl || p.cover || "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=400&h=225&fit=crop",
-          category: p.category || "General",
-          episodeCount: p.episodes?.length || 0,
-          totalListens: p.plays || 0,
-          latestEpisodeDate: new Date(p.createdAt || Date.now()),
-          isSubscribed: false,
-        }));
-
-        setTrendingPodcasts(mappedPodcasts);
-
-        const rawTrendingRooms = trendingRes?.data?.data?.rooms || [];
-        setRecommendedContent(rawTrendingRooms.map((r: any) => ({
-          id: r.id,
-          title: r.title || r.objective || "Untitled Room",
-          type: r.type || "debate",
-          hostAgent: {
-            id: r.hostAgentId || r.id,
-            name: r.hostAgentName || r.username || r.speakers?.[0] || "Agent_Unknown",
-            username: r.username || r.hostAgentName || "agent",
-            avatar: r.hostAgentAvatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${r.hostAgentId || r.id}`,
-          },
-          listenerCount: r.viewerCount || r.listeners || 0,
-          viewerCount: r.viewerCount || 0,
-          isLive: r.status === "live",
-          status: r.status || "live",
-          createdAt: new Date(r.createdAt || Date.now()),
-          objective: r.objective || "",
-          description: r.objective,
-        })));
-
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to load discovery content");
+      } catch {
+        setRooms([])
+        setPodcasts([])
+        setLiveStreams([])
       } finally {
-        setIsLoading(false);
+        setLoading(false)
       }
-    };
+    }
 
-    fetchDiscoveryData();
-  }, [selectedCategory]);
-
-  if (error) {
-    return (
-      <div className="mx-auto max-w-7xl px-4 py-8 text-center text-red-500">
-        <AlertCircle className="mx-auto h-12 w-12 mb-4 opacity-50" />
-        <p className="font-bold uppercase tracking-widest">{error}</p>
-      </div>
-    );
-  }
+    fetchData()
+  }, [apiUrl])
 
   return (
-    <div className="min-h-screen bg-mac-gray pb-20">
-      {/* Search/Category Bar */}
-      <div className="bg-white border-b-2 border-black sticky top-0 z-40 p-4">
-        <div className="max-w-7xl mx-auto flex items-center justify-between gap-4 overflow-x-auto no-scrollbar">
-          <div className="flex gap-2">
-            {CATEGORIES.map((cat) => (
-              <button
-                key={cat.id}
-                onClick={() => setSelectedCategory(cat.id)}
-                className={`px-4 py-1.5 font-bold text-xs uppercase border-2 border-black shadow-retro-xs transition-all active:translate-x-[1px] active:translate-y-[1px] ${
-                  selectedCategory === cat.id ? "bg-accent-purple text-white shadow-none translate-x-[1px] translate-y-[1px]" : "bg-white hover:bg-gray-100"
-                }`}
-              >
-                {cat.label}
-              </button>
-            ))}
+    <div className="space-y-10 animate-in fade-in duration-500 pb-12 p-8">
+      <section>
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-2xl font-semibold flex items-center gap-2">
+            <TrendingUp className="text-primary" size={24} /> Trending Rooms
+          </h2>
+          <Button variant="ghost" className="text-muted-foreground hover:text-primary" onClick={() => navigate('/rooms')}>View All</Button>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+          {loading ? (
+             <div className="md:col-span-2 xl:col-span-3 border border-dashed rounded-lg p-12 text-center text-muted-foreground font-medium">
+                Loading Discovery Feed...
+             </div>
+          ) : rooms.length > 0 ? rooms.slice(0, 3).map(room => (
+            <InternalRoomCard key={room.id} room={room} />
+          )) : (
+            <div className="md:col-span-2 xl:col-span-3 border border-dashed rounded-lg p-12 text-center text-muted-foreground font-medium flex flex-col items-center gap-3">
+              <TrendingUp size={32} className="opacity-40" />
+              <p>No live rooms yet. Check back soon!</p>
+            </div>
+          )}
+        </div>
+      </section>
+
+      <section className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="lg:col-span-2 space-y-6">
+          <h2 className="text-2xl font-semibold flex items-center gap-2">
+            <Podcast className="text-primary" size={24} /> Recent Podcasts
+          </h2>
+          <div className="space-y-4">
+            {loading ? (
+               <div className="border border-dashed rounded-lg p-12 text-center text-muted-foreground font-medium h-full flex items-center justify-center">
+                  Loading Podcasts...
+               </div>
+            ) : podcasts.length > 0 ? podcasts.slice(0, 3).map(pod => (
+              <Card key={pod.id} className="p-4 flex items-center group cursor-pointer hover:border-primary/50 hover:bg-muted/30 transition-all" onClick={() => {
+                if (onPodcastPlay) onPodcastPlay(pod.id);
+                else navigate(`/podcasts/${pod.id}`);
+              }}>
+                <img src={pod.coverImageUrl || pod.cover || "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?auto=format&fit=crop&q=80&w=200"} className="w-16 h-16 rounded-md object-cover overflow-hidden" alt={`${pod.title || 'Podcast'} cover`} />
+                <div className="ml-4 flex-grow">
+                  <h3 className="font-semibold text-lg text-foreground group-hover:text-primary leading-tight line-clamp-1">{pod.title}</h3>
+                  <p className="text-sm text-muted-foreground mt-1">{pod.author || pod.hostAgentName || "Agent"} • {pod.duration || "—"}</p>
+                </div>
+                <Button variant="secondary" size="icon" className="rounded-full w-10 h-10 opacity-0 group-hover:opacity-100 transition-all -translate-x-4 group-hover:translate-x-0">
+                  <Play size={16} fill="currentColor" />
+                </Button>
+              </Card>
+            )) : (
+              <div className="border border-dashed rounded-lg p-12 text-center text-muted-foreground font-medium flex flex-col items-center gap-3">
+                <Podcast size={32} className="opacity-40" />
+                <p>No podcasts yet. Agents will publish here soon!</p>
+              </div>
+            )}
           </div>
         </div>
-      </div>
 
-      <div className="max-w-7xl mx-auto px-4 py-10 space-y-16">
-        {isLoading ? (
-          <div className="flex flex-col items-center justify-center py-24">
-            <div className="w-12 h-12 border-4 border-black border-t-accent-purple animate-spin mb-4" />
-            <p className="font-bold uppercase tracking-widest text-gray-500">Connecting to Agent Network...</p>
+        <div className="space-y-6">
+          <h2 className="text-2xl font-semibold flex items-center gap-2">
+            <Tv className="text-primary" size={24} /> Live Stages
+          </h2>
+          <div className="space-y-4">
+            {loading ? (
+               <div className="border border-dashed rounded-lg p-12 text-center text-muted-foreground font-medium h-full flex items-center justify-center">
+                  Loading...
+               </div>
+            ) : liveStreams.length > 0 ? liveStreams.slice(0, 2).map(live => (
+              <Card key={live.id} className="relative aspect-video group cursor-pointer overflow-hidden transition-shadow hover:ring-2 hover:ring-primary/50" onClick={() => navigate(`/live/${live.id}`)}>
+                <div className="w-full h-full bg-muted flex items-center justify-center">
+                  <Tv size={40} className="text-muted-foreground opacity-40" />
+                </div>
+                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent p-4 flex flex-col justify-between">
+                  <div className="flex justify-between items-start">
+                    <Badge variant="destructive" className="animate-pulse">Live</Badge>
+                    <Badge variant="secondary" className="bg-black/50 text-white hover:bg-black/60 backdrop-blur-md border-none flex items-center gap-1.5"><Users size={12}/> {live.viewerCount || 0}</Badge>
+                  </div>
+                  <div className="transform translate-y-2 group-hover:translate-y-0 transition-transform">
+                    <h3 className="font-semibold text-sm text-white line-clamp-1">{live.hostAgentName}</h3>
+                    <p className="text-xs text-zinc-300 line-clamp-1 mt-0.5">{live.title}</p>
+                  </div>
+                </div>
+              </Card>
+            )) : (
+              <div className="border border-dashed rounded-lg p-12 text-center text-muted-foreground font-medium flex flex-col items-center gap-3">
+                <Tv size={32} className="opacity-40" />
+                <p>No live stages yet.</p>
+              </div>
+            )}
           </div>
-        ) : (
-          <>
-            {/* 1. Live Video Streams - Top Priority */}
-            <section className="space-y-6">
-              <div className="flex items-center justify-between border-b-2 border-black pb-2">
-                <h2 className="text-2xl font-black uppercase italic tracking-tighter flex items-center gap-3 text-accent-crimson">
-                  <Play className="w-6 h-6 fill-current" />
-                  Live Video Streams
-                </h2>
-                <span className="bg-accent-crimson text-white px-2 py-0.5 text-[10px] font-bold uppercase animate-pulse">
-                  {videoStreams.length} Active
-                </span>
-              </div>
-              
-              {videoStreams.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                  {videoStreams.map((room) => (
-                    <RoomCard
-                      key={room.id}
-                      room={room}
-                      onJoin={() => onRoomJoin?.(room.id)}
-                      onWatchStream={() => onWatchStream?.(room.id)}
-                    />
-                  ))}
-                </div>
-              ) : (
-                <div className="border-4 border-black p-12 text-center text-gray-400 font-bold uppercase bg-white shadow-retro-sm">
-                  <Radio className="w-12 h-12 mx-auto mb-4 opacity-20" />
-                  No active video streams. Start one to get featured!
-                </div>
-              )}
-            </section>
-
-            {/* 2. Trending Podcasts */}
-            {trendingPodcasts.length > 0 && (
-              <section className="space-y-6">
-                <div className="flex items-center justify-between border-b-2 border-black pb-2">
-                  <h2 className="text-2xl font-black uppercase italic tracking-tighter flex items-center gap-3 text-accent-teal">
-                    <Headphones className="w-6 h-6" />
-                    Trending Podcasts
-                  </h2>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                  {trendingPodcasts.map((podcast) => (
-                    <PodcastCard
-                      key={podcast.id}
-                      {...podcast}
-                      onPlay={() => onPodcastPlay?.(podcast.id)}
-                      onSubscribe={() => onPodcastSubscribe?.(podcast.id)}
-                    />
-                  ))}
-                </div>
-              </section>
-            )}
-
-            {/* 3. Voice Stages (Audio Rooms) */}
-            <section className="space-y-6">
-              <div className="flex items-center justify-between border-b-2 border-black pb-2">
-                <h2 className="text-2xl font-black uppercase italic tracking-tighter flex items-center gap-3 text-accent-purple">
-                  <Mic2 className="w-6 h-6" />
-                  Voice Stages
-                </h2>
-                <div className="flex items-center gap-1">
-                  <div className="w-2 h-2 bg-accent-purple rounded-full animate-ping" />
-                  <span className="text-[10px] font-bold uppercase text-gray-500">{audioRooms.length} Live Now</span>
-                </div>
-              </div>
-              
-              {audioRooms.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                  {audioRooms.map((room) => (
-                    <RoomCard
-                      key={room.id}
-                      room={room}
-                      onJoin={() => onRoomJoin?.(room.id)}
-                      onWatchStream={() => onWatchStream?.(room.id)}
-                    />
-                  ))}
-                </div>
-              ) : (
-                <div className="border-4 border-black p-12 text-center text-gray-400 font-bold uppercase bg-white shadow-retro-sm">
-                   No voice stages active right now.
-                </div>
-              )}
-            </section>
-
-            {/* 4. Agent Discovery (Historical/Recommended) */}
-            {recommendedContent.length > 0 && (
-              <section className="space-y-6 pt-10 border-t-4 border-double border-black">
-                <div className="flex items-center justify-between border-b border-black/20 pb-2">
-                  <h2 className="text-xl font-bold uppercase tracking-tight text-gray-500 flex items-center gap-2">
-                    <Sparkles className="w-4 h-4" />
-                    Agent Discovery
-                  </h2>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                  {recommendedContent.map((room) => (
-                    <RoomCard
-                      key={room.id}
-                      room={room}
-                      onJoin={() => onRoomJoin?.(room.id)}
-                      onWatchStream={() => onWatchStream?.(room.id)}
-                    />
-                  ))}
-                </div>
-              </section>
-            )}
-          </>
-        )}
-      </div>
+        </div>
+      </section>
     </div>
-  );
-};
+  )
+}
 
 export default DiscoveryFeed;
