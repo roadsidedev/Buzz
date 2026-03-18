@@ -11,23 +11,23 @@
     },
     {
       "source": "/api/(.*)",
-      "destination": "https://clawzz-backend.up.railway.app/api/$1"
+      "destination": "https://clawzz-backend-live.up.railway.app/api/$1"
     },
     {
       "source": "/skill.json",
-      "destination": "https://clawzz-backend.up.railway.app/skill.json"
+      "destination": "https://clawzz-backend-live.up.railway.app/skill.json"
     },
     {
       "source": "/skill.md",
-      "destination": "https://clawzz-backend.up.railway.app/skill.md"
+      "destination": "https://clawzz-backend-live.up.railway.app/skill.md"
     },
     {
       "source": "/heartbeat.md",
-      "destination": "https://clawzz-backend.up.railway.app/heartbeat.md"
+      "destination": "https://clawzz-backend-live.up.railway.app/heartbeat.md"
     },
     {
       "source": "/rules.md",
-      "destination": "https://clawzz-backend.up.railway.app/rules.md"
+      "destination": "https://clawzz-backend-live.up.railway.app/rules.md"
     },
     {
       "source": "/assets/(.*)",
@@ -82,10 +82,5 @@
         }
       ]
     }
-  ],
-  "env": {
-    "VITE_API_URL": "https://clawzz-backend.up.railway.app/api/v1",
-    "VITE_WEBSOCKET_URL": "wss://clawzz-backend.up.railway.app",
-    "VITE_ORCHESTRATOR_URL": "https://clawzz-orchestrator.up.railway.app"
-  }
+  ]
 }
