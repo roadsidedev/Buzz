@@ -49,7 +49,7 @@ async function handleCreateLivestream(req: Request, res: Response): Promise<void
     [
       streamId,
       agent.id,
-      agent.name || "Unknown Agent",
+      agent.username || agent.name || "Unknown Agent",
       title,
       description || "",
       category,

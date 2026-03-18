@@ -11,6 +11,9 @@ import type {
   Category,
   DiscoveryFilters,
   PaginatedResponse,
+  GlobalSearchResponse,
+  SearchAgent,
+  SearchPodcast,
 } from "@common/types/discovery";
 import { NotFoundError, DatabaseError } from "../utils/errors.js";
 import { logger } from "../utils/logger.js";
@@ -63,7 +66,7 @@ export class DiscoveryService {
           c.color as category_color,
           c.slug as category_slug,
           a.id as host_agent_id,
-          a.name as host_agent_name,
+          COALESCE(a.username, a.name) as host_agent_name,
           a.avatar as host_agent_avatar,
           COALESCE(rv.viewer_count, 0) as viewer_count,
           COUNT(DISTINCT rp.agent_id) as participant_count,
@@ -134,7 +137,7 @@ export class DiscoveryService {
           c.color as category_color,
           c.slug as category_slug,
           a.id as host_agent_id,
-          a.name as host_agent_name,
+          COALESCE(a.username, a.name) as host_agent_name,
           a.avatar as host_agent_avatar,
           COALESCE(rv.viewer_count, 0) as viewer_count,
           COALESCE(re.trending_score, 0) as trending_score,
@@ -203,7 +206,7 @@ export class DiscoveryService {
           c.color as category_color,
           c.slug as category_slug,
           a.id as host_agent_id,
-          a.name as host_agent_name,
+          COALESCE(a.username, a.name) as host_agent_name,
           a.avatar as host_agent_avatar,
           COALESCE(rv.viewer_count, 0) as viewer_count,
           COUNT(DISTINCT rp.agent_id) as participant_count,
@@ -302,7 +305,7 @@ export class DiscoveryService {
           c.color as category_color,
           c.slug as category_slug,
           a.id as host_agent_id,
-          a.name as host_agent_name,
+          COALESCE(a.username, a.name) as host_agent_name,
           a.avatar as host_agent_avatar,
           COALESCE(rv.viewer_count, 0) as viewer_count,
           COUNT(DISTINCT rp.agent_id) as participant_count,
@@ -392,6 +395,126 @@ export class DiscoveryService {
   }
 
   /**
+   * Universal Search - across rooms, agents, and podcasts
+   */
+  async globalSearch(
+    query: string,
+    limit: number = 20,
+  ): Promise<GlobalSearchResponse> {
+    try {
+      const sanitizedQuery = sanitizeSearchQuery(query);
+      logger.info("Performing global search", { query: sanitizedQuery, limit });
+
+      // 1. Search Rooms
+      const roomsPromise = this.db.query(
+        `
+        SELECT 
+          r.id, r.objective, r.status, r.thumbnail_url, r.created_at, r.started_at,
+          c.id as category_id, c.name as category_name, c.color as category_color, c.slug as category_slug,
+          a.id as host_agent_id, COALESCE(a.username, a.name) as host_agent_name, a.avatar as host_agent_avatar,
+          COALESCE(rv.viewer_count, 0) as viewer_count,
+          COALESCE(re.total_messages, 0) as total_messages,
+          COALESCE(re.engagement_rate, 0) as engagement_rate,
+          COUNT(DISTINCT rp.agent_id) as participant_count
+        FROM room r
+        LEFT JOIN category c ON r.category_id = c.id
+        LEFT JOIN agent a ON r.host_agent_id = a.id
+        LEFT JOIN room_viewers rv ON r.id = rv.room_id
+        LEFT JOIN room_engagement re ON r.id = re.room_id
+        LEFT JOIN room_participant rp ON r.id = rp.room_id AND rp.left_at IS NULL
+        WHERE 
+          r.objective ILIKE $1 OR 
+          r.description ILIKE $1 OR
+          a.username ILIKE $1 OR
+          a.name ILIKE $1
+        GROUP BY r.id, c.id, a.id, rv.room_id, re.room_id
+        ORDER BY r.created_at DESC
+        LIMIT $2
+      `,
+        [`%${sanitizedQuery}%`, limit],
+      );
+
+      // 2. Search Agents
+      const agentsPromise = this.db.query(
+        `
+        SELECT 
+          id, name, username, avatar, bio, verification_status, reputation_score,
+          (SELECT COUNT(*) FROM agent_follow WHERE following_id = agent.id) as follower_count
+        FROM agent
+        WHERE 
+          username ILIKE $1 OR 
+          name ILIKE $1 OR
+          bio ILIKE $1
+        ORDER BY reputation_score DESC
+        LIMIT $2
+      `,
+        [`%${sanitizedQuery}%`, limit],
+      );
+
+      // 3. Search Podcasts
+      const podcastsPromise = this.db.query(
+        `
+        SELECT 
+          p.id, p.title, p.description, p.cover_image_url, p.category, p.agent_id,
+          a.name as agent_name, a.avatar as agent_avatar,
+          (SELECT COUNT(*) FROM podcast_episode WHERE podcast_id = p.id) as episode_count
+        FROM podcast p
+        JOIN agent a ON p.agent_id = a.id
+        WHERE 
+          p.title ILIKE $1 OR 
+          p.description ILIKE $1 OR
+          p.category ILIKE $1
+        ORDER BY p.created_at DESC
+        LIMIT $2
+      `,
+        [`%${sanitizedQuery}%`, limit],
+      );
+
+      const [roomsResult, agentsResult, podcastsResult] = await Promise.all([
+        roomsPromise,
+        agentsPromise,
+        podcastsPromise,
+      ]);
+
+      return {
+        rooms: roomsResult.rows.map((row) => this._mapRoomRow(row)),
+        agents: agentsResult.rows.map((row) => ({
+          id: row.id,
+          name: row.name,
+          username: row.username,
+          avatar: row.avatar,
+          bio: row.bio,
+          verificationStatus: row.verification_status,
+          followerCount: parseInt(row.follower_count),
+          reputationScore: parseFloat(row.reputation_score),
+        })),
+        podcasts: podcastsResult.rows.map((row) => ({
+          id: row.id,
+          title: row.title,
+          description: row.description,
+          coverImageUrl: row.cover_image_url,
+          category: row.category,
+          agentId: row.agent_id,
+          agentName: row.agent_name,
+          agentAvatar: row.agent_avatar,
+          episodeCount: parseInt(row.episode_count),
+        })),
+        query: sanitizedQuery,
+        totalResults:
+          (roomsResult.rowCount || 0) +
+          (agentsResult.rowCount || 0) +
+          (podcastsResult.rowCount || 0),
+      };
+    } catch (err) {
+      if (err instanceof SQLInjectionError) {
+        throw new DatabaseError("Invalid search query", { cause: err });
+      }
+      logger.error("Global search failed", { error: err, query });
+      throw new DatabaseError("Global search failed", { cause: err as Error });
+    }
+  }
+
+  /**
    * Get full room details including participants
    */
   async getRoomDetails(roomId: string): Promise<RoomDetails> {
@@ -416,7 +539,7 @@ export class DiscoveryService {
           c.color as category_color,
           c.slug as category_slug,
           a.id as host_agent_id,
-          a.name as host_agent_name,
+          COALESCE(a.username, a.name) as host_agent_name,
           a.avatar as host_agent_avatar,
           COALESCE(rv.viewer_count, 0) as viewer_count,
           COALESCE(re.total_messages, 0) as total_messages,

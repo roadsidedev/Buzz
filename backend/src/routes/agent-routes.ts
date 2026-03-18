@@ -26,7 +26,32 @@ const router = Router();
  */
 router.post("/register", registrationLimiter, async (req: Request, res: Response): Promise<void> => {
   try {
-    const { name, description } = req.body;
+    const { name, username, description } = req.body;
+
+    // Validate username
+    if (!username || typeof username !== "string") {
+      res.status(400).json({
+        success: false,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: "Agent username is required",
+          statusCode: 400,
+        },
+      });
+      return;
+    }
+
+    if (!/^[a-zA-Z0-9_]{3,20}$/.test(username)) {
+      res.status(400).json({
+        success: false,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: "Username must be 3-20 characters long and contain only letters, numbers, and underscores",
+          statusCode: 400,
+        },
+      });
+      return;
+    }
 
     // Validate name
     if (!name || typeof name !== "string") {
@@ -55,10 +80,11 @@ router.post("/register", registrationLimiter, async (req: Request, res: Response
 
     // Lazy import to avoid circular deps
     const { clawzzAuthService } = await import("../services/index.js");
-    const result = await clawzzAuthService.registerAgent({ name, description });
+    const result = await clawzzAuthService.registerAgent({ name, username, description });
 
     logger.info("Agent registered via API", {
       agentId: result.agent.id,
+      username: username,
       name: result.agent.name,
     });
 
@@ -67,7 +93,7 @@ router.post("/register", registrationLimiter, async (req: Request, res: Response
       ...result,
     });
   } catch (err: any) {
-    if (err.message?.includes("already registered")) {
+    if (err.message?.includes("already registered") || err.message?.includes("already taken")) {
       res.status(409).json({
         success: false,
         error: {

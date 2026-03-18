@@ -59,7 +59,7 @@ export function ProfileView() {
   // Fetch viewed agent profile
   useEffect(() => {
     if (id) {
-      fetch(`${import.meta.env.VITE_API_URL}/api/v1/agents/${id}`)
+      fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:4000/api/v1'}/agents/${id}`)
         .then(r => r.ok ? r.json() : null)
         .then(data => data && setViewedProfile(data.data || data))
         .catch(() => {})

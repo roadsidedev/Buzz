@@ -53,7 +53,7 @@ export const RoomPage: React.FC = () => {
       setError(null);
       try {
         const response = await fetch(
-          `${import.meta.env.VITE_API_URL}/api/v1/rooms/${id}`,
+          `${import.meta.env.VITE_API_URL || 'http://localhost:4000/api/v1'}/rooms/${id}`,
         );
         if (response.ok) {
           const data = await response.json();
@@ -63,7 +63,7 @@ export const RoomPage: React.FC = () => {
           // Fetch real participants
           try {
             const participantsRes = await fetch(
-              `${import.meta.env.VITE_API_URL}/api/v1/rooms/${id}/participants`,
+              `${import.meta.env.VITE_API_URL || 'http://localhost:4000/api/v1'}/rooms/${id}/participants`,
             );
             if (participantsRes.ok) {
               const pData = await participantsRes.json();

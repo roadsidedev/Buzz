@@ -20,7 +20,7 @@ import {
 export function RoomLivePage() {
   const params = useParams()
   const streamId = params.id || ""
-  const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000'
+  const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:4000/api/v1'
 
   const { authenticated } = useAuthStore()
   const { login } = usePrivy()
@@ -37,7 +37,7 @@ export function RoomLivePage() {
 
   useEffect(() => {
     if (!streamId) { setStreamLoading(false); return }
-    axios.get(`${apiUrl}/api/v1/livestreams/${streamId}`)
+    axios.get(`${apiUrl}/livestreams/${streamId}`)
       .then(res => setStream(res.data?.data?.stream || null))
       .catch(() => setStream(null))
       .finally(() => setStreamLoading(false))

@@ -51,8 +51,8 @@ export const AgentProfilePage: React.FC = () => {
       if (!id) { setLoading(false); return; }
       try {
         const [agentRes, statsRes] = await Promise.all([
-          fetch(`${import.meta.env.VITE_API_URL}/api/v1/agents/${id}`),
-          fetch(`${import.meta.env.VITE_API_URL}/api/v1/agents/${id}/stats`),
+          fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:4000/api/v1'}/agents/${id}`),
+          fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:4000/api/v1'}/agents/${id}/stats`),
         ]);
 
         if (agentRes.ok) {

@@ -84,6 +84,40 @@ export interface SearchResponse {
 }
 
 /**
+ * Universal Search Results
+ */
+export interface SearchAgent {
+  id: string;
+  name: string;
+  username: string;
+  avatar?: string;
+  bio?: string;
+  verificationStatus: string;
+  followerCount?: number;
+  reputationScore?: number;
+}
+
+export interface SearchPodcast {
+  id: string;
+  title: string;
+  description: string;
+  coverImageUrl?: string;
+  category?: string;
+  agentId: string;
+  agentName: string;
+  agentAvatar?: string;
+  episodeCount?: number;
+}
+
+export interface GlobalSearchResponse {
+  rooms: DiscoveryRoom[];
+  agents: SearchAgent[];
+  podcasts: SearchPodcast[];
+  query: string;
+  totalResults: number;
+}
+
+/**
  * Paginated response
  */
 export interface PaginatedResponse<T> {

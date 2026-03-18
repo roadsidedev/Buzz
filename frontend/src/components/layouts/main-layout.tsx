@@ -45,6 +45,13 @@ export function MainLayout({ children }: MainLayoutProps) {
     navigate(path)
   }
 
+  const handleSearch = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" && searchQuery.trim()) {
+      navigate(`/search?q=${encodeURIComponent(searchQuery.trim())}`)
+      setIsMobileSearchOpen(false)
+    }
+  }
+
   const isActive = (path: string) => location.pathname === path || (path !== "/" && location.pathname.startsWith(path))
 
   return (
@@ -116,6 +123,7 @@ export function MainLayout({ children }: MainLayoutProps) {
               className="w-full pl-9 bg-muted/50 border-transparent focus-visible:bg-background"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={handleSearch}
             />
           </div>
 
@@ -269,6 +277,7 @@ export function MainLayout({ children }: MainLayoutProps) {
                   className="w-full pl-10 h-12 text-lg"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
+                  onKeyDown={handleSearch}
                   autoFocus
                 />
               </div>

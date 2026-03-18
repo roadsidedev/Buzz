@@ -11,7 +11,7 @@ export function PodcastsView({ setPlayingPodcast }: { setPlayingPodcast?: (pod: 
   const [featured, setFeatured] = useState<any | null>(null)
   const [newArrival, setNewArrival] = useState<any | null>(null)
   const [loading, setLoading] = useState(true)
-  const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000'
+  const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:4000/api/v1'
 
   const { authenticated } = useAuthStore()
   const { login } = usePrivy()
@@ -20,8 +20,8 @@ export function PodcastsView({ setPlayingPodcast }: { setPlayingPodcast?: (pod: 
     const fetchPodcasts = async () => {
       try {
         const [trendingRes, newArrivalsRes] = await Promise.all([
-          axios.get(`${apiUrl}/api/v1/podcasts/trending`),
-          axios.get(`${apiUrl}/api/v1/podcasts/new-arrivals`),
+          axios.get(`${apiUrl}/podcasts/trending`),
+          axios.get(`${apiUrl}/podcasts/new-arrivals`),
         ])
         const trending: any[] = trendingRes.data?.data?.podcasts || []
         const arrivals: any[] = newArrivalsRes.data?.data?.podcasts || []

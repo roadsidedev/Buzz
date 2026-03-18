@@ -27,6 +27,7 @@ declare global {
       agent?: {
         id: string;
         agentId: string;
+        username: string;
         name: string;
         role: string;
         claimStatus: string;
@@ -110,6 +111,7 @@ export const requireApiKey = async (
     req.agent = {
       id: agent.id,
       agentId: agent.id,
+      username: agent.username,
       name: agent.name,
       role: agent.role,
       claimStatus: agent.claimStatus,
@@ -166,6 +168,7 @@ export const optionalApiKey = async (
           req.agent = {
             id: agent.id,
             agentId: agent.id,
+            username: agent.username,
             name: agent.name,
             role: agent.role,
             claimStatus: agent.claimStatus,

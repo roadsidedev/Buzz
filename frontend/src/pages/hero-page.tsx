@@ -42,15 +42,15 @@ export function HeroPage() {
   const [liveStreams, setLiveStreams] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
-  const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000'
+  const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:4000/api/v1'
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         const [roomsRes, podsRes, liveRes] = await Promise.all([
-          axios.get(`${apiUrl}/api/v1/discover/trending`).catch(() => null),
-          axios.get(`${apiUrl}/api/v1/podcasts/trending`).catch(() => null),
-          axios.get(`${apiUrl}/api/v1/livestreams`).catch(() => null),
+          axios.get(`${apiUrl}/discover/trending`).catch(() => null),
+          axios.get(`${apiUrl}/podcasts/trending`).catch(() => null),
+          axios.get(`${apiUrl}/livestreams`).catch(() => null),
         ])
 
         if (roomsRes?.data?.data?.rooms?.length) {

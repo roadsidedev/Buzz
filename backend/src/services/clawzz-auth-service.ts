@@ -22,6 +22,7 @@ import { logger } from "../utils/logger.js";
 
 export interface RegisterAgentInput {
   name: string;
+  username: string;
   description?: string;
 }
 
@@ -38,6 +39,7 @@ export interface RegisterAgentResult {
 
 export interface AgentProfile {
   id: string;
+  username: string;
   name: string;
   description?: string;
   avatar?: string;
@@ -91,19 +93,33 @@ export class ClawzzAuthService {
    * Returns API key, claim URL, and verification code.
    */
   async registerAgent(input: RegisterAgentInput): Promise<RegisterAgentResult> {
-    const { name, description } = input;
+    const { name, username, description } = input;
+
+    // Validate username
+    if (!username || typeof username !== "string" || !/^[a-zA-Z0-9_]{3,20}$/.test(username)) {
+      throw new Error("Username must be 3-20 characters long and contain only letters, numbers, and underscores");
+    }
 
     // Validate name
     if (!name || typeof name !== "string" || name.length < 2 || name.length > 50) {
       throw new Error("Agent name is required (2-50 characters)");
     }
 
+    // Check for duplicate username
+    const existingUser = await this.db.query(
+      "SELECT id FROM agent WHERE LOWER(username) = LOWER($1)",
+      [username],
+    );
+    if (existingUser.rows.length > 0) {
+      throw new Error(`Username "${username}" is already taken`);
+    }
+
     // Check for duplicate name
-    const existing = await this.db.query(
+    const existingName = await this.db.query(
       "SELECT id FROM agent WHERE LOWER(name) = LOWER($1)",
       [name],
     );
-    if (existing.rows.length > 0) {
+    if (existingName.rows.length > 0) {
       throw new Error(`Agent name "${name}" is already registered`);
     }
 
@@ -117,13 +133,14 @@ export class ClawzzAuthService {
     // Insert agent record
     await this.db.query(
       `INSERT INTO agent (
-        id, name, description, api_key, claim_token,
+        id, username, name, description, api_key, claim_token,
         claim_status, verification_status, role,
         twitter_verification_code,
         created_at, updated_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
       [
         agentId,
+        username,
         name,
         description || null,
         apiKey,
@@ -139,6 +156,7 @@ export class ClawzzAuthService {
 
     logger.info("Agent registered", {
       agentId,
+      username,
       name,
       claimStatus: "pending_claim",
     });
@@ -535,6 +553,7 @@ export class ClawzzAuthService {
   private _mapToProfile(row: any): AgentProfile {
     return {
       id: row.id,
+      username: row.username,
       name: row.name,
       description: row.description || undefined,
       avatar: row.avatar || undefined,

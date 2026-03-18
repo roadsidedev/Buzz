@@ -13,6 +13,7 @@
 
 import React, { useState, useEffect } from "react";
 import { AlertCircle, Loader } from "lucide-react";
+import axios from "axios";
 import { RoomCard } from "./RoomCard";
 import { PodcastCard } from "./PodcastCard";
 
@@ -77,113 +78,62 @@ export const DiscoveryFeed: React.FC<DiscoveryFeedProps> = ({
       setError(null);
 
       try {
-        // TODO: Implement actual API calls
-        // For now, use mock data for UI development
+        const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:4000/api/v1';
+        
+        let typeQuery = "";
+        if (selectedCategory !== "all") {
+           typeQuery = `?type=${selectedCategory}`;
+        }
+        
+        const [liveRes, podsRes, trendingRes] = await Promise.all([
+          axios.get(`${apiUrl}/discover/live-now${typeQuery}`).catch(() => null),
+          axios.get(`${apiUrl}/podcasts/trending${selectedCategory !== "all" ? `?category=${selectedCategory}` : ""}`).catch(() => null),
+          axios.get(`${apiUrl}/discover/trending${typeQuery}`).catch(() => null),
+        ]);
 
-        // Simulated API delay
-        await new Promise((resolve) => setTimeout(resolve, 500));
+        const rawLiveRooms = liveRes?.data?.data?.rooms || [];
+        const mappedLiveRooms: Room[] = rawLiveRooms.map((r: any) => ({
+          id: r.id,
+          title: r.title || r.objective || "Untitled Room",
+          type: r.type || "debate",
+          hostName: `@${r.hostAgentName || r.speakers?.[0] || "Agent_Unknown"}`,
+          hostAvatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${r.hostAgentId || r.id}`,
+          listenerCount: r.viewerCount || r.listeners || 0,
+          isLive: r.status === "live",
+          createdAt: new Date(r.createdAt || Date.now()),
+          description: r.objective,
+        }));
 
-        // Mock live rooms (with filter)
-        const mockLiveRooms: Room[] = [
-          {
-            id: "room-1",
-            title: "AI Ethics Debate",
-            type: "debate",
-            hostName: "@alice",
-            hostAvatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=alice",
-            listenerCount: 234,
-            isLive: true,
-            createdAt: new Date(Date.now() - 15 * 60000),
-            description: "Is AI development outpacing safety research?",
-          },
-          {
-            id: "room-2",
-            title: "Rust Systems Programming",
-            type: "coding",
-            hostName: "@bob",
-            hostAvatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=bob",
-            listenerCount: 567,
-            isLive: true,
-            createdAt: new Date(Date.now() - 30 * 60000),
-            description: "Building high-performance concurrent systems",
-          },
-        ];
+        const rawPodcasts = podsRes?.data?.data?.podcasts || [];
+        const mappedPodcasts: Podcast[] = rawPodcasts.map((p: any) => ({
+          id: p.id,
+          title: p.title || "Untitled Podcast",
+          creatorName: `@${p.author || p.agentId || "Agent_Unknown"}`,
+          creatorAvatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${p.agentId || p.id}`,
+          coverImage: p.coverImageUrl || p.cover || "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=400&h=225&fit=crop",
+          category: p.category || "General",
+          episodeCount: p.episodes?.length || 0,
+          totalListens: p.plays || 0,
+          latestEpisodeDate: new Date(p.createdAt || Date.now()),
+          isSubscribed: false,
+        }));
 
-        // Mock trending podcasts
-        const mockPodcasts: Podcast[] = [
-          {
-            id: "pod-1",
-            title: "Tech Deep Dive",
-            creatorName: "@creator_1",
-            creatorAvatar:
-              "https://api.dicebear.com/7.x/avataaars/svg?seed=creator1",
-            coverImage:
-              "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=400&h=225&fit=crop",
-            category: "tech",
-            episodeCount: 42,
-            totalListens: 125000,
-            latestEpisodeDate: new Date(Date.now() - 8 * 60 * 60000),
-            isSubscribed: false,
-          },
-          {
-            id: "pod-2",
-            title: "Market Analysis Daily",
-            creatorName: "@analyst_pro",
-            creatorAvatar:
-              "https://api.dicebear.com/7.x/avataaars/svg?seed=analyst",
-            category: "finance",
-            episodeCount: 156,
-            totalListens: 342000,
-            latestEpisodeDate: new Date(Date.now() - 2 * 60 * 60000),
-            isSubscribed: true,
-          },
-          {
-            id: "pod-3",
-            title: "Code Chronicles",
-            creatorName: "@dev_genius",
-            creatorAvatar:
-              "https://api.dicebear.com/7.x/avataaars/svg?seed=devgenius",
-            category: "dev",
-            episodeCount: 87,
-            totalListens: 95000,
-            latestEpisodeDate: new Date(Date.now() - 1 * 24 * 60 * 60000),
-            isSubscribed: false,
-          },
-        ];
+        const rawTrendingRooms = trendingRes?.data?.data?.rooms || [];
+        const mappedTrendingRooms: Room[] = rawTrendingRooms.map((r: any) => ({
+          id: r.id,
+          title: r.title || r.objective || "Untitled Room",
+          type: r.type || "debate",
+          hostName: `@${r.hostAgentName || r.speakers?.[0] || "Agent_Unknown"}`,
+          hostAvatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${r.hostAgentId || r.id}`,
+          listenerCount: r.viewerCount || r.listeners || 0,
+          isLive: r.status === "live",
+          createdAt: new Date(r.createdAt || Date.now()),
+          description: r.objective,
+        }));
 
-        // Mock trending rooms (non-live)
-        const mockTrendingRooms: Room[] = [
-          {
-            id: "room-3",
-            title: "DeFi Strategy Workshop",
-            type: "research",
-            hostName: "@defi_expert",
-            listenerCount: 1200,
-            isLive: false,
-            createdAt: new Date(Date.now() - 2 * 24 * 60 * 60000),
-            description: "Optimizing yield farming strategies",
-          },
-          {
-            id: "room-4",
-            title: "JavaScript Q&A with Experts",
-            type: "coding",
-            hostName: "@js_master",
-            listenerCount: 456,
-            isLive: false,
-            createdAt: new Date(Date.now() - 3 * 24 * 60 * 60000),
-            description: "Ask anything about modern JavaScript",
-          },
-        ];
-
-        // Filter by category
-        const filteredPodcasts =
-          selectedCategory === "all"
-            ? mockPodcasts
-            : mockPodcasts.filter((p) => p.category === selectedCategory);
-
-        setLiveRooms(mockLiveRooms);
-        setTrendingPodcasts(filteredPodcasts);
-        setTrendingRooms(mockTrendingRooms);
+        setLiveRooms(mappedLiveRooms);
+        setTrendingPodcasts(mappedPodcasts);
+        setTrendingRooms(mappedTrendingRooms);
       } catch (err) {
         setError(
           err instanceof Error

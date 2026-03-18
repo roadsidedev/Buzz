@@ -81,12 +81,12 @@ export function RoomsView() {
   const [activeCategory, setActiveCategory] = useState('All')
   const [rooms, setRooms] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000'
+  const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:4000/api/v1'
 
   useEffect(() => {
     const fetchRooms = async () => {
       try {
-        const res = await axios.get(`${apiUrl}/api/v1/discover/live-now`)
+        const res = await axios.get(`${apiUrl}/discover/live-now`)
         if (res.data?.data?.rooms && res.data.data.rooms.length > 0) {
             setRooms(res.data.data.rooms)
         } else {

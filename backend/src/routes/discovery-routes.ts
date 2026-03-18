@@ -11,7 +11,7 @@
 
 import { Router, Request, Response } from "express";
 import { asyncHandler, optionalAuth } from "../middleware/index.js";
-import { roomService } from "../services/index.js";
+import { roomService, discoveryService } from "../services/index.js";
 import { logger } from "../utils/logger.js";
 import { ValidationError } from "../utils/errors.js";
 import { pool } from "../config/database.js";
@@ -200,41 +200,22 @@ router.get(
       agentId: req.agent?.id,
     });
 
-    // Search across rooms — for now, fetch all rooms and filter
-    // In production this would use full-text search in PostgreSQL
     try {
-      const rooms = await roomService.getLiveRooms(limit, offset, type);
-      const searchLower = query.toLowerCase();
-
-      const filtered = rooms.filter((room) =>
-        room.objective?.toLowerCase().includes(searchLower) ||
-        room.type?.toLowerCase().includes(searchLower)
-      );
+      // Use the new globalSearch method for unified results
+      const searchResults = await discoveryService.globalSearch(query, limit);
 
       res.json({
         success: true,
-        data: {
-          query,
-          rooms: filtered.map((room) => ({
-            id: room.id,
-            type: room.type,
-            objective: room.objective,
-            status: room.status,
-            viewerCount: room.viewerCount,
-            participantCount: room.participantCount,
-          })),
-          total: filtered.length,
-          filter: { type, status },
-        },
+        data: searchResults,
       });
-    } catch {
-      // Return empty results on error (don't crash)
-      res.json({
-        success: true,
-        data: {
-          query,
-          rooms: [],
-          total: 0,
+    } catch (err) {
+      logger.error("Global search route failed", { error: err, query });
+      res.status(500).json({
+        success: false,
+        error: {
+          code: "SEARCH_FAILED",
+          message: "An error occurred while performing search",
+          statusCode: 500,
         },
       });
     }
