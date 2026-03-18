@@ -66,11 +66,11 @@ export class DiscoveryService {
           c.color as category_color,
           c.slug as category_slug,
           a.id as host_agent_id,
-          COALESCE(a.username, a.name) as host_agent_name,
-          a.avatar as host_agent_avatar,
-          COALESCE(rv.viewer_count, 0) as viewer_count,
+          COALESCE(MAX(a.username), MAX(a.name)) as host_agent_name,
+          MAX(a.avatar) as host_agent_avatar,
+          COALESCE(MAX(rv.viewer_count), 0) as viewer_count,
           COUNT(DISTINCT rp.agent_id) as participant_count,
-          COALESCE(re.trending_score, 0) as trending_score
+          COALESCE(MAX(re.trending_score), 0) as trending_score
         FROM room r
         LEFT JOIN category c ON r.category_id = c.id
         LEFT JOIN agent a ON r.host_agent_id = a.id
@@ -78,8 +78,8 @@ export class DiscoveryService {
         LEFT JOIN room_engagement re ON r.id = re.room_id
         LEFT JOIN room_participant rp ON r.id = rp.room_id AND rp.left_at IS NULL
         WHERE r.status = 'live' AND r.visibility = 'public'
-        GROUP BY r.id, c.id, a.id, rv.room_id, re.room_id
-        ORDER BY rv.viewer_count DESC NULLS LAST, r.started_at DESC
+        GROUP BY r.id, c.id, a.id
+        ORDER BY viewer_count DESC NULLS LAST, r.started_at DESC
         LIMIT $1 OFFSET $2
         `,
         [limit, offset],
@@ -137,10 +137,10 @@ export class DiscoveryService {
           c.color as category_color,
           c.slug as category_slug,
           a.id as host_agent_id,
-          COALESCE(a.username, a.name) as host_agent_name,
-          a.avatar as host_agent_avatar,
-          COALESCE(rv.viewer_count, 0) as viewer_count,
-          COALESCE(re.trending_score, 0) as trending_score,
+          COALESCE(MAX(a.username), MAX(a.name)) as host_agent_name,
+          MAX(a.avatar) as host_agent_avatar,
+          COALESCE(MAX(rv.viewer_count), 0) as viewer_count,
+          COALESCE(MAX(re.trending_score), 0) as trending_score,
           COUNT(DISTINCT rp.agent_id) as participant_count
         FROM room r
         LEFT JOIN category c ON r.category_id = c.id
@@ -149,8 +149,8 @@ export class DiscoveryService {
         LEFT JOIN room_engagement re ON r.id = re.room_id
         LEFT JOIN room_participant rp ON r.id = rp.room_id AND rp.left_at IS NULL
         WHERE (r.status = 'live' OR r.status = 'completed') AND r.visibility = 'public'
-        GROUP BY r.id, c.id, a.id, rv.room_id, re.room_id
-        ORDER BY COALESCE(re.trending_score, 0) DESC, rv.viewer_count DESC
+        GROUP BY r.id, c.id, a.id
+        ORDER BY trending_score DESC, viewer_count DESC
         LIMIT $1
         `,
         [limit],
@@ -412,9 +412,9 @@ export class DiscoveryService {
           r.id, r.objective, r.status, r.thumbnail_url, r.created_at, r.started_at,
           c.id as category_id, c.name as category_name, c.color as category_color, c.slug as category_slug,
           a.id as host_agent_id, COALESCE(a.username, a.name) as host_agent_name, a.avatar as host_agent_avatar,
-          COALESCE(rv.viewer_count, 0) as viewer_count,
-          COALESCE(re.total_messages, 0) as total_messages,
-          COALESCE(re.engagement_rate, 0) as engagement_rate,
+          COALESCE(MAX(rv.viewer_count), 0) as viewer_count,
+          COALESCE(MAX(re.total_messages), 0) as total_messages,
+          COALESCE(MAX(re.engagement_rate), 0) as engagement_rate,
           COUNT(DISTINCT rp.agent_id) as participant_count
         FROM room r
         LEFT JOIN category c ON r.category_id = c.id
@@ -427,7 +427,7 @@ export class DiscoveryService {
           r.description ILIKE $1 OR
           a.username ILIKE $1 OR
           a.name ILIKE $1
-        GROUP BY r.id, c.id, a.id, rv.room_id, re.room_id
+        GROUP BY r.id, c.id, a.id
         ORDER BY r.created_at DESC
         LIMIT $2
       `,
@@ -658,10 +658,43 @@ export class DiscoveryService {
         name: row.host_agent_name,
         avatar: row.host_agent_avatar,
       },
-      viewerCount: row.viewer_count,
-      participantCount: row.participant_count,
-      trendingScore: row.trending_score,
-      engagementRate: row.engagement_rate,
+      viewerCount: parseInt(row.viewer_count || "0", 10),
+      participantCount: parseInt(row.participant_count || "0", 10),
+      trendingScore: parseFloat(row.trending_score || "0"),
+      engagementRate: parseFloat(row.engagement_rate || "0"),
+    };
+  }
+
+  /**
+   * Helper: Map database row to SearchAgent object
+   */
+  private _mapAgentRow(row: any): SearchAgent {
+    return {
+      id: row.id,
+      name: row.name,
+      username: row.username,
+      avatar: row.avatar,
+      bio: row.bio,
+      verificationStatus: row.verification_status,
+      followerCount: parseInt(row.follower_count || "0", 10),
+      reputationScore: parseFloat(row.reputation_score || "0"),
+    };
+  }
+
+  /**
+   * Helper: Map database row to SearchPodcast object
+   */
+  private _mapPodcastRow(row: any): SearchPodcast {
+    return {
+      id: row.id,
+      title: row.title,
+      description: row.description,
+      coverImageUrl: row.cover_image_url,
+      category: row.category,
+      agentId: row.agent_id,
+      agentName: row.agent_name,
+      agentAvatar: row.agent_avatar,
+      episodeCount: parseInt(row.episode_count || "0", 10),
     };
   }
 }
