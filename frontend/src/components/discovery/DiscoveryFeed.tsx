@@ -1,18 +1,15 @@
 /**
- * DiscoveryFeed Component
- *
+ * DiscoveryFeed Component  
+ * 
  * Main discovery page layout combining:
- * - Featured live rooms (top prominence, like X Spaces)
- * - Trending podcasts (secondary prominence)
- * - Trending past rooms/replays
- * - Category filtering
- * - Real-time updates via WebSocket
- *
- * Part of Phase 1: Strategic Pivot UI
+ * - Live Video Streams (Prominent)
+ * - Trending Podcasts
+ * - Live Audio Rooms (Voice Stages)
+ * - Agent Discovery (Trending/Recommended)
  */
 
 import React, { useState, useEffect } from "react";
-import { AlertCircle, Loader } from "lucide-react";
+import { AlertCircle, Loader, Play, Mic2, Radio, Sparkles, Headphones } from "lucide-react";
 import axios from "axios";
 import { RoomCard } from "./RoomCard";
 import { PodcastCard } from "./PodcastCard";
@@ -39,11 +36,10 @@ export interface DiscoveryFeedProps {
 }
 
 const CATEGORIES = [
-  { id: "all", label: "All" },
-  { id: "tech", label: "Tech" },
+  { id: "all", label: "All Content" },
+  { id: "tech", label: "Tech & AI" },
   { id: "finance", label: "Finance" },
   { id: "creative", label: "Creative" },
-  { id: "dev", label: "Dev" },
   { id: "research", label: "Research" },
 ];
 
@@ -55,13 +51,14 @@ export const DiscoveryFeed: React.FC<DiscoveryFeedProps> = ({
 }) => {
   // State
   const [selectedCategory, setSelectedCategory] = useState("all");
-  const [liveRooms, setLiveRooms] = useState<DiscoveryRoom[]>([]);
+  const [videoStreams, setVideoStreams] = useState<DiscoveryRoom[]>([]);
+  const [audioRooms, setAudioRooms] = useState<DiscoveryRoom[]>([]);
   const [trendingPodcasts, setTrendingPodcasts] = useState<Podcast[]>([]);
-  const [trendingRooms, setTrendingRooms] = useState<DiscoveryRoom[]>([]);
+  const [recommendedContent, setRecommendedContent] = useState<DiscoveryRoom[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch data on mount and category change
+  // Fetch data
   useEffect(() => {
     const fetchDiscoveryData = async () => {
       setIsLoading(true);
@@ -82,13 +79,14 @@ export const DiscoveryFeed: React.FC<DiscoveryFeedProps> = ({
         ]);
 
         const rawLiveRooms = liveRes?.data?.data?.rooms || [];
-        const mappedLiveRooms: DiscoveryRoom[] = rawLiveRooms.map((r: any) => ({
+        const mappedRooms: DiscoveryRoom[] = rawLiveRooms.map((r: any) => ({
           id: r.id,
           title: r.title || r.objective || "Untitled Room",
           type: r.type || "debate",
           hostAgent: {
             id: r.hostAgentId || r.id,
-            name: r.hostAgentName || r.speakers?.[0] || "Agent_Unknown",
+            name: r.hostAgentName || r.username || r.speakers?.[0] || "Agent_Unknown",
+            username: r.username || r.hostAgentName || "agent",
             avatar: r.hostAgentAvatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${r.hostAgentId || r.id}`,
           },
           listenerCount: r.viewerCount || r.listeners || 0,
@@ -99,6 +97,10 @@ export const DiscoveryFeed: React.FC<DiscoveryFeedProps> = ({
           objective: r.objective || "",
           description: r.objective,
         }));
+
+        // Partition Live Rooms
+        setVideoStreams(mappedRooms.filter(r => r.type === 'livestream'));
+        setAudioRooms(mappedRooms.filter(r => r.type !== 'livestream'));
 
         const rawPodcasts = podsRes?.data?.data?.podcasts || [];
         const mappedPodcasts: Podcast[] = rawPodcasts.map((p: any) => ({
@@ -114,14 +116,17 @@ export const DiscoveryFeed: React.FC<DiscoveryFeedProps> = ({
           isSubscribed: false,
         }));
 
+        setTrendingPodcasts(mappedPodcasts);
+
         const rawTrendingRooms = trendingRes?.data?.data?.rooms || [];
-        const mappedTrendingRooms: DiscoveryRoom[] = rawTrendingRooms.map((r: any) => ({
+        setRecommendedContent(rawTrendingRooms.map((r: any) => ({
           id: r.id,
           title: r.title || r.objective || "Untitled Room",
           type: r.type || "debate",
           hostAgent: {
             id: r.hostAgentId || r.id,
-            name: r.hostAgentName || r.speakers?.[0] || "Agent_Unknown",
+            name: r.hostAgentName || r.username || r.speakers?.[0] || "Agent_Unknown",
+            username: r.username || r.hostAgentName || "agent",
             avatar: r.hostAgentAvatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${r.hostAgentId || r.id}`,
           },
           listenerCount: r.viewerCount || r.listeners || 0,
@@ -131,66 +136,39 @@ export const DiscoveryFeed: React.FC<DiscoveryFeedProps> = ({
           createdAt: new Date(r.createdAt || Date.now()),
           objective: r.objective || "",
           description: r.objective,
-        }));
+        })));
 
-        setLiveRooms(mappedLiveRooms);
-        setTrendingPodcasts(mappedPodcasts);
-        setTrendingRooms(mappedTrendingRooms);
       } catch (err) {
-        setError(
-          err instanceof Error
-            ? err.message
-            : "Failed to load discovery content"
-        );
+        setError(err instanceof Error ? err.message : "Failed to load discovery content");
       } finally {
         setIsLoading(false);
       }
     };
 
     fetchDiscoveryData();
-
-    // TODO: Set up WebSocket subscription for real-time updates
-    // socket.on('rooms:updated', (newRooms) => setLiveRooms(newRooms));
   }, [selectedCategory]);
 
-  // Error state
   if (error) {
     return (
-      <div className="mx-auto max-w-7xl px-4 py-8">
-        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-red-900">
-          <div className="flex items-center gap-3">
-            <AlertCircle className="h-5 w-5" />
-            <p>{error}</p>
-          </div>
-        </div>
+      <div className="mx-auto max-w-7xl px-4 py-8 text-center text-red-500">
+        <AlertCircle className="mx-auto h-12 w-12 mb-4 opacity-50" />
+        <p className="font-bold uppercase tracking-widest">{error}</p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-white">
-      {/* Header */}
-      <div className="border-b border-gray-200 bg-white">
-        <div className="mx-auto max-w-7xl px-4 py-6">
-          <h1 className="text-3xl font-bold text-gray-900">Discover</h1>
-          <p className="mt-1 text-gray-600">
-            Live rooms and trending podcasts from creators
-          </p>
-        </div>
-      </div>
-
-      {/* Category Filter */}
-      <div className="border-b border-gray-200 bg-gray-50">
-        <div className="mx-auto max-w-7xl px-4 py-4">
-          <div className="flex gap-2 overflow-x-auto pb-2">
+    <div className="min-h-screen bg-mac-gray pb-20">
+      {/* Search/Category Bar */}
+      <div className="bg-white border-b-2 border-black sticky top-0 z-40 p-4">
+        <div className="max-w-7xl mx-auto flex items-center justify-between gap-4 overflow-x-auto no-scrollbar">
+          <div className="flex gap-2">
             {CATEGORIES.map((cat) => (
               <button
                 key={cat.id}
                 onClick={() => setSelectedCategory(cat.id)}
-                className={`whitespace-nowrap rounded-full px-4 py-2 text-sm font-medium transition-colors ${
-                  selectedCategory === cat.id
-                    ? "bg-black text-white"
-                    : "bg-white text-gray-900 hover:bg-gray-100 border border-gray-200"
+                className={`px-4 py-1.5 font-bold text-xs uppercase border-2 border-black shadow-retro-xs transition-all active:translate-x-[1px] active:translate-y-[1px] ${
+                  selectedCategory === cat.id ? "bg-accent-purple text-white shadow-none translate-x-[1px] translate-y-[1px]" : "bg-white hover:bg-gray-100"
                 }`}
               >
                 {cat.label}
@@ -200,84 +178,119 @@ export const DiscoveryFeed: React.FC<DiscoveryFeedProps> = ({
         </div>
       </div>
 
-      {/* Main Content */}
-      <div className="mx-auto max-w-7xl px-4 py-8">
+      <div className="max-w-7xl mx-auto px-4 py-10 space-y-16">
         {isLoading ? (
-          <div className="flex items-center justify-center py-16">
-            <Loader className="h-8 w-8 animate-spin text-gray-400" />
+          <div className="flex flex-col items-center justify-center py-24">
+            <div className="w-12 h-12 border-4 border-black border-t-accent-purple animate-spin mb-4" />
+            <p className="font-bold uppercase tracking-widest text-gray-500">Connecting to Agent Network...</p>
           </div>
         ) : (
           <>
-            {/* Live Rooms Section (Featured) */}
-            {liveRooms.length > 0 && (
-              <section className="mb-12">
-                <div className="mb-4 flex items-center gap-2">
-                  <div className="h-3 w-3 animate-pulse rounded-full bg-red-500" />
-                  <h2 className="text-2xl font-bold text-gray-900">
-                    🔴 Live Now
-                  </h2>
-                </div>
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                  {liveRooms.map((room) => (
+            {/* 1. Live Video Streams - Top Priority */}
+            <section className="space-y-6">
+              <div className="flex items-center justify-between border-b-2 border-black pb-2">
+                <h2 className="text-2xl font-black uppercase italic tracking-tighter flex items-center gap-3 text-accent-crimson">
+                  <Play className="w-6 h-6 fill-current" />
+                  Live Video Streams
+                </h2>
+                <span className="bg-accent-crimson text-white px-2 py-0.5 text-[10px] font-bold uppercase animate-pulse">
+                  {videoStreams.length} Active
+                </span>
+              </div>
+              
+              {videoStreams.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                  {videoStreams.map((room) => (
                     <RoomCard
                       key={room.id}
                       room={room}
-                      onJoin={onRoomJoin || (() => {})}
-                      onWatch={onWatchStream}
+                      onJoin={() => onRoomJoin?.(room.id)}
+                      onWatchStream={() => onWatchStream?.(room.id)}
                     />
                   ))}
                 </div>
-              </section>
-            )}
+              ) : (
+                <div className="border-4 border-black p-12 text-center text-gray-400 font-bold uppercase bg-white shadow-retro-sm">
+                  <Radio className="w-12 h-12 mx-auto mb-4 opacity-20" />
+                  No active video streams. Start one to get featured!
+                </div>
+              )}
+            </section>
 
-            {/* Trending Podcasts Section */}
+            {/* 2. Trending Podcasts */}
             {trendingPodcasts.length > 0 && (
-              <section className="mb-12">
-                <h2 className="mb-4 text-2xl font-bold text-gray-900">
-                  📻 Trending Podcasts
-                </h2>
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <section className="space-y-6">
+                <div className="flex items-center justify-between border-b-2 border-black pb-2">
+                  <h2 className="text-2xl font-black uppercase italic tracking-tighter flex items-center gap-3 text-accent-teal">
+                    <Headphones className="w-6 h-6" />
+                    Trending Podcasts
+                  </h2>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                   {trendingPodcasts.map((podcast) => (
                     <PodcastCard
                       key={podcast.id}
                       {...podcast}
-                      onPlay={onPodcastPlay}
-                      onSubscribe={onPodcastSubscribe}
+                      onPlay={() => onPodcastPlay?.(podcast.id)}
+                      onSubscribe={() => onPodcastSubscribe?.(podcast.id)}
                     />
                   ))}
                 </div>
               </section>
             )}
 
-            {/* Trending Rooms Section (Non-Live) */}
-            {trendingRooms.length > 0 && (
-              <section>
-                <h2 className="mb-4 text-2xl font-bold text-gray-900">
-                  🔥 Trending Rooms
+            {/* 3. Voice Stages (Audio Rooms) */}
+            <section className="space-y-6">
+              <div className="flex items-center justify-between border-b-2 border-black pb-2">
+                <h2 className="text-2xl font-black uppercase italic tracking-tighter flex items-center gap-3 text-accent-purple">
+                  <Mic2 className="w-6 h-6" />
+                  Voice Stages
                 </h2>
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                  {trendingRooms.map((room) => (
+                <div className="flex items-center gap-1">
+                  <div className="w-2 h-2 bg-accent-purple rounded-full animate-ping" />
+                  <span className="text-[10px] font-bold uppercase text-gray-500">{audioRooms.length} Live Now</span>
+                </div>
+              </div>
+              
+              {audioRooms.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                  {audioRooms.map((room) => (
                     <RoomCard
                       key={room.id}
                       room={room}
-                      onJoin={onRoomJoin || (() => {})}
-                      onWatch={onWatchStream}
+                      onJoin={() => onRoomJoin?.(room.id)}
+                      onWatchStream={() => onWatchStream?.(room.id)}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div className="border-4 border-black p-12 text-center text-gray-400 font-bold uppercase bg-white shadow-retro-sm">
+                   No voice stages active right now.
+                </div>
+              )}
+            </section>
+
+            {/* 4. Agent Discovery (Historical/Recommended) */}
+            {recommendedContent.length > 0 && (
+              <section className="space-y-6 pt-10 border-t-4 border-double border-black">
+                <div className="flex items-center justify-between border-b border-black/20 pb-2">
+                  <h2 className="text-xl font-bold uppercase tracking-tight text-gray-500 flex items-center gap-2">
+                    <Sparkles className="w-4 h-4" />
+                    Agent Discovery
+                  </h2>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                  {recommendedContent.map((room) => (
+                    <RoomCard
+                      key={room.id}
+                      room={room}
+                      onJoin={() => onRoomJoin?.(room.id)}
+                      onWatchStream={() => onWatchStream?.(room.id)}
                     />
                   ))}
                 </div>
               </section>
             )}
-
-            {/* Empty State */}
-            {liveRooms.length === 0 &&
-              trendingPodcasts.length === 0 &&
-              trendingRooms.length === 0 && (
-                <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-gray-300 bg-gray-50 py-12">
-                  <p className="text-gray-600">
-                    No content found for this category
-                  </p>
-                </div>
-              )}
           </>
         )}
       </div>

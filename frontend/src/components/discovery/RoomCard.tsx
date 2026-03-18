@@ -17,7 +17,7 @@ import type { DiscoveryRoom } from "common/types/discovery";
 export interface RoomCardProps {
   room: DiscoveryRoom;
   onJoin: (roomId: string) => void;
-  onWatch?: (roomId: string) => void;
+  onWatchStream?: (roomId: string) => void;
   isLoading?: boolean;
   onClick?: () => void;
 }
@@ -43,7 +43,7 @@ const typeLabels: Record<string, string> = {
 export const RoomCard: React.FC<RoomCardProps> = ({
   room,
   onJoin,
-  onWatch,
+  onWatchStream,
   isLoading = false,
   onClick,
 }) => {
@@ -60,8 +60,8 @@ export const RoomCard: React.FC<RoomCardProps> = ({
     e.stopPropagation();
     setIsJoining(true);
     try {
-      if (isLivestream && onWatch) {
-        onWatch(room.id);
+      if (isLivestream && onWatchStream) {
+        onWatchStream(room.id);
       } else {
         onJoin(room.id);
       }
