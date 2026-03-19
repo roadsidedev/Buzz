@@ -167,7 +167,7 @@ export function RoomLivePage() {
                   size="icon"
                   className={cn(
                     "hover:bg-white/10 rounded-full h-9 w-9 transition-colors",
-                    showChat ? "text-accent-teal" : "text-white hover:text-accent-teal"
+                    showChat ? "text-primary" : "text-white hover:text-primary"
                   )}
                   aria-label="Open live chat"
                 >
@@ -192,26 +192,26 @@ export function RoomLivePage() {
           />
 
           <div
-            className="fixed inset-x-0 bottom-0 z-50 flex flex-col h-[65vh] animate-in slide-in-from-bottom duration-300 rounded-t-2xl overflow-hidden border-t-2 border-mac-charcoal bg-background/98 backdrop-blur-sm shadow-2xl"
+            className="fixed inset-x-0 bottom-0 z-50 flex flex-col h-[65vh] animate-in slide-in-from-bottom duration-300 rounded-t-2xl overflow-hidden border-t bg-background/98 backdrop-blur-sm shadow-2xl"
             role="dialog"
             aria-label="Live Chat"
           >
-            <div className="flex justify-center pt-3 pb-1 bg-mac-gray shrink-0">
-              <div className="w-10 h-1.5 rounded-full bg-mac-charcoal/30" />
+            <div className="flex justify-center pt-3 pb-1 bg-muted shrink-0">
+              <div className="w-10 h-1.5 rounded-full bg-border" />
             </div>
 
-            <div className="px-4 py-3 border-b-2 border-mac-charcoal bg-mac-gray shrink-0">
-              <h3 className="font-black tracking-widest uppercase text-sm flex justify-between items-center text-mac-charcoal">
+            <div className="px-4 py-3 border-b bg-muted/30 shrink-0">
+              <h3 className="font-semibold tracking-tight text-sm flex justify-between items-center text-foreground">
                 <span className="flex items-center gap-2">
-                  <MessageSquare size={16} />
+                  <MessageSquare size={16} className="text-muted-foreground" />
                   Live Chat
                 </span>
                 <span className="flex items-center gap-2">
-                  <Users size={14} className="text-mac-charcoal/60" />
+                  <Users size={14} className="text-muted-foreground" />
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-6 w-6 -mr-2 text-mac-charcoal hover:bg-mac-charcoal/10"
+                    className="h-6 w-6 -mr-2 text-muted-foreground hover:bg-muted"
                     onClick={() => setShowChat(false)}
                     aria-label="Close chat"
                   >
@@ -229,31 +229,31 @@ export function RoomLivePage() {
                   key={i}
                   className={`animate-in slide-in-from-bottom-2 duration-300 p-2.5 rounded-lg ${
                     c.isPriority
-                      ? 'bg-accent-teal/10 border-l-4 border-accent-teal'
+                      ? 'bg-primary/10 border-l-4 border-primary'
                       : 'hover:bg-muted/50 transition-colors'
                   }`}
                 >
-                  <span className={`font-black tracking-wide mr-2 ${
-                    c.user === 'You' ? 'text-accent-purple' : c.isAgent ? 'text-accent-teal' : 'text-mac-charcoal'
+                  <span className={`font-semibold mr-2 ${
+                    c.user === 'You' ? 'text-primary' : c.isAgent ? 'text-secondary-foreground' : 'text-foreground'
                   }`}>
-                    {c.isPriority && <DollarSign size={14} className="inline mr-1 text-accent-teal" />}
+                    {c.isPriority && <DollarSign size={14} className="inline mr-1 text-primary" />}
                     {c.user}:
                   </span>
-                  <span className="text-base-gray-600 leading-snug">{c.msg}</span>
+                  <span className="text-muted-foreground leading-snug">{c.msg}</span>
                 </div>
               ))}
             </div>
 
-            <div className="p-3 border-t-2 border-mac-charcoal bg-mac-white shrink-0">
+            <div className="p-3 border-t bg-background shrink-0">
               {qnaCredits > 0 && (
-                <div className="mb-3 flex items-center justify-between bg-accent-teal/10 rounded-md px-3 py-2 border border-accent-teal/30">
-                  <span className="text-xs font-black uppercase tracking-wider text-accent-teal">Priority Q's: {qnaCredits}</span>
-                  <label className="text-xs font-bold flex items-center cursor-pointer select-none text-mac-charcoal">
+                <div className="mb-3 flex items-center justify-between bg-primary/10 rounded-md px-3 py-2 border border-primary/20">
+                  <span className="text-xs font-semibold uppercase tracking-wider text-primary">Priority Q's: {qnaCredits}</span>
+                  <label className="text-xs font-medium flex items-center cursor-pointer select-none text-foreground">
                     <input
                       type="checkbox"
                       checked={usePriority}
                       onChange={(e) => setUsePriority(e.target.checked)}
-                      className="mr-2 rounded border-2 border-mac-charcoal text-accent-teal focus:ring-accent-teal"
+                      className="mr-2 rounded border-primary text-primary focus:ring-primary"
                       aria-label="Use priority question credits"
                     />
                     Use Priority
@@ -266,10 +266,10 @@ export function RoomLivePage() {
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
                   placeholder={authenticated ? "Send a message..." : "Login to chat..."}
-                  className="flex-grow shadow-none border-2 border-mac-charcoal bg-white font-bold placeholder:font-medium placeholder:uppercase placeholder:text-xs"
+                  className="flex-grow"
                   autoFocus
                 />
-                <Button type="submit" variant="accent" size="icon" className="shrink-0 border-2 shadow-retro-sm">
+                <Button type="submit" size="icon" className="shrink-0 shadow-sm">
                   <MessageSquare size={16} />
                 </Button>
               </form>
