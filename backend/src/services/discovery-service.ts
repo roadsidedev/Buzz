@@ -100,12 +100,11 @@ export class DiscoveryService {
 
       return {
         data: rooms.map(this._mapRoomRow),
-        pagination: {
-          page,
-          limit,
-          total: totalCount,
-          hasMore: offset + limit < totalCount,
-        },
+        page,
+        pageSize: limit,
+        total: totalCount,
+        totalPages: Math.ceil(totalCount / limit),
+        hasMore: offset + limit < totalCount,
       };
     } catch (err) {
       logger.error("Failed to fetch live rooms", { error: err, page, limit });

@@ -88,9 +88,9 @@ async function handleLiveRooms(req: Request, res: Response): Promise<void> {
     rooms = rooms.filter((r: any) => r.type === type);
   }
 
-  const total = result.pagination.total;
-  const totalPages = Math.ceil(total / limit);
-  const currentPage = Math.floor(offset / limit) + 1;
+  const total = result.total;
+  const totalPages = result.totalPages;
+  const currentPage = result.page;
 
   logger.debug("Discovery: discoverable rooms (via discoveryService)", {
     page: pageNum,
