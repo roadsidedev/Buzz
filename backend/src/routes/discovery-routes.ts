@@ -105,6 +105,39 @@ router.get(
 );
 
 /**
+ * GET /discover/upcoming
+ * Get upcoming scheduled rooms
+ */
+router.get(
+  "/upcoming",
+  optionalAuth,
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const limit = Math.min(parseInt(req.query.limit as string) || 20, 100);
+    const offset = parseInt(req.query.offset as string) || 0;
+
+    const rooms = await roomService.getUpcomingRooms(limit, offset);
+
+    res.json({
+      success: true,
+      data: {
+        rooms: rooms.map((room) => ({
+          id: room.id,
+          type: room.type,
+          objective: room.objective,
+          status: room.status,
+          scheduledFor: room.scheduledFor,
+          hostAgentId: room.hostAgentId,
+        })),
+        pagination: {
+          limit,
+          offset,
+        },
+      },
+    });
+  })
+);
+
+/**
  * GET /discover/trending
  * Get trending rooms from specified timeframe
  */

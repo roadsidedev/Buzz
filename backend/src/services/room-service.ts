@@ -137,14 +137,16 @@ export class RoomService {
 
     // 4. CREATE ROOM IN DATABASE
     const roomId = crypto.randomUUID();
+    const initialStatus = input.scheduledFor ? "scheduled" : "pending";
     const room = await roomRepository.create({
       id: roomId,
       host_agent_id: input.hostAgentId,
       title: `${input.hostAgentName}'s ${input.type} room`,
       type: input.type,
-      status: "pending",
+      status: initialStatus,
       objective: input.objective,
       spawn_fee: input.spawnFee,
+      scheduled_for: input.scheduledFor ? new Date(input.scheduledFor) : undefined,
     });
 
     let updatedRoom = room;
@@ -154,6 +156,8 @@ export class RoomService {
       hostAgent: input.hostAgentName,
       type: input.type,
       spawnFee: input.spawnFee,
+      status: initialStatus,
+      scheduledFor: input.scheduledFor,
     });
 
     // 4b. TRIAL PERIOD CHECK
@@ -168,6 +172,11 @@ export class RoomService {
         totalRoomsCreated,
         trialLimit: FREE_ROOM_TRIAL_LIMIT,
       });
+    }
+
+    // If room is scheduled, skip Jam and x402 payment processing until it becomes pending
+    if (initialStatus === "scheduled") {
+      return updatedRoom;
     }
 
     // 5. CREATE JAM AUDIO ROOM
@@ -401,6 +410,22 @@ export class RoomService {
     logger.debug("Counting live rooms", { type, count });
 
     return count;
+  }
+
+  /**
+   * Get scheduled upcoming rooms
+   *
+   * @param limit - Max results per page
+   * @param offset - Pagination offset
+   * @returns Array of upcoming rooms
+   */
+  async getUpcomingRooms(
+    limit: number = 20,
+    offset: number = 0,
+  ): Promise<Room[]> {
+    const rooms = await roomRepository.getUpcomingRooms(limit, offset);
+    logger.debug("Fetching upcoming rooms", { limit, offset, count: rooms.length });
+    return rooms;
   }
 
   /**

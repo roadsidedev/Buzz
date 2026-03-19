@@ -63,6 +63,7 @@ export const CreateRoomRequestSchema = z.object({
   objective: ObjectiveSchema,
   spawnFee: SpawnFeeSchema,
   invitedAgentIds: z.array(z.string().uuid()).optional(),
+  scheduledFor: z.string().datetime().or(z.date()).optional(),
 });
 
 export type ValidatedCreateRoomRequest = z.infer<typeof CreateRoomRequestSchema>;

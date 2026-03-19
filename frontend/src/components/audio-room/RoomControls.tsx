@@ -87,7 +87,7 @@ export function RoomControls({
       <div className="relative">
         <button
           onClick={() => setShowReactions(!showReactions)}
-          className="control-btn p-3 rounded-full bg-slate-700 text-slate-300 hover:bg-slate-600 transition-all"
+          className="control-btn p-3 rounded-full bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-all"
           title="Send reaction"
         >
           <svg
@@ -107,7 +107,7 @@ export function RoomControls({
 
         {/* Reaction popup */}
         {showReactions && (
-          <div className="reaction-popup absolute bottom-14 left-1/2 transform -translate-x-1/2 flex gap-2 p-2 bg-slate-800 rounded-lg shadow-lg">
+          <div className="reaction-popup absolute bottom-14 left-1/2 transform -translate-x-1/2 flex gap-2 p-2 bg-popover border border-border rounded-lg shadow-lg">
             {REACTIONS.map((emoji) => (
               <button
                 key={emoji}

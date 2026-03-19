@@ -25,6 +25,7 @@ import { useAuthStore } from "@/stores/auth-store";
 import { Button } from "@/components/ui/button"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
 import { ModeToggle } from "@/components/mode-toggle"
+import { NotificationBell } from "@/components/notifications/NotificationBell"
 import { Input } from "@/components/ui/input"
 
 interface MainLayoutProps {
@@ -128,6 +129,7 @@ export function MainLayout({ children }: MainLayoutProps) {
           </div>
 
           <div className="flex items-center gap-4 shrink-0 ml-auto">
+            <NotificationBell />
             <ModeToggle />
             <DropdownMenu>
               <DropdownMenuTrigger asChild>

@@ -14,10 +14,12 @@ import {
   asyncHandler,
   requireAuth,
   requireApiKey,
+  optionalApiKey,
   roomCreationLimiter,
 } from "../middleware/index.js";
 import { validate, CreateRoomRequestSchema } from "../utils/validators.js";
 import { roomService, paymentService, orchestratorClient } from "../services/index.js";
+import { notificationRepository } from "../repositories/notification-repository.js";
 import { logger } from "../utils/logger.js";
 
 const router = Router();
@@ -60,6 +62,11 @@ function normalizeRoomRequest(body: Record<string, unknown>): Record<string, unk
   delete normalized.max_participants;
   delete normalized.min_duration_minutes;
   delete normalized.title;
+
+  if (normalized.scheduled_for !== undefined && normalized.scheduledFor === undefined) {
+    normalized.scheduledFor = normalized.scheduled_for;
+    delete normalized.scheduled_for;
+  }
 
   return normalized;
 }
@@ -404,6 +411,56 @@ router.post(
         message: "Joined room successfully",
       },
     });
+  })
+);
+
+/**
+ * POST /rooms/:id/notify
+ * Subscribe to notifications for a scheduled room
+ */
+router.post(
+  "/:id/notify",
+  optionalApiKey,
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const { id } = req.params;
+    
+    // Accept either authenticated agent OR human user from body
+    const subscriberId = req.agent?.id || req.body.userId;
+    
+    if (!subscriberId) {
+      res.status(401).json({
+        success: false,
+        error: {
+          code: "UNAUTHORIZED",
+          message: "Must provide API key or userId in body",
+          statusCode: 401
+        }
+      });
+      return;
+    }
+
+    const room = await roomService.getRoomById(id);
+    
+    if (room.status !== "scheduled") {
+      res.status(400).json({
+         success: false,
+         error: {
+           code: "NOT_SCHEDULED",
+           message: "Room is not a scheduled room",
+           statusCode: 400
+         }
+      });
+      return;
+    }
+    
+    await notificationRepository.addNotification(id, subscriberId);
+    
+    logger.info("User/Agent subscribed to room notifications", {
+      roomId: id,
+      subscriberId
+    });
+
+    res.json({ success: true, message: "Subscribed to notifications" });
   })
 );
 

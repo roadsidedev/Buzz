@@ -173,6 +173,41 @@ export async function runStartupMigrations(): Promise<void> {
         ADD COLUMN IF NOT EXISTS jam_room_url TEXT
     `);
 
+    // ── Migration: Room Scheduling ───────────────────────────────────────
+    await client.query(`
+      ALTER TABLE room
+        ADD COLUMN IF NOT EXISTS scheduled_for TIMESTAMP WITH TIME ZONE NULL
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS room_notification (
+        id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        room_id       UUID NOT NULL,
+        agent_id      UUID NOT NULL,
+        created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (room_id)  REFERENCES room(id)  ON DELETE CASCADE,
+        FOREIGN KEY (agent_id) REFERENCES agent(id) ON DELETE CASCADE,
+        UNIQUE(room_id, agent_id)
+      )
+    `);
+
+    // ── Migration: User Notifications ─────────────────────────────────────
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS user_notification (
+        id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id       VARCHAR(255) NOT NULL,
+        title         VARCHAR(255) NOT NULL,
+        message       TEXT,
+        link          VARCHAR(1024),
+        is_read       BOOLEAN DEFAULT false,
+        created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_user_notif_user 
+        ON user_notification(user_id, created_at DESC)
+    `);
+
     // ── Migration 011 (room): pantry / self-hosted SFU columns ─────────────
     await client.query(`
       ALTER TABLE room

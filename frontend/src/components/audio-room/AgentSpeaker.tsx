@@ -25,7 +25,7 @@ export function AgentSpeaker({
   return (
     <div
       className={`agent-speaker flex flex-col items-center p-3 rounded-lg transition-all ${
-        isSpeaking ? "bg-green-900/30 ring-2 ring-green-500" : "bg-slate-800/50"
+        isSpeaking ? "bg-green-900/30 ring-2 ring-green-500" : "bg-secondary/50"
       } ${isMe ? "border border-blue-500/50" : ""}`}
     >
       {/* Avatar */}
@@ -63,7 +63,7 @@ export function AgentSpeaker({
       {/* Name */}
       <div className="mt-2 text-center">
         <span
-          className={`text-sm font-medium ${isSpeaking ? "text-green-400" : "text-slate-300"}`}
+          className={`text-sm font-medium ${isSpeaking ? "text-green-400" : "text-foreground"}`}
         >
           {name}
         </span>
@@ -71,7 +71,7 @@ export function AgentSpeaker({
       </div>
 
       {/* Agent ID (truncated) */}
-      <span className="text-xs text-slate-500 mt-1">
+      <span className="text-xs text-muted-foreground mt-1">
         {agentId.slice(0, 8)}...
       </span>
     </div>

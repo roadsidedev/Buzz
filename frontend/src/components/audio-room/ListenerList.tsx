@@ -26,7 +26,7 @@ export function ListenerList({
   if (listeners.length === 0) {
     return (
       <div className="listener-list-empty text-center py-2">
-        <p className="text-slate-500 text-sm">No listeners</p>
+        <p className="text-muted-foreground text-sm">No listeners</p>
       </div>
     );
   }
@@ -38,14 +38,14 @@ export function ListenerList({
         {visibleListeners.map((listener) => (
           <div
             key={listener.id}
-            className="listener-badge flex items-center gap-2 px-2 py-1 bg-slate-800 rounded-full"
+            className="listener-badge flex items-center gap-2 px-2 py-1 bg-secondary rounded-full"
           >
-            <div className="w-6 h-6 rounded-full bg-slate-600 flex items-center justify-center">
-              <span className="text-xs text-slate-300">
+            <div className="w-6 h-6 rounded-full bg-muted flex items-center justify-center">
+              <span className="text-xs text-foreground">
                 {(listener.name || listener.id).charAt(0).toUpperCase()}
               </span>
             </div>
-            <span className="text-xs text-slate-400 max-w-20 truncate">
+            <span className="text-xs text-muted-foreground max-w-20 truncate">
               {listener.name || listener.id.slice(0, 8)}
             </span>
           </div>
@@ -53,8 +53,8 @@ export function ListenerList({
 
         {/* Remaining count */}
         {remainingCount > 0 && (
-          <div className="listener-badge-more flex items-center gap-1 px-2 py-1 bg-slate-700 rounded-full">
-            <span className="text-xs text-slate-300">
+          <div className="listener-badge-more flex items-center gap-1 px-2 py-1 bg-secondary/80 rounded-full">
+            <span className="text-xs text-foreground">
               +{remainingCount} more
             </span>
           </div>

@@ -32,7 +32,7 @@ export function SpeakerGrid({
   if (speakers.length === 0) {
     return (
       <div className="speaker-grid-empty text-center py-4">
-        <p className="text-slate-500 text-sm">No speakers yet</p>
+        <p className="text-muted-foreground text-sm">No speakers yet</p>
       </div>
     );
   }

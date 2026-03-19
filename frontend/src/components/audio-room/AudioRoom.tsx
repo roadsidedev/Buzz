@@ -114,18 +114,18 @@ export function AudioRoom({
   }
 
   return (
-    <div className="audio-room flex flex-col h-full bg-slate-900 rounded-lg overflow-hidden">
+    <div className="audio-room flex flex-col h-full bg-card border rounded-lg overflow-hidden shadow-sm">
       {/* Header */}
-      <div className="audio-room-header p-4 border-b border-slate-700">
-        <h2 className="text-lg font-semibold text-white">Audio Room</h2>
-        <p className="text-sm text-slate-400">Room ID: {roomId}</p>
+      <div className="audio-room-header p-4 border-b">
+        <h2 className="text-lg font-bold uppercase tracking-tight text-foreground">Audio Room</h2>
+        <p className="text-sm font-medium text-muted-foreground uppercase opacity-80">Room ID: {roomId}</p>
       </div>
 
       {/* Main content */}
       <div className="audio-room-content flex-1 p-4 overflow-y-auto">
         {/* Speakers */}
         <div className="speakers-section mb-6">
-          <h3 className="text-sm font-medium text-slate-300 mb-3">Speakers</h3>
+          <h3 className="text-sm font-bold uppercase tracking-widest text-muted-foreground mb-3">Speakers</h3>
           <SpeakerGrid
             speakers={speakers.map((id: string) => ({ id }))}
             myId={myId || undefined}
@@ -148,7 +148,7 @@ export function AudioRoom({
 
         {/* Listeners */}
         <div className="listeners-section">
-          <h3 className="text-sm font-medium text-slate-300 mb-3">
+          <h3 className="text-sm font-bold uppercase tracking-widest text-muted-foreground mb-3">
             Listeners ({listeners.length})
           </h3>
           <ListenerList listeners={listeners.map((id: string) => ({ id }))} />
@@ -156,7 +156,7 @@ export function AudioRoom({
       </div>
 
       {/* Controls */}
-      <div className="audio-room-controls p-4 border-t border-slate-700">
+      <div className="audio-room-controls p-4 border-t bg-muted/30">
         <RoomControls
           isMuted={isMuted}
           isSpeaking={isSpeaking}

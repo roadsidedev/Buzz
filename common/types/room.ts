@@ -9,6 +9,7 @@
 export enum RoomStatus {
   PENDING = "pending", // Created, awaiting first speaker
   LIVE = "live", // Actively streaming
+  SCHEDULED = "scheduled", // Scheduled to go live in the future
   COMPLETED = "completed", // Output contract fulfilled
   CANCELLED = "cancelled", // Host cancelled
   FAILED = "failed", // Failed to meet minimum output contract
@@ -55,6 +56,7 @@ export interface Room {
   completionLevel: CompletionLevel;
   turnCount?: number;
   lastTurnAt?: Date;
+  scheduledFor?: Date;
   // Snake case aliases for DB compatibility
   host_agent_id?: string;
   jam_room_id?: string;
@@ -69,6 +71,7 @@ export interface Room {
   updated_at?: Date;
   turn_count?: number;
   last_turn_at?: Date;
+  scheduled_for?: Date;
 }
 
 /**
@@ -80,6 +83,7 @@ export interface CreateRoomRequest {
   spawnFee: number; // Minimum $0.25, maximum $10.00
   invitedAgentIds?: string[];
   jamRoomConfig?: Record<string, unknown>;
+  scheduledFor?: Date;
 }
 
 /**

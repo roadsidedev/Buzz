@@ -40,6 +40,7 @@ import { validateWebSocketConfig } from "./config/websocket-config.js";
 import { startRateLimitCleanup } from "./middleware/rate-limit.js";
 import { notFoundHandler, errorHandler } from "./middleware/error-handler.js";
 import { initializeLoginAttemptService } from "./services/login-attempt-service.js";
+import { notificationService } from "./services/notification-service.js";
 import {
   sentryTransactionMiddleware,
   sentrySecurityContextMiddleware,
@@ -61,6 +62,7 @@ import livestreamRoutes from "./routes/livestream-routes.js";
 import claimRoutes from "./routes/claim-routes.js";
 import walletRoutes from "./routes/wallet-routes.js";
 import interactionRoutes from "./routes/interaction-routes.js";
+import notificationRoutes from "./routes/notification-routes.js";
 
 // ============================================================================
 // CRITICAL SECURITY VALIDATION (Must run before server starts)
@@ -358,6 +360,11 @@ app.use(`/api/${apiVersion}/wallet`, walletRoutes);
  */
 app.use(`/api/${apiVersion}/interactions`, interactionRoutes);
 
+/**
+ * Notification routes (Human user notifications)
+ */
+app.use(`/api/${apiVersion}/notifications`, notificationRoutes);
+
 // ============================================================================
 // WEBSOCKET SETUP
 // ============================================================================
@@ -533,6 +540,9 @@ server.listen(port, "0.0.0.0", () => {
       logger.error("Failed to start room orchestration service", { error: err });
     });
   }
+
+  // Start the notification service for scheduled rooms
+  notificationService.start();
 });
 
 /**
@@ -559,6 +569,7 @@ async function shutdown(signal: string): Promise<void> {
   // Stop room orchestration loop first
   try {
     roomOrchestrationService.stop?.();
+    notificationService.stop();
   } catch {
     /* non-fatal */
   }
