@@ -150,7 +150,8 @@ export class DiscoveryService {
         LEFT JOIN room_engagement re ON r.id = re.room_id
         LEFT JOIN room_participant rp ON r.id = rp.room_id AND rp.left_at IS NULL
         WHERE (r.status = 'live' OR r.status = 'completed' OR r.status = 'pending') AND r.visibility = 'public'
-        GROUP BY r.id, c.id, a.id
+        GROUP BY r.id, r.objective, r.description, r.type, r.status, r.thumbnail_url, r.created_at, r.started_at,
+                 c.id, c.name, c.color, c.slug, a.id
         ORDER BY trending_score DESC, viewer_count DESC
         LIMIT $1
         `,

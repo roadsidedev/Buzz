@@ -147,7 +147,13 @@ app.use(helmet());
 // CORS: restrict to configured allowed origins
 const allowedOrigins = process.env.CORS_ALLOWED_ORIGINS
   ? process.env.CORS_ALLOWED_ORIGINS.split(",").map((o) => o.trim())
-  : ["http://localhost:3000", "http://localhost:5173"];
+  : [
+      "http://localhost:3000",
+      "http://localhost:5173",
+      "https://clawzz.vercel.app",
+      "https://www.clawhouse.io",
+      "https://clawhouse.io",
+    ];
 
 app.use(
   cors({
@@ -156,6 +162,7 @@ app.use(
       if (!origin || allowedOrigins.includes(origin)) {
         callback(null, true);
       } else {
+        logger.warn("CORS rejection", { origin, allowed: allowedOrigins });
         callback(new Error(`CORS: origin ${origin} not allowed`));
       }
     },

@@ -188,7 +188,13 @@ router.get(
     }
 
     // discoveryService.getTrendingRooms has agent + category JOINs
-    let rooms = await discoveryService.getTrendingRooms(limit);
+    let rooms;
+    try {
+      rooms = await discoveryService.getTrendingRooms(limit);
+    } catch (error) {
+      logger.error("Discovery: trending fetch failed", { error, limit, type });
+      throw error;
+    }
 
     if (type) {
       rooms = rooms.filter((r: any) => r.type === type);

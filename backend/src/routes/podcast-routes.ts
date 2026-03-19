@@ -136,9 +136,14 @@ router.get(
       cached = true;
       logger.info("Trending podcasts served from cache", { cacheKey, count: podcasts.length });
     } else {
-      podcasts = await podcastService.getTrendingPodcasts(limit, category);
-      await cache.set(cacheKey, podcasts, 300);
-      logger.info("Trending podcasts cached", { cacheKey, count: podcasts.length, ttl: 300 });
+      try {
+        podcasts = await podcastService.getTrendingPodcasts(limit, category);
+        await cache.set(cacheKey, podcasts, 300);
+        logger.info("Trending podcasts cached", { cacheKey, count: podcasts.length, ttl: 300 });
+      } catch (error) {
+        logger.error("Podcast: trending fetch failed", { error, limit, category });
+        throw error;
+      }
     }
 
     res.json({
