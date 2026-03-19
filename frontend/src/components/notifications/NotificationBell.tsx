@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Bell } from "lucide-react";
+import { usePrivy } from "@privy-io/react-auth";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import {
@@ -15,6 +16,7 @@ export function NotificationBell() {
   const [notifications, setNotifications] = useState<any[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const { walletAddress } = useAuthStore();
+  const { login } = usePrivy();
   const navigate = useNavigate();
 
   const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:4000/api/v1";
@@ -35,6 +37,7 @@ export function NotificationBell() {
 
   useEffect(() => {
     fetchNotifications();
+    if (!walletAddress) return;
     // Poll every 30 seconds
     const timer = setInterval(fetchNotifications, 30000);
     return () => clearInterval(timer);
@@ -53,11 +56,16 @@ export function NotificationBell() {
     }
   };
 
-  if (!walletAddress) return null;
+  const handleOpenClick = (e: React.MouseEvent) => {
+    if (!walletAddress) {
+      e.preventDefault();
+      login();
+    }
+  };
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger asChild>
+      <DropdownMenuTrigger asChild onClick={handleOpenClick}>
         <button className="relative p-2 text-muted-foreground hover:text-foreground transition-colors outline-none">
           <Bell size={20} />
           {unreadCount > 0 && (

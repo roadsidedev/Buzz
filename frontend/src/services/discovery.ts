@@ -297,7 +297,8 @@ export class DiscoveryService {
    * Get authentication token from localStorage
    */
   private static getToken(): string {
-    return localStorage.getItem("token") || "";
+    // BUG FIX: Use "auth_token" to match the key written by api.ts#setToken()
+    return localStorage.getItem("auth_token") || localStorage.getItem("token") || "";
   }
 }
 

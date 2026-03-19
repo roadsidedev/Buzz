@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { UpcomingStages } from "@/components/discovery/upcoming-stages";
 
 interface RoomDetails {
   id: string;
@@ -247,6 +248,10 @@ export const RoomPage: React.FC = () => {
             )}
           </CardContent>
         </Card>
+        
+        <div className="mt-12">
+          <UpcomingStages />
+        </div>
       </main>
     </div>
   );

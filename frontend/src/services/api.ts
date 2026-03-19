@@ -260,12 +260,31 @@ export class ApiClient {
     category?: string;
     limit?: number;
   }): Promise<TrendingPodcast[]> {
-    return this.request<TrendingPodcast[]>("GET", "/podcasts/trending", {
-      query: {
-        category: options?.category ?? "",
-        limit: options?.limit ?? 10,
-      },
-    });
+    // BUG FIX: /podcasts/trending returns { success, data: { podcasts: [...] } }
+    // We must unwrap data.podcasts; returning the whole response object caused
+    // callers to receive a plain object instead of an array.
+    const response = await this.request<{ podcasts: TrendingPodcast[] }>(
+      "GET",
+      "/podcasts/trending",
+      {
+        query: {
+          category: options?.category ?? "",
+          limit: options?.limit ?? 10,
+        },
+      }
+    );
+    // The request() method returns the parsed JSON body directly.
+    // The backend wraps it as { success, data: { podcasts } }, so we need to
+    // handle both the raw shape and the pre-unwrapped shape gracefully.
+    const anyResp = response as unknown as Record<string, unknown>;
+    if (Array.isArray(response)) return response as TrendingPodcast[];
+    if (anyResp.data && Array.isArray((anyResp.data as Record<string, unknown>).podcasts)) {
+      return (anyResp.data as { podcasts: TrendingPodcast[] }).podcasts;
+    }
+    if (Array.isArray((anyResp as Record<string, unknown>).podcasts)) {
+      return (anyResp as { podcasts: TrendingPodcast[] }).podcasts;
+    }
+    return [];
   }
 
   // ==================== EPISODE ENDPOINTS ====================
