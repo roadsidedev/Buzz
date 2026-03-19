@@ -40,7 +40,7 @@ export class ApiClient {
   private accessToken: string | null = null;
 
   constructor(config: ApiClientConfig) {
-    this.baseUrl = config.baseUrl;
+    this.baseUrl = config.baseUrl.replace(/\/+$/, "");
     this.timeout = config.timeout ?? 30000;
     this.retries = config.retries ?? 3;
 

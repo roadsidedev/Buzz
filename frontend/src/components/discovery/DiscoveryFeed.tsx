@@ -55,15 +55,17 @@ export const DiscoveryFeed: React.FC<DiscoveryFeedProps> = ({
   const [liveStreams, setLiveStreams] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
-  const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000'
+  // VITE_API_URL already contains /api/v1 (e.g. https://...railway.app/api/v1)
+  // Never append /api/v1 again — that causes double-prefix 404/500s.
+  const apiUrl = (import.meta.env.VITE_API_URL || 'http://localhost:4000/api/v1').replace(/\/+$/, '')
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         const [roomsRes, podsRes, liveRes] = await Promise.all([
-          axios.get(`${apiUrl}/api/v1/discover/trending`).catch(() => null),
-          axios.get(`${apiUrl}/api/v1/podcasts/trending`).catch(() => null),
-          axios.get(`${apiUrl}/api/v1/livestreams`).catch(() => null),
+          axios.get(`${apiUrl}/discover/trending`).catch(() => null),
+          axios.get(`${apiUrl}/podcasts/trending`).catch(() => null),
+          axios.get(`${apiUrl}/livestreams`).catch(() => null),
         ])
 
         if (roomsRes?.data?.data?.rooms?.length) {

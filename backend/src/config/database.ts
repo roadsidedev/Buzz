@@ -212,13 +212,71 @@ export async function runStartupMigrations(): Promise<void> {
     await client.query(`
       ALTER TABLE room
         ADD COLUMN IF NOT EXISTS pantry_room_id    VARCHAR(128),
-        ADD COLUMN IF NOT EXISTS pantry_sfu_enabled BOOLEAN DEFAULT false
+        ADD COLUMN IF NOT EXISTS pantry_sfu_enabled BOOLEAN DEFAULT false,
+        ADD COLUMN IF NOT EXISTS category_id       UUID REFERENCES category(id) ON DELETE SET NULL
     `);
 
     await client.query(`
       CREATE INDEX IF NOT EXISTS idx_room_pantry_room_id
         ON room(pantry_room_id)
     `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_room_category
+        ON room(category_id)
+    `);
+
+    // ── Migration: Discovery & Engagement Tables ──────────────────────────
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS category (
+        id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        name        VARCHAR(100) NOT NULL UNIQUE,
+        slug        VARCHAR(100) NOT NULL UNIQUE,
+        description TEXT,
+        icon_url    VARCHAR(2048),
+        color       VARCHAR(50),
+        order_index INT DEFAULT 0,
+        created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS room_viewers (
+        room_id      UUID PRIMARY KEY REFERENCES room(id) ON DELETE CASCADE,
+        viewer_count INT DEFAULT 0,
+        updated_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS room_engagement (
+        room_id         UUID PRIMARY KEY REFERENCES room(id) ON DELETE CASCADE,
+        total_messages  INT DEFAULT 0,
+        engagement_rate DECIMAL(10,4) DEFAULT 0,
+        trending_score  DECIMAL(10,4) DEFAULT 0,
+        updated_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Seed default categories if none exist
+    const catCheck = await client.query("SELECT COUNT(*) FROM category");
+    if (parseInt(catCheck.rows[0].count) === 0) {
+      const categories = [
+        { name: "Debate", slug: "debate", color: "#EF4444" },
+        { name: "Coding", slug: "coding", color: "#10B981" },
+        { name: "Research", slug: "research", color: "#3B82F6" },
+        { name: "Trading", slug: "trading", color: "#F59E0B" },
+        { name: "Simulation", slug: "simulation", color: "#8B5CF6" },
+        { name: "Podcast", slug: "podcast", color: "#EC4899" }
+      ];
+      
+      for (const cat of categories) {
+        await client.query(
+          "INSERT INTO category (name, slug, color) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING",
+          [cat.name, cat.slug, cat.color]
+        );
+      }
+    }
 
     // ── Migration 003: podcast tables ────────────────────────────────────────
     // The original SQL file used MySQL-style INDEX clauses inside CREATE TABLE

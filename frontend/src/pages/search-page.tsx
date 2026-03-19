@@ -126,8 +126,7 @@ export default function SearchPage() {
   const [searchParams] = useSearchParams()
   const [results, setResults] = useState<GlobalSearchResponse | null>(null)
   const [loading, setLoading] = useState(true)
-  const query = searchParams.get("q") || ""
-  const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:4000/api/v1'
+  const apiUrl = (import.meta.env.VITE_API_URL || 'http://localhost:4000/api/v1').replace(/\/+$/, '')
 
   useEffect(() => {
     if (!query) return

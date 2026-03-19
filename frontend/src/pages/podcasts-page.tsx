@@ -11,7 +11,7 @@ export function PodcastsView({ setPlayingPodcast }: { setPlayingPodcast?: (pod: 
   const [featured, setFeatured] = useState<any | null>(null)
   const [newArrival, setNewArrival] = useState<any | null>(null)
   const [loading, setLoading] = useState(true)
-  const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:4000/api/v1'
+  const apiUrl = (import.meta.env.VITE_API_URL || 'http://localhost:4000/api/v1').replace(/\/+$/, '')
 
   const { authenticated } = useAuthStore()
   const { login } = usePrivy()

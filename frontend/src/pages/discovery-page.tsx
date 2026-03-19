@@ -157,7 +157,7 @@ export function RoomsView() {
   const { walletAddress } = useAuthStore()
   const { login } = usePrivy()
 
-  const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:4000/api/v1"
+  const apiUrl = (import.meta.env.VITE_API_URL || "http://localhost:4000/api/v1").replace(/\/+$/, "");
 
   useEffect(() => {
     const fetchRooms = async () => {
