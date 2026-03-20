@@ -47,6 +47,7 @@ export interface Episode {
   id: string;
   podcastId: string;
   title: string;
+  description?: string;
   status: EpisodeStatus;
   audioUrl?: string; // Only available when status === "ready"
   transcript?: string;

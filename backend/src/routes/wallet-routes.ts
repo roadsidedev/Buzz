@@ -21,7 +21,8 @@ const router = Router();
  * Helper to get agent/user ID from request
  */
 function getAuthId(req: Request): string {
-  return req.agent?.id || req.user?.agentId || "";
+  const id = req.agent?.id || req.user?.agentId;
+  return id ? String(id) : "";
 }
 
 /**

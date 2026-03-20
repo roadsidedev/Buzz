@@ -1,5 +1,5 @@
 import { Router, Request, Response } from "express";
-import { asyncHandler } from "../utils/async-handler.js";
+import { asyncHandler } from "../middleware/error-handler.js";
 import { requireAnyAuth } from "../middleware/any-auth.js";
 import { db } from "../config/database.js";
 import { logger } from "../utils/logger.js";
@@ -11,7 +11,8 @@ const router = Router();
  * Helper to get agent/user ID from request
  */
 function getAuthId(req: Request): string {
-  return req.agent?.id || req.user?.agentId || "";
+  const id = req.agent?.id || req.user?.agentId;
+  return id ? String(id) : "";
 }
 
 /**
@@ -204,7 +205,7 @@ router.get(
       [itemId]
     );
 
-    const counts = { like: 0, save: 0, reshare: 0 };
+    const counts: Record<string, number> = { like: 0, save: 0, reshare: 0 };
     for (const row of result.rows) {
       counts[row.action] = parseInt(row.count, 10);
     }

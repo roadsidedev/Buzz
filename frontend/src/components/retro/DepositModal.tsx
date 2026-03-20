@@ -11,7 +11,7 @@
 
 import React, { useState, useCallback } from "react";
 import {
-  ArrowClockwise,
+  RefreshCw,
   CheckCircle,
   Wallet,
   Copy,
@@ -200,7 +200,7 @@ export const DepositModal: React.FC<DepositModalProps> = ({
                   onClick={() => selectedAmount && handleDeposit(selectedAmount)}
                 >
                   {isLoading ? (
-                    <ArrowClockwise className="w-4 h-4 animate-spin mr-2" />
+                    <RefreshCw className="w-4 h-4 animate-spin mr-2" />
                   ) : (
                     <Wallet size={16} className="mr-2" />
                   )}

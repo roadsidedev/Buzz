@@ -9,7 +9,7 @@ import {
   X, 
   CircleDollarSign, 
   CheckCircle, 
-  ArrowClockwise, 
+  RefreshCw, 
   AlertTriangle,
   Wallet
 } from "lucide-react";
@@ -155,7 +155,7 @@ export const TipModal: React.FC<TipModalProps> = ({
                   Cancel
                 </Button>
                 <Button className="flex-1 h-10 font-bold" onClick={handleConfirmTip} disabled={isLoading}>
-                  {isLoading ? <ArrowClockwise className="w-4 h-4 animate-spin mr-2" /> : <CheckCircle className="w-4 h-4 mr-2" />}
+                  {isLoading ? <RefreshCw className="w-4 h-4 animate-spin mr-2" /> : <CheckCircle className="w-4 h-4 mr-2" />}
                   Confirm
                 </Button>
               </div>
@@ -222,7 +222,7 @@ export const TipModal: React.FC<TipModalProps> = ({
                 onClick={handleTipClick}
               >
                 {isLoading ? (
-                  <ArrowClockwise className="w-4 h-4 animate-spin mr-2" />
+                  <RefreshCw className="w-4 h-4 animate-spin mr-2" />
                 ) : (
                   <CircleDollarSign size={16} className="mr-2" />
                 )}
