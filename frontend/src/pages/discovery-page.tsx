@@ -97,12 +97,25 @@ const RoomCard = ({ room }: { room: any }) => {
  */
 const LivestreamCard = ({ stream }: { stream: any }) => {
   const navigate = useNavigate()
+  const { authenticated } = useAuthStore()
+  const { login } = usePrivy()
+  const { toggleLike, toggleSave, isLiked, isSaved } = useSocialStore()
+  const [showTipModal, setShowTipModal] = useState(false)
+
   const title = stream.title || "Untitled Livestream"
   const category = stream.category || "General"
   const viewers = stream.viewerCount || 0
   const hostName = stream.hostAgentName || "Agent"
+  const hostAgentId = stream.hostAgentId || stream.id
+
+  const requireAuth = (e: React.MouseEvent, fn: () => void) => {
+    e.stopPropagation()
+    if (!authenticated) { login(); return }
+    fn()
+  }
 
   return (
+    <>
     <Card
       className="hover:border-primary/50 hover:shadow-md transition-all cursor-pointer group flex flex-col h-full overflow-hidden border-2 bg-card text-card-foreground hover:-translate-y-1"
       onClick={() => navigate(`/room/${stream.id}`)}
@@ -124,7 +137,7 @@ const LivestreamCard = ({ stream }: { stream: any }) => {
           </div>
         </div>
       </div>
-      <div className="flex items-center justify-between border-t bg-muted/50 px-4 py-3">
+      <div className="flex items-center justify-between border-t bg-muted/50 px-4 py-3" onClick={(e) => e.stopPropagation()}>
         <button
           className="text-muted-foreground hover:text-red-500 transition-all p-2 hover:bg-background border border-transparent rounded-sm"
           title="Watch Livestream"
@@ -132,15 +145,14 @@ const LivestreamCard = ({ stream }: { stream: any }) => {
         >
           <Play size={16} />
         </button>
-        <button
-          onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(`${window.location.origin}/room/${stream.id}`) }}
-          className="text-muted-foreground hover:text-accent-purple transition-all p-2 hover:bg-background border border-transparent rounded-sm"
-          title="Share"
-        >
-          <Share2 size={16} />
-        </button>
+        <button onClick={(e) => requireAuth(e, () => toggleLike(String(stream.id)))} className={`transition-all p-2 hover:bg-background border border-transparent rounded-sm ${isLiked(String(stream.id)) ? 'text-accent-crimson' : 'text-muted-foreground hover:text-accent-crimson'}`} title="Like Stream"><Heart size={16} fill={isLiked(String(stream.id)) ? "currentColor" : "none"} /></button>
+        <button onClick={(e) => requireAuth(e, () => setShowTipModal(true))} className="text-muted-foreground hover:text-green-600 transition-all p-2 hover:bg-background border border-transparent rounded-sm" title="Tip Hosts"><DollarSign size={16} /></button>
+        <button onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(`${window.location.origin}/room/${stream.id}`) }} className="text-muted-foreground hover:text-accent-purple transition-all p-2 hover:bg-background border border-transparent rounded-sm" title="Share"><Share2 size={16} /></button>
+        <button onClick={(e) => requireAuth(e, () => toggleSave(String(stream.id)))} className={`transition-all p-2 hover:bg-background border border-transparent rounded-sm ${isSaved(String(stream.id)) ? 'text-yellow-500' : 'text-muted-foreground hover:text-yellow-500'}`} title="Save Stream"><Bookmark size={16} fill={isSaved(String(stream.id)) ? "currentColor" : "none"} /></button>
       </div>
     </Card>
+    <TipModal isOpen={showTipModal} onClose={() => setShowTipModal(false)} agentId={hostAgentId} agentName={hostName} />
+    </>
   )
 }
 

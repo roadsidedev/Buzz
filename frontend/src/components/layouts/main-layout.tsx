@@ -1,4 +1,4 @@
-import React, { useState } from "react"
+import React, { useState, useRef, useEffect } from "react"
 import { useLocation, useNavigate, Outlet } from "react-router-dom"
 import {
   Home,
@@ -10,6 +10,7 @@ import {
   SkipBack,
   SkipForward,
   Pause,
+  Play as PlayIcon,
   X,
   Radio,
   Bot,
@@ -22,6 +23,7 @@ import {
 
 import { cn } from "@/lib/utils"
 import { useAuthStore } from "@/stores/auth-store";
+import { usePlayerStore } from "@/stores/player-store";
 import { Button } from "@/components/ui/button"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
 import { ModeToggle } from "@/components/mode-toggle"
@@ -35,10 +37,13 @@ interface MainLayoutProps {
 export function MainLayout({ children }: MainLayoutProps) {
   const navigate = useNavigate()
   const location = useLocation()
+  const audioRef = useRef<HTMLAudioElement>(null)
 
-  const [playingPodcast, setPlayingPodcast] = useState<any>(null)
+  const { playingPodcast, isPlaying, replayTrigger, setPlayingPodcast, setIsPlaying, togglePlay } = usePlayerStore()
   const [searchQuery, setSearchQuery] = useState("")
   const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false)
+  const [currentTime, setCurrentTime] = useState(0)
+  const [duration, setDuration] = useState(0)
 
   const { authenticated } = useAuthStore()
 
@@ -53,10 +58,71 @@ export function MainLayout({ children }: MainLayoutProps) {
     }
   }
 
+  // Handle Replay Trigger
+  useEffect(() => {
+    if (audioRef.current && replayTrigger > 0) {
+      audioRef.current.currentTime = 0;
+      audioRef.current.play().catch(err => console.error("Replay playback failed:", err));
+    }
+  }, [replayTrigger]);
+
+  // Handle Playback State Sync
+  useEffect(() => {
+    if (!audioRef.current) return;
+    
+    if (isPlaying) {
+      audioRef.current.play().catch(err => {
+        console.error("Playback failed:", err);
+        setIsPlaying(false);
+      });
+    } else {
+      audioRef.current.pause();
+    }
+  }, [isPlaying, playingPodcast?.id]);
+
+  // Audio Event Listeners
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    const handleTimeUpdate = () => setCurrentTime(audio.currentTime);
+    const handleLoadedMetadata = () => setDuration(audio.duration);
+    const handleEnded = () => setIsPlaying(false);
+
+    audio.addEventListener('timeupdate', handleTimeUpdate);
+    audio.addEventListener('loadedmetadata', handleLoadedMetadata);
+    audio.addEventListener('ended', handleEnded);
+
+    return () => {
+      audio.removeEventListener('timeupdate', handleTimeUpdate);
+      audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
+      audio.removeEventListener('ended', handleEnded);
+    };
+  }, []);
+
+  const formatTime = (seconds: number): string => {
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const handleSeek = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!audioRef.current || !duration) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const percentage = x / rect.width;
+    audioRef.current.currentTime = percentage * duration;
+  };
+
   const isActive = (path: string) => location.pathname === path || (path !== "/" && location.pathname.startsWith(path))
 
   return (
     <div className="min-h-screen bg-background text-foreground flex overflow-hidden">
+      {/* Hidden Audio Element */}
+      {playingPodcast?.audioUrl && (
+        <audio ref={audioRef} src={playingPodcast.audioUrl} />
+      )}
+
       {/* Desktop Sidebar */}
       <aside className="hidden lg:flex flex-col w-72 border-r bg-muted/30 p-6 shrink-0 z-10">
         <div className="flex items-center gap-3 mb-10 pb-4 border-b">
@@ -116,7 +182,7 @@ export function MainLayout({ children }: MainLayoutProps) {
           </button>
 
           {/* Desktop Search */}
-          <div className="relative w-full max-w-md hidden sm:block">
+          <div className="relative w-full max-md hidden sm:block">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
               type="search"
@@ -232,28 +298,50 @@ export function MainLayout({ children }: MainLayoutProps) {
           <div className="fixed bottom-20 lg:bottom-6 left-4 right-4 lg:left-[calc(18rem+2rem)] bg-card border p-4 rounded-xl shadow-lg flex flex-col z-50 animate-in slide-in-from-bottom duration-300 gap-3">
             <div className="flex items-center w-full">
               <img src={playingPodcast.cover} className="w-12 h-12 rounded-md object-cover shrink-0" alt={`${playingPodcast.title} cover`} />
-              <div className="ml-4 flex-grow truncate">
+              <div className="ml-4 flex-grow truncate" onClick={() => handleNav(`/podcasts/${playingPodcast.id}`)} style={{ cursor: 'pointer' }}>
                 <h4 className="text-sm font-semibold truncate">{playingPodcast.title}</h4>
                 <p className="text-xs text-muted-foreground truncate">{playingPodcast.author}</p>
               </div>
               <div className="flex items-center gap-4 px-4 shrink-0">
-                <button className="text-muted-foreground hover:text-foreground transition-colors"><SkipBack size={20} /></button>
+                <button 
+                  className="text-muted-foreground hover:text-foreground transition-colors"
+                  onClick={() => { if (audioRef.current) audioRef.current.currentTime -= 10 }}
+                >
+                  <SkipBack size={20} />
+                </button>
                 <button
-                  onClick={() => setPlayingPodcast(null)}
+                  onClick={togglePlay}
                   className="w-10 h-10 bg-primary text-primary-foreground rounded-full flex items-center justify-center hover:bg-primary/90 transition-colors"
                 >
-                  <Pause size={18} fill="currentColor" />
+                  {isPlaying ? <Pause size={18} fill="currentColor" /> : <PlayIcon size={18} fill="currentColor" className="ml-0.5" />}
                 </button>
-                <button className="text-muted-foreground hover:text-foreground transition-colors"><SkipForward size={20} /></button>
+                <button 
+                  className="text-muted-foreground hover:text-foreground transition-colors"
+                  onClick={() => { if (audioRef.current) audioRef.current.currentTime += 10 }}
+                >
+                  <SkipForward size={20} />
+                </button>
+                <button 
+                  onClick={() => setPlayingPodcast(null)}
+                  className="ml-2 text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <X size={16} />
+                </button>
               </div>
             </div>
             
             <div className="w-full flex items-center gap-3 px-1">
-              <span className="text-[10px] font-medium text-muted-foreground w-8 text-right shrink-0">12:34</span>
-              <div className="h-1.5 flex-grow bg-secondary rounded-full overflow-hidden cursor-pointer relative">
-                <div className="absolute top-0 left-0 h-full bg-primary w-[30%]"></div>
+              <span className="text-[10px] font-medium text-muted-foreground w-8 text-right shrink-0">{formatTime(currentTime)}</span>
+              <div 
+                className="h-1.5 flex-grow bg-secondary rounded-full overflow-hidden cursor-pointer relative"
+                onClick={handleSeek}
+              >
+                <div 
+                  className="absolute top-0 left-0 h-full bg-primary transition-all duration-100" 
+                  style={{ width: `${(currentTime / (duration || 1)) * 100}%` }}
+                ></div>
               </div>
-              <span className="text-[10px] font-medium text-muted-foreground w-8 shrink-0">{playingPodcast.duration || "45:00"}</span>
+              <span className="text-[10px] font-medium text-muted-foreground w-8 shrink-0">{formatTime(duration)}</span>
             </div>
           </div>
         )}

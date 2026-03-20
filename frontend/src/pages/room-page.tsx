@@ -1,11 +1,15 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, Users, Target, Clock, Hash, Play } from "lucide-react";
+import { ArrowLeft, Users, Target, Clock, Hash, Play, Heart, DollarSign, Share2, Bookmark } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { UpcomingStages } from "@/components/discovery/upcoming-stages";
+import { useAuthStore } from "@/stores/auth-store";
+import { useSocialStore } from "@/stores/social-store";
+import { usePrivy } from "@privy-io/react-auth";
+import { TipModal } from "@/components/retro/TipModal";
 
 interface RoomDetails {
   id: string;
@@ -26,17 +30,27 @@ interface RoomDetails {
 export const RoomPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { authenticated } = useAuthStore();
+  const { login } = usePrivy();
+  const { toggleLike, toggleSave, isLiked, isSaved } = useSocialStore();
+  
   const [room, setRoom] = useState<RoomDetails | null>(null);
   const [participants, setParticipants] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [linkCopied, setLinkCopied] = useState(false);
+  const [showTipModal, setShowTipModal] = useState(false);
 
   const handleCopyLink = useCallback(() => {
     navigator.clipboard.writeText(window.location.href);
     setLinkCopied(true);
     setTimeout(() => setLinkCopied(false), 2000);
   }, []);
+
+  const requireAuth = (fn: () => void) => {
+    if (!authenticated) { login(); return }
+    fn()
+  }
 
   useEffect(() => {
     const fetchRoom = async () => {
@@ -207,9 +221,33 @@ export const RoomPage: React.FC = () => {
                   Join Live
                 </Button>
 
-                <Button variant="outline" size="lg" className="w-full" onClick={handleCopyLink}>
-                  <Hash className="w-4 h-4 mr-2" />
-                  {linkCopied ? "Copied!" : "Copy Link"}
+                <div className="grid grid-cols-2 gap-2">
+                  <Button 
+                    variant="outline" 
+                    className={isLiked(String(id)) ? "text-accent-crimson border-accent-crimson/50 bg-accent-crimson/5" : ""}
+                    onClick={() => requireAuth(() => toggleLike(String(id)))}
+                  >
+                    <Heart className={`w-4 h-4 mr-2 ${isLiked(String(id)) ? "fill-current" : ""}`} />
+                    Like
+                  </Button>
+                  <Button 
+                    variant="outline"
+                    className={isSaved(String(id)) ? "text-yellow-500 border-yellow-500/50 bg-yellow-500/5" : ""}
+                    onClick={() => requireAuth(() => toggleSave(String(id)))}
+                  >
+                    <Bookmark className={`w-4 h-4 mr-2 ${isSaved(String(id)) ? "fill-current" : ""}`} />
+                    Save
+                  </Button>
+                </div>
+
+                <Button variant="outline" onClick={() => requireAuth(() => setShowTipModal(true))}>
+                  <DollarSign className="w-4 h-4 mr-2" />
+                  Tip Hosts
+                </Button>
+
+                <Button variant="outline" className="w-full" onClick={handleCopyLink}>
+                  <Share2 className="w-4 h-4 mr-2" />
+                  {linkCopied ? "Copied!" : "Share Room"}
                 </Button>
               </div>
             </div>
@@ -249,6 +287,16 @@ export const RoomPage: React.FC = () => {
           </CardContent>
         </Card>
         
+        {/* Tip Modal */}
+        {room && (
+          <TipModal 
+            isOpen={showTipModal} 
+            onClose={() => setShowTipModal(false)} 
+            agentId={room.hostAgent.id} 
+            agentName={room.hostAgent.name} 
+          />
+        )}
+
         <div className="mt-12">
           <UpcomingStages />
         </div>

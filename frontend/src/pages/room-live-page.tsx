@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from "react"
 import { useParams } from "react-router-dom"
-import { Heart, MessageSquare, Users, Share2, DollarSign, Bookmark, Copy, Plus, X, ChevronDown } from "lucide-react"
+import { Heart, MessageSquare, Users, Share2, DollarSign, Bookmark, Copy, Plus, X, ChevronDown, Check } from "lucide-react"
 import axios from "axios"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { useAuthStore } from "@/stores/auth-store"
+import { useSocialStore } from "@/stores/social-store"
 import { usePrivy, useWallets } from "@privy-io/react-auth"
+import { TipModal } from "@/components/retro/TipModal"
 import { cn } from "@/lib/utils"
 import {
   Dialog,
@@ -25,7 +27,8 @@ export function RoomLivePage() {
   const { authenticated } = useAuthStore()
   const { login } = usePrivy()
   const { wallets } = useWallets()
-
+  const { toggleLike, toggleSave, toggleFollow, isLiked, isSaved, isFollowing } = useSocialStore()
+  
   const [stream, setStream] = useState<any>(null)
   const [streamLoading, setStreamLoading] = useState(true)
   const [chat, setChat] = useState<{ user: string; msg: string; isAgent: boolean; isPriority: boolean }[]>([])
@@ -34,6 +37,7 @@ export function RoomLivePage() {
   const [usePriority, setUsePriority] = useState(false)
   const [shareWizardOpen, setShareWizardOpen] = useState(false)
   const [showChat, setShowChat] = useState(false)
+  const [showTipModal, setShowTipModal] = useState(false)
 
   useEffect(() => {
     if (!streamId) { setStreamLoading(false); return }
@@ -43,33 +47,17 @@ export function RoomLivePage() {
       .finally(() => setStreamLoading(false))
   }, [streamId, apiUrl])
 
-  const requireLoginForAction = (actionName: string, callback?: () => void) => {
+  const requireAuth = (fn: () => void) => {
     if (!authenticated) {
       login()
-    } else if (callback) {
-      callback()
+    } else {
+      fn()
     }
   }
 
   const handleTip = () => {
-    requireLoginForAction('Tip to Ask', async () => {
-      try {
-        const wallet = wallets.find(w => w.walletClientType === 'privy') || wallets[0];
-        if (wallet) {
-          const provider = await wallet.getEthereumProvider();
-          await provider.request({
-            method: 'eth_sendTransaction',
-            params: [{
-               from: wallet.address,
-               to: "0x0000000000000000000000000000000000000000",
-               value: "0x0"
-            }]
-          });
-        }
-        setQnaCredits(prev => prev + 3)
-      } catch (e) {
-        console.error("Tipping failed or was rejected:", e)
-      }
+    requireAuth(async () => {
+      setShowTipModal(true)
     })
   }
 
@@ -149,17 +137,32 @@ export function RoomLivePage() {
 
               {/* Feed action buttons */}
               <div className="flex items-center gap-2">
-                <Button onClick={() => requireLoginForAction('Like')} variant="ghost" size="icon" className="text-white hover:text-red-500 hover:bg-white/10 rounded-full h-9 w-9">
-                  <Heart size={18} />
+                <Button 
+                  onClick={() => requireAuth(() => toggleLike(streamId))} 
+                  variant="ghost" 
+                  size="icon" 
+                  className={cn("text-white hover:text-red-500 hover:bg-white/10 rounded-full h-9 w-9", isLiked(streamId) && "text-red-500")}
+                >
+                  <Heart size={18} fill={isLiked(streamId) ? "currentColor" : "none"} />
                 </Button>
-                <Button onClick={() => requireLoginForAction('Follow')} variant="ghost" size="icon" className="text-white hover:text-primary hover:bg-white/10 rounded-full h-9 w-9">
-                  <Plus size={20} />
+                <Button 
+                  onClick={() => requireAuth(() => toggleFollow(stream.hostAgentId))} 
+                  variant="ghost" 
+                  size="icon" 
+                  className={cn("text-white hover:text-primary hover:bg-white/10 rounded-full h-9 w-9", isFollowing(stream.hostAgentId) && "text-primary")}
+                >
+                  {isFollowing(stream.hostAgentId) ? <Check size={18} /> : <Plus size={20} />}
                 </Button>
                 <Button onClick={handleTip} variant="ghost" size="icon" className="text-white hover:text-green-500 hover:bg-white/10 rounded-full h-9 w-9">
                   <DollarSign size={18} />
                 </Button>
-                <Button onClick={() => requireLoginForAction('Save')} variant="ghost" size="icon" className="text-white hover:text-yellow-500 hover:bg-white/10 rounded-full h-9 w-9">
-                  <Bookmark size={18} />
+                <Button 
+                  onClick={() => requireAuth(() => toggleSave(streamId))} 
+                  variant="ghost" 
+                  size="icon" 
+                  className={cn("text-white hover:text-yellow-500 hover:bg-white/10 rounded-full h-9 w-9", isSaved(streamId) && "text-yellow-500")}
+                >
+                  <Bookmark size={18} fill={isSaved(streamId) ? "currentColor" : "none"} />
                 </Button>
                 <Button
                   onClick={() => setShowChat(true)}
@@ -287,14 +290,27 @@ export function RoomLivePage() {
           </DialogHeader>
           <div className="flex flex-col gap-3">
             <div className="relative mt-2 flex gap-2">
-              <Input value={`https://clawzz.vercel.app/live/${streamId}`} readOnly className="pr-12 bg-muted/50 font-mono text-xs w-full" />
-              <Button size="icon" variant="secondary" className="shrink-0 w-10" onClick={() => navigator.clipboard.writeText(`https://clawzz.vercel.app/live/${streamId}`)}>
+              <Input value={`${window.location.origin}/live/${streamId}`} readOnly className="pr-12 bg-muted/50 font-mono text-xs w-full" />
+              <Button size="icon" variant="secondary" className="shrink-0 w-10" onClick={() => {
+                navigator.clipboard.writeText(`${window.location.origin}/live/${streamId}`);
+                alert('Copied to clipboard!');
+              }}>
                 <Copy size={14} />
               </Button>
             </div>
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Tip Modal */}
+      {stream && (
+        <TipModal
+          isOpen={showTipModal}
+          onClose={() => setShowTipModal(false)}
+          agentId={stream.hostAgentId}
+          agentName={hostName}
+        />
+      )}
     </div>
   )
 }

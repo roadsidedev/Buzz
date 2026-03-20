@@ -267,14 +267,17 @@ export class PodcastService {
     const query = `
       SELECT 
         p.*,
+        a.username as author_name,
+        a.avatar as author_avatar,
         COUNT(DISTINCT pe.id) as episode_count,
         MAX(pe.published_at) as latest_episode_date,
         COALESCE(SUM(pa.total_listens), 0) as total_listens
       FROM podcast p
+      LEFT JOIN agent a ON p.agent_id = a.id
       LEFT JOIN podcast_episode pe ON p.id = pe.podcast_id
       LEFT JOIN podcast_analytics pa ON pe.id = pa.episode_id
       WHERE p.agent_id = $1
-      GROUP BY p.id
+      GROUP BY p.id, a.id
       ORDER BY p.created_at DESC
       LIMIT $2 OFFSET $3;
     `;
@@ -365,14 +368,8 @@ export class PodcastService {
         });
       }
 
-      const podcast = this._rowToPodcast(result.rows[0]);
-
-      logger.info("Podcast updated", {
-        podcastId,
-        changes: Object.keys(updates),
-      });
-
-      return podcast;
+      // Need to fetch again to get joined fields
+      return this.getPodcast(podcastId);
     } catch (err) {
       logger.error("Failed to update podcast", {
         podcastId,
@@ -400,14 +397,17 @@ export class PodcastService {
     const query = `
       SELECT 
         p.*,
+        a.username as author_name,
+        a.avatar as author_avatar,
         COUNT(DISTINCT pe.id) as episode_count,
         MAX(pe.published_at) as latest_episode_date,
         COALESCE(SUM(pa.total_listens), 0) as total_listens
       FROM podcast p
+      LEFT JOIN agent a ON p.agent_id = a.id
       LEFT JOIN podcast_episode pe ON p.id = pe.podcast_id
       LEFT JOIN podcast_analytics pa ON pe.id = pa.episode_id
       WHERE p.id = $1
-      GROUP BY p.id;
+      GROUP BY p.id, a.id;
     `;
 
     try {
@@ -834,15 +834,18 @@ export class PodcastService {
     const query = `
       SELECT
         p.*,
+        a.username as author_name,
+        a.avatar as author_avatar,
         COUNT(DISTINCT pe.id) as episode_count,
         MAX(pe.published_at) as latest_episode_date,
         COALESCE(SUM(pa.total_listens), 0) as total_listens
       FROM podcast p
+      LEFT JOIN agent a ON p.agent_id = a.id
       LEFT JOIN podcast_episode pe ON p.id = pe.podcast_id
       LEFT JOIN podcast_analytics pa ON pe.id = pa.episode_id
       WHERE p.status = 'active'
         AND p.created_at >= NOW() - ($2 || ' days')::INTERVAL
-      GROUP BY p.id
+      GROUP BY p.id, a.id
       ORDER BY total_listens DESC, p.created_at DESC
       LIMIT $1;
     `;
@@ -873,10 +876,13 @@ export class PodcastService {
     let query = `
       SELECT
         p.*,
+        a.username as author_name,
+        a.avatar as author_avatar,
         COUNT(DISTINCT pe.id) as episode_count,
         MAX(pe.published_at) as latest_episode_date,
         COALESCE(SUM(pa.total_listens), 0) as total_listens
       FROM podcast p
+      LEFT JOIN agent a ON p.agent_id = a.id
       LEFT JOIN podcast_episode pe ON p.id = pe.podcast_id
       LEFT JOIN podcast_analytics pa ON pe.id = pa.episode_id
         AND pa.recorded_at >= NOW() - INTERVAL '7 days'
@@ -891,7 +897,7 @@ export class PodcastService {
     }
 
     query += `
-      GROUP BY p.id
+      GROUP BY p.id, a.id
       ORDER BY total_listens DESC
       LIMIT $${params.length + 1};
     `;
@@ -1174,6 +1180,8 @@ export class PodcastService {
       totalListens: row.total_listens
         ? parseInt(row.total_listens)
         : 0,
+      author: row.author_name || "Agent_Unknown",
+      authorAvatar: row.author_avatar || null,
     };
   }
 
