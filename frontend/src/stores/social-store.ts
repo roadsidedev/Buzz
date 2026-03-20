@@ -16,9 +16,11 @@ interface SocialState {
   saves: Record<string, boolean>;
   reshares: Record<string, boolean>;
   following: Record<string, boolean>;
+  savedItems: Array<{ id: string; type: string }>;
 
-  toggleLike: (itemId: string) => Promise<void>;
-  toggleSave: (itemId: string) => Promise<void>;
+  fetchInteractions: () => Promise<void>;
+  toggleLike: (itemId: string, itemType?: string) => Promise<void>;
+  toggleSave: (itemId: string, itemType?: string) => Promise<void>;
   toggleReshare: (itemId: string) => Promise<void>;
   toggleFollow: (agentId: string) => Promise<void>;
 
@@ -35,8 +37,30 @@ export const useSocialStore = create<SocialState>()(
       saves: {},
       reshares: {},
       following: {},
+      savedItems: [],
 
-      toggleLike: async (itemId: string) => {
+      fetchInteractions: async () => {
+        try {
+          const response: any = await apiClient.get('/interactions/mine');
+          const { likes, saves } = response.data;
+          
+          const likesMap: Record<string, boolean> = {};
+          likes.forEach((id: string) => likesMap[id] = true);
+          
+          const savesMap: Record<string, boolean> = {};
+          saves.forEach((s: any) => savesMap[s.id] = true);
+          
+          set({ 
+            likes: likesMap, 
+            saves: savesMap,
+            savedItems: saves
+          });
+        } catch (error) {
+          console.error("Failed to fetch interactions:", error);
+        }
+      },
+
+      toggleLike: async (itemId: string, itemType: string = "room") => {
         const currentState = get().likes[itemId] || false;
         const newState = !currentState;
 
@@ -48,12 +72,11 @@ export const useSocialStore = create<SocialState>()(
           if (newState) {
             await apiClient.post(`/interactions/like`, {
               itemId,
-              type: "like",
+              itemType,
             });
           } else {
             await apiClient.post(`/interactions/unlike`, {
               itemId,
-              type: "like",
             });
           }
         } catch (error) {
@@ -64,23 +87,29 @@ export const useSocialStore = create<SocialState>()(
         }
       },
 
-      toggleSave: async (itemId: string) => {
+      toggleSave: async (itemId: string, itemType: string = "room") => {
         const currentState = get().saves[itemId] || false;
         const newState = !currentState;
 
         set((state) => ({
           saves: { ...state.saves, [itemId]: newState },
+          savedItems: newState 
+            ? [...get().savedItems, { id: itemId, type: itemType }]
+            : get().savedItems.filter(i => i.id !== itemId)
         }));
 
         try {
           if (newState) {
-            await apiClient.post(`/interactions/save`, { itemId });
+            await apiClient.post(`/interactions/save`, { itemId, itemType });
           } else {
             await apiClient.post(`/interactions/unsave`, { itemId });
           }
         } catch (error) {
           set((state) => ({
             saves: { ...state.saves, [itemId]: currentState },
+            savedItems: currentState
+              ? (get().savedItems.some(i => i.id === itemId) ? get().savedItems : [...get().savedItems, { id: itemId, type: itemType }])
+              : get().savedItems.filter(i => i.id !== itemId)
           }));
           console.error("Failed to toggle save:", error);
         }
@@ -142,6 +171,7 @@ export const useSocialStore = create<SocialState>()(
         saves: state.saves,
         reshares: state.reshares,
         following: state.following,
+        savedItems: state.savedItems,
       }),
     },
   ),

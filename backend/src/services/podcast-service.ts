@@ -47,6 +47,10 @@ export interface Podcast {
   episodeCount?: number;
   latestEpisodeDate?: Date;
   totalListens?: number;
+  audioUrl?: string;
+  duration?: string;
+  author?: string;
+  authorAvatar?: string;
 }
 
 export interface CreateEpisodeRequest {
@@ -832,20 +836,32 @@ export class PodcastService {
     windowDays: number = 30,
   ): Promise<Podcast[]> {
     const query = `
+      WITH LatestEpisodes AS (
+        SELECT DISTINCT ON (podcast_id)
+          podcast_id,
+          audio_url,
+          duration_seconds
+        FROM podcast_episode
+        WHERE status = 'ready'
+        ORDER BY podcast_id, published_at DESC NULLS LAST, created_at DESC
+      )
       SELECT
         p.*,
         a.username as author_name,
         a.avatar as author_avatar,
         COUNT(DISTINCT pe.id) as episode_count,
         MAX(pe.published_at) as latest_episode_date,
-        COALESCE(SUM(pa.total_listens), 0) as total_listens
+        COALESCE(SUM(pa.total_listens), 0) as total_listens,
+        le.audio_url as latest_audio_url,
+        le.duration_seconds as latest_duration
       FROM podcast p
       LEFT JOIN agent a ON p.agent_id = a.id
       LEFT JOIN podcast_episode pe ON p.id = pe.podcast_id
       LEFT JOIN podcast_analytics pa ON pe.id = pa.episode_id
+      LEFT JOIN LatestEpisodes le ON p.id = le.podcast_id
       WHERE p.status = 'active'
         AND p.created_at >= NOW() - ($2 || ' days')::INTERVAL
-      GROUP BY p.id, a.id
+      GROUP BY p.id, a.id, le.audio_url, le.duration_seconds
       ORDER BY total_listens DESC, p.created_at DESC
       LIMIT $1;
     `;
@@ -874,18 +890,30 @@ export class PodcastService {
     category?: string,
   ): Promise<Podcast[]> {
     let query = `
+      WITH LatestEpisodes AS (
+        SELECT DISTINCT ON (podcast_id)
+          podcast_id,
+          audio_url,
+          duration_seconds
+        FROM podcast_episode
+        WHERE status = 'ready'
+        ORDER BY podcast_id, published_at DESC NULLS LAST, created_at DESC
+      )
       SELECT
         p.*,
         a.username as author_name,
         a.avatar as author_avatar,
         COUNT(DISTINCT pe.id) as episode_count,
         MAX(pe.published_at) as latest_episode_date,
-        COALESCE(SUM(pa.total_listens), 0) as total_listens
+        COALESCE(SUM(pa.total_listens), 0) as total_listens,
+        le.audio_url as latest_audio_url,
+        le.duration_seconds as latest_duration
       FROM podcast p
       LEFT JOIN agent a ON p.agent_id = a.id
       LEFT JOIN podcast_episode pe ON p.id = pe.podcast_id
       LEFT JOIN podcast_analytics pa ON pe.id = pa.episode_id
         AND pa.recorded_at >= NOW() - INTERVAL '7 days'
+      LEFT JOIN LatestEpisodes le ON p.id = le.podcast_id
       WHERE p.status = 'active'
     `;
 
@@ -897,7 +925,7 @@ export class PodcastService {
     }
 
     query += `
-      GROUP BY p.id, a.id
+      GROUP BY p.id, a.id, le.audio_url, le.duration_seconds
       ORDER BY total_listens DESC
       LIMIT $${params.length + 1};
     `;
@@ -1182,6 +1210,8 @@ export class PodcastService {
         : 0,
       author: row.author_name || "Agent_Unknown",
       authorAvatar: row.author_avatar || null,
+      audioUrl: row.latest_audio_url || null,
+      duration: row.latest_duration ? `${Math.floor(row.latest_duration / 60)}:${(row.latest_duration % 60).toString().padStart(2, '0')}` : "0:00",
     };
   }
 

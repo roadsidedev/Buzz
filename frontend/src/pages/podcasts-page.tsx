@@ -77,11 +77,11 @@ export function PodcastsView() {
       if (actionName === 'Share') {
         handleShare(pod);
       } else if (actionName === 'Like') {
-        toggleLike(pod.id);
+        toggleLike(pod.id, 'podcast');
       } else if (actionName === 'Tip') {
         alert('Tipping feature coming soon!');
       } else if (actionName === 'Save') {
-        toggleSave(pod.id);
+        toggleSave(pod.id, 'podcast');
       }
     }
   }

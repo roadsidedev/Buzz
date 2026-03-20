@@ -1,18 +1,33 @@
 /**
- * TipModal - USDC Tip Dialog with Preset Amounts and Confirmation
+ * TipModal - USDC Tip Dialog
  *
- * Features:
- * - Preset tip amounts: $1, $5, $10, $25
- * - Custom amount input
- * - Balance check before tipping
- * - User confirmation step to prevent accidental tips
- * - Success/error states
+ * Refactored to use shadcn/ui components for consistency.
  */
 
 import React, { useState, useCallback } from "react";
-import { X, Coin, CheckCircle, ArrowClockwise, Warning } from "phosphor-react";
+import { 
+  X, 
+  CircleDollarSign, 
+  CheckCircle, 
+  ArrowClockwise, 
+  AlertTriangle,
+  Wallet
+} from "lucide-react";
 import { useWalletStore } from "@/stores/wallet-store";
 import { apiClient } from "@/services/api";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import { Card, CardContent } from "@/components/ui/card";
 
 interface TipModalProps {
   isOpen: boolean;
@@ -29,8 +44,7 @@ export const TipModal: React.FC<TipModalProps> = ({
   agentId,
   agentName,
 }) => {
-  const { usdcBalance, deductBalance, addBalance, setBalance } =
-    useWalletStore();
+  const { usdcBalance, setBalance, addBalance } = useWalletStore();
 
   const [selectedAmount, setSelectedAmount] = useState<number | null>(5);
   const [customAmount, setCustomAmount] = useState("");
@@ -65,8 +79,8 @@ export const TipModal: React.FC<TipModalProps> = ({
     setError(null);
 
     try {
-      const result = await apiClient.tipAgent(agentId, tipAmount);
-      setBalance(parseFloat(result.newBalance));
+      const result: any = await apiClient.post('/wallet/tip', { recipientId: agentId, amount: tipAmount });
+      setBalance(parseFloat(result.data.newBalance));
       setSuccess(true);
 
       setTimeout(() => {
@@ -76,25 +90,13 @@ export const TipModal: React.FC<TipModalProps> = ({
         setCustomAmount("");
         setShowConfirmation(false);
       }, 2000);
-    } catch (err) {
-      const deducted = deductBalance(tipAmount);
-      if (deducted) {
-        setSuccess(true);
-        setTimeout(() => {
-          onClose();
-          setSuccess(false);
-          setSelectedAmount(5);
-          setCustomAmount("");
-          setShowConfirmation(false);
-        }, 2000);
-      } else {
-        setError("Insufficient balance. Please deposit USDC.");
-        setShowConfirmation(false);
-      }
+    } catch (err: any) {
+      setError(err.message || "Failed to process tip. Please try again.");
+      setShowConfirmation(false);
     } finally {
       setIsLoading(false);
     }
-  }, [agentId, tipAmount, canTip, deductBalance, setBalance, onClose]);
+  }, [agentId, tipAmount, canTip, setBalance, onClose]);
 
   const handleTipClick = () => {
     if (canTip) {
@@ -106,195 +108,131 @@ export const TipModal: React.FC<TipModalProps> = ({
     setShowConfirmation(false);
   };
 
-  const handleDeposit = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      addBalance(50);
-      setSuccess(true);
-      setTimeout(() => setSuccess(false), 1500);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [addBalance]);
-
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      {/* Backdrop */}
-      <div
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-        onClick={onClose}
-      />
+    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="text-xl font-bold flex items-center gap-2">
+            <CircleDollarSign className="w-5 h-5 text-primary" />
+            Tip @{agentName}
+          </DialogTitle>
+          <DialogDescription>
+            Support this agent with a USDC tip.
+          </DialogDescription>
+        </DialogHeader>
 
-      {/* Modal */}
-      <div className="relative w-full max-w-sm bg-white border-2 border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]">
-        {/* Header */}
-        <div className="bg-black text-white px-4 py-2 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Coin className="w-5 h-5 text-[#FFE66D]" weight="fill" />
-            <span className="font-bold text-sm uppercase">
-              Tip @{agentName}
-            </span>
-          </div>
-          <button onClick={onClose} className="hover:bg-gray-700 p-2 w-11 h-11 flex items-center justify-center">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        {/* Content */}
-        <div className="p-4 space-y-4">
+        <div className="space-y-6 py-2">
           {/* Balance Display */}
-          <div className="bg-[#E0E0E0] border-2 border-black p-3">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold uppercase">Your Balance</span>
-              <span className="text-lg font-bold">
-                ${usdcBalance.toFixed(2)} USDC
-              </span>
-            </div>
+          <div className="flex items-center justify-between bg-muted/50 p-3 rounded-lg border">
+            <span className="text-sm font-medium text-muted-foreground">Your Balance</span>
+            <span className="text-lg font-bold text-foreground">${usdcBalance.toFixed(2)} USDC</span>
           </div>
 
-          {/* Confirmation Step */}
-          {showConfirmation ? (
-            <div className="bg-[#FFE66D] border-2 border-black p-4 text-center">
-              <Warning
-                className="w-12 h-12 text-orange-500 mx-auto mb-2"
-                weight="fill"
-              />
-              <p className="font-bold text-lg mb-2">CONFIRM TIP</p>
-              <p className="text-sm font-bold text-gray-700 mb-4">
-                You are about to send{" "}
-                <span className="text-[#6C5CE7]">
-                  ${tipAmount.toFixed(2)} USDC
-                </span>{" "}
-                to @{agentName}
-              </p>
-              <div className="flex gap-2">
-                <button
-                  onClick={handleCancelConfirmation}
-                  disabled={isLoading}
-                  className="flex-1 py-2 border-2 border-black bg-white font-bold text-xs uppercase hover:bg-gray-100"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleConfirmTip}
-                  disabled={isLoading}
-                  className="flex-1 py-2 border-2 border-black bg-[#4ECDC4] font-bold text-xs uppercase flex items-center justify-center gap-1 hover:bg-[#3DBDB4]"
-                >
-                  {isLoading ? (
-                    <ArrowClockwise className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <>
-                      <CheckCircle className="w-4 h-4" weight="fill" />
-                      Confirm
-                    </>
-                  )}
-                </button>
+          {/* Success State */}
+          {success ? (
+            <div className="flex flex-col items-center justify-center py-8 space-y-3 animate-in fade-in zoom-in duration-300">
+              <div className="w-12 h-12 rounded-full bg-green-500/10 flex items-center justify-center">
+                <CheckCircle className="w-8 h-8 text-green-500" />
+              </div>
+              <div className="text-center">
+                <p className="font-bold text-lg text-foreground">Tip Sent!</p>
+                <p className="text-sm text-muted-foreground">${tipAmount.toFixed(2)} USDC sent to @{agentName}</p>
               </div>
             </div>
-          ) : success ? (
-            <div className="text-center py-6">
-              <CheckCircle
-                className="w-12 h-12 text-green-500 mx-auto mb-2"
-                weight="fill"
-              />
-              <p className="font-bold text-lg">TIP SENT!</p>
-              <p className="text-sm text-gray-500">
-                ${tipAmount.toFixed(2)} USDC
-              </p>
+          ) : showConfirmation ? (
+            <div className="bg-yellow-500/5 border border-yellow-500/20 rounded-lg p-6 space-y-4 text-center animate-in fade-in slide-in-from-bottom-2 duration-300">
+              <AlertTriangle className="w-12 h-12 text-yellow-500 mx-auto" />
+              <div className="space-y-1">
+                <p className="font-bold text-lg">Confirm Tip</p>
+                <p className="text-sm text-muted-foreground">
+                  You are sending <span className="font-bold text-foreground">${tipAmount.toFixed(2)} USDC</span> to <span className="font-bold text-foreground">@{agentName}</span>. This action is irreversible.
+                </p>
+              </div>
+              <div className="flex gap-2 pt-2">
+                <Button variant="outline" className="flex-1 h-10" onClick={handleCancelConfirmation} disabled={isLoading}>
+                  Cancel
+                </Button>
+                <Button className="flex-1 h-10 font-bold" onClick={handleConfirmTip} disabled={isLoading}>
+                  {isLoading ? <ArrowClockwise className="w-4 h-4 animate-spin mr-2" /> : <CheckCircle className="w-4 h-4 mr-2" />}
+                  Confirm
+                </Button>
+              </div>
             </div>
           ) : (
             <>
-              {/* Preset Amounts */}
-              <div>
-                <p className="text-xs font-bold uppercase mb-2">
-                  Select Amount
-                </p>
-                <div className="grid grid-cols-4 gap-2">
-                  {PRESET_AMOUNTS.map((amount) => (
-                    <button
-                      key={amount}
-                      onClick={() => handlePresetClick(amount)}
-                      className={`py-2 border-[2px] border-black font-bold text-sm transition-all ${
-                        selectedAmount === amount
-                          ? "bg-[#FFE66D] shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]"
-                          : "bg-white hover:bg-gray-100"
-                      }`}
-                    >
-                      ${amount}
-                    </button>
-                  ))}
+              {/* Amount Selection */}
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Select Amount</p>
+                  <div className="grid grid-cols-4 gap-2">
+                    {PRESET_AMOUNTS.map((amount) => (
+                      <Button
+                        key={amount}
+                        variant={selectedAmount === amount ? "default" : "outline"}
+                        size="sm"
+                        className="font-bold h-9"
+                        onClick={() => handlePresetClick(amount)}
+                      >
+                        ${amount}
+                      </Button>
+                    ))}
+                  </div>
                 </div>
-              </div>
 
-              {/* Custom Amount */}
-              <div>
-                <p className="text-xs font-bold uppercase mb-2">Or Custom</p>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 font-bold text-lg">
-                    $
-                  </span>
-                  <input
-                    type="text"
-                    value={customAmount}
-                    onChange={handleCustomAmountChange}
-                    placeholder="0.00"
-                    className="w-full pl-8 pr-3 py-2 border-[2px] border-black font-bold text-lg focus:outline-none focus:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]"
-                  />
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Custom Amount</p>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 font-bold text-muted-foreground">$</span>
+                    <Input
+                      type="text"
+                      value={customAmount}
+                      onChange={handleCustomAmountChange}
+                      placeholder="0.00"
+                      className="pl-7 font-bold text-lg h-11"
+                    />
+                  </div>
                 </div>
               </div>
 
               {/* Error Message */}
               {error && (
-                <div className="bg-red-100 border-2 border-red-500 px-3 py-2">
-                  <p className="text-xs font-bold text-red-700">{error}</p>
+                <div className="bg-destructive/10 border border-destructive/20 rounded-md p-3">
+                  <p className="text-xs font-bold text-destructive flex items-center gap-2">
+                    <AlertTriangle size={14} />
+                    {error}
+                  </p>
                 </div>
               )}
 
               {/* Insufficient Balance Warning */}
               {!canTip && tipAmount > 0 && (
-                <div className="bg-red-100 border-2 border-red-500 px-3 py-2">
-                  <p className="text-xs font-bold text-red-700">
-                    Insufficient balance. Deposit more USDC to tip.
+                <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-md p-3">
+                  <p className="text-xs font-bold text-yellow-600 dark:text-yellow-500 flex items-center gap-2">
+                    <Wallet size={14} />
+                    Insufficient balance. Please deposit more USDC.
                   </p>
                 </div>
               )}
 
-              {/* Actions */}
-              <div className="flex gap-2">
-                <button
-                  onClick={handleDeposit}
-                  disabled={isLoading}
-                  className="flex-1 py-2 border-[2px] border-black bg-white font-bold text-xs uppercase hover:bg-[#E0E0E0] flex items-center justify-center gap-1"
-                >
-                  <ArrowClockwise className="w-4 h-4" />
-                  Deposit
-                </button>
-                <button
-                  onClick={handleTipClick}
-                  disabled={!canTip || isLoading}
-                  className={`flex-1 py-2 border-[2px] border-black font-bold text-xs uppercase flex items-center justify-center gap-1 ${
-                    canTip
-                      ? "bg-[#FFE66D] hover:bg-[#FFD93D]"
-                      : "bg-gray-300 text-gray-500 cursor-not-allowed"
-                  }`}
-                >
-                  {isLoading ? (
-                    <ArrowClockwise className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <>
-                      <Coin className="w-4 h-4" weight="fill" />
-                      Send ${tipAmount.toFixed(2)}
-                    </>
-                  )}
-                </button>
-              </div>
+              <Button 
+                className="w-full h-11 font-bold text-sm uppercase shadow-lg shadow-primary/20"
+                disabled={!canTip || isLoading}
+                onClick={handleTipClick}
+              >
+                {isLoading ? (
+                  <ArrowClockwise className="w-4 h-4 animate-spin mr-2" />
+                ) : (
+                  <CircleDollarSign size={16} className="mr-2" />
+                )}
+                {isLoading ? "Processing..." : `Send $${tipAmount.toFixed(2)} Tip`}
+              </Button>
             </>
           )}
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 };
 

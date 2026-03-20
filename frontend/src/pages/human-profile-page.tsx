@@ -16,6 +16,7 @@ import { RetroWindow } from "@/components/retro/RetroWindow";
 import { BrutalistButton } from "@/components/retro/BrutalistButton";
 import { LiveBadge } from "@/components/retro/LiveBadge";
 import { DepositModal } from "@/components/retro/DepositModal";
+import { apiClient } from "@/services/api";
 import {
   User,
   Wallet,
@@ -38,8 +39,7 @@ interface FollowingAgent {
 interface SavedContent {
   id: string;
   title: string;
-  type: "room" | "podcast";
-  savedAt: string;
+  type: string;
 }
 
 export const HumanProfilePage: React.FC = () => {
@@ -50,34 +50,59 @@ export const HumanProfilePage: React.FC = () => {
     "following",
   );
   const [showDepositModal, setShowDepositModal] = useState(false);
+  const [savedContent, setSavedContent] = useState<SavedContent[]>([]);
+  const [loadingSaved, setLoadingSaved] = useState(false);
+  const [transactions, setTransactions] = useState<any[]>([]);
+  const [loadingTx, setLoadingTx] = useState(false);
 
   const followingAgents: FollowingAgent[] = [
-    { id: "1", name: "DeFiAnalyst", isLive: true },
-    { id: "2", name: "CryptoSage" },
-    { id: "3", name: "TokenTracker", isLive: false },
-    { id: "4", name: "BlockchainBot" },
+    // TODO: Fetch from backend once follow functionality is fully wired
   ];
 
-  const savedContent: SavedContent[] = [
-    {
-      id: "1",
-      title: "DeFi Strategies Ep. 12",
-      type: "room",
-      savedAt: "2 hours ago",
-    },
-    {
-      id: "2",
-      title: "Weekly Market Analysis",
-      type: "podcast",
-      savedAt: "1 day ago",
-    },
-    {
-      id: "3",
-      title: "Tokenomics Deep Dive",
-      type: "room",
-      savedAt: "3 days ago",
-    },
-  ];
+  useEffect(() => {
+    if (activeTab === "saved") {
+      const fetchSaved = async () => {
+        setLoadingSaved(true);
+        try {
+          const res: any = await apiClient.get('/interactions/saved-details');
+          setSavedContent(res.data?.saves || []);
+        } catch (err) {
+          console.error("Failed to fetch saved content:", err);
+        } finally {
+          setLoadingSaved(false);
+        }
+      };
+      fetchSaved();
+    } else if (activeTab === "wallet") {
+      const fetchTransactions = async () => {
+        setLoadingTx(true);
+        try {
+          const res: any = await apiClient.getTipHistory();
+          const sent = (res.data?.sent || []).map((t: any) => ({
+            type: "tip",
+            agent: t.recipientName || "Agent",
+            amount: `$${t.amount}`,
+            time: new Date(t.timestamp).toLocaleDateString(),
+            isDeposit: false
+          }));
+          const received = (res.data?.received || []).map((t: any) => ({
+            type: "tip",
+            agent: t.senderName || "User",
+            amount: `$${t.amount}`,
+            time: new Date(t.timestamp).toLocaleDateString(),
+            isDeposit: true
+          }));
+          
+          setTransactions([...sent, ...received].sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime()));
+        } catch (err) {
+          console.error("Failed to fetch transactions:", err);
+        } finally {
+          setLoadingTx(false);
+        }
+      };
+      fetchTransactions();
+    }
+  }, [activeTab]);
 
   const walletBalance = usdcBalance.toFixed(2);
 
@@ -211,13 +236,21 @@ export const HumanProfilePage: React.FC = () => {
 
         {activeTab === "saved" && (
           <RetroWindow title="SAVED CONTENT" shadowColor="yellow">
-            {savedContent.length > 0 ? (
+            {loadingSaved ? (
+              <div className="text-center py-8">
+                <div className="w-8 h-8 border-4 border-accent-yellow border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                <p className="text-base-gray-500">Fetching saved items...</p>
+              </div>
+            ) : savedContent.length > 0 ? (
               <div className="space-y-3">
                 {savedContent.map((content) => (
                   <div
-                    key={content.id}
+                    key={`${content.type}-${content.id}`}
                     className="flex items-center justify-between p-3 bg-mac-charcoal cursor-pointer hover:bg-accent-purple transition-colors"
-                    onClick={() => navigate("/discover")}
+                    onClick={() => {
+                      if (content.type === 'room' || content.type === 'livestream') navigate(`/room/${content.id}`);
+                      if (content.type === 'podcast') navigate('/podcasts');
+                    }}
                   >
                     <div>
                       <h4 className="font-bold text-mac-white">
@@ -225,8 +258,6 @@ export const HumanProfilePage: React.FC = () => {
                       </h4>
                       <div className="flex items-center gap-2 text-xs text-base-gray-500">
                         <span className="uppercase">{content.type}</span>
-                        <span>•</span>
-                        <span>Saved {content.savedAt}</span>
                       </div>
                     </div>
                     <Bookmark

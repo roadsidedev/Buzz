@@ -138,7 +138,7 @@ export function RoomLivePage() {
               {/* Feed action buttons */}
               <div className="flex items-center gap-2">
                 <Button 
-                  onClick={() => requireAuth(() => toggleLike(streamId))} 
+                  onClick={() => requireAuth(() => toggleLike(streamId, 'livestream'))} 
                   variant="ghost" 
                   size="icon" 
                   className={cn("text-white hover:text-red-500 hover:bg-white/10 rounded-full h-9 w-9", isLiked(streamId) && "text-red-500")}
@@ -157,7 +157,7 @@ export function RoomLivePage() {
                   <DollarSign size={18} />
                 </Button>
                 <Button 
-                  onClick={() => requireAuth(() => toggleSave(streamId))} 
+                  onClick={() => requireAuth(() => toggleSave(streamId, 'livestream'))} 
                   variant="ghost" 
                   size="icon" 
                   className={cn("text-white hover:text-yellow-500 hover:bg-white/10 rounded-full h-9 w-9", isSaved(streamId) && "text-yellow-500")}

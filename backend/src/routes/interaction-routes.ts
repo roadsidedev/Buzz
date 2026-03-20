@@ -1,75 +1,58 @@
+import { Router, Request, Response } from "express";
+import { asyncHandler } from "../utils/async-handler.js";
+import { requireAnyAuth } from "../middleware/any-auth.js";
+import { db } from "../config/database.js";
+import { logger } from "../utils/logger.js";
+import { v4 as uuidv4 } from "uuid";
+
+const router = Router();
+
+/**
+ * Helper to get agent/user ID from request
+ */
+function getAuthId(req: Request): string {
+  return req.agent?.id || req.user?.agentId || "";
+}
+
 /**
  * Interaction Routes
  *
  * REST endpoints for social interactions:
  * - POST /api/v1/interactions/like       — Like an item
  * - POST /api/v1/interactions/unlike     — Unlike an item
- * - POST /api/v1/interactions/save       — Save/bookmark an item
- * - POST /api/v1/interactions/unsave     — Remove saved item
- * - POST /api/v1/interactions/reshare    — Reshare an item
- * - POST /api/v1/interactions/unreshare  — Remove reshare
- * - GET  /api/v1/interactions/:itemId    — Get interaction counts for an item
+ * - POST /api/v1/interactions/save       — Save an item
+ * - POST /api/v1/interactions/unsave     — Unsave an item
+ * - GET  /api/v1/interactions/mine       — Get current user's interactions
  */
-
-import { Router, Request, Response } from "express";
-import { asyncHandler, requireApiKey } from "../middleware/index.js";
-import { logger } from "../utils/logger.js";
-import { pool } from "../config/database.js";
-
-const router = Router();
-
-const VALID_ACTIONS = ["like", "save", "reshare"] as const;
-type InteractionAction = (typeof VALID_ACTIONS)[number];
-
-/**
- * Helper: add an interaction
- */
-async function addInteraction(
-  agentId: string,
-  itemId: string,
-  action: InteractionAction,
-): Promise<void> {
-  await pool.query(
-    `INSERT INTO interaction (agent_id, item_id, action)
-     VALUES ($1, $2, $3)
-     ON CONFLICT (agent_id, item_id, action) DO NOTHING`,
-    [agentId, itemId, action],
-  );
-}
-
-/**
- * Helper: remove an interaction
- */
-async function removeInteraction(
-  agentId: string,
-  itemId: string,
-  action: InteractionAction,
-): Promise<void> {
-  await pool.query(
-    "DELETE FROM interaction WHERE agent_id = $1 AND item_id = $2 AND action = $3",
-    [agentId, itemId, action],
-  );
-}
 
 /**
  * POST /api/v1/interactions/like
  */
 router.post(
   "/like",
-  requireApiKey,
+  requireAnyAuth,
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
-    const agentId = req.agent!.id;
-    const { itemId } = req.body;
+    const agentId = getAuthId(req);
+    const { itemId, itemType = "room" } = req.body;
 
     if (!itemId) {
-      res.status(400).json({ success: false, error: { code: "MISSING_ITEM_ID", message: "itemId is required", statusCode: 400 } });
+      res.status(400).json({ success: false, error: "itemId required" });
       return;
     }
 
-    await addInteraction(agentId, String(itemId), "like");
-    logger.debug("Like added", { agentId, itemId });
+    try {
+      await db.query(
+        `INSERT INTO interaction (id, agent_id, item_id, item_type, action)
+         VALUES ($1, $2, $3, $4, 'like')
+         ON CONFLICT (agent_id, item_id, action) DO NOTHING`,
+        [uuidv4(), agentId, itemId, itemType]
+      );
 
-    res.json({ success: true, data: { itemId, action: "like", state: true } });
+      res.json({ success: true });
+    } catch (err) {
+      logger.error("Like interaction failed", { error: err, agentId, itemId });
+      res.status(500).json({ success: false, error: "Database error" });
+    }
   }),
 );
 
@@ -78,20 +61,17 @@ router.post(
  */
 router.post(
   "/unlike",
-  requireApiKey,
+  requireAnyAuth,
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
-    const agentId = req.agent!.id;
+    const agentId = getAuthId(req);
     const { itemId } = req.body;
 
-    if (!itemId) {
-      res.status(400).json({ success: false, error: { code: "MISSING_ITEM_ID", message: "itemId is required", statusCode: 400 } });
-      return;
-    }
+    await db.query(
+      "DELETE FROM interaction WHERE agent_id = $1 AND item_id = $2 AND action = 'like'",
+      [agentId, itemId]
+    );
 
-    await removeInteraction(agentId, String(itemId), "like");
-    logger.debug("Like removed", { agentId, itemId });
-
-    res.json({ success: true, data: { itemId, action: "like", state: false } });
+    res.json({ success: true });
   }),
 );
 
@@ -100,20 +80,24 @@ router.post(
  */
 router.post(
   "/save",
-  requireApiKey,
+  requireAnyAuth,
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
-    const agentId = req.agent!.id;
-    const { itemId } = req.body;
+    const agentId = getAuthId(req);
+    const { itemId, itemType = "room" } = req.body;
 
     if (!itemId) {
-      res.status(400).json({ success: false, error: { code: "MISSING_ITEM_ID", message: "itemId is required", statusCode: 400 } });
+      res.status(400).json({ success: false, error: "itemId required" });
       return;
     }
 
-    await addInteraction(agentId, String(itemId), "save");
-    logger.debug("Save added", { agentId, itemId });
+    await db.query(
+      `INSERT INTO interaction (id, agent_id, item_id, item_type, action)
+       VALUES ($1, $2, $3, $4, 'save')
+       ON CONFLICT (agent_id, item_id, action) DO NOTHING`,
+      [uuidv4(), agentId, itemId, itemType]
+    );
 
-    res.json({ success: true, data: { itemId, action: "save", state: true } });
+    res.json({ success: true });
   }),
 );
 
@@ -122,85 +106,105 @@ router.post(
  */
 router.post(
   "/unsave",
-  requireApiKey,
+  requireAnyAuth,
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
-    const agentId = req.agent!.id;
+    const agentId = getAuthId(req);
     const { itemId } = req.body;
 
-    if (!itemId) {
-      res.status(400).json({ success: false, error: { code: "MISSING_ITEM_ID", message: "itemId is required", statusCode: 400 } });
-      return;
-    }
+    await db.query(
+      "DELETE FROM interaction WHERE agent_id = $1 AND item_id = $2 AND action = 'save'",
+      [agentId, itemId]
+    );
 
-    await removeInteraction(agentId, String(itemId), "save");
-    logger.debug("Save removed", { agentId, itemId });
-
-    res.json({ success: true, data: { itemId, action: "save", state: false } });
+    res.json({ success: true });
   }),
 );
 
 /**
- * POST /api/v1/interactions/reshare
+ * GET /api/v1/interactions/mine
+ * Fetch all likes and saves for the current user
  */
-router.post(
-  "/reshare",
-  requireApiKey,
+router.get(
+  "/mine",
+  requireAnyAuth,
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
-    const agentId = req.agent!.id;
-    const { itemId } = req.body;
+    const agentId = getAuthId(req);
 
-    if (!itemId) {
-      res.status(400).json({ success: false, error: { code: "MISSING_ITEM_ID", message: "itemId is required", statusCode: 400 } });
-      return;
-    }
+    const result = await db.query(
+      "SELECT item_id, item_type, action FROM interaction WHERE agent_id = $1",
+      [agentId]
+    );
 
-    await addInteraction(agentId, String(itemId), "reshare");
-    logger.debug("Reshare added", { agentId, itemId });
+    const likes = result.rows.filter(r => r.action === 'like').map(r => r.item_id);
+    const saves = result.rows.filter(r => r.action === 'save').map(r => ({ id: r.item_id, type: r.item_type }));
 
-    res.json({ success: true, data: { itemId, action: "reshare", state: true } });
+    res.json({
+      success: true,
+      data: { likes, saves }
+    });
   }),
 );
 
 /**
- * POST /api/v1/interactions/unreshare
+ * GET /api/v1/interactions/saved-details
+ * Fetch detailed info for saved items
  */
-router.post(
-  "/unreshare",
-  requireApiKey,
+router.get(
+  "/saved-details",
+  requireAnyAuth,
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
-    const agentId = req.agent!.id;
-    const { itemId } = req.body;
+    const agentId = getAuthId(req);
 
-    if (!itemId) {
-      res.status(400).json({ success: false, error: { code: "MISSING_ITEM_ID", message: "itemId is required", statusCode: 400 } });
-      return;
+    const result = await db.query(
+      "SELECT item_id, item_type FROM interaction WHERE agent_id = $1 AND action = 'save'",
+      [agentId]
+    );
+
+    const detailedSaves = [];
+
+    for (const row of result.rows) {
+      let details = { id: row.item_id, type: row.item_type, title: "Unknown Item" };
+      
+      try {
+        if (row.item_type === 'room') {
+          const roomRes = await db.query("SELECT title FROM room WHERE id = $1", [row.item_id]);
+          if (roomRes.rows[0]) details.title = roomRes.rows[0].title;
+        } else if (row.item_type === 'podcast') {
+          const podRes = await db.query("SELECT title FROM podcast WHERE id = $1", [row.item_id]);
+          if (podRes.rows[0]) details.title = podRes.rows[0].title;
+        } else if (row.item_type === 'livestream') {
+          const streamRes = await db.query("SELECT title FROM livestream WHERE id = $1", [row.item_id]);
+          if (streamRes.rows[0]) details.title = streamRes.rows[0].title;
+        }
+      } catch (err) {
+        logger.error("Failed to fetch saved item details", { itemId: row.item_id, error: err });
+      }
+      
+      detailedSaves.push(details);
     }
 
-    await removeInteraction(agentId, String(itemId), "reshare");
-    logger.debug("Reshare removed", { agentId, itemId });
-
-    res.json({ success: true, data: { itemId, action: "reshare", state: false } });
+    res.json({
+      success: true,
+      data: { saves: detailedSaves }
+    });
   }),
 );
 
 /**
  * GET /api/v1/interactions/:itemId
- * Get aggregate interaction counts for an item (public).
+ * Get counts for a specific item
  */
 router.get(
   "/:itemId",
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const { itemId } = req.params;
 
-    const result = await pool.query(
-      `SELECT action, COUNT(*) as count
-       FROM interaction
-       WHERE item_id = $1
-       GROUP BY action`,
-      [itemId],
+    const result = await db.query(
+      "SELECT action, COUNT(*) as count FROM interaction WHERE item_id = $1 GROUP BY action",
+      [itemId]
     );
 
-    const counts: Record<string, number> = { like: 0, save: 0, reshare: 0 };
+    const counts = { like: 0, save: 0, reshare: 0 };
     for (const row of result.rows) {
       counts[row.action] = parseInt(row.count, 10);
     }

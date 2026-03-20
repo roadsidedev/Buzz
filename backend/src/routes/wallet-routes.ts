@@ -9,7 +9,8 @@
  */
 
 import { Router, Request, Response } from "express";
-import { asyncHandler, requireApiKey } from "../middleware/index.js";
+import { asyncHandler } from "../middleware/index.js";
+import { requireAnyAuth } from "../middleware/any-auth.js";
 import { logger } from "../utils/logger.js";
 import { pool } from "../config/database.js";
 import crypto from "crypto";
@@ -17,14 +18,21 @@ import crypto from "crypto";
 const router = Router();
 
 /**
+ * Helper to get agent/user ID from request
+ */
+function getAuthId(req: Request): string {
+  return req.agent?.id || req.user?.agentId || "";
+}
+
+/**
  * GET /api/v1/wallet/balance
  * Get the authenticated agent's USDC balance.
  */
 router.get(
   "/balance",
-  requireApiKey,
+  requireAnyAuth,
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
-    const agentId = req.agent!.id;
+    const agentId = getAuthId(req);
 
     const result = await pool.query(
       "SELECT usdc_balance FROM agent WHERE id = $1",
@@ -51,16 +59,12 @@ router.get(
 /**
  * POST /api/v1/wallet/deposit
  * Record a USDC deposit and update the agent's balance.
- *
- * In production this is called after a confirmed on-chain transfer.
- * The frontend shows instructions for sending USDC to the wallet address,
- * and this endpoint credits the balance once the transfer is confirmed.
  */
 router.post(
   "/deposit",
-  requireApiKey,
+  requireAnyAuth,
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
-    const agentId = req.agent!.id;
+    const agentId = getAuthId(req);
     const { amount, token = "USDC", txHash } = req.body;
 
     const parsedAmount = parseFloat(amount);
@@ -80,7 +84,6 @@ router.post(
       return;
     }
 
-    // Update balance atomically
     const updateResult = await pool.query(
       `UPDATE agent
        SET usdc_balance = usdc_balance + $1, updated_at = NOW()
@@ -99,7 +102,6 @@ router.post(
 
     const newBalance = parseFloat(updateResult.rows[0].usdc_balance);
 
-    // Record the deposit in the payment table
     const depositTxHash = txHash || `deposit-${crypto.randomBytes(16).toString("hex")}`;
     await pool.query(
       `INSERT INTO payment (
@@ -131,9 +133,9 @@ router.post(
  */
 router.post(
   "/tip",
-  requireApiKey,
+  requireAnyAuth,
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
-    const senderId = req.agent!.id;
+    const senderId = getAuthId(req);
     const { recipientId, amount, token = "USDC" } = req.body;
 
     if (!recipientId) {
@@ -161,7 +163,6 @@ router.post(
       return;
     }
 
-    // Verify recipient exists
     const recipientResult = await pool.query(
       "SELECT id, name FROM agent WHERE id = $1",
       [recipientId],
@@ -174,12 +175,10 @@ router.post(
       return;
     }
 
-    // Execute tip as a transaction: deduct from sender, credit recipient
     const client = await pool.connect();
     try {
       await client.query("BEGIN");
 
-      // Check and deduct sender balance
       const senderResult = await client.query(
         `UPDATE agent
          SET usdc_balance = usdc_balance - $1, updated_at = NOW()
@@ -197,7 +196,6 @@ router.post(
         return;
       }
 
-      // Credit recipient
       await client.query(
         `UPDATE agent
          SET usdc_balance = usdc_balance + $1, updated_at = NOW()
@@ -205,7 +203,6 @@ router.post(
         [parsedAmount, recipientId],
       );
 
-      // Record in payment table
       const txHash = `tip-${crypto.randomBytes(16).toString("hex")}`;
       await client.query(
         `INSERT INTO payment (
@@ -247,9 +244,9 @@ router.post(
  */
 router.get(
   "/tips",
-  requireApiKey,
+  requireAnyAuth,
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
-    const agentId = req.agent!.id;
+    const agentId = getAuthId(req);
 
     const [sentResult, receivedResult] = await Promise.all([
       pool.query(

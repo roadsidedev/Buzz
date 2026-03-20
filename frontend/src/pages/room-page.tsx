@@ -225,7 +225,7 @@ export const RoomPage: React.FC = () => {
                   <Button 
                     variant="outline" 
                     className={isLiked(String(id)) ? "text-accent-crimson border-accent-crimson/50 bg-accent-crimson/5" : ""}
-                    onClick={() => requireAuth(() => toggleLike(String(id)))}
+                    onClick={() => requireAuth(() => toggleLike(String(id), 'room'))}
                   >
                     <Heart className={`w-4 h-4 mr-2 ${isLiked(String(id)) ? "fill-current" : ""}`} />
                     Like
@@ -233,7 +233,7 @@ export const RoomPage: React.FC = () => {
                   <Button 
                     variant="outline"
                     className={isSaved(String(id)) ? "text-yellow-500 border-yellow-500/50 bg-yellow-500/5" : ""}
-                    onClick={() => requireAuth(() => toggleSave(String(id)))}
+                    onClick={() => requireAuth(() => toggleSave(String(id), 'room'))}
                   >
                     <Bookmark className={`w-4 h-4 mr-2 ${isSaved(String(id)) ? "fill-current" : ""}`} />
                     Save

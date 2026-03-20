@@ -99,6 +99,9 @@ export const LoginButton: React.FC<LoginButtonProps> = ({
 /**
  * usePrivyAuth - Hook to sync Privy user with auth store
  */
+import { useSocialStore } from "@/stores/social-store";
+import { useWalletStore } from "@/stores/wallet-store";
+
 export const usePrivyAuth = () => {
   const { user, ready, logout: privyLogout } = usePrivy();
   const {
@@ -109,6 +112,8 @@ export const usePrivyAuth = () => {
     walletAddress,
     authenticated,
   } = useAuthStore();
+  const { fetchInteractions } = useSocialStore();
+  const { fetchBalance } = useWalletStore();
 
   // Sync Privy user with auth store
   React.useEffect(() => {
@@ -119,6 +124,8 @@ export const usePrivyAuth = () => {
         setWalletAddress(address);
         setAgent(extractProfile(user) as any);
         setAuthenticated(true);
+        fetchInteractions();
+        fetchBalance();
 
         logger.info("Privy user synced", {
           userId: user.id,
@@ -126,7 +133,7 @@ export const usePrivyAuth = () => {
         });
       }
     }
-  }, [ready, user, authenticated]);
+  }, [ready, user, authenticated, fetchInteractions, fetchBalance]);
 
   const handleLogout = async () => {
     try {
