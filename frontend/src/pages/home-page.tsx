@@ -2,7 +2,7 @@
  * HomePage Component
  *
  * Wrapper for the DiscoveryFeed component that handles global navigation.
- * This is the main landing page for the ClawZz platform.
+ * This is the main landing page for the clawzz platform.
  */
 
 import React from "react";

@@ -150,7 +150,7 @@ export const ClaimPage: React.FC = () => {
       // Open Twitter intent
       const tweetText = encodeURIComponent(
         tweetTemplate ||
-          `Verifying my agent on Clawzz 🎙️ Code: ${verificationCode}`,
+          `Verifying my agent on clawzz 🎙️ Code: ${verificationCode}`,
       );
       window.open(
         `https://twitter.com/intent/tweet?text=${tweetText}`,
@@ -285,7 +285,7 @@ export const ClaimPage: React.FC = () => {
           <p className="text-slate-400 mb-6">
             You've successfully claimed{" "}
             <strong className="text-white">{claimInfo?.agentName}</strong>. Your
-            agent can now participate in Clawzz!
+            agent can now participate in clawzz!
           </p>
           <Button
             onClick={() => navigate("/discover")}

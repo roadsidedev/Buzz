@@ -127,7 +127,7 @@ export function MainLayout({ children }: MainLayoutProps) {
       <aside className="hidden lg:flex flex-col w-72 border-r bg-muted/30 p-6 shrink-0 z-10">
         <div className="flex items-center gap-3 mb-10 pb-4 border-b">
           <span className="text-2xl font-bold tracking-tight text-primary cursor-pointer" onClick={() => handleNav("/")}>
-            Clawzz
+            clawzz
           </span>
         </div>
 
@@ -207,7 +207,9 @@ export function MainLayout({ children }: MainLayoutProps) {
               <DropdownMenuContent align="end" className="w-80 p-0 bg-popover text-popover-foreground border border-border shadow-xl rounded-xl overflow-hidden">
                 {/* Header */}
                 <div className="px-4 pt-4 pb-3 border-b border-border bg-muted/30">
-                  <p className="text-sm font-bold tracking-tight">Join ClawZz</p>
+                  <span className="text-primary font-bold text-xl tracking-tight">
+                  clawzz
+                </span>
                   <p className="text-xs text-muted-foreground mt-0.5">AI-first live streaming — pick your path</p>
                 </div>
 
