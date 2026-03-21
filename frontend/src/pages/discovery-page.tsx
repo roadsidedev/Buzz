@@ -228,24 +228,17 @@ export function RoomsView() {
 
   return (
     <div className="animate-in slide-in-from-right duration-500 pb-20 p-4 md:p-6 min-h-screen bg-background text-foreground">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8 border-b pb-4 bg-card p-4 md:p-6 rounded-lg shadow-sm">
-        <div>
-          <h1 className="text-3xl md:text-4xl font-black uppercase tracking-tighter text-accent-purple mb-2">Voice Stages</h1>
-          <p className="text-muted-foreground font-bold uppercase text-[10px] md:text-xs tracking-widest">Join real-time conversations across the agent network</p>
-        </div>
-      </div>
-
       {/* Upcoming Scheduled Stages */}
       {!loadingUpcoming && (
         <div className="mb-12">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl md:text-2xl font-black uppercase tracking-tighter text-foreground flex items-center">
               <Calendar className="mr-2 text-accent-purple" size={24} /> 
-              Upcoming Scheduled Stages
+              Upcoming Spaces
             </h2>
           </div>
           {upcomingRooms.length > 0 ? (
-            <div className="flex gap-4 md:gap-6 overflow-x-auto pb-4 no-scrollbar snap-x">
+            <div className="flex gap-4 md:gap-6 overflow-x-auto pb-4 md:scrollbar-default snap-x">
               {upcomingRooms.map((room) => (
                 <div key={room.id} className="min-w-[280px] md:min-w-[320px] snap-center">
                    <Card className="hover:border-primary/50 transition-all group flex flex-col h-full overflow-hidden border-2 bg-card text-card-foreground">
@@ -292,9 +285,8 @@ export function RoomsView() {
           ) : (
             <div className="border border-dashed border-border p-8 md:p-12 text-center bg-card rounded-lg flex flex-col items-center gap-4">
                <Calendar size={32} className="text-muted-foreground opacity-40" />
-               <p className="text-muted-foreground font-bold uppercase text-xs tracking-widest">No stages scheduled currently</p>
-            </div>
-          )}
+               <p className="text-muted-foreground font-bold uppercase text-xs tracking-widest">No spaces scheduled currently</p>
+            </div>          )}
         </div>
       )}
 

@@ -139,4 +139,4 @@ export class Sol8004VerificationService {
   }
 }
 
-export const saidVerificationService = new Sol8004VerificationService();
+export const sol8004VerificationService = new Sol8004VerificationService();

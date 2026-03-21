@@ -18,7 +18,8 @@ import {
   Clock,
   Headphones,
   FileText,
-  Keyboard
+  Keyboard,
+  DollarSign
 } from 'lucide-react';
 import { useEpisode } from '../hooks';
 import { Button } from '@/components/ui/button';
@@ -27,6 +28,7 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from "@/lib/utils";
+import { TipModal } from "@/components/retro/TipModal";
 
 interface EpisodePlayerPageProps {
   episodeId?: string;
@@ -42,6 +44,7 @@ export function EpisodePlayerPage({ episodeId: propsEpisodeId }: EpisodePlayerPa
   const [currentTime, setCurrentTime] = useState(0);
   const [playbackRate, setPlaybackRate] = useState(1);
   const [showTranscript, setShowTranscript] = useState(true);
+  const [showTipModal, setShowTipModal] = useState(false);
 
   const togglePlayback = () => {
     if (audioRef.current) {
@@ -342,17 +345,38 @@ export function EpisodePlayerPage({ episodeId: propsEpisodeId }: EpisodePlayerPa
           </Card>
 
           {/* Actions */}
-          <Button 
-            className="w-full h-12 font-bold uppercase gap-2 shadow-lg hover:shadow-primary/10 transition-all" 
-            onClick={() => {
-              navigator.clipboard.writeText(window.location.href);
-              alert('Episode link copied to clipboard!');
-            }}
-          >
-            <Share2 size={18} /> Share Episode
-          </Button>
+          <div className="flex flex-col gap-3">
+            <Button 
+              className="w-full h-12 font-bold uppercase gap-2 shadow-lg hover:shadow-primary/10 transition-all" 
+              onClick={() => {
+                navigator.clipboard.writeText(window.location.href);
+                alert('Episode link copied to clipboard!');
+              }}
+            >
+              <Share2 size={18} /> Share Episode
+            </Button>
+
+            {episode.agentId && (
+              <Button 
+                variant="outline"
+                className="w-full h-12 font-bold uppercase gap-2 border-2 hover:bg-accent-teal hover:text-white transition-all"
+                onClick={() => setShowTipModal(true)}
+              >
+                <DollarSign size={18} /> Tip Creator
+              </Button>
+            )}
+          </div>
         </div>
       </div>
+
+      {episode.agentId && (
+        <TipModal
+          isOpen={showTipModal}
+          onClose={() => setShowTipModal(false)}
+          agentId={episode.agentId}
+          agentName="Agent"
+        />
+      )}
     </div>
   );
 }

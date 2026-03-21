@@ -8,14 +8,6 @@ import { v4 as uuidv4 } from "uuid";
 const router = Router();
 
 /**
- * Helper to get agent/user ID from request
- */
-function getAuthId(req: Request): string {
-  const id = req.agent?.id || req.user?.agentId;
-  return id ? String(id) : "";
-}
-
-/**
  * Interaction Routes
  *
  * REST endpoints for social interactions:
@@ -33,7 +25,7 @@ router.post(
   "/like",
   requireAnyAuth,
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
-    const agentId = getAuthId(req);
+    const agentId = req.agent!.id;
     const { itemId, itemType = "room" } = req.body;
 
     if (!itemId) {
@@ -64,7 +56,7 @@ router.post(
   "/unlike",
   requireAnyAuth,
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
-    const agentId = getAuthId(req);
+    const agentId = req.agent!.id;
     const { itemId } = req.body;
 
     await db.query(
@@ -83,7 +75,7 @@ router.post(
   "/save",
   requireAnyAuth,
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
-    const agentId = getAuthId(req);
+    const agentId = req.agent!.id;
     const { itemId, itemType = "room" } = req.body;
 
     if (!itemId) {
@@ -109,7 +101,7 @@ router.post(
   "/unsave",
   requireAnyAuth,
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
-    const agentId = getAuthId(req);
+    const agentId = req.agent!.id;
     const { itemId } = req.body;
 
     await db.query(
@@ -129,7 +121,7 @@ router.get(
   "/mine",
   requireAnyAuth,
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
-    const agentId = getAuthId(req);
+    const agentId = req.agent!.id;
 
     const result = await db.query(
       "SELECT item_id, item_type, action FROM interaction WHERE agent_id = $1",
@@ -154,7 +146,7 @@ router.get(
   "/saved-details",
   requireAnyAuth,
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
-    const agentId = getAuthId(req);
+    const agentId = req.agent!.id;
 
     const result = await db.query(
       "SELECT item_id, item_type FROM interaction WHERE agent_id = $1 AND action = 'save'",

@@ -8,6 +8,7 @@ import { usePrivy } from "@privy-io/react-auth"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
+import { TipModal } from "@/components/retro/TipModal"
 
 export function PodcastsView() {
   const [podcasts, setPodcasts] = useState<any[]>([])
@@ -20,6 +21,10 @@ export function PodcastsView() {
   const { setPlayingPodcast, replay } = usePlayerStore()
   const { toggleLike, toggleSave, isLiked, isSaved } = useSocialStore()
   const { login } = usePrivy()
+
+  const [showTipModal, setShowTipModal] = useState(false)
+  const [tipAgentId, setTipAgentId] = useState("")
+  const [tipAgentName, setTipAgentName] = useState("")
 
   useEffect(() => {
     const fetchPodcasts = async () => {
@@ -79,7 +84,9 @@ export function PodcastsView() {
       } else if (actionName === 'Like') {
         toggleLike(pod.id, 'podcast');
       } else if (actionName === 'Tip') {
-        alert('Tipping feature coming soon!');
+        setTipAgentId(pod.agentId);
+        setTipAgentName(pod.author || "Agent");
+        setShowTipModal(true);
       } else if (actionName === 'Save') {
         toggleSave(pod.id, 'podcast');
       }
@@ -88,8 +95,6 @@ export function PodcastsView() {
 
   return (
     <div className="animate-in slide-in-from-right duration-500 max-w-5xl mx-auto pb-12">
-      <h1 className="text-4xl font-bold uppercase tracking-tighter mb-8 text-shadow-sm">Discovery Feed</h1>
-      
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
         {/* Featured Series — #1 podcast by all-time listens */}
         {featured ? (
@@ -192,6 +197,12 @@ export function PodcastsView() {
           ))}
         </div>
       </div>
+      <TipModal 
+        isOpen={showTipModal} 
+        onClose={() => setShowTipModal(false)} 
+        agentId={tipAgentId} 
+        agentName={tipAgentName} 
+      />
     </div>
   )
 }

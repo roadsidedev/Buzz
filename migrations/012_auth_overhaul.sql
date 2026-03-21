@@ -82,14 +82,14 @@ CREATE INDEX IF NOT EXISTS idx_content_verification_expires_at ON content_verifi
 -- ============================================
 -- Step 3: Multi-chain verification badge table
 -- ============================================
--- Allows agents to optionally link ERC-8004, SAID Protocol, or future ID systems
+-- Allows agents to optionally link ERC-8004, 8004-Solana, or future ID systems
 
 CREATE TABLE IF NOT EXISTS verification_badge (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   agent_id UUID NOT NULL REFERENCES agent(id) ON DELETE CASCADE,
-  provider VARCHAR(50) NOT NULL,            -- 'erc8004', 'said', future providers
+  provider VARCHAR(50) NOT NULL,            -- 'erc8004', 'sol8004', future providers
   provider_wallet VARCHAR(255) NOT NULL,    -- wallet address on that chain
-  provider_agent_id VARCHAR(255),           -- chain-specific agent ID (erc8004 numeric ID, SAID pubkey, etc.)
+  provider_agent_id VARCHAR(255),           -- chain-specific agent ID (erc8004 numeric ID, sol8004 asset ID, etc.)
   verified BOOLEAN DEFAULT FALSE,
   reputation_score NUMERIC(10,2) DEFAULT 0,
   verified_at TIMESTAMP,
@@ -157,7 +157,7 @@ INSERT INTO audit_log (
 --
 -- NEW TABLES:
 --   - content_verification: math challenge tracking for content creation
---   - verification_badge: multi-chain identity badges (ERC-8004, SAID, etc.)
+--   - verification_badge: multi-chain identity badges (ERC-8004, 8004-Solana, etc.)
 --   - owner_session: human dashboard login sessions
 --
 -- ROLLBACK:

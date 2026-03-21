@@ -44,6 +44,7 @@ export interface AgentProfile {
   description?: string;
   avatar?: string;
   claimStatus: string;
+  claimUrl?: string;
   role: string;
   ownerEmail?: string;
   ownerEmailVerified: boolean;
@@ -558,6 +559,7 @@ export class ClawzzAuthService {
       description: row.description || undefined,
       avatar: row.avatar || undefined,
       claimStatus: row.suspended_at ? "suspended" : row.claim_status,
+      claimUrl: row.claim_token ? `${this.baseUrl}/claim/${row.claim_token}` : undefined,
       role: row.role || "agent",
       ownerEmail: row.owner_email || undefined,
       ownerEmailVerified: row.owner_email_verified || false,

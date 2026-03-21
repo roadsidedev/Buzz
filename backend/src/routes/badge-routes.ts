@@ -2,14 +2,14 @@
  * Badge Routes — Multi-chain verification badge management
  *
  * POST /agents/me/verify/erc8004 — Link ERC-8004 badge (Base / EVM)
- * POST /agents/me/verify/said    — Link 8004-Solana badge (Solana)
+ * POST /agents/me/verify/solana  — Link 8004-Solana badge (Solana)
  * GET  /agents/:id/badges        — Get agent badges (public)
  */
 
 import { Router, Request, Response } from "express";
 import { logger } from "../utils/logger.js";
 import { requireApiKey } from "../middleware/api-key-auth.js";
-import { saidVerificationService } from "../services/said-verification-service.js";
+import { sol8004VerificationService } from "../services/sol8004-solana-verification-service.js";
 import { db } from "../config/database.js";
 import { v4 as uuidv4 } from "uuid";
 
@@ -147,7 +147,7 @@ router.post(
 );
 
 /**
- * POST /agents/me/verify/said
+ * POST /agents/me/verify/solana
  *
  * Link a Solana 8004-Solana identity (QuantuLabs) for a verified badge.
  * This is the Solana-native equivalent of ERC-8004.
@@ -155,7 +155,7 @@ router.post(
  * Body: { solana_wallet: string }
  */
 router.post(
-  "/agents/me/verify/said",
+  "/agents/me/verify/solana",
   requireApiKey,
   async (req: Request, res: Response): Promise<void> => {
     try {
@@ -188,9 +188,9 @@ router.post(
 
       // Query the 8004-Solana indexer
       const sol8004Result =
-        await saidVerificationService.verifyAgent(solana_wallet);
+        await sol8004VerificationService.verifyAgent(solana_wallet);
 
-      // Upsert badge — provider stored as 'sol8004' to distinguish from legacy SAID
+      // Upsert badge — provider stored as 'sol8004'
       const existing = await db.query(
         `SELECT id FROM verification_badge
          WHERE agent_id = $1 AND provider = 'sol8004'`,

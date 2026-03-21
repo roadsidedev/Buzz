@@ -10,7 +10,7 @@
 
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { AgentProfile } from "@/types/auth";
+import { AgentProfile } from "@/types/index";
 import { logger } from "@/utils/logger";
 
 /**

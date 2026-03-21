@@ -191,6 +191,22 @@ export class AudioStorageService {
     audioBuffer: Buffer,
     messageId: string,
   ): Promise<string | null> {
+    return this.uploadFile(audioBuffer, `audio/${messageId}.mp3`, "audio/mpeg");
+  }
+
+  /**
+   * Upload a generic file to S3-compatible storage.
+   *
+   * @param buffer      Raw file data
+   * @param key         Object key (path in bucket)
+   * @param contentType MIME type of the file
+   * @returns Public URL string, or null if storage is not configured or upload fails
+   */
+  async uploadFile(
+    buffer: Buffer,
+    key: string,
+    contentType: string,
+  ): Promise<string | null> {
     if (!this.config) {
       return null;
     }
@@ -198,9 +214,7 @@ export class AudioStorageService {
     const { bucket, region, endpoint, accessKey, secretKey, publicBaseUrl } =
       this.config;
 
-    const key = `audio/${messageId}.mp3`;
-    const contentType = "audio/mpeg";
-    const contentLength = audioBuffer.length;
+    const contentLength = buffer.length;
 
     // Build ISO-8601 date strings required by AWS Sig V4
     const now = new Date();
@@ -210,7 +224,7 @@ export class AudioStorageService {
       .replace(/\.\d{3}Z$/, "Z");
     const dateStamp = amzDate.slice(0, 8);
 
-    const payloadHash = sha256Hex(audioBuffer);
+    const payloadHash = sha256Hex(buffer);
     const host = endpoint;
 
     const authorization = buildAuthHeader({
@@ -231,10 +245,10 @@ export class AudioStorageService {
     const uploadUrl = `https://${host}/${bucket}/${key}`;
 
     try {
-      logger.debug("Uploading audio to storage", {
-        messageId,
+      logger.debug("Uploading file to storage", {
         key,
         size: contentLength,
+        contentType,
       });
 
       const response = await fetch(uploadUrl, {
@@ -246,15 +260,15 @@ export class AudioStorageService {
           "x-amz-content-sha256": payloadHash,
           "x-amz-date": amzDate,
         },
-        body: audioBuffer,
+        body: buffer,
         // @ts-ignore — Node.js 18+ supports this
         duplex: "half",
       });
 
       if (!response.ok) {
         const errorText = await response.text();
-        logger.error("Audio storage upload failed", {
-          messageId,
+        logger.error("Storage upload failed", {
+          key,
           status: response.status,
           error: errorText,
         });
@@ -263,16 +277,16 @@ export class AudioStorageService {
 
       const publicUrl = `${publicBaseUrl.replace(/\/$/, "")}/${key}`;
 
-      logger.info("Audio uploaded successfully", {
-        messageId,
+      logger.info("File uploaded successfully", {
+        key,
         url: publicUrl,
         size: contentLength,
       });
 
       return publicUrl;
     } catch (err) {
-      logger.error("Audio upload error", {
-        messageId,
+      logger.error("File upload error", {
+        key,
         error: err instanceof Error ? err.message : String(err),
       });
       return null;

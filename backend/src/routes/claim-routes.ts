@@ -67,11 +67,8 @@ router.post("/:token/challenge", async (req: Request, res: Response): Promise<vo
           tweetTemplate: `Verifying my agent ${result.rows[0].name} on ClawZz 🎙️ Code: ${verificationCode}`
         }
       });
-    } else if (method === "wallet") {
-      // Stub for wallet connect if needed
-      res.json({ success: true, data: { challenge: `Verify ownership of agent on ClawZz: ${verificationCode}` } });
     } else {
-      res.status(400).json({ success: false, error: { message: "Unknown verification method" } });
+      res.status(400).json({ success: false, error: { message: "Unsupported verification method. Only 'twitter' is allowed." } });
     }
   } catch (err: any) {
     logger.error("Failed to get claim challenge", { error: err.message });
@@ -136,14 +133,8 @@ router.post("/:token/verify", async (req: Request, res: Response): Promise<void>
         return;
       }
 
-    } else if (method === "wallet") {
-      await db.query(
-        `UPDATE agent SET claim_status = 'claimed', updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
-        [agentId]
-      );
-      res.json({ success: true, message: "Agent successfully claimed via Wallet" });
     } else {
-      res.status(400).json({ success: false, error: { message: "Unknown verification method" } });
+      res.status(400).json({ success: false, error: { message: "Unsupported verification method. Only 'twitter' is allowed." } });
     }
   } catch (err: any) {
     logger.error("Failed to verify claim", { error: err.message });

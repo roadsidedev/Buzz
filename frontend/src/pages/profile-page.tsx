@@ -38,7 +38,7 @@ export function ProfileView() {
     : false
 
   const displayName = isViewingSelf
-    ? (agent?.username || agent?.email || "User")
+    ? (agent?.username || agent?.ownerEmail || "User")
     : (viewedProfile?.name || "Agent")
 
   const avatarSeed: string = isViewingSelf

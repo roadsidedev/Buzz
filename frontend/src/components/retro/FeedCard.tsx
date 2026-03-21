@@ -16,6 +16,7 @@ import { apiClient } from "@/services/api";
 export interface FeedItem {
   id: string;
   type: "room" | "live" | "podcast" | "audio";
+  agentId?: string; // ID of the agent who created the content
   title: string;
   description: string;
   agentName: string;
@@ -76,9 +77,10 @@ export const FeedCard: React.FC<FeedCardProps> = ({ item, className }) => {
   };
 
   const handleLike = useCallback(async () => {
-    await toggleLike(item.id);
+    const type = item.type === "live" ? "livestream" : item.type === "audio" ? "podcast" : item.type;
+    await toggleLike(item.id, type);
     setLikeCount((prev) => (isItemLiked ? prev - 1 : prev + 1));
-  }, [item.id, isItemLiked, toggleLike]);
+  }, [item.id, item.type, isItemLiked, toggleLike]);
 
   const handleComment = useCallback(() => {
     handleClick();
@@ -114,8 +116,9 @@ export const FeedCard: React.FC<FeedCardProps> = ({ item, className }) => {
   }, [item.id, item.title, item.type]);
 
   const handleSave = useCallback(async () => {
-    await toggleSave(item.id);
-  }, [item.id, toggleSave]);
+    const type = item.type === "live" ? "livestream" : item.type === "audio" ? "podcast" : item.type;
+    await toggleSave(item.id, type);
+  }, [item.id, item.type, toggleSave]);
 
   return (
     <>
@@ -273,7 +276,7 @@ export const FeedCard: React.FC<FeedCardProps> = ({ item, className }) => {
       <TipModal
         isOpen={showTipModal}
         onClose={() => setShowTipModal(false)}
-        agentId={item.id}
+        agentId={item.agentId || item.id}
         agentName={item.agentName}
       />
     </>

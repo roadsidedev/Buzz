@@ -11,7 +11,7 @@
  */
 
 import { Router, Request, Response } from "express";
-import { asyncHandler, optionalAuth } from "../middleware/index.js";
+import { asyncHandler, optionalApiKey } from "../middleware/index.js";
 import { roomService, discoveryService } from "../services/index.js";
 import { logger } from "../utils/logger.js";
 import { pool } from "../config/database.js";
@@ -122,13 +122,13 @@ async function handleLiveRooms(req: Request, res: Response): Promise<void> {
  * GET /discover/live-now
  * Original route — live + pending rooms sorted by viewer count
  */
-router.get("/live-now", optionalAuth, asyncHandler(handleLiveRooms));
+router.get("/live-now", optionalApiKey, asyncHandler(handleLiveRooms));
 
 /**
  * GET /discover/live
  * Alias matching documented API in skill.md
  */
-router.get("/live", optionalAuth, asyncHandler(handleLiveRooms));
+router.get("/live", optionalApiKey, asyncHandler(handleLiveRooms));
 
 /**
  * GET /discover/upcoming
@@ -136,7 +136,7 @@ router.get("/live", optionalAuth, asyncHandler(handleLiveRooms));
  */
 router.get(
   "/upcoming",
-  optionalAuth,
+  optionalApiKey,
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const limit = Math.min(parseInt(req.query.limit as string) || 20, 100);
     const offset = parseInt(req.query.offset as string) || 0;
@@ -169,7 +169,7 @@ router.get(
  */
 router.get(
   "/trending",
-  optionalAuth,
+  optionalApiKey,
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const limit = Math.min(parseInt(req.query.limit as string) || 10, 50);
     const type = (req.query.type as string) || undefined;
@@ -224,7 +224,7 @@ router.get(
  */
 router.get(
   "/search",
-  optionalAuth,
+  optionalApiKey,
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const query = req.query.q as string;
     const limit = Math.min(parseInt(req.query.limit as string) || 20, 100);
@@ -267,7 +267,7 @@ router.get(
  */
 router.get(
   "/categories",
-  optionalAuth,
+  optionalApiKey,
   asyncHandler(async (_req: Request, res: Response): Promise<void> => {
     const categories = [
       { id: "debate", name: "Debate", description: "Structured debates with turn-taking and scoring", emoji: "⚔️" },
@@ -291,7 +291,7 @@ router.get(
  */
 router.get(
   "/episodes",
-  optionalAuth,
+  optionalApiKey,
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const sort = (req.query.sort as string) || "recent";
     const limit = Math.min(parseInt(req.query.limit as string) || 20, 50);
@@ -341,7 +341,7 @@ router.get(
  */
 router.get(
   "/by-type/:type",
-  optionalAuth,
+  optionalApiKey,
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const { type } = req.params;
     const limit = Math.min(parseInt(req.query.limit as string) || 20, 100);

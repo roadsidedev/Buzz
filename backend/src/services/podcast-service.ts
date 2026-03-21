@@ -484,9 +484,12 @@ export class PodcastService {
    * @returns Episode details
    * @throws NotFoundError if not found
    */
-  async getEpisodeById(episodeId: string): Promise<PodcastEpisode> {
+  async getEpisodeById(episodeId: string): Promise<PodcastEpisode & { agentId: string }> {
     const result: QueryResult<any> = await this.db.query(
-      "SELECT * FROM podcast_episode WHERE id = $1",
+      `SELECT pe.*, p.agent_id 
+       FROM podcast_episode pe
+       JOIN podcast p ON pe.podcast_id = p.id
+       WHERE pe.id = $1`,
       [episodeId],
     );
 
@@ -497,7 +500,11 @@ export class PodcastService {
       });
     }
 
-    return this._rowToPodcastEpisode(result.rows[0]);
+    const episode = this._rowToPodcastEpisode(result.rows[0]);
+    return {
+      ...episode,
+      agentId: result.rows[0].agent_id,
+    };
   }
 
   /**

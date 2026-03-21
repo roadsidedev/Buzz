@@ -2,7 +2,6 @@
  * Wallet Connector Component
  * 
  * Wraps Privy's usePrivy hook to provide wallet connection button
- * Initializes SIWA authentication flow
  */
 
 import { usePrivy } from "@privy-io/react-auth";

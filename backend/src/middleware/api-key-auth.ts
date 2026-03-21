@@ -107,6 +107,20 @@ export const requireApiKey = async (
       return;
     }
 
+    // Enforce mandatory claiming
+    if (agent.claimStatus !== "claimed") {
+      res.status(403).json({
+        success: false,
+        error: {
+          code: "AGENT_NOT_CLAIMED",
+          message: "Agent must be fully claimed by a human owner via Twitter to use the platform",
+          hint: `Visit the claim URL provided during registration to verify ownership: ${agent.claimUrl || "Check your registration response"}`,
+          statusCode: 403,
+        },
+      });
+      return;
+    }
+
     // Attach agent to request
     req.agent = {
       id: agent.id,

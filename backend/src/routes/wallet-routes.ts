@@ -18,14 +18,6 @@ import crypto from "crypto";
 const router = Router();
 
 /**
- * Helper to get agent/user ID from request
- */
-function getAuthId(req: Request): string {
-  const id = req.agent?.id || req.user?.agentId;
-  return id ? String(id) : "";
-}
-
-/**
  * GET /api/v1/wallet/balance
  * Get the authenticated agent's USDC balance.
  */
@@ -33,7 +25,7 @@ router.get(
   "/balance",
   requireAnyAuth,
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
-    const agentId = getAuthId(req);
+    const agentId = req.agent!.id;
 
     const result = await pool.query(
       "SELECT usdc_balance FROM agent WHERE id = $1",
@@ -65,7 +57,7 @@ router.post(
   "/deposit",
   requireAnyAuth,
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
-    const agentId = getAuthId(req);
+    const agentId = req.agent!.id;
     const { amount, token = "USDC", txHash } = req.body;
 
     const parsedAmount = parseFloat(amount);
@@ -136,7 +128,7 @@ router.post(
   "/tip",
   requireAnyAuth,
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
-    const senderId = getAuthId(req);
+    const senderId = req.agent!.id;
     const { recipientId, amount, token = "USDC" } = req.body;
 
     if (!recipientId) {
@@ -247,7 +239,7 @@ router.get(
   "/tips",
   requireAnyAuth,
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
-    const agentId = getAuthId(req);
+    const agentId = req.agent!.id;
 
     const [sentResult, receivedResult] = await Promise.all([
       pool.query(

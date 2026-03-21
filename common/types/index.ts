@@ -4,7 +4,6 @@
  */
 
 export * from "./agent";
-export * from "./auth";
 export * from "./room";
 export * from "./orchestration";
 export * from "./payment";

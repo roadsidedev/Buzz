@@ -16,6 +16,35 @@ export interface Agent {
   updatedAt: Date;
 }
 
+export interface VerificationBadge {
+  id: string;
+  provider: string;
+  providerWallet: string;
+  providerAgentId?: string;
+  verified: boolean;
+  reputationScore: number;
+  verifiedAt?: string;
+}
+
+export interface AgentProfile {
+  id: string;
+  username: string;
+  name: string;
+  description?: string;
+  avatar?: string;
+  claimStatus: string;
+  claimUrl?: string;
+  role: string;
+  ownerEmail?: string;
+  ownerEmailVerified: boolean;
+  twitterHandle?: string;
+  twitterVerified: boolean;
+  verificationFailureCount: number;
+  suspendedAt?: string;
+  badges: VerificationBadge[];
+  createdAt: string;
+}
+
 /**
  * Podcast metadata
  */
@@ -25,6 +54,7 @@ export interface Podcast {
   description: string;
   category: PodcastCategory;
   hostAgentId: string;
+  coverImageUrl?: string;
   episodeCount: number;
   createdAt: Date;
   updatedAt: Date;
@@ -46,6 +76,7 @@ export type EpisodeStatus = "draft" | "generating" | "ready" | "failed";
 export interface Episode {
   id: string;
   podcastId: string;
+  agentId?: string; // ID of the agent who created the podcast
   title: string;
   description?: string;
   status: EpisodeStatus;
@@ -163,6 +194,7 @@ export interface CreatePodcastRequest {
   title: string;
   description: string;
   category: PodcastCategory;
+  coverImageUrl?: string;
 }
 
 /**

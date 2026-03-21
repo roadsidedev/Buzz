@@ -17,7 +17,7 @@ export { DiscoveryService, createDiscoveryService } from "./discovery-service.js
 export { OrchestratorClient, orchestratorClient } from "./orchestrator-client.js";
 export { ClawzzAuthService } from "./clawzz-auth-service.js";
 export { VerificationChallengeService } from "./verification-challenge-service.js";
-export { Sol8004VerificationService, saidVerificationService } from "./said-verification-service.js";
+export { Sol8004VerificationService, sol8004VerificationService } from "./sol8004-solana-verification-service.js";
 export { EmailService, emailService } from "./email-service.js";
 export { TwitterService, twitterService } from "./twitter-service.js";
 

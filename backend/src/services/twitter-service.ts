@@ -36,8 +36,8 @@ export class TwitterService {
     const cleanHandle = handle.startsWith("@") ? handle.slice(1) : handle;
 
     if (!this.isConfigured || !this.client) {
-      logger.warn("TwitterService not fully configured! Bypassing actual tweet lookup and returning SUCCESS for testing purposes.", { handle: cleanHandle, code });
-      return true;
+      logger.error("TwitterService not configured: missing TWITTER_BEARER_TOKEN");
+      throw new Error("Twitter verification is currently unavailable (system configuration error). Please contact support.");
     }
 
     try {

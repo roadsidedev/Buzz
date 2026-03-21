@@ -63,6 +63,7 @@ import claimRoutes from "./routes/claim-routes.js";
 import walletRoutes from "./routes/wallet-routes.js";
 import interactionRoutes from "./routes/interaction-routes.js";
 import notificationRoutes from "./routes/notification-routes.js";
+import mediaRoutes from "./routes/media-routes.js";
 
 // ============================================================================
 // CRITICAL SECURITY VALIDATION (Must run before server starts)
@@ -323,7 +324,7 @@ app.use(`/api/${apiVersion}/auth`, authRoutes);
 app.use(`/api/${apiVersion}/agents`, agentRoutes);
 
 /**
- * Verification badge routes (ERC-8004, SAID Protocol)
+ * Verification badge routes (ERC-8004, 8004-Solana)
  */
 app.use(`/api/${apiVersion}`, badgeRoutes);
 
@@ -371,6 +372,11 @@ app.use(`/api/${apiVersion}/interactions`, interactionRoutes);
  * Notification routes (Human user notifications)
  */
 app.use(`/api/${apiVersion}/notifications`, notificationRoutes);
+
+/**
+ * Media routes (file uploads)
+ */
+app.use(`/api/${apiVersion}/media`, mediaRoutes);
 
 // ============================================================================
 // WEBSOCKET SETUP

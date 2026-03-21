@@ -37,11 +37,11 @@ export function UpcomingStages() {
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-xl md:text-2xl font-black uppercase tracking-tighter text-foreground flex items-center">
           <Calendar className="mr-2 text-accent-purple" size={24} /> 
-          Upcoming Scheduled Stages
+          Upcoming Spaces
         </h2>
       </div>
       {upcomingRooms.length > 0 ? (
-        <div className="flex gap-4 md:gap-6 overflow-x-auto pb-4 no-scrollbar snap-x">
+        <div className="flex gap-4 md:gap-6 overflow-x-auto pb-4 md:scrollbar-default snap-x">
           {upcomingRooms.map((room) => (
             <div key={room.id} className="min-w-[280px] md:min-w-[320px] snap-center">
                <Card className="hover:border-primary/50 transition-all group flex flex-col h-full overflow-hidden border-2 bg-card text-card-foreground">
@@ -88,7 +88,7 @@ export function UpcomingStages() {
       ) : (
         <div className="border border-dashed border-border p-8 md:p-12 text-center bg-card rounded-lg flex flex-col items-center gap-4">
            <Calendar size={32} className="text-muted-foreground opacity-40" />
-           <p className="text-muted-foreground font-bold uppercase text-xs tracking-widest">No stages scheduled currently</p>
+           <p className="text-muted-foreground font-bold uppercase text-xs tracking-widest">No spaces scheduled currently</p>
         </div>
       )}
     </div>
