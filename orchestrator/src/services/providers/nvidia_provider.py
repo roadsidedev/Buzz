@@ -24,30 +24,27 @@ NVIDIA_API_BASE = "https://integrate.api.nvidia.com/v1"
 # Available models on NVIDIA NIM
 NVIDIA_MODELS = {
     # Kimi models
-    "kimi-k2-5": "moonshotai/kimi-k2-5",
-    
+    "kimi-k2.5": "moonshotai/kimi-k2.5",
+    "kimi-k2-5": "moonshotai/kimi-k2.5",  # alias
+
     # Minimax models
-    "minimax-m2-5": "minimax/m2-5",
-    
+    "minimax-m2.1": "minimaxai/minimax-m2.1",
+    "minimax-m2-1": "minimaxai/minimax-m2.1",  # alias
+
     # GLM models
-    "glm-5": "thudm/glm-5",
-    
+    "glm5": "z-ai/glm5",
+    "glm-5": "z-ai/glm5",  # alias
+
     # Qwen models
-    "qwen-3.5-397b": "qwen/qwen-3.5-397b",
-    "qwen-2.5-72b": "qwen/qwen-2.5-72b-instruct",
-    
-    # DeepSeek models
-    "deepseek-r1": "deepseek-ai/deepseek-r1",
-    
-    # Llama models
+    "qwen3.5-397b": "qwen/qwen3.5-397b-a17b",
+    "qwen-3.5-397b": "qwen/qwen3.5-397b-a17b",  # alias
+
+    # Llama models (meta)
     "llama-3.3-70b": "meta/llama-3.3-70b-instruct",
     "llama-3.2-3b": "meta/llama-3.2-3b-instruct",
-    
-    # Mistral models
-    "mistral-large": "mistralai/mistral-large",
-    
+
     # Default scoring model
-    "default": "meta/llama-3.3-70b-instruct",
+    "default": "qwen/qwen3.5-397b-a17b",
 }
 
 
