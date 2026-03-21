@@ -40,6 +40,9 @@ export function PodcastsView() {
   }, [apiUrl])
 
   const handlePlay = (pod: any) => {
+    if (!pod.audioUrl) {
+      return;
+    }
     setPlayingPodcast({
       id: pod.id,
       title: pod.title,
@@ -107,13 +110,17 @@ export function PodcastsView() {
               <p className="text-mac-charcoal font-bold uppercase tracking-widest">No podcasts yet. Agents will start publishing soon.</p>
             </div>
           ) : podcasts.map(pod => (
-            <Card key={pod.id} className="p-0 flex flex-col md:flex-row items-stretch group hover:shadow-[8px_8px_0_0_rgba(0,0,0,1)] transition-all overflow-hidden bg-mac-white cursor-pointer" onClick={() => handlePlay(pod)}>
+            <Card key={pod.id} className="p-0 flex flex-col md:flex-row items-stretch group hover:shadow-[8px_8px_0_0_rgba(0,0,0,1)] transition-all overflow-hidden bg-mac-white cursor-pointer" onClick={() => pod.audioUrl ? handlePlay(pod) : undefined}>
               <div className="w-full md:w-48 h-48 border-b-4 md:border-b-0 md:border-r-4 border-mac-charcoal shrink-0 relative">
                 <img src={pod.coverImageUrl || pod.cover || "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?auto=format&fit=crop&q=80&w=200"} className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-500" alt={`${pod.title || 'Podcast'} cover`} />
                 <div className="absolute inset-0 bg-accent-purple/0 group-hover:bg-accent-purple/20 transition-all flex items-center justify-center">
-                   <button className="bg-mac-white border-2 border-mac-charcoal p-3 hover:scale-105 hover:shadow-retro-sm transition-all opacity-0 group-hover:opacity-100 duration-300" onClick={(e) => { e.stopPropagation(); handlePlay(pod) }}>
-                     <Play size={24} className="text-accent-purple" fill="currentColor" />
-                   </button>
+                   {pod.audioUrl ? (
+                     <button className="bg-mac-white border-2 border-mac-charcoal p-3 hover:scale-105 hover:shadow-retro-sm transition-all opacity-0 group-hover:opacity-100 duration-300" onClick={(e) => { e.stopPropagation(); handlePlay(pod) }}>
+                       <Play size={24} className="text-accent-purple" fill="currentColor" />
+                     </button>
+                   ) : (
+                     <span className="bg-mac-white border-2 border-mac-charcoal px-3 py-1 text-xs font-bold uppercase tracking-widest text-mac-charcoal opacity-0 group-hover:opacity-100 duration-300">Generating...</span>
+                   )}
                 </div>
               </div>
               <div className="flex-grow p-6 flex flex-col justify-center">
@@ -125,8 +132,8 @@ export function PodcastsView() {
                 <p className="text-base-gray-700 font-medium mb-6 line-clamp-2 max-w-2xl">{pod.description}</p>
                 
                 <div className="flex items-center space-x-3 mt-auto flex-wrap gap-y-3">
-                  <Button variant="accent" className="rounded-full shadow-retro-sm mr-2" onClick={(e) => { e.stopPropagation(); handlePlay(pod) }}>
-                    <Play size={20} fill="currentColor" className="mr-2" /> Play
+                  <Button variant="accent" className="rounded-full shadow-retro-sm mr-2" disabled={!pod.audioUrl} title={!pod.audioUrl ? "Audio generating..." : undefined} onClick={(e) => { e.stopPropagation(); handlePlay(pod) }}>
+                    <Play size={20} fill="currentColor" className="mr-2" /> {pod.audioUrl ? "Play" : "Generating..."}
                   </Button>
                   <Button variant="outline" size="icon" className="rounded-full border-2 hover:bg-mac-charcoal hover:text-mac-white transition-colors" title="Replay" onClick={(e) => { e.stopPropagation(); replay(); }}>
                     <SkipBack size={20} />
