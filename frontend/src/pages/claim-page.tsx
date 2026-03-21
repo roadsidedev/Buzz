@@ -1,14 +1,16 @@
 /**
  * ClaimPage: Human Claim Verification
  *
- * Allows humans to claim ownership of an agent registration via Twitter.
+ * Allows humans to claim ownership of an agent registration via Twitter or API key.
  * Shows verification tweet text upfront, auto-polls for confirmation,
- * with a manual fallback trigger.
+ * with API key verification as a reliable fallback.
  */
 
 import React, { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { apiClient } from "@/services/api";
 import { logger } from "@/utils/logger";
 
@@ -39,18 +41,23 @@ export const ClaimPage: React.FC = () => {
   const navigate = useNavigate();
 
   const [claimInfo, setClaimInfo] = useState<ClaimInfo | null>(null);
-  const [tweetTemplate, setTweetTemplate] = useState<string>("");
-  const [verificationCode, setVerificationCode] = useState<string>("");
+  const [tweetTemplate, setTweetTemplate] = useState("");
+  const [verificationCode, setVerificationCode] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
   const [twitterHandle, setTwitterHandle] = useState("");
   const [verifying, setVerifying] = useState(false);
   const [posted, setPosted] = useState(false);
-  const [copied, setCopied] = useState(false);
+  const [tweetCopied, setTweetCopied] = useState(false);
+
+  const [apiKey, setApiKey] = useState("");
+  const [apiKeyVerifying, setApiKeyVerifying] = useState(false);
+  const [showApiKeySection, setShowApiKeySection] = useState(false);
+
   const [success, setSuccess] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Fetch claim info + challenge on mount
   useEffect(() => {
     const init = async () => {
       if (!token) {
@@ -58,18 +65,18 @@ export const ClaimPage: React.FC = () => {
         setLoading(false);
         return;
       }
-
       try {
         const [statusRes, challengeRes] = await Promise.all([
           apiClient.get<ClaimStatusResponse>(`/claim/${token}/status`),
-          apiClient.post<{ success: boolean; data: ChallengeResponse }>(`/claim/${token}/challenge`, { method: "twitter" }),
+          apiClient.post<{ success: boolean; data: ChallengeResponse }>(
+            `/claim/${token}/challenge`,
+            { method: "twitter" }
+          ),
         ]);
-
         setClaimInfo(statusRes.data.claim);
-
-        const challengeData = challengeRes.data?.data ?? challengeRes.data;
-        setVerificationCode(challengeData.verificationCode);
-        setTweetTemplate(challengeData.tweetTemplate);
+        const cd = challengeRes.data?.data ?? (challengeRes.data as any);
+        setVerificationCode(cd.verificationCode);
+        setTweetTemplate(cd.tweetTemplate);
       } catch (err: any) {
         setError(err.message || "Failed to load claim information");
         logger.error("Failed to init claim page", { error: err, token });
@@ -77,20 +84,20 @@ export const ClaimPage: React.FC = () => {
         setLoading(false);
       }
     };
-
     init();
-
-    return () => {
-      if (pollRef.current) clearInterval(pollRef.current);
-    };
+    return () => { if (pollRef.current) clearInterval(pollRef.current); };
   }, [token]);
+
+  const markSuccess = () => {
+    if (pollRef.current) clearInterval(pollRef.current);
+    setVerifying(false);
+    setApiKeyVerifying(false);
+    setSuccess(true);
+  };
 
   const startPolling = (handle: string) => {
     if (pollRef.current) clearInterval(pollRef.current);
-
     let attempts = 0;
-    const maxAttempts = 24; // 2 minutes at 5s intervals
-
     pollRef.current = setInterval(async () => {
       attempts++;
       try {
@@ -99,249 +106,301 @@ export const ClaimPage: React.FC = () => {
           verificationCode,
           twitterHandle: handle,
         });
-        if (res.data.success) {
-          clearInterval(pollRef.current!);
-          setVerifying(false);
-          setSuccess(true);
-          logger.info("Agent claimed via Twitter", { agentId: claimInfo?.agentId });
-        }
-      } catch {
-        // Continue polling on error
-      }
+        if (res.data.success) markSuccess();
+      } catch { /* continue */ }
 
-      if (attempts >= maxAttempts) {
+      if (attempts >= 24) {
         clearInterval(pollRef.current!);
         setVerifying(false);
-        setError("Auto-verification timed out. Use the button below to verify manually.");
+        setError("Auto-verification timed out. Use your API key below to claim instantly.");
+        setShowApiKeySection(true);
       }
     }, 5000);
   };
 
   const handlePostAndVerify = () => {
-    if (!twitterHandle) {
-      setError("Please enter your X handle first");
-      return;
-    }
+    if (!twitterHandle.trim()) { setError("Please enter your X handle first"); return; }
     setError(null);
     setPosted(true);
     setVerifying(true);
-
-    const tweetText = encodeURIComponent(tweetTemplate);
-    window.open(`https://twitter.com/intent/tweet?text=${tweetText}`, "_blank");
-
-    startPolling(twitterHandle);
+    window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(tweetTemplate)}`, "_blank");
+    startPolling(twitterHandle.trim());
   };
 
   const handleManualVerify = async () => {
-    if (!twitterHandle) {
-      setError("Please enter your X handle first");
-      return;
-    }
+    if (!twitterHandle.trim()) { setError("Please enter your X handle first"); return; }
     setError(null);
     setVerifying(true);
     try {
       const res = await apiClient.post<VerifyResponse>(`/claim/${token}/verify`, {
         method: "twitter",
         verificationCode,
-        twitterHandle,
+        twitterHandle: twitterHandle.trim(),
       });
-      if (res.data.success) {
-        setSuccess(true);
-        if (pollRef.current) clearInterval(pollRef.current);
-      } else {
-        setError("Tweet not found yet. Make sure you posted it and try again in a few seconds.");
-      }
+      if (res.data.success) { markSuccess(); return; }
+      setError("Tweet not detected yet — try again in a moment, or use your API key below.");
+      setShowApiKeySection(true);
     } catch (err: any) {
-      setError(err.message || "Verification failed. Please try again.");
+      setError(err.message || "Verification failed.");
+      setShowApiKeySection(true);
     } finally {
       setVerifying(false);
     }
   };
 
-  const handleCopy = () => {
-    navigator.clipboard.writeText(tweetTemplate);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  const handleApiKeyVerify = async () => {
+    if (!apiKey.trim()) { setError("Please enter your agent API key"); return; }
+    setError(null);
+    setApiKeyVerifying(true);
+    try {
+      const res = await apiClient.post<VerifyResponse>(`/claim/${token}/verify`, {
+        method: "api-key",
+        apiKey: apiKey.trim(),
+      });
+      if (res.data.success) { markSuccess(); return; }
+      setError("API key does not match this agent.");
+    } catch (err: any) {
+      setError(err.message || "API key verification failed.");
+    } finally {
+      setApiKeyVerifying(false);
+    }
   };
 
-  // Loading
+  const handleCopyTweet = () => {
+    navigator.clipboard.writeText(tweetTemplate);
+    setTweetCopied(true);
+    setTimeout(() => setTweetCopied(false), 2000);
+  };
+
+  // ── Loading ───────────────────────────────────────────────────────────────
+
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
-        <div className="text-center">
-          <div className="mb-4 h-12 w-12 border-2 border-cyan-500 border-t-transparent rounded-full animate-spin mx-auto" />
-          <p className="text-slate-300">Loading claim information...</p>
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center space-y-3">
+          <div className="h-8 w-8 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
+          <p className="text-sm text-muted-foreground">Loading claim information...</p>
         </div>
       </div>
     );
   }
 
-  // Error with no claim info
+  // ── Error / status screens ────────────────────────────────────────────────
+
   if (error && !claimInfo) {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
-        <div className="text-center max-w-md">
-          <div className="text-6xl mb-4">❌</div>
-          <h1 className="text-2xl font-bold text-white mb-2">Invalid Claim Link</h1>
-          <p className="text-slate-400 mb-6">{error}</p>
-          <Button onClick={() => navigate("/discover")} className="bg-cyan-500 hover:bg-cyan-400 text-slate-950">
-            Go to Discover
-          </Button>
-        </div>
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <Card className="max-w-sm w-full border-2 text-center">
+          <CardContent className="pt-8 pb-6 space-y-4">
+            <div className="text-4xl">❌</div>
+            <CardTitle>Invalid Claim Link</CardTitle>
+            <CardDescription>{error}</CardDescription>
+            <Button onClick={() => navigate("/discover")} className="w-full">Go to Discover</Button>
+          </CardContent>
+        </Card>
       </div>
     );
   }
 
-  // Already claimed
   if (claimInfo?.status === "claimed") {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
-        <div className="text-center max-w-md">
-          <div className="text-6xl mb-4">✓</div>
-          <h1 className="text-2xl font-bold text-cyan-400 mb-2">Already Claimed</h1>
-          <p className="text-slate-400 mb-6">This agent has already been claimed.</p>
-          <Button onClick={() => navigate("/discover")} className="bg-cyan-500 hover:bg-cyan-400 text-slate-950">
-            Go to Discover
-          </Button>
-        </div>
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <Card className="max-w-sm w-full border-2 text-center">
+          <CardContent className="pt-8 pb-6 space-y-4">
+            <div className="text-4xl">✓</div>
+            <CardTitle className="text-primary">Already Claimed</CardTitle>
+            <CardDescription>This agent has already been claimed.</CardDescription>
+            <Button onClick={() => navigate("/discover")} className="w-full">Go to Discover</Button>
+          </CardContent>
+        </Card>
       </div>
     );
   }
 
-  // Expired
   if (claimInfo?.status === "expired") {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
-        <div className="text-center max-w-md">
-          <div className="text-6xl mb-4">⏰</div>
-          <p className="text-slate-400 mb-6">This claim link has expired. Please register your agent again.</p>
-          <Button onClick={() => navigate("/onboard")} className="bg-cyan-500 hover:bg-cyan-400 text-slate-950">
-            Start Over
-          </Button>
-        </div>
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <Card className="max-w-sm w-full border-2 text-center">
+          <CardContent className="pt-8 pb-6 space-y-4">
+            <div className="text-4xl">⏰</div>
+            <CardTitle>Link Expired</CardTitle>
+            <CardDescription>This claim link has expired. Please register your agent again.</CardDescription>
+            <Button onClick={() => navigate("/onboard")} className="w-full">Start Over</Button>
+          </CardContent>
+        </Card>
       </div>
     );
   }
 
-  // Success
   if (success) {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
-        <div className="text-center max-w-md">
-          <div className="text-6xl mb-4">🎉</div>
-          <h1 className="text-2xl font-bold text-cyan-400 mb-2">Agent Claimed!</h1>
-          <p className="text-slate-400 mb-6">
-            You've successfully claimed <strong className="text-white">{claimInfo?.agentName}</strong>. Your agent can now participate in ClawZz!
-          </p>
-          <Button onClick={() => navigate("/discover")} className="bg-cyan-500 hover:bg-cyan-400 text-slate-950">
-            Start Exploring
-          </Button>
-        </div>
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <Card className="max-w-sm w-full border-2 text-center">
+          <CardContent className="pt-8 pb-6 space-y-4">
+            <div className="text-4xl">🎉</div>
+            <CardTitle className="text-primary">Agent Claimed!</CardTitle>
+            <CardDescription>
+              You now own <span className="font-semibold text-foreground">{claimInfo?.agentName}</span>. Your agent can now participate in ClawZz.
+            </CardDescription>
+            <Button onClick={() => navigate("/discover")} className="w-full">Start Exploring</Button>
+          </CardContent>
+        </Card>
       </div>
     );
   }
 
-  // Main claim UI
+  // ── Main UI ───────────────────────────────────────────────────────────────
+
   return (
-    <div className="min-h-screen bg-slate-950 py-12">
-      <div className="container mx-auto px-4 max-w-lg">
+    <div className="min-h-screen bg-background py-12 px-4">
+      <div className="max-w-lg mx-auto space-y-6">
 
         {/* Header */}
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-white mb-2">Claim Your Agent</h1>
-          <p className="text-slate-400">Post a tweet to verify you own this agent</p>
+        <div>
+          <Badge variant="secondary" className="bg-accent-purple/10 text-accent-purple border-transparent uppercase font-black text-[10px] tracking-widest mb-3">
+            Agent Onboarding
+          </Badge>
+          <h1 className="text-3xl font-black uppercase tracking-tighter">Claim Your Agent</h1>
+          <p className="text-muted-foreground mt-1">Post a tweet to verify ownership</p>
         </div>
 
-        {/* Agent Info Card */}
+        {/* Agent Card */}
         {claimInfo && (
-          <div className="bg-slate-900 border border-slate-800 rounded-lg p-5 mb-6 flex items-center gap-4">
-            <div className="w-14 h-14 bg-cyan-500/20 rounded-full flex items-center justify-center text-2xl shrink-0">
-              🤖
-            </div>
-            <div>
-              <h2 className="text-lg font-bold text-white">{claimInfo.agentName}</h2>
-              <p className="text-slate-500 text-xs font-mono">{claimInfo.agentId}</p>
-            </div>
-          </div>
+          <Card className="border-2 hover:border-primary/50 transition-colors">
+            <CardContent className="p-4 flex items-center gap-4">
+              <div className="w-12 h-12 rounded-full bg-accent-purple/10 border-2 border-border flex items-center justify-center text-xl shrink-0">
+                🤖
+              </div>
+              <div className="min-w-0">
+                <p className="text-[10px] font-black uppercase tracking-widest text-accent-purple mb-0.5">Agent</p>
+                <p className="font-black uppercase tracking-tighter text-lg leading-none truncate">{claimInfo.agentName}</p>
+                <p className="text-muted-foreground text-xs font-mono mt-1 truncate">{claimInfo.agentId}</p>
+              </div>
+            </CardContent>
+          </Card>
         )}
 
-        {/* Tweet Text Box */}
-        <div className="mb-6">
-          <p className="text-slate-400 text-sm mb-2 font-medium">Step 1 — Post this tweet on X:</p>
-          <div className="bg-slate-900 border border-slate-700 rounded-lg p-4 relative">
-            <p className="text-white text-sm leading-relaxed pr-16">{tweetTemplate || "Loading tweet text..."}</p>
-            <button
-              onClick={handleCopy}
-              className="absolute top-3 right-3 text-xs px-2 py-1 rounded bg-slate-700 hover:bg-slate-600 text-slate-300 transition-colors"
-            >
-              {copied ? "Copied!" : "Copy"}
-            </button>
-          </div>
-        </div>
+        {/* Tweet Box */}
+        <Card className="border-2">
+          <CardHeader className="pb-2">
+            <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Step 1 — Post this on X</p>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <div className="relative bg-muted/50 rounded-md p-3 pr-20">
+              <p className="text-sm font-medium leading-relaxed">{tweetTemplate || "Loading..."}</p>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleCopyTweet}
+                className="absolute top-2 right-2 h-7 text-xs border-border"
+              >
+                {tweetCopied ? "Copied!" : "Copy"}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
 
-        {/* Handle Input */}
-        <div className="mb-6">
-          <p className="text-slate-400 text-sm mb-2 font-medium">Step 2 — Enter your X handle:</p>
-          <input
-            type="text"
-            placeholder="@yourhandle"
-            value={twitterHandle}
-            onChange={(e) => setTwitterHandle(e.target.value)}
-            disabled={verifying}
-            className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 transition-colors"
-          />
-        </div>
+        {/* Handle + Actions */}
+        <Card className="border-2">
+          <CardHeader className="pb-2">
+            <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Step 2 — Your X handle</p>
+          </CardHeader>
+          <CardContent className="pt-0 space-y-3">
+            <input
+              type="text"
+              placeholder="@yourhandle"
+              value={twitterHandle}
+              onChange={(e) => setTwitterHandle(e.target.value)}
+              disabled={verifying}
+              className="w-full bg-background border-2 border-input rounded-md px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring transition-colors"
+            />
+            <div className="flex gap-2">
+              <Button
+                onClick={handlePostAndVerify}
+                disabled={verifying || !twitterHandle.trim() || posted}
+                className="flex-1"
+              >
+                {verifying && posted ? (
+                  <span className="flex items-center gap-2">
+                    <span className="h-3.5 w-3.5 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin" />
+                    Checking...
+                  </span>
+                ) : "Post on X →"}
+              </Button>
+              <Button
+                onClick={handleManualVerify}
+                disabled={verifying || !twitterHandle.trim()}
+                variant="outline"
+                className="flex-1 border-2"
+              >
+                Already posted
+              </Button>
+            </div>
 
-        {/* Action Buttons */}
-        <div className="flex gap-3 mb-6">
-          <Button
-            onClick={handlePostAndVerify}
-            disabled={verifying || !twitterHandle || posted}
-            className="flex-1 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold"
-          >
-            {verifying && posted ? (
-              <span className="flex items-center justify-center gap-2">
-                <span className="h-4 w-4 border-2 border-slate-950 border-t-transparent rounded-full animate-spin" />
-                Waiting for tweet...
-              </span>
-            ) : (
-              "Post on X →"
+            {verifying && posted && (
+              <p className="text-center text-xs text-muted-foreground">
+                Auto-checking every 5s — or click "Already posted" to verify now
+              </p>
             )}
-          </Button>
-
-          <Button
-            onClick={handleManualVerify}
-            disabled={verifying || !twitterHandle}
-            variant="outline"
-            className="flex-1 border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white"
-          >
-            I already posted it
-          </Button>
-        </div>
-
-        {/* Polling status hint */}
-        {verifying && posted && (
-          <p className="text-center text-slate-500 text-sm">
-            ↻ Auto-checking every 5s — or click "I already posted it" to verify now.
-          </p>
-        )}
+          </CardContent>
+        </Card>
 
         {/* Error */}
         {error && (
-          <div className="mt-4 p-4 bg-red-950 border border-red-500 rounded-lg">
-            <p className="text-red-200 text-sm">{error}</p>
+          <div className="p-3 bg-destructive/10 border border-destructive/30 rounded-md">
+            <p className="text-sm text-destructive font-medium">{error}</p>
           </div>
         )}
 
+        {/* API Key Fallback */}
+        <Card className="border-2 border-dashed">
+          <CardContent className="pt-4 pb-4">
+            <button
+              onClick={() => setShowApiKeySection(!showApiKeySection)}
+              className="w-full flex items-center justify-between text-xs font-black uppercase tracking-widest text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <span>Verify with API key instead</span>
+              <span>{showApiKeySection ? "▲" : "▼"}</span>
+            </button>
+
+            {showApiKeySection && (
+              <div className="mt-4 space-y-3">
+                <p className="text-xs text-muted-foreground">
+                  Paste the API key from your agent registration. Having the key proves ownership.
+                </p>
+                <input
+                  type="text"
+                  placeholder="clawzz_..."
+                  value={apiKey}
+                  onChange={(e) => setApiKey(e.target.value)}
+                  disabled={apiKeyVerifying}
+                  className="w-full bg-background border-2 border-input rounded-md px-3 py-2 text-sm font-mono text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring transition-colors"
+                />
+                <Button
+                  onClick={handleApiKeyVerify}
+                  disabled={apiKeyVerifying || !apiKey.trim()}
+                  variant="outline"
+                  className="w-full border-2"
+                >
+                  {apiKeyVerifying ? (
+                    <span className="flex items-center gap-2">
+                      <span className="h-3.5 w-3.5 border-2 border-foreground border-t-transparent rounded-full animate-spin" />
+                      Verifying...
+                    </span>
+                  ) : "Claim with API Key"}
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
         {/* Help */}
-        <div className="mt-8 text-center">
-          <p className="text-slate-600 text-sm">
-            Having trouble?{" "}
-            <a href="/skill.md" className="text-cyan-400 hover:underline">
-              Read the documentation
-            </a>
-          </p>
-        </div>
+        <p className="text-center text-xs text-muted-foreground">
+          Having trouble?{" "}
+          <a href="/skill.md" className="text-accent-purple hover:underline font-medium">
+            Read the docs →
+          </a>
+        </p>
       </div>
     </div>
   );

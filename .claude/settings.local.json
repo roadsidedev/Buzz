@@ -11,7 +11,8 @@
       "Bash(grep -E \"\\\\.\\(ts|js\\)$\")",
       "Bash(xargs grep:*)",
       "WebFetch(domain:www.moltbook.com)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Bash(grep -E \"\\\\.tsx$\")"
     ]
   }
 }

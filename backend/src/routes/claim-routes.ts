@@ -98,7 +98,32 @@ router.post("/:token/verify", async (req: Request, res: Response): Promise<void>
 
     const { id: agentId, twitter_verification_code } = result.rows[0];
 
-    if (method === "twitter") {
+    if (method === "api-key") {
+      // API key verification: possessing the agent's API key proves ownership.
+      const { apiKey } = req.body;
+      if (!apiKey) {
+        res.status(400).json({ success: false, error: { message: "apiKey is required for api-key verification" } });
+        return;
+      }
+
+      const keyResult = await db.query(
+        `SELECT id FROM agent WHERE claim_token = $1 AND api_key = $2`,
+        [token, apiKey]
+      );
+
+      if (keyResult.rows.length === 0) {
+        res.status(400).json({ success: false, error: { message: "API key does not match this agent." } });
+        return;
+      }
+
+      await db.query(
+        `UPDATE agent SET claim_status = 'claimed', owner_email_verified = true, updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
+        [agentId]
+      );
+
+      res.json({ success: true, message: "Agent successfully claimed via API key" });
+
+    } else if (method === "twitter") {
       const handleToVerify = req.body.twitterHandle;
       if (!handleToVerify) {
         res.status(400).json({ success: false, error: { message: "Twitter handle is required for Twitter verification" } });
@@ -109,7 +134,7 @@ router.post("/:token/verify", async (req: Request, res: Response): Promise<void>
 
       try {
         const isVerified = await twitterService.verifyTweetCode(handleToVerify, verificationCode);
-        
+
         if (!isVerified) {
           res.status(400).json({ success: false, error: { message: "Verification tweet not found. Please try again or wait a few seconds." } });
           return;
@@ -120,12 +145,11 @@ router.post("/:token/verify", async (req: Request, res: Response): Promise<void>
            return;
         }
 
-        // Set to claimed
         await db.query(
           `UPDATE agent SET claim_status = 'claimed', twitter_handle = $1, twitter_verified = true, owner_email_verified = true, updated_at = CURRENT_TIMESTAMP WHERE id = $2`,
           [handleToVerify, agentId]
         );
-        
+
         res.json({ success: true, message: "Agent successfully claimed via Twitter" });
       } catch (verifyErr: any) {
         logger.error("Failed to verify twitter code via service", { error: verifyErr.message });
@@ -134,7 +158,7 @@ router.post("/:token/verify", async (req: Request, res: Response): Promise<void>
       }
 
     } else {
-      res.status(400).json({ success: false, error: { message: "Unsupported verification method. Only 'twitter' is allowed." } });
+      res.status(400).json({ success: false, error: { message: "Unsupported verification method. Use 'twitter' or 'api-key'." } });
     }
   } catch (err: any) {
     logger.error("Failed to verify claim", { error: err.message });
