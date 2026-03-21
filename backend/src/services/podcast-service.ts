@@ -630,10 +630,13 @@ export class PodcastService {
       }
     }
 
-    // Update episode status to 'generating' after orchestrator + payment succeed
+    // Update episode status to 'generating' after orchestrator + payment succeed.
+    // Also persist the script returned by the orchestrator so finalize doesn't
+    // depend on Redis cache being available.
+    const script = orchestratorResult?.script || null;
     const updateResult: QueryResult<any> = await this.db.query(
-      `UPDATE podcast_episode SET status = $1, updated_at = $2 WHERE id = $3 RETURNING *;`,
-      ["generating", new Date(), episodeId],
+      `UPDATE podcast_episode SET status = $1, transcript = COALESCE($2, transcript), updated_at = $3 WHERE id = $4 RETURNING *;`,
+      ["generating", script, new Date(), episodeId],
     );
 
     const updatedEpisode = this._rowToPodcastEpisode(updateResult.rows[0]);
@@ -1139,13 +1142,22 @@ export class PodcastService {
         previousStatus: episode.status,
       });
 
-      await this.orchestrator.generatePodcastEpisode({
+      const retryResult = await this.orchestrator.generatePodcastEpisode({
         podcastId: episode.podcastId,
         episodeId,
         title: episode.title,
         sourceUrls: [],
         voicePreferences: {},
       });
+
+      // Persist the script immediately so finalize doesn't rely on Redis cache
+      const retryScript = retryResult?.script || null;
+      if (retryScript) {
+        await this.db.query(
+          `UPDATE podcast_episode SET transcript = $1, updated_at = $2 WHERE id = $3`,
+          [retryScript, new Date(), episodeId],
+        );
+      }
 
       // Orchestrator accepted — move to 'generating'
       const updated = await this.updateEpisodeStatus(episodeId, "generating");
@@ -1217,20 +1229,21 @@ export class PodcastService {
   async finalizeEpisode(episodeId: string): Promise<PodcastEpisode> {
     const episode = await this.getEpisodeById(episodeId);
 
-    // 1. Fetch cached script from orchestrator
-    let transcript: string | undefined;
+    // 1. Get transcript — prefer orchestrator Redis cache, fall back to DB column
+    //    (DB column is populated during generateEpisode/retryEpisodeGeneration).
+    let transcript: string | undefined = episode.transcript ?? undefined;
     let durationSeconds: number | undefined;
     let audioUrl: string | undefined;
 
     try {
       const orchestratorStatus = await this.orchestrator.getPodcastEpisodeStatus(episodeId);
-      transcript = orchestratorStatus.transcript ?? undefined;
+      if (orchestratorStatus.transcript) transcript = orchestratorStatus.transcript;
       durationSeconds = orchestratorStatus.durationSeconds ?? undefined;
-      // If the orchestrator already has an audio URL, reuse it
       audioUrl = orchestratorStatus.audioUrl ?? undefined;
     } catch (err) {
-      logger.warn("finalizeEpisode: could not fetch orchestrator status", {
+      logger.warn("finalizeEpisode: orchestrator cache unavailable, using DB transcript", {
         episodeId,
+        hasDbTranscript: !!transcript,
         error: err instanceof Error ? err.message : String(err),
       });
     }
