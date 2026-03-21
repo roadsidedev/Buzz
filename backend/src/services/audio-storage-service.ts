@@ -42,17 +42,17 @@ function loadConfig(): StorageConfig | null {
   const bucket = process.env.AUDIO_STORAGE_BUCKET || process.env.R2_BUCKET_NAME;
   const accessKey = process.env.AUDIO_STORAGE_ACCESS_KEY || process.env.R2_ACCESS_ID;
   const secretKey = process.env.AUDIO_STORAGE_SECRET_KEY || process.env.R2_SECRET_ACCESS_KEY;
-  const publicBaseUrl = process.env.AUDIO_STORAGE_PUBLIC_URL || process.env.R2_PUBLIC_URL;
   const endpoint = process.env.AUDIO_STORAGE_ENDPOINT || process.env.R2_ENDPOINT;
 
-  if (!bucket || !accessKey || !secretKey || !publicBaseUrl) {
+  if (!bucket || !accessKey || !secretKey || !endpoint) {
     return null;
   }
 
   const region = process.env.AUDIO_STORAGE_REGION || "auto";
-  const resolvedEndpoint = endpoint || `s3.${region}.amazonaws.com`;
+  // publicBaseUrl is optional — presigned URLs are used when not set
+  const publicBaseUrl = process.env.AUDIO_STORAGE_PUBLIC_URL || process.env.R2_PUBLIC_URL || "";
 
-  return { bucket, region, endpoint: resolvedEndpoint, accessKey, secretKey, publicBaseUrl };
+  return { bucket, region, endpoint, accessKey, secretKey, publicBaseUrl };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -154,6 +154,68 @@ function buildAuthHeader(params: {
   );
 }
 
+/**
+ * Generate an AWS SigV4 presigned GET URL for an S3/R2 object.
+ * The URL is self-authenticating and valid for `expiresIn` seconds (default 7 days).
+ * R2 bucket stays private — no public access required.
+ */
+function buildPresignedGetUrl(params: {
+  bucket: string;
+  key: string;
+  host: string;
+  region: string;
+  accessKey: string;
+  secretKey: string;
+  expiresIn: number;
+}): string {
+  const { bucket, key, host, region, accessKey, secretKey, expiresIn } = params;
+
+  const now = new Date();
+  const amzDate = now
+    .toISOString()
+    .replace(/[:-]/g, "")
+    .replace(/\.\d{3}Z$/, "Z");
+  const dateStamp = amzDate.slice(0, 8);
+
+  const credentialScope = `${dateStamp}/${region}/s3/aws4_request`;
+  const credential = `${accessKey}/${credentialScope}`;
+
+  // Query string params must be sorted
+  const queryParams = new URLSearchParams({
+    "X-Amz-Algorithm": "AWS4-HMAC-SHA256",
+    "X-Amz-Credential": credential,
+    "X-Amz-Date": amzDate,
+    "X-Amz-Expires": String(expiresIn),
+    "X-Amz-SignedHeaders": "host",
+  });
+  // URLSearchParams sorts by insertion order; manually sort for SigV4 compliance
+  const sortedQuery = [...queryParams.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
+    .join("&");
+
+  const canonicalRequest = [
+    "GET",
+    `/${bucket}/${key}`,
+    sortedQuery,
+    `host:${host}\n`,
+    "host",
+    "UNSIGNED-PAYLOAD",
+  ].join("\n");
+
+  const stringToSign = [
+    "AWS4-HMAC-SHA256",
+    amzDate,
+    credentialScope,
+    sha256Hex(canonicalRequest),
+  ].join("\n");
+
+  const signingKey = getSigningKey(secretKey, dateStamp, region, "s3");
+  const signature = hmacSHA256(signingKey, stringToSign).toString("hex");
+
+  return `https://${host}/${bucket}/${key}?${sortedQuery}&X-Amz-Signature=${signature}`;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // AudioStorageService
 // ─────────────────────────────────────────────────────────────────────────────
@@ -166,7 +228,7 @@ export class AudioStorageService {
     if (!this.config) {
       logger.warn(
         "AudioStorageService: storage not configured " +
-          "(AUDIO_STORAGE_BUCKET / ACCESS_KEY / SECRET_KEY / PUBLIC_URL missing). " +
+          "(R2_BUCKET_NAME / R2_ACCESS_ID / R2_SECRET_ACCESS_KEY / R2_ENDPOINT missing). " +
           "Audio URLs will not be persisted.",
       );
     }
@@ -274,11 +336,22 @@ export class AudioStorageService {
         return null;
       }
 
-      const publicUrl = `${publicBaseUrl.replace(/\/$/, "")}/${key}`;
+      // Use static public URL if configured, otherwise generate a 7-day presigned URL
+      const publicUrl = publicBaseUrl
+        ? `${publicBaseUrl.replace(/\/$/, "")}/${key}`
+        : buildPresignedGetUrl({
+            bucket,
+            key,
+            host: endpoint,
+            region,
+            accessKey,
+            secretKey,
+            expiresIn: 604800, // 7 days
+          });
 
       logger.info("File uploaded successfully", {
         key,
-        url: publicUrl,
+        urlType: publicBaseUrl ? "public" : "presigned",
         size: contentLength,
       });
 
