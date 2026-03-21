@@ -27,7 +27,6 @@ import { securityHeaders, cspReportRoutes } from "./middleware/security-headers.
 // ============================================================================
 import { logger } from "./utils/logger.js";
 import { initializeSentry } from "./config/sentry-config.js";
-import { validateJWTConfig } from "./services/auth-service.js";
 import {
   validateCSRFConfig,
   csrfTokenProvider,
@@ -71,7 +70,6 @@ import mediaRoutes from "./routes/media-routes.js";
 
 try {
   // Validate all critical security configurations
-  validateJWTConfig();
   validateCSRFConfig();
   validateWebSocketConfig();
 
