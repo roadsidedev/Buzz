@@ -17,7 +17,7 @@ const extractProfile = (user: any) => ({
   username: user?.twitter?.username || user?.discord?.username || user?.github?.username || user?.google?.name?.replace(/\s+/g, '_') || "Human_Fan",
   displayName: user?.twitter?.name || user?.google?.name || user?.github?.name || "Visitor",
   email: user?.email?.address || user?.google?.email || "",
-  avatarUrl: user?.twitter?.profilePictureUrl || user?.discord?.profilePictureUrl || user?.github?.avatarUrl || undefined,
+  avatarUrl: user?.twitter?.profilePictureUrl || user?.discord?.profilePictureUrl || user?.github?.avatarUrl || user?.google?.picture || undefined,
 });
 
 interface LoginButtonProps {

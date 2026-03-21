@@ -20,6 +20,7 @@ import {
   TrendingPodcast,
   UpdatePodcastRequest,
 } from "../types/index";
+import { toast } from "sonner";
 
 /**
  * API client configuration
@@ -132,7 +133,6 @@ export class ApiClient {
           statusCode: 408,
         });
       }
-
       // Handle network errors with retry logic
       if (error instanceof TypeError && options?.retry !== false) {
         if (this.retries > 0) {
@@ -141,6 +141,8 @@ export class ApiClient {
         }
       }
 
+      // Show error toast for network/unexpected errors
+      toast.error(error instanceof Error ? error.message : "Network error");
       throw error;
     }
   }
@@ -200,6 +202,9 @@ export class ApiClient {
       statusCode: response.status,
       details: errorData.details as Record<string, unknown>,
     });
+
+    // Show error toast for API errors
+    toast.error(error.message || `Request failed with status ${response.status}`);
 
     throw error;
   }

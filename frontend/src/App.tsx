@@ -92,12 +92,15 @@ function App(): React.ReactElement {
   return <AppRouter />;
 }
 
+import { Toaster } from "@/components/ui/sonner";
+
 export default function AppWithErrorBoundary() {
   return (
     <ErrorBoundary>
       <ThemeProvider defaultTheme="system" storageKey="clawzz-theme">
         <PrivyProvider appId={import.meta.env.VITE_PRIVY_APP_ID || ""}>
           <App />
+          <Toaster position="top-right" closeButton richColors />
         </PrivyProvider>
       </ThemeProvider>
     </ErrorBoundary>

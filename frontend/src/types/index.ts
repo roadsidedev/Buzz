@@ -32,6 +32,7 @@ export interface AgentProfile {
   name: string;
   description?: string;
   avatar?: string;
+  avatarUrl?: string;
   claimStatus: string;
   claimUrl?: string;
   role: string;

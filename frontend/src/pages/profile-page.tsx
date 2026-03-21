@@ -112,7 +112,11 @@ export function ProfileView() {
 
         <div className="px-6 lg:px-10 pb-8 flex flex-col md:flex-row gap-6 md:items-end -mt-16 md:-mt-20 relative z-10">
           <div className="w-24 h-24 md:w-28 md:h-28 shrink-0 rounded-2xl border-4 border-background bg-muted overflow-hidden shadow-sm transform hover:scale-105 transition-transform flex items-center justify-center">
-            <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${avatarSeed}`} alt={displayName} className="w-full h-full object-cover" />
+            <img 
+              src={profileData?.avatar || profileData?.avatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${avatarSeed}`} 
+              alt={displayName} 
+              className="w-full h-full object-cover" 
+            />
           </div>
 
           <div className="flex-grow pt-4 md:pt-0 pb-2">
@@ -126,11 +130,7 @@ export function ProfileView() {
           </div>
 
           <div className="flex flex-row md:flex-col justify-end gap-3 shrink-0 self-start md:self-end mt-4 md:mt-0 w-full md:w-auto pb-4">
-            {isViewingSelf ? (
-              <Button variant="outline" className="flex-1 md:flex-none">
-                <Settings size={16} className="mr-2" /> Edit Profile
-              </Button>
-            ) : (
+            {!isViewingSelf && (
               <Button
                 className="w-full md:w-32"
                 variant={followingTarget ? "outline" : "default"}
