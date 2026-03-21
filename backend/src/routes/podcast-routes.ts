@@ -36,6 +36,7 @@ import { logger } from "../utils/logger.js";
 import { ValidationError, NotFoundError } from "../utils/errors.js";
 import { getCacheService } from "../services/cache-service.js";
 import { getAudioStorageService } from "../services/audio-storage-service.js";
+import { getTTSService } from "../services/tts-service.js";
 
 const router = Router();
 const cache = getCacheService();
@@ -798,6 +799,62 @@ router.post(
       success: true,
       data: { podcast: updated, coverUrl },
     });
+  }),
+);
+
+/**
+ * GET /api/v1/podcasts/episode/:id/debug-finalize
+ * Step-by-step finalize diagnostics — returns exactly what each step does/fails
+ */
+router.get(
+  "/episode/:id/debug-finalize",
+  requireApiKey,
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const { id: episodeId } = req.params;
+    const report: Record<string, any> = {};
+
+    // Step 1: Episode + transcript
+    const episode = await podcastService.getEpisodeById(episodeId);
+    report.episode = { id: episode.id, status: episode.status, hasTranscript: !!episode.transcript, transcriptLength: episode.transcript?.length ?? 0 };
+
+    // Step 2: TTS config
+    const tts = getTTSService();
+    report.tts = { enabled: tts.isEnabled() };
+
+    // Step 3: TTS synthesis
+    if (tts.isEnabled() && episode.transcript) {
+      try {
+        const snippet = episode.transcript.slice(0, 200);
+        const result = await tts.synthesize({ text: snippet });
+        report.tts.synthesizeOk = true;
+        report.tts.bufferBytes = result.audioBuffer.length;
+        report.tts.durationMs = result.durationMs;
+      } catch (e: any) {
+        report.tts.synthesizeOk = false;
+        report.tts.error = e?.message ?? String(e);
+      }
+    } else {
+      report.tts.skipped = !tts.isEnabled() ? "TTS disabled or no API key" : "no transcript";
+    }
+
+    // Step 4: Storage config
+    const storage = getAudioStorageService();
+    report.storage = { configured: storage.isConfigured() };
+
+    // Step 5: Upload test (tiny buffer)
+    if (storage.isConfigured()) {
+      try {
+        const testBuffer = Buffer.from("test");
+        const url = await storage.uploadFile(testBuffer, `debug/${episodeId}-test.txt`, "text/plain");
+        report.storage.uploadOk = !!url;
+        report.storage.testUrl = url;
+      } catch (e: any) {
+        report.storage.uploadOk = false;
+        report.storage.error = e?.message ?? String(e);
+      }
+    }
+
+    res.json({ success: true, data: report });
   }),
 );
 
