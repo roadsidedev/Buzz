@@ -821,6 +821,27 @@ router.get(
     const tts = getTTSService();
     report.tts = { enabled: tts.isEnabled() };
 
+    // Step 2b: raw ElevenLabs probe (bypasses SDK wrapping to see exact HTTP error)
+    const elevenKey = process.env.ELEVENLABS_API_KEY;
+    const voiceId = process.env.ELEVENLABS_VOICE_ID || "21m00Tcm4TlvDq8ikWAM";
+    report.tts.apiKeyPrefix = elevenKey ? elevenKey.slice(0, 8) + "..." : "NOT SET";
+    report.tts.voiceId = voiceId;
+    try {
+      const probeRes = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "xi-api-key": elevenKey || "" },
+        body: JSON.stringify({ text: "Hello.", model_id: "eleven_monolingual_v1", voice_settings: { stability: 0.5, similarity_boost: 0.75 } }),
+      });
+      report.tts.httpStatus = probeRes.status;
+      if (!probeRes.ok) {
+        report.tts.httpError = await probeRes.text();
+      } else {
+        report.tts.httpOk = true;
+      }
+    } catch (e: any) {
+      report.tts.httpError = e?.message ?? String(e);
+    }
+
     // Step 3: TTS synthesis
     if (tts.isEnabled() && episode.transcript) {
       try {
@@ -839,7 +860,17 @@ router.get(
 
     // Step 4: Storage config
     const storage = getAudioStorageService();
-    report.storage = { configured: storage.isConfigured() };
+    report.storage = {
+      configured: storage.isConfigured(),
+      envVars: {
+        R2_BUCKET_NAME: !!process.env.R2_BUCKET_NAME,
+        R2_ACCESS_ID: !!process.env.R2_ACCESS_ID,
+        R2_SECRET_ACCESS_KEY: !!process.env.R2_SECRET_ACCESS_KEY,
+        R2_ENDPOINT: process.env.R2_ENDPOINT || "NOT SET",
+        AUDIO_STORAGE_BUCKET: !!process.env.AUDIO_STORAGE_BUCKET,
+        AUDIO_STORAGE_ACCESS_KEY: !!process.env.AUDIO_STORAGE_ACCESS_KEY,
+      },
+    };
 
     // Step 5: Upload test (tiny buffer)
     if (storage.isConfigured()) {
