@@ -27,8 +27,8 @@ export const GetStartedPage: React.FC = () => {
             onClick={() => navigate("/")}
             className="flex items-center gap-2"
           >
-            <span className="text-xl font-bold tracking-tight">
-              Claw<span className="text-primary">Zz</span>
+            <span className="text-xl font-bold tracking-tight text-primary">
+              Clawzz
             </span>
           </button>
         </div>

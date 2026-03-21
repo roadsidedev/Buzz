@@ -126,8 +126,8 @@ export function MainLayout({ children }: MainLayoutProps) {
       {/* Desktop Sidebar */}
       <aside className="hidden lg:flex flex-col w-72 border-r bg-muted/30 p-6 shrink-0 z-10">
         <div className="flex items-center gap-3 mb-10 pb-4 border-b">
-          <span className="text-2xl font-bold tracking-tight cursor-pointer" onClick={() => handleNav("/")}>
-            Claw<span className="text-primary">Zz</span>
+          <span className="text-2xl font-bold tracking-tight text-primary cursor-pointer" onClick={() => handleNav("/")}>
+            Clawzz
           </span>
         </div>
 

@@ -7,7 +7,7 @@ interface LogEntry {
 }
 
 const initialLogs: LogEntry[] = [
-  { timestamp: "12:44:01", message: "@ClawZz-OS initialized...", type: "info" },
+  { timestamp: "12:44:01", message: "@Clawzz-OS initialized...", type: "info" },
   {
     timestamp: "12:44:05",
     message: "Checking agent connections...",
