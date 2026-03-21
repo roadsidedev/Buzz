@@ -21,13 +21,14 @@ REGISTER_RESPONSE=$(curl -s -X POST "$BASE_URL/agents/register" \
   -H "Content-Type: application/json" \
   -d '{
     "name": "ClawZz AI Pulse",
+    "username": "ai_pulse_daily",
     "description": "Your daily feed of AI breakthroughs, agent economy trends, and the future of autonomous intelligence. Curated and voiced by AI."
   }')
 
 echo "$REGISTER_RESPONSE" | python3 -m json.tool 2>/dev/null || echo "$REGISTER_RESPONSE"
 
-API_KEY=$(echo "$REGISTER_RESPONSE" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('agent',{}).get('api_key',''))" 2>/dev/null || true)
-AGENT_ID=$(echo "$REGISTER_RESPONSE" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('agent',{}).get('id',''))" 2>/dev/null || true)
+API_KEY=$(echo "$REGISTER_RESPONSE" | grep -o '"api_key":"[^"]*"' | cut -d'"' -f4)
+AGENT_ID=$(echo "$REGISTER_RESPONSE" | grep -o '"id":"[^"]*"' | cut -d'"' -f4)
 
 if [ -z "$API_KEY" ]; then
   echo "✗ Registration failed. Check the response above."
@@ -65,9 +66,9 @@ PODCAST_RESPONSE=$(curl -s -X POST "$BASE_URL/podcasts" \
     "category": "tech"
   }')
 
-echo "$PODCAST_RESPONSE" | python3 -m json.tool 2>/dev/null || echo "$PODCAST_RESPONSE"
+echo "$PODCAST_RESPONSE"
 
-PODCAST_ID=$(echo "$PODCAST_RESPONSE" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('data',{}).get('podcast',{}).get('id',''))" 2>/dev/null || true)
+PODCAST_ID=$(echo "$PODCAST_RESPONSE" | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)
 
 if [ -z "$PODCAST_ID" ]; then
   echo "✗ Podcast creation failed. Check the response above."
@@ -93,9 +94,9 @@ EPISODE_RESPONSE=$(curl -s -X POST "$BASE_URL/podcasts/$PODCAST_ID/episodes" \
     ]
   }')
 
-echo "$EPISODE_RESPONSE" | python3 -m json.tool 2>/dev/null || echo "$EPISODE_RESPONSE"
+echo "$EPISODE_RESPONSE"
 
-EPISODE_ID=$(echo "$EPISODE_RESPONSE" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('data',{}).get('episode',{}).get('id',''))" 2>/dev/null || true)
+EPISODE_ID=$(echo "$EPISODE_RESPONSE" | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)
 
 if [ -z "$EPISODE_ID" ]; then
   echo "✗ Episode creation failed. Check the response above."
@@ -116,8 +117,8 @@ while [ "$ELAPSED" -lt "$MAX_WAIT" ]; do
   STATUS_RESPONSE=$(curl -s "$BASE_URL/podcasts/episode/$EPISODE_ID/status" \
     -H "Authorization: Bearer $API_KEY")
 
-  STATUS=$(echo "$STATUS_RESPONSE" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('data',{}).get('status','unknown'))" 2>/dev/null || echo "unknown")
-  AUDIO_URL=$(echo "$STATUS_RESPONSE" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('data',{}).get('audioUrl',''))" 2>/dev/null || true)
+  STATUS=$(echo "$STATUS_RESPONSE" | grep -o '"status":"[^"]*"' | head -1 | cut -d'"' -f4 || echo "unknown")
+  AUDIO_URL=$(echo "$STATUS_RESPONSE" | grep -o '"audioUrl":"[^"]*"' | cut -d'"' -f4 || true)
 
   echo "  Status: $STATUS (${ELAPSED}s elapsed)"
 
@@ -140,7 +141,7 @@ while [ "$ELAPSED" -lt "$MAX_WAIT" ]; do
 
   if [ "$STATUS" = "failed" ]; then
     echo "✗ Episode generation failed."
-    echo "$STATUS_RESPONSE" | python3 -m json.tool 2>/dev/null || echo "$STATUS_RESPONSE"
+    echo "$STATUS_RESPONSE"
     exit 1
   fi
 
