@@ -35,6 +35,7 @@ import { podcastService, paymentService } from "../services/index.js";
 import { logger } from "../utils/logger.js";
 import { ValidationError, NotFoundError } from "../utils/errors.js";
 import { getCacheService } from "../services/cache-service.js";
+import { getAudioStorageService } from "../services/audio-storage-service.js";
 
 const router = Router();
 const cache = getCacheService();
@@ -700,6 +701,102 @@ router.post(
             ? "Episode generation retried successfully. Poll status via GET /api/v1/podcasts/episode/:id/status"
             : "Orchestrator still unavailable. Episode marked as failed. You can retry again later.",
       },
+    });
+  }),
+);
+
+/**
+ * POST /api/v1/podcasts/:id/cover
+ * Upload custom cover art for a podcast
+ *
+ * Accepts a base64-encoded image and uploads it to R2 storage,
+ * then updates the podcast's cover_image_url.
+ *
+ * Request body:
+ *   - image: string (required) — base64-encoded image data
+ *   - mimeType?: "image/jpeg" | "image/png" | "image/webp" (default: image/jpeg)
+ *
+ * Response: 200 OK
+ *   {
+ *     success: true,
+ *     data: { podcast: Podcast, coverUrl: string }
+ *   }
+ */
+router.post(
+  "/:id/cover",
+  requireApiKey,
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const agent = req.agent!;
+    const { id: podcastId } = req.params;
+    const { image, mimeType = "image/jpeg" } = req.body;
+
+    if (!image || typeof image !== "string") {
+      res.status(400).json({
+        success: false,
+        error: { code: "IMAGE_REQUIRED", message: "base64-encoded image is required", statusCode: 400 },
+      });
+      return;
+    }
+
+    const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
+    if (!allowedTypes.includes(mimeType)) {
+      res.status(400).json({
+        success: false,
+        error: { code: "INVALID_MIME_TYPE", message: `mimeType must be one of: ${allowedTypes.join(", ")}`, statusCode: 400 },
+      });
+      return;
+    }
+
+    // Verify ownership
+    const podcast = await podcastService.getPodcastById(podcastId);
+    if (podcast.agentId !== agent.agentId) {
+      res.status(403).json({
+        success: false,
+        error: { code: "UNAUTHORIZED", message: "Only podcast creator can upload cover art", statusCode: 403 },
+      });
+      return;
+    }
+
+    const storage = getAudioStorageService();
+    if (!storage.isConfigured()) {
+      res.status(503).json({
+        success: false,
+        error: { code: "STORAGE_UNAVAILABLE", message: "Image storage is not configured", statusCode: 503 },
+      });
+      return;
+    }
+
+    // Decode base64 and upload
+    const ext = mimeType === "image/png" ? "png" : mimeType === "image/webp" ? "webp" : "jpg";
+    const buffer = Buffer.from(image, "base64");
+
+    // Enforce 5 MB limit
+    if (buffer.length > 5 * 1024 * 1024) {
+      res.status(400).json({
+        success: false,
+        error: { code: "IMAGE_TOO_LARGE", message: "Image must be under 5 MB", statusCode: 400 },
+      });
+      return;
+    }
+
+    const coverUrl = await storage.uploadFile(buffer, `covers/${podcastId}.${ext}`, mimeType);
+
+    if (!coverUrl) {
+      res.status(500).json({
+        success: false,
+        error: { code: "UPLOAD_FAILED", message: "Failed to upload cover image", statusCode: 500 },
+      });
+      return;
+    }
+
+    // Persist the new cover URL on the podcast
+    const updated = await podcastService.updatePodcast(podcastId, { coverImageUrl: coverUrl });
+
+    logger.info("Podcast cover art uploaded", { podcastId, agentId: agent.agentId, coverUrl });
+
+    res.json({
+      success: true,
+      data: { podcast: updated, coverUrl },
     });
   }),
 );
