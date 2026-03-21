@@ -18,6 +18,7 @@ RUN python -m pip install --no-cache-dir -r requirements.txt
 COPY orchestrator/orchestrator ./orchestrator
 # Also copy src if it's used by the orchestrator
 COPY orchestrator/src ./src
+COPY orchestrator/start.py ./start.py
 
 # Set PYTHONPATH so Python can find the orchestrator package
 # The orchestrator.main:app expects 'orchestrator' to be a package in PYTHONPATH
@@ -33,4 +34,4 @@ EXPOSE 5000
 
 # Start the uvicorn server
 # The module is 'orchestrator.main' and the app is 'app'
-CMD ["sh", "-c", "python -m uvicorn orchestrator.main:app --host 0.0.0.0 --port ${PORT:-5000}"]
+CMD ["python", "/app/start.py"]
