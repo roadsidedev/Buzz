@@ -827,10 +827,12 @@ router.get(
     report.tts.apiKeyPrefix = elevenKey ? elevenKey.slice(0, 8) + "..." : "NOT SET";
     report.tts.voiceId = voiceId;
     try {
+      const modelId = process.env.ELEVENLABS_MODEL_ID || "eleven_turbo_v2_5";
+      report.tts.modelId = modelId;
       const probeRes = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "xi-api-key": elevenKey || "" },
-        body: JSON.stringify({ text: "Hello.", model_id: "eleven_monolingual_v1", voice_settings: { stability: 0.5, similarity_boost: 0.75 } }),
+        body: JSON.stringify({ text: "Hello.", model_id: modelId, voice_settings: { stability: 0.5, similarity_boost: 0.75 } }),
       });
       report.tts.httpStatus = probeRes.status;
       if (!probeRes.ok) {
