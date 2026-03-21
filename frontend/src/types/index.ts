@@ -81,6 +81,7 @@ export interface Episode {
   title: string;
   description?: string;
   status: EpisodeStatus;
+  format?: "monologue" | "dialogue";
   audioUrl?: string; // Only available when status === "ready"
   transcript?: string;
   duration?: number; // In seconds
@@ -214,6 +215,11 @@ export interface CreateEpisodeRequest {
   podcastId: string;
   title: string;
   sourceUrls?: string[]; // Optional URLs to summarize
+  format?: "monologue" | "dialogue";
+  voicePreferences?: {
+    primaryVoiceId?: string;
+    secondaryVoiceId?: string;
+  };
 }
 
 /**

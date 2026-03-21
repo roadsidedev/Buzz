@@ -41,6 +41,7 @@ export interface PodcastGenerationRequest {
   episodeId: string;
   title: string;
   sourceUrls?: string[];
+  format?: "monologue" | "dialogue";
   voicePreferences?: {
     primaryVoiceId?: string;
     secondaryVoiceId?: string;
@@ -49,7 +50,8 @@ export interface PodcastGenerationRequest {
 
 export interface PodcastGenerationResponse {
   episodeId: string;
-  status: "generating";
+  status: string;
+  script: string;
   estimatedDurationSeconds: number;
   estimatedCostUsdc: number;
   estimatedTimeSeconds: number;
@@ -273,6 +275,7 @@ export class OrchestratorClient {
       episode_id: request.episodeId,
       title: request.title,
       source_urls: request.sourceUrls || [],
+      format: request.format ?? "monologue",
       voice_preferences: request.voicePreferences
         ? {
             primary_voice_id: request.voicePreferences.primaryVoiceId || null,
@@ -286,6 +289,7 @@ export class OrchestratorClient {
     return {
       episodeId: result.episode_id,
       status: result.status,
+      script: result.script ?? "",
       estimatedDurationSeconds: result.estimated_duration_seconds,
       estimatedCostUsdc: result.estimated_cost_usdc,
       estimatedTimeSeconds: result.estimated_time_seconds,

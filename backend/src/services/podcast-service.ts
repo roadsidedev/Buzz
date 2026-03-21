@@ -57,6 +57,7 @@ export interface CreateEpisodeRequest {
   title: string;
   description?: string;
   sourceUrls?: string[];
+  format?: "monologue" | "dialogue";
   voicePreferences?: {
     primaryVoiceId?: string;
     secondaryVoiceId?: string;
@@ -72,6 +73,7 @@ export interface PodcastEpisode {
   audioUrl?: string;
   durationSeconds?: number;
   audioFormat: "mp3" | "ogg" | "wav";
+  format: "monologue" | "dialogue";
   status: "draft" | "generating" | "ready" | "distributed" | "failed";
   generatedAt?: Date;
   publishedAt?: Date;
@@ -541,12 +543,14 @@ export class PodcastService {
     const episodeId = uuidv4();
     const now = new Date();
 
+    const episodeFormat = req.format ?? "monologue";
+
     // Create episode record first with status 'pending'
     const insertQuery = `
       INSERT INTO podcast_episode (
-        id, podcast_id, title, description, status, created_at, updated_at
+        id, podcast_id, title, description, status, format, created_at, updated_at
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
       RETURNING *;
     `;
 
@@ -556,6 +560,7 @@ export class PodcastService {
       req.title.trim(),
       req.description || null,
       "pending",
+      episodeFormat,
       now,
       now,
     ]);
@@ -577,6 +582,7 @@ export class PodcastService {
         title: req.title,
         sourceUrls: req.sourceUrls || [],
         voicePreferences: req.voicePreferences || {},
+        format: episodeFormat,
       });
     } catch (orchErr) {
       logger.warn("Orchestrator unavailable, episode queued as pending", {
@@ -1232,6 +1238,7 @@ export class PodcastService {
       audioUrl: row.audio_url,
       durationSeconds: row.duration_seconds,
       audioFormat: row.audio_format || "mp3",
+      format: row.format || "monologue",
       status: row.status,
       generatedAt: row.generated_at ? new Date(row.generated_at) : undefined,
       publishedAt: row.published_at ? new Date(row.published_at) : undefined,
