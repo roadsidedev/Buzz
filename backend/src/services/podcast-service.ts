@@ -22,6 +22,8 @@ import {
 } from "@/utils/errors";
 import { OrchestratorClient } from "@/services/orchestrator-client";
 import { PaymentService } from "@/services/payment-service";
+import { getTTSService } from "@/services/tts-service";
+import { getAudioStorageService } from "@/services/audio-storage-service";
 
 // ===================================================================
 // Type Definitions
@@ -1198,6 +1200,103 @@ export class PodcastService {
       durationSeconds: episode.durationSeconds,
       canRetry: ["pending", "failed"].includes(episode.status),
     };
+  }
+
+  /**
+   * Finalize an episode: synthesize audio via TTS, upload to storage,
+   * then mark the episode as 'ready'.
+   *
+   * Safe to call when episode is in 'generating' status. Fetches the
+   * script cached by the orchestrator, passes it through ElevenLabs TTS,
+   * uploads the resulting audio (graceful degradation if storage is not
+   * configured), and updates the episode record.
+   *
+   * @param episodeId - Episode to finalize
+   * @returns Updated episode with status 'ready'
+   */
+  async finalizeEpisode(episodeId: string): Promise<PodcastEpisode> {
+    const episode = await this.getEpisodeById(episodeId);
+
+    // 1. Fetch cached script from orchestrator
+    let transcript: string | undefined;
+    let durationSeconds: number | undefined;
+    let audioUrl: string | undefined;
+
+    try {
+      const orchestratorStatus = await this.orchestrator.getPodcastEpisodeStatus(episodeId);
+      transcript = orchestratorStatus.transcript ?? undefined;
+      durationSeconds = orchestratorStatus.durationSeconds ?? undefined;
+      // If the orchestrator already has an audio URL, reuse it
+      audioUrl = orchestratorStatus.audioUrl ?? undefined;
+    } catch (err) {
+      logger.warn("finalizeEpisode: could not fetch orchestrator status", {
+        episodeId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+
+    // 2. TTS synthesis (if we have a transcript and storage-backed audio isn't available)
+    if (!audioUrl && transcript) {
+      try {
+        const tts = getTTSService();
+        if (tts.isEnabled()) {
+          const format = episode.format ?? "monologue";
+          let result: { audioBuffer: Buffer; durationMs: number } | null = null;
+
+          if (format === "dialogue") {
+            const secondaryVoiceId = (episode as any).secondaryVoiceId ?? tts["config"]?.defaultVoiceId;
+            result = await tts.synthesizeDialogue(
+              transcript,
+              tts["config"]?.defaultVoiceId,
+              secondaryVoiceId,
+            );
+          } else {
+            result = await tts.synthesize({ text: transcript });
+          }
+
+          if (result) {
+            durationSeconds = Math.round(result.durationMs / 1000);
+
+            // 3. Upload audio
+            try {
+              const storage = getAudioStorageService();
+              if (storage) {
+                const uploaded = await storage.upload(result.audioBuffer, episodeId);
+                audioUrl = uploaded ?? undefined;
+              }
+            } catch (uploadErr) {
+              logger.warn("finalizeEpisode: audio upload failed (graceful degradation)", {
+                episodeId,
+                error: uploadErr instanceof Error ? uploadErr.message : String(uploadErr),
+              });
+            }
+          }
+        }
+      } catch (ttsErr) {
+        logger.warn("finalizeEpisode: TTS synthesis failed (graceful degradation)", {
+          episodeId,
+          error: ttsErr instanceof Error ? ttsErr.message : String(ttsErr),
+        });
+      }
+    }
+
+    // 4. Mark episode ready
+    const updated = await this.updateEpisodeStatus(
+      episodeId,
+      "ready",
+      audioUrl,
+      transcript,
+      durationSeconds,
+    );
+
+    logger.info("Episode finalized", {
+      episodeId,
+      audioUrl: audioUrl ?? null,
+      durationSeconds: durationSeconds ?? null,
+      transcriptLength: transcript?.length ?? 0,
+    });
+
+    return updated;
   }
 
   // ===================================================================

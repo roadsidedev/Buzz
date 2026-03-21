@@ -704,4 +704,57 @@ router.post(
   }),
 );
 
+/**
+ * POST /api/v1/podcasts/episode/:id/finalize
+ * Synthesize audio via TTS and mark episode 'ready'
+ *
+ * Fetches the orchestrator-cached script, runs ElevenLabs TTS,
+ * uploads audio (gracefully skipped if storage unconfigured), and
+ * sets episode status to 'ready'.
+ *
+ * Response: 200 OK
+ *   {
+ *     success: true,
+ *     data: { episode: PodcastEpisode }
+ *   }
+ */
+router.post(
+  "/episode/:id/finalize",
+  requireApiKey,
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const agent = req.agent!;
+    const { id: episodeId } = req.params;
+
+    // Verify episode exists and agent owns its podcast
+    const episode = await podcastService.getEpisodeById(episodeId);
+    const podcast = await podcastService.getPodcastById(episode.podcastId);
+
+    if (podcast.agentId !== agent.agentId) {
+      res.status(403).json({
+        success: false,
+        error: {
+          code: "UNAUTHORIZED",
+          message: "Only podcast creator can finalize episodes",
+          statusCode: 403,
+        },
+      });
+      return;
+    }
+
+    const updated = await podcastService.finalizeEpisode(episodeId);
+
+    logger.info("Episode finalized via API", {
+      episodeId,
+      agentId: agent.agentId,
+      status: updated.status,
+      audioUrl: updated.audioUrl,
+    });
+
+    res.json({
+      success: true,
+      data: { episode: updated },
+    });
+  }),
+);
+
 export default router;
