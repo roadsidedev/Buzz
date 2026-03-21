@@ -222,6 +222,43 @@ async def health_check() -> dict:
     return {"status": "healthy", "service": "orchestrator"}
 
 
+@router.get("/debug/llm")
+async def debug_llm() -> dict:
+    """Diagnose LLM provider configuration and connectivity."""
+    from ..config.settings import settings
+    from ..services.llm_provider import get_provider, _detect_provider_from_env
+
+    info: dict = {
+        "LLM_PROVIDER_setting": settings.LLM_PROVIDER,
+        "LLM_API_KEY_set": bool(settings.LLM_API_KEY),
+        "SCORING_MODEL": settings.SCORING_MODEL,
+    }
+
+    detected_name, detected_key = _detect_provider_from_env()
+    info["auto_detected_provider"] = detected_name
+    info["auto_detected_key_set"] = bool(detected_key)
+
+    try:
+        provider = get_provider()
+        info["provider_loaded"] = type(provider).__name__
+        # Quick test call
+        response = provider.messages_create(
+            model=settings.SCORING_MODEL,
+            max_tokens=20,
+            messages=[{"role": "user", "content": "Say hello in 3 words."}],
+        )
+        if hasattr(response, "content") and response.content:
+            info["test_response"] = response.content[0].text.strip()
+        else:
+            info["test_response"] = str(response)
+        info["status"] = "ok"
+    except Exception as e:
+        info["status"] = "error"
+        info["error"] = str(e)
+
+    return info
+
+
 @router.get("/version")
 async def version() -> dict:
     """Get service version."""
