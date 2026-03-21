@@ -3,8 +3,6 @@ builder = "DOCKERFILE"
 dockerfilePath = "orchestrator/Dockerfile"
 
 [deploy]
-# Use Railway's PORT env var dynamically
-startCommand = "python -m uvicorn orchestrator.main:app --host 0.0.0.0 --port $PORT"
 # Disable healthcheck - configured in Railway UI
 healthcheck = false
 restartPolicyType = "ON_FAILURE"
