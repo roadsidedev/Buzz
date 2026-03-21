@@ -416,6 +416,123 @@ class OrchestrationService:
             "estimated_time_seconds": 5,
         }
 
+    async def generate_podcast_dialogue(
+        self,
+        podcast_id: str,
+        episode_id: str,
+        title: str,
+        source_urls: list[str] | None = None,
+    ) -> dict:
+        """
+        Generate a two-host dialogue podcast script in NotebookLM style.
+
+        HOST_A is a curious, thoughtful learner; HOST_B is a knowledgeable expert.
+        Each line is prefixed with [HOST_A]: or [HOST_B]: for downstream TTS routing.
+        Source URLs are fetched and their text is injected into the prompt for grounding.
+        Falls back to title-only if all URL fetches fail.
+        Returns a dict compatible with GeneratePodcastResponse.
+        """
+        import json
+        import re
+
+        # Fetch and extract text from source URLs (best-effort)
+        source_content = ""
+        if source_urls:
+            try:
+                import httpx
+                async with httpx.AsyncClient(timeout=10) as client:
+                    for url in source_urls[:3]:  # Cap at 3 sources
+                        try:
+                            resp = await client.get(url, follow_redirects=True)
+                            if resp.status_code == 200:
+                                # Strip HTML tags with a simple regex
+                                text = re.sub(r"<[^>]+>", " ", resp.text)
+                                text = re.sub(r"\s+", " ", text).strip()
+                                source_content += f"\n\n--- Source: {url} ---\n{text[:3000]}"
+                        except Exception as fetch_err:
+                            logger.debug("Failed to fetch source URL %s: %s", url, fetch_err)
+            except ImportError:
+                logger.warning("httpx not installed; skipping source URL fetch")
+
+        sources_block = (
+            f"\n\nGround every claim in the following source material:\n{source_content}"
+            if source_content
+            else ""
+        )
+
+        system_prompt = (
+            "You are a podcast producer writing natural two-host dialogue scripts. "
+            "Respond ONLY with the dialogue lines — no headers, no preamble, no stage directions."
+        )
+
+        user_prompt = (
+            f'Write a podcast dialogue between two hosts about: "{title}".{sources_block}\n\n'
+            "HOST_A is a curious, thoughtful learner who asks questions and builds understanding.\n"
+            "HOST_B is a knowledgeable expert who explains with concrete examples.\n\n"
+            "Rules:\n"
+            "- Alternate speakers 10-16 times total (~600-900 words)\n"
+            "- Each line must be on its own line, prefixed exactly as [HOST_A]: or [HOST_B]:\n"
+            "- No blank lines between speakers, no other text outside the dialogue\n"
+            "- Ground every claim in the source material when provided\n"
+            "- End with HOST_A thanking listeners and HOST_B signing off\n\n"
+            "Begin the dialogue now."
+        )
+
+        fallback_script = (
+            f"[HOST_A]: Welcome back everyone. Today we're exploring: {title}.\n"
+            f"[HOST_B]: That's right. It's a fascinating topic and we have a lot to cover.\n"
+            f"[HOST_A]: Let's dive in. What should our listeners know first?\n"
+            f"[HOST_B]: The most important thing to understand is that this area is evolving rapidly. "
+            f"Staying curious and informed is the best approach.\n"
+            f"[HOST_A]: Great point. Thanks for listening, everyone.\n"
+            f"[HOST_B]: Until next time."
+        )
+
+        script = await self._call_llm(
+            system=system_prompt,
+            user_content=user_prompt,
+            max_tokens=1500,
+            fallback=fallback_script,
+        )
+
+        # Validate that the script has dialogue markers; fall back if not
+        if "[HOST_A]:" not in script and "[HOST_B]:" not in script:
+            logger.warning("Dialogue script missing speaker markers, using fallback")
+            script = fallback_script
+
+        word_count = len(script.split())
+        estimated_seconds = max(60, int(word_count / 150 * 60))
+
+        # Cache in Redis
+        if self.room_state_manager:
+            try:
+                await self.room_state_manager.redis.setex(
+                    f"podcast_episode:{episode_id}",
+                    172800,  # 48h
+                    json.dumps({
+                        "status": "ready",
+                        "script": script,
+                        "episode_id": episode_id,
+                        "format": "dialogue",
+                    }),
+                )
+            except Exception as cache_err:
+                logger.warning("Failed to cache dialogue episode: %s", cache_err)
+
+        logger.info(
+            "Dialogue podcast script generated",
+            extra={"episode_id": episode_id, "word_count": word_count},
+        )
+
+        return {
+            "episode_id": episode_id,
+            "status": "ready",
+            "script": script,
+            "estimated_duration_seconds": estimated_seconds,
+            "estimated_cost_usdc": round(word_count * 0.000_015, 4),  # slightly higher for multi-voice
+            "estimated_time_seconds": 8,
+        }
+
     async def get_podcast_episode_status(self, episode_id: str) -> dict | None:
         """
         Return cached episode status/script from Redis, or None if not found.

@@ -275,10 +275,15 @@ export function EpisodePlayerPage({ episodeId: propsEpisodeId }: EpisodePlayerPa
                 <CardTitle className="text-lg font-bold flex items-center gap-2">
                   <FileText size={18} className="text-primary" />
                   Transcript
+                  {episode.format === 'dialogue' && (
+                    <Badge variant="secondary" className="ml-2 text-[10px] font-bold uppercase tracking-wider">
+                      Dialogue
+                    </Badge>
+                  )}
                 </CardTitle>
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
+                <Button
+                  variant="ghost"
+                  size="sm"
                   onClick={() => setShowTranscript(!showTranscript)}
                   className="text-xs font-bold uppercase"
                 >
@@ -289,11 +294,55 @@ export function EpisodePlayerPage({ episodeId: propsEpisodeId }: EpisodePlayerPa
               {showTranscript && (
                 <ScrollArea className="h-[400px]">
                   <CardContent className="p-6 pt-4">
-                    <div className="prose prose-sm dark:prose-invert max-w-none">
-                      <p className="text-foreground/80 leading-relaxed whitespace-pre-wrap font-medium">
-                        {episode.transcript}
-                      </p>
-                    </div>
+                    {episode.format === 'dialogue'
+                      ? (() => {
+                          const lineRegex = /^\[(HOST_[AB])\]:\s*(.+)$/;
+                          const lines = episode.transcript!.split('\n').filter(Boolean);
+                          return (
+                            <div className="space-y-3">
+                              {lines.map((line, idx) => {
+                                const match = line.match(lineRegex);
+                                if (!match) return null;
+                                const [, speaker, text] = match;
+                                const isA = speaker === 'HOST_A';
+                                return (
+                                  <div
+                                    key={idx}
+                                    className={cn(
+                                      "flex gap-3 items-start",
+                                      isA ? "flex-row" : "flex-row-reverse"
+                                    )}
+                                  >
+                                    <div className={cn(
+                                      "shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-black border-2",
+                                      isA
+                                        ? "bg-blue-100 border-blue-400 text-blue-700"
+                                        : "bg-purple-100 border-purple-400 text-purple-700"
+                                    )}>
+                                      {isA ? 'A' : 'B'}
+                                    </div>
+                                    <div className={cn(
+                                      "max-w-[80%] rounded-xl px-4 py-2 text-sm leading-relaxed font-medium",
+                                      isA
+                                        ? "bg-blue-50 text-blue-900 border border-blue-200"
+                                        : "bg-purple-50 text-purple-900 border border-purple-200"
+                                    )}>
+                                      {text}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          );
+                        })()
+                      : (
+                        <div className="prose prose-sm dark:prose-invert max-w-none">
+                          <p className="text-foreground/80 leading-relaxed whitespace-pre-wrap font-medium">
+                            {episode.transcript}
+                          </p>
+                        </div>
+                      )
+                    }
                   </CardContent>
                 </ScrollArea>
               )}

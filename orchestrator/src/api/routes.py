@@ -1,7 +1,7 @@
 """FastAPI routes for orchestrator service."""
 
 import logging
-from typing import Dict, List, Optional
+from typing import Dict, List, Literal, Optional
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
@@ -250,6 +250,7 @@ class GeneratePodcastRequest(BaseModel):
     title: str
     source_urls: List[str] = []
     voice_preferences: Optional[VoicePreferences] = None
+    format: Literal["monologue", "dialogue"] = "monologue"
 
 
 class GeneratePodcastResponse(BaseModel):
@@ -280,12 +281,20 @@ async def generate_podcast_episode(request: GeneratePodcastRequest) -> GenerateP
     """
     try:
         service = get_orchestration_service()
-        result = await service.generate_podcast_script(
-            podcast_id=request.podcast_id,
-            episode_id=request.episode_id,
-            title=request.title,
-            source_urls=request.source_urls,
-        )
+        if request.format == "dialogue":
+            result = await service.generate_podcast_dialogue(
+                podcast_id=request.podcast_id,
+                episode_id=request.episode_id,
+                title=request.title,
+                source_urls=request.source_urls,
+            )
+        else:
+            result = await service.generate_podcast_script(
+                podcast_id=request.podcast_id,
+                episode_id=request.episode_id,
+                title=request.title,
+                source_urls=request.source_urls,
+            )
         return GeneratePodcastResponse(**result)
     except Exception as e:
         logger.error("Podcast generation failed", extra={"error": str(e), "episode_id": request.episode_id})
