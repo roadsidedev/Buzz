@@ -26,7 +26,7 @@ export const TTS_CONFIG = {
   apiKey: process.env.ELEVENLABS_API_KEY || "",
   baseUrl: "https://api.elevenlabs.io/v1",
   defaultVoiceId: process.env.ELEVENLABS_VOICE_ID || "21m00Tcm4TlvDq8ikWAM",
-  defaultModelId: "eleven_monolingual_v1",
+  defaultModelId: process.env.ELEVENLABS_MODEL_ID || "eleven_turbo_v2_5",
   enabled: process.env.ENABLE_TTS !== "false",
   cacheEnabled: process.env.TTS_CACHE_ENABLED !== "false",
   maxCacheSize: parseInt(process.env.TTS_MAX_CACHE_SIZE || "1000"),

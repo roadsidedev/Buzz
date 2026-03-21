@@ -40,13 +40,22 @@ interface StorageConfig {
 function loadConfig(): StorageConfig | null {
   // Accept both generic AUDIO_STORAGE_* and Cloudflare R2_* naming conventions
   const bucket = process.env.AUDIO_STORAGE_BUCKET || process.env.R2_BUCKET_NAME;
-  const accessKey = process.env.AUDIO_STORAGE_ACCESS_KEY || process.env.R2_ACCESS_ID;
+  const accessKey =
+    process.env.AUDIO_STORAGE_ACCESS_KEY ||
+    process.env.R2_ACCESS_ID ||
+    process.env.R2_ACCESS_KEY_ID ||
+    process.env.R2_ACCESS_KEY;
   const secretKey = process.env.AUDIO_STORAGE_SECRET_KEY || process.env.R2_SECRET_ACCESS_KEY;
-  const endpoint = process.env.AUDIO_STORAGE_ENDPOINT || process.env.R2_ENDPOINT;
+  const rawEndpoint = process.env.AUDIO_STORAGE_ENDPOINT || process.env.R2_ENDPOINT;
 
-  if (!bucket || !accessKey || !secretKey || !endpoint) {
+  if (!bucket || !accessKey || !secretKey || !rawEndpoint) {
     return null;
   }
+
+  // Strip https:// prefix and any trailing path — we need just the hostname
+  const endpoint = rawEndpoint
+    .replace(/^https?:\/\//, "")
+    .replace(/\/.*$/, "");
 
   const region = process.env.AUDIO_STORAGE_REGION || "auto";
   // publicBaseUrl is optional — presigned URLs are used when not set
