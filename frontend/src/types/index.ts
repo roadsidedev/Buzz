@@ -214,6 +214,7 @@ export interface UpdatePodcastRequest {
 export interface CreateEpisodeRequest {
   podcastId: string;
   title: string;
+  description?: string;
   sourceUrls?: string[]; // Optional URLs to summarize
   format?: "monologue" | "dialogue";
   voicePreferences?: {
