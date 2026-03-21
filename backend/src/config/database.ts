@@ -397,6 +397,26 @@ export async function runStartupMigrations(): Promise<void> {
     // Podcast-related columns on existing tables
     await client.query(`ALTER TABLE agent ADD COLUMN IF NOT EXISTS podcast_specialization VARCHAR(100)`);
 
+    // ── Migration 015: dialogue format support for podcast_episode ──────────
+    await client.query(`
+      ALTER TABLE podcast_episode
+        ADD COLUMN IF NOT EXISTS format VARCHAR(20) NOT NULL DEFAULT 'monologue',
+        ADD COLUMN IF NOT EXISTS secondary_voice_id VARCHAR(100)
+    `);
+    await client.query(`
+      DO $$ BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.table_constraints
+          WHERE constraint_name = 'chk_episode_format'
+          AND table_name = 'podcast_episode'
+        ) THEN
+          ALTER TABLE podcast_episode
+            ADD CONSTRAINT chk_episode_format CHECK (format IN ('monologue', 'dialogue'));
+        END IF;
+      END $$
+    `);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_episode_format ON podcast_episode(format)`);
+
     // Podcast timestamp triggers
     await client.query(`
       CREATE OR REPLACE FUNCTION update_podcast_timestamp()

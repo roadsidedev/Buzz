@@ -711,12 +711,12 @@ export class PodcastService {
     try {
       const query = `
         UPDATE podcast_episode
-        SET 
+        SET
           status = $1,
           audio_url = COALESCE($2, audio_url),
           transcript = COALESCE($3, transcript),
           duration_seconds = COALESCE($4, duration_seconds),
-          generated_at = CASE WHEN $1 IN ('ready', 'distributed') THEN $5 ELSE generated_at END,
+          generated_at = CASE WHEN $7 IN ('ready', 'distributed') THEN $5 ELSE generated_at END,
           updated_at = $5
         WHERE id = $6
         RETURNING *;
@@ -729,6 +729,7 @@ export class PodcastService {
         durationSeconds || null,
         now,
         episodeId,
+        status,
       ]);
 
       if (result.rows.length === 0) {
