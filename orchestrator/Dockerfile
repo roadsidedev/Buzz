@@ -33,4 +33,4 @@ EXPOSE 5000
 
 # Start the uvicorn server
 # The module is 'orchestrator.main' and the app is 'app'
-CMD ["python", "-m", "uvicorn", "orchestrator.main:app", "--host", "0.0.0.0", "--port", "5000"]
+CMD ["sh", "-c", "python -m uvicorn orchestrator.main:app --host 0.0.0.0 --port ${PORT:-5000}"]
