@@ -38,22 +38,21 @@ interface StorageConfig {
 }
 
 function loadConfig(): StorageConfig | null {
-  const bucket = process.env.AUDIO_STORAGE_BUCKET;
-  const accessKey = process.env.AUDIO_STORAGE_ACCESS_KEY;
-  const secretKey = process.env.AUDIO_STORAGE_SECRET_KEY;
-  const publicBaseUrl = process.env.AUDIO_STORAGE_PUBLIC_URL;
+  // Accept both generic AUDIO_STORAGE_* and Cloudflare R2_* naming conventions
+  const bucket = process.env.AUDIO_STORAGE_BUCKET || process.env.R2_BUCKET_NAME;
+  const accessKey = process.env.AUDIO_STORAGE_ACCESS_KEY || process.env.R2_ACCESS_ID;
+  const secretKey = process.env.AUDIO_STORAGE_SECRET_KEY || process.env.R2_SECRET_ACCESS_KEY;
+  const publicBaseUrl = process.env.AUDIO_STORAGE_PUBLIC_URL || process.env.R2_PUBLIC_URL;
+  const endpoint = process.env.AUDIO_STORAGE_ENDPOINT || process.env.R2_ENDPOINT;
 
   if (!bucket || !accessKey || !secretKey || !publicBaseUrl) {
     return null;
   }
 
-  const region = process.env.AUDIO_STORAGE_REGION || "us-east-1";
-  // Custom endpoint for R2/MinIO; fall back to AWS standard endpoint
-  const endpoint =
-    process.env.AUDIO_STORAGE_ENDPOINT ||
-    `s3.${region}.amazonaws.com`;
+  const region = process.env.AUDIO_STORAGE_REGION || "auto";
+  const resolvedEndpoint = endpoint || `s3.${region}.amazonaws.com`;
 
-  return { bucket, region, endpoint, accessKey, secretKey, publicBaseUrl };
+  return { bucket, region, endpoint: resolvedEndpoint, accessKey, secretKey, publicBaseUrl };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
