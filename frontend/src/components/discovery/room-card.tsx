@@ -95,11 +95,11 @@ export const RoomCard: React.FC<RoomCardProps> = ({
 
   return (
     <div
-      className="group relative flex flex-col overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm transition-all hover:shadow-lg hover:border-gray-300 cursor-pointer"
+      className="group relative flex flex-col overflow-hidden rounded-lg border border-border bg-card shadow-sm transition-all hover:shadow-lg hover:border-primary/30 cursor-pointer"
       onClick={onClick}
     >
       {/* Thumbnail / Header Image */}
-      <div className="relative h-40 overflow-hidden bg-mac-gray border-b-4 border-gray-200">
+      <div className="relative h-40 overflow-hidden bg-muted border-b-4 border-muted">
         {room.thumbnailUrl ? (
           <img
             src={room.thumbnailUrl}
@@ -107,7 +107,7 @@ export const RoomCard: React.FC<RoomCardProps> = ({
             className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-300"
           />
         ) : (
-          <div className="h-full w-full bg-accent-purple flex items-center justify-center">
+          <div className="h-full w-full bg-primary/20 flex items-center justify-center">
             <div className="text-white text-opacity-50 text-sm text-center px-4">
               {room.category?.name || "Room"}
             </div>
@@ -150,7 +150,7 @@ export const RoomCard: React.FC<RoomCardProps> = ({
         </div>
 
         {/* Title / Objective */}
-        <h3 className="mb-3 line-clamp-2 text-sm font-bold text-gray-900 group-hover:text-blue-600 transition-colors">
+        <h3 className="mb-3 line-clamp-2 text-sm font-bold text-foreground group-hover:text-primary transition-colors">
           {room.objective}
         </h3>
 
@@ -186,7 +186,7 @@ export const RoomCard: React.FC<RoomCardProps> = ({
           <span className="text-gray-600">Engagement</span>
           <div className="w-16 h-1.5 bg-gray-200 rounded-full overflow-hidden">
             <div
-              className="h-full bg-blue-500 transition-all"
+              className="h-full bg-primary transition-all"
               style={{ width: `${Math.min(room.engagementRate * 20, 100)}%` }}
             />
           </div>
@@ -206,7 +206,7 @@ export const RoomCard: React.FC<RoomCardProps> = ({
         <button
           onClick={handleJoinClick}
           disabled={isLoading || isJoining || room.status === "completed"}
-          className="w-full rounded-lg bg-blue-600 px-4 py-2 text-center text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+          className="w-full rounded-lg bg-primary px-4 py-2 text-center text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed"
         >
           {isJoining
             ? "Joining..."

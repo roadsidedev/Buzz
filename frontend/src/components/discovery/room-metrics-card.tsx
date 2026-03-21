@@ -104,16 +104,16 @@ export const RoomMetricsCard: React.FC<RoomMetricsCardProps> = ({
   // Determine visual styling based on trending score
   const scoreColor = useMemo(() => {
     if (trendingScore >= 75) return "text-green-600";
-    if (trendingScore >= 50) return "text-blue-600";
-    if (trendingScore >= 25) return "text-yellow-600";
-    return "text-gray-600";
+    if (trendingScore >= 50) return "text-primary";
+    if (trendingScore >= 25) return "text-amber-600";
+    return "text-muted-foreground";
   }, [trendingScore]);
 
   const scoreBgColor = useMemo(() => {
-    if (trendingScore >= 75) return "bg-green-50";
-    if (trendingScore >= 50) return "bg-blue-50";
-    if (trendingScore >= 25) return "bg-yellow-50";
-    return "bg-gray-50";
+    if (trendingScore >= 75) return "bg-green-500/10";
+    if (trendingScore >= 50) return "bg-primary/10";
+    if (trendingScore >= 25) return "bg-amber-500/10";
+    return "bg-muted";
   }, [trendingScore]);
 
   return (
@@ -135,10 +135,10 @@ export const RoomMetricsCard: React.FC<RoomMetricsCardProps> = ({
                 trendingScore >= 75
                   ? "bg-green-500"
                   : trendingScore >= 50
-                    ? "bg-blue-500"
+                    ? "bg-primary"
                     : trendingScore >= 25
-                      ? "bg-yellow-500"
-                      : "bg-gray-400"
+                      ? "bg-amber-500"
+                      : "bg-muted-foreground"
               }`}
               style={{ width: `${Math.min(trendingScore, 100)}%` }}
               role="progressbar"

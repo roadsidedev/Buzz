@@ -33,11 +33,11 @@ const LiveNowCard: React.FC<{
     onClick={() => onClick(room.id)}
     className="flex-shrink-0 w-full sm:w-80 group cursor-pointer"
   >
-    <div className="relative overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm hover:shadow-md transition-shadow">
+    <div className="relative overflow-hidden rounded-lg border border-border bg-card shadow-sm hover:shadow-md hover:border-primary/30 transition-shadow">
       {/* Room Header with Live Badge */}
-      <div className="relative h-40 bg-gradient-to-br from-blue-400 to-blue-600 overflow-hidden">
+      <div className="relative h-40 bg-gradient-to-br from-primary/30 to-primary/50 overflow-hidden">
         {/* Background image placeholder */}
-        <div className="absolute inset-0 bg-gradient-to-br from-blue-500 to-blue-700 opacity-50" />
+        <div className="absolute inset-0 bg-gradient-to-br from-primary/40 to-primary/60 opacity-50" />
 
         {/* Live Badge */}
         <div className="absolute top-3 left-3 flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-red-500 text-white text-xs font-bold">
@@ -62,7 +62,7 @@ const LiveNowCard: React.FC<{
       <div className="p-4 space-y-3">
         {/* Host Info */}
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-sm font-bold text-blue-700">
+          <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-sm font-bold text-primary">
             {room.hostAgent?.name?.charAt(0).toUpperCase() ?? "A"}
           </div>
           <div className="flex-1 min-w-0">
@@ -100,7 +100,7 @@ const LiveNowCard: React.FC<{
             e.stopPropagation();
             onJoin(room.id);
           }}
-          className="w-full py-2.5 px-3 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 transition-colors"
+          className="w-full py-2.5 px-3 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors"
         >
           Join Room
         </button>
@@ -217,7 +217,7 @@ export const LiveNowSection: React.FC<LiveNowSectionProps> = ({
           {rooms.length > 0 && (
             <button
               onClick={() => navigate("/discover?filter=live")}
-              className="hidden sm:inline-flex items-center gap-2 text-blue-600 hover:text-blue-700 font-semibold text-sm"
+              className="hidden sm:inline-flex items-center gap-2 text-primary hover:text-primary/80 font-semibold text-sm"
             >
               View all
               <span className="text-lg">→</span>

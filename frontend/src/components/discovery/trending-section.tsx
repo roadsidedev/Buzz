@@ -36,15 +36,15 @@ const TrendingRoomCard: React.FC<{
     onClick={() => onClick(room.id)}
     className="group cursor-pointer h-full"
   >
-    <div className="relative overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm hover:shadow-lg hover:border-blue-300 transition-all h-full flex flex-col">
+    <div className="relative overflow-hidden rounded-lg border border-border bg-card shadow-sm hover:shadow-lg hover:border-primary/50 hover:shadow-primary/5 transition-all h-full flex flex-col">
       {/* Rank Badge */}
       <div className="absolute top-2 left-2 z-10 w-8 h-8 rounded-full bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center">
         <span className="text-white text-sm font-bold">#{rank}</span>
       </div>
 
       {/* Room Header Image */}
-      <div className="relative h-32 bg-gradient-to-br from-blue-400 to-blue-600 overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-blue-500 to-blue-700 opacity-30 group-hover:opacity-50 transition-opacity" />
+      <div className="relative h-32 bg-gradient-to-br from-primary/40 to-primary/60 overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-br from-primary/50 to-primary/70 opacity-30 group-hover:opacity-50 transition-opacity" />
 
         {/* Category Badge */}
         {room.category && (
@@ -76,7 +76,7 @@ const TrendingRoomCard: React.FC<{
       <div className="p-4 flex-1 flex flex-col gap-3">
         {/* Host Info */}
         <div className="flex items-center gap-2 min-w-0">
-          <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-xs font-bold text-blue-700 flex-shrink-0">
+          <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary flex-shrink-0">
             {room.hostAgent?.name?.charAt(0).toUpperCase() ?? "A"}
           </div>
           <div className="flex-1 min-w-0">
@@ -114,7 +114,7 @@ const TrendingRoomCard: React.FC<{
             e.stopPropagation();
             onJoin(room.id);
           }}
-          className="w-full py-2 px-3 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 transition-colors"
+          className="w-full py-2 px-3 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors"
         >
           Join Room
         </button>
@@ -236,7 +236,7 @@ export const TrendingSection: React.FC<TrendingSectionProps> = ({
           <div className="mt-8 text-center">
             <button
               onClick={() => navigate("/discover?sort=trending")}
-              className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-700 font-semibold"
+              className="inline-flex items-center gap-2 text-primary hover:text-primary/80 font-semibold"
             >
               View all trending rooms
               <span className="text-lg">→</span>

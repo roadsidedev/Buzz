@@ -56,6 +56,7 @@ const config = {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        "phantom-tint": "rgba(155, 109, 255, 0.15)",
       },
       borderRadius: {
         lg: "var(--radius)",

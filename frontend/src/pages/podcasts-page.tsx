@@ -12,8 +12,6 @@ import { TipModal } from "@/components/retro/TipModal"
 
 export function PodcastsView() {
   const [podcasts, setPodcasts] = useState<any[]>([])
-  const [featured, setFeatured] = useState<any | null>(null)
-  const [newArrival, setNewArrival] = useState<any | null>(null)
   const [loading, setLoading] = useState(true)
   const apiUrl = (import.meta.env.VITE_API_URL || 'http://localhost:4000/api/v1').replace(/\/+$/, '')
 
@@ -29,18 +27,9 @@ export function PodcastsView() {
   useEffect(() => {
     const fetchPodcasts = async () => {
       try {
-        const [trendingRes, newArrivalsRes] = await Promise.all([
-          axios.get(`${apiUrl}/podcasts/trending`),
-          axios.get(`${apiUrl}/podcasts/new-arrivals`),
-        ])
-        const trending: any[] = trendingRes.data?.data?.podcasts || []
-        const arrivals: any[] = newArrivalsRes.data?.data?.podcasts || []
-        // Featured = #1 by all-time listens
-        setFeatured(trending[0] || null)
-        // New Arrival = hottest recent podcast; skip if it's the same as featured
-        const arrival = arrivals.find((p) => p.id !== trending[0]?.id) || arrivals[0] || null
-        setNewArrival(arrival)
-        setPodcasts(trending)
+        const response = await axios.get(`${apiUrl}/podcasts/new-arrivals?limit=20`)
+        const arrivals: any[] = response.data?.data?.podcasts || []
+        setPodcasts(arrivals)
       } catch {
         setPodcasts([])
       } finally {
@@ -82,53 +71,28 @@ export function PodcastsView() {
       if (actionName === 'Share') {
         handleShare(pod);
       } else if (actionName === 'Like') {
-        toggleLike(pod.id, 'podcast');
+        handleLike(pod);
       } else if (actionName === 'Tip') {
         setTipAgentId(pod.agentId);
         setTipAgentName(pod.author || "Agent");
         setShowTipModal(true);
       } else if (actionName === 'Save') {
-        toggleSave(pod.id, 'podcast');
+        handleSave(pod);
       }
     }
   }
 
+  const handleLike = (pod: any) => {
+    toggleLike(pod.id, 'podcast');
+  }
+
+  const handleSave = (pod: any) => {
+    toggleSave(pod.id, 'podcast');
+  }
+
   return (
     <div className="animate-in slide-in-from-right duration-500 max-w-5xl mx-auto pb-12">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
-        {/* Featured Series — #1 podcast by all-time listens */}
-        {featured ? (
-          <div className="relative h-64 border-2 border-mac-charcoal overflow-hidden group cursor-pointer shadow-retro-purple bg-mac-gray" onClick={() => handlePlay(featured)}>
-            <img src={featured.coverImageUrl || "https://images.unsplash.com/photo-1557682250-33bd709cbe85?auto=format&fit=crop&q=80&w=800"} className="w-full h-full object-cover brightness-50 grayscale group-hover:grayscale-0 transition-all duration-500" alt={`${featured.title} cover`} />
-            <div className="absolute inset-0 p-6 flex flex-col justify-end">
-              <span className="text-accent-teal font-bold uppercase tracking-widest text-shadow-retro mb-2 bg-mac-charcoal w-fit px-2 py-1">Featured Series</span>
-              <h2 className="text-3xl font-bold text-mac-white mb-2 uppercase text-shadow-retro line-clamp-1">{featured.title}</h2>
-              <p className="text-mac-white mb-4 line-clamp-2 font-bold max-w-md">{featured.description}</p>
-              <Button variant="secondary" className="w-fit" onClick={(e) => { e.stopPropagation(); handlePlay(featured) }}>Listen Now</Button>
-            </div>
-          </div>
-        ) : (
-          <div className="relative h-64 border-2 border-dashed border-mac-charcoal bg-mac-gray flex items-center justify-center">
-            <p className="text-mac-charcoal font-bold uppercase tracking-widest opacity-40">No featured series yet</p>
-          </div>
-        )}
-        {/* New Arrival — hottest recently published podcast */}
-        {newArrival ? (
-          <div className="relative h-64 border-2 border-mac-charcoal overflow-hidden group cursor-pointer shadow-retro-teal bg-mac-gray" onClick={() => handlePlay(newArrival)}>
-            <img src={newArrival.coverImageUrl || "https://images.unsplash.com/photo-1516222338250-863216ce01ea?auto=format&fit=crop&q=80&w=800"} className="w-full h-full object-cover brightness-50 grayscale group-hover:grayscale-0 transition-all duration-500" alt={`${newArrival.title} cover`} />
-            <div className="absolute inset-0 p-6 flex flex-col justify-end">
-              <span className="text-accent-purple font-bold uppercase tracking-widest text-shadow-retro mb-2 bg-mac-white w-fit px-2 py-1">New Arrival</span>
-              <h2 className="text-3xl font-bold text-mac-white mb-2 uppercase text-shadow-retro line-clamp-1">{newArrival.title}</h2>
-              <p className="text-mac-white mb-4 line-clamp-2 font-bold max-w-md">{newArrival.description}</p>
-              <Button variant="secondary" className="w-fit" onClick={(e) => { e.stopPropagation(); handlePlay(newArrival) }}>Listen Now</Button>
-            </div>
-          </div>
-        ) : (
-          <div className="relative h-64 border-2 border-dashed border-mac-charcoal bg-mac-gray flex items-center justify-center">
-            <p className="text-mac-charcoal font-bold uppercase tracking-widest opacity-40">No new arrivals yet</p>
-          </div>
-        )}
-      </div>
+
 
       <div className="space-y-6">
         <h3 className="text-2xl font-bold uppercase tracking-widest">Latest Episodes</h3>
