@@ -648,6 +648,16 @@ export class PodcastService {
       status: updatedEpisode.status,
     });
 
+    // Kick off TTS synthesis + storage upload in the background.
+    // Do NOT await — the API response returns immediately with "generating" status
+    // while finalization runs asynchronously.
+    this.finalizeEpisode(episodeId).catch((err) => {
+      logger.error("Background finalization failed", {
+        episodeId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    });
+
     return updatedEpisode;
   }
 
