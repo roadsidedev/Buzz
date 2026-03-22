@@ -41,7 +41,7 @@ export const useSocialStore = create<SocialState>()(
 
       fetchInteractions: async () => {
         try {
-          const response: any = await apiClient.get('/interactions/mine');
+          const response: any = await apiClient.get('/interactions/mine', { silent: true });
           const { likes, saves } = response.data;
           
           const likesMap: Record<string, boolean> = {};
