@@ -360,17 +360,19 @@ export class RoomRepository {
    * Update room status
    */
   async updateStatus(roomId: string, status: RoomStatus): Promise<void> {
-    // Use $1::text in CASE comparisons to avoid enum/text operator mismatch.
+    // status is a RoomStatus enum — safe to inline as a SQL literal to
+    // avoid PostgreSQL parameter type-inference issues with enum columns.
+    const s = String(status).replace(/'/g, "''"); // no-op for valid enum values
     const text = `
       UPDATE room
-      SET status = $1::room_status,
-          started_at = CASE WHEN $1::text = 'live' THEN NOW() ELSE started_at END,
-          ended_at   = CASE WHEN $1::text IN ('completed', 'cancelled', 'failed') THEN NOW() ELSE ended_at END,
-          updated_at = NOW()
-      WHERE id = $2
+      SET status      = '${s}'::room_status,
+          started_at  = CASE WHEN '${s}' = 'live' THEN NOW() ELSE started_at END,
+          ended_at    = CASE WHEN '${s}' IN ('completed', 'cancelled', 'failed') THEN NOW() ELSE ended_at END,
+          updated_at  = NOW()
+      WHERE id = $1
     `;
 
-    await query(text, [status, roomId]);
+    await query(text, [roomId]);
 
     logger.info("Room status updated", {
       roomId,
