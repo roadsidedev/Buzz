@@ -528,7 +528,7 @@ export class ApiClient {
    */
   public async get<T>(
     path: string,
-    options?: { query?: Record<string, string | number | boolean> },
+    options?: { query?: Record<string, string | number | boolean>; silent?: boolean },
   ): Promise<{ data: T }> {
     const data = await this.request<T>("GET", path, options);
     return { data };
@@ -548,7 +548,7 @@ export class ApiClient {
    * Get user's USDC balance
    */
   public async getBalance(): Promise<{ balance: string }> {
-    return this.request<{ balance: string }>("GET", "/wallet/balance");
+    return this.request<{ balance: string }>("GET", "/wallet/balance", { silent: true });
   }
 
   /**
