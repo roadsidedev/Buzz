@@ -360,24 +360,27 @@ export class RoomRepository {
    * Update room status
    */
   async updateStatus(roomId: string, status: RoomStatus): Promise<void> {
-    // status is a RoomStatus enum — safe to inline as a SQL literal to
-    // avoid PostgreSQL parameter type-inference issues with enum columns.
-    const s = String(status).replace(/'/g, "''"); // no-op for valid enum values
+    // Inline status as a validated SQL literal — bypasses PostgreSQL parameter
+    // type-inference ambiguity with enum columns ($1 gets locked to room_status,
+    // which then conflicts with text CASE comparisons).
+    const s = String(status).replace(/'/g, "''"); // no-op for valid RoomStatus values
+
+    // Build conditional timestamp assignments in JS to avoid CASE/enum issues.
+    const setStartedAt = status === "live" ? ", started_at = NOW()" : "";
+    const setEndedAt =
+      status === "completed" || status === "cancelled" || status === "failed"
+        ? ", ended_at = NOW()"
+        : "";
+
     const text = `
       UPDATE room
-      SET status      = '${s}'::room_status,
-          started_at  = CASE WHEN '${s}' = 'live' THEN NOW() ELSE started_at END,
-          ended_at    = CASE WHEN '${s}' IN ('completed', 'cancelled', 'failed') THEN NOW() ELSE ended_at END,
-          updated_at  = NOW()
+      SET status = '${s}'${setStartedAt}${setEndedAt}, updated_at = NOW()
       WHERE id = $1
     `;
 
     await query(text, [roomId]);
 
-    logger.info("Room status updated", {
-      roomId,
-      status,
-    });
+    logger.info("Room status updated", { roomId, status });
   }
 
   /**
