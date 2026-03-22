@@ -23,6 +23,13 @@ import {
 import { toast } from "sonner";
 
 /**
+ * HTTP status codes that should NOT show a toast to the user.
+ * - 401: Auth interceptor handles redirect to login; no user toast needed.
+ * - 404: Resource simply doesn't exist; callers show empty-state UI instead.
+ */
+const SILENT_STATUS_CODES = new Set([401, 404]);
+
+/**
  * API client configuration
  */
 interface ApiClientConfig {
@@ -93,6 +100,8 @@ export class ApiClient {
       query?: Record<string, string | number | boolean>;
       headers?: Record<string, string>;
       retry?: boolean;
+      /** Suppress all error toasts for background/polling requests */
+      silent?: boolean;
     },
   ): Promise<T> {
     const url = this.buildUrl(path, options?.query);
@@ -112,7 +121,7 @@ export class ApiClient {
 
       // Handle non-2xx responses
       if (!response.ok) {
-        await this.handleErrorResponse(response);
+        await this.handleErrorResponse(response, options?.silent);
       }
 
       // Parse response
@@ -141,8 +150,10 @@ export class ApiClient {
         }
       }
 
-      // Show error toast for network/unexpected errors
-      toast.error(error instanceof Error ? error.message : "Network error");
+      // Only show toast for network/unexpected errors when not a silent request
+      if (!options?.silent) {
+        toast.error(error instanceof Error ? error.message : "Network error");
+      }
       throw error;
     }
   }
@@ -187,8 +198,12 @@ export class ApiClient {
 
   /**
    * Handle HTTP error responses
+   *
+   * Only surfaces a toast for errors that are truly actionable or blocking for
+   * the user. Silent status codes (401, 404) and explicitly silent requests are
+   * handled quietly — the UI shows empty states or the auth flow redirects.
    */
-  private async handleErrorResponse(response: Response): Promise<never> {
+  private async handleErrorResponse(response: Response, silent?: boolean): Promise<never> {
     let errorData: Record<string, unknown> = {};
 
     try {
@@ -203,8 +218,11 @@ export class ApiClient {
       details: errorData.details as Record<string, unknown>,
     });
 
-    // Show error toast for API errors
-    toast.error(error.message || `Request failed with status ${response.status}`);
+    // Only show a toast when the error is actionable/blocking for the user.
+    // Skip toasts for: silent requests, 401 (auth flow handles it), 404 (no resource).
+    if (!silent && !SILENT_STATUS_CODES.has(response.status)) {
+      toast.error(error.message || `Request failed with status ${response.status}`);
+    }
 
     throw error;
   }
@@ -276,6 +294,7 @@ export class ApiClient {
           category: options?.category ?? "",
           limit: options?.limit ?? 10,
         },
+        silent: true,
       }
     );
     // The request() method returns the parsed JSON body directly.
@@ -409,6 +428,7 @@ export class ApiClient {
         type: options?.type ?? "",
         limit: options?.limit ?? 10,
       },
+      silent: true,
     });
   }
 
@@ -500,7 +520,7 @@ export class ApiClient {
     timestamp: string;
     orchestrator: boolean;
   }> {
-    return this.request("GET", "/health");
+    return this.request("GET", "/health", { silent: true });
   }
 
   /**
