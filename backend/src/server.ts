@@ -182,9 +182,9 @@ app.use(sentryTransactionMiddleware);
 app.use(sentrySecurityContextMiddleware);
 app.use(sentryAuthTrackingMiddleware);
 
-// Body parsing
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// Body parsing — 10mb limit to support base64 image uploads (cover art, etc.)
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
 // SQL Injection Prevention
 // Validates and sanitizes inputs to prevent SQL injection attacks
