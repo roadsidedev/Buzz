@@ -360,9 +360,13 @@ export class RoomRepository {
    * Update room status
    */
   async updateStatus(roomId: string, status: RoomStatus): Promise<void> {
+    // Use $1::text in CASE comparisons to avoid enum/text operator mismatch.
     const text = `
       UPDATE room
-      SET status = $1, started_at = CASE WHEN $1 = 'live' THEN NOW() ELSE started_at END, ended_at = CASE WHEN $1 IN ('completed', 'cancelled', 'failed') THEN NOW() ELSE ended_at END, updated_at = NOW()
+      SET status = $1::room_status,
+          started_at = CASE WHEN $1::text = 'live' THEN NOW() ELSE started_at END,
+          ended_at   = CASE WHEN $1::text IN ('completed', 'cancelled', 'failed') THEN NOW() ELSE ended_at END,
+          updated_at = NOW()
       WHERE id = $2
     `;
 
