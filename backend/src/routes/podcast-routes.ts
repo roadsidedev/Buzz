@@ -821,18 +821,21 @@ router.get(
     const tts = getTTSService();
     report.tts = { enabled: tts.isEnabled() };
 
-    // Step 2b: raw ElevenLabs probe (bypasses SDK wrapping to see exact HTTP error)
-    const elevenKey = process.env.ELEVENLABS_API_KEY;
-    const voiceId = process.env.ELEVENLABS_VOICE_ID || "21m00Tcm4TlvDq8ikWAM";
-    report.tts.apiKeyPrefix = elevenKey ? elevenKey.slice(0, 8) + "..." : "NOT SET";
-    report.tts.voiceId = voiceId;
+    // Step 2b: raw Google Cloud TTS probe
+    const googleKey = process.env.GOOGLE_TTS_API_KEY;
+    const googleVoice = process.env.GOOGLE_TTS_VOICE || "en-US-Neural2-D";
+    const googleLang = process.env.GOOGLE_TTS_LANGUAGE || "en-US";
+    report.tts.apiKeyPrefix = googleKey ? googleKey.slice(0, 8) + "..." : "NOT SET";
+    report.tts.voice = googleVoice;
     try {
-      const modelId = process.env.ELEVENLABS_MODEL_ID || "eleven_turbo_v2_5";
-      report.tts.modelId = modelId;
-      const probeRes = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
+      const probeRes = await fetch(`https://texttospeech.googleapis.com/v1/text:synthesize?key=${googleKey || ""}`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", "xi-api-key": elevenKey || "" },
-        body: JSON.stringify({ text: "Hello.", model_id: modelId, voice_settings: { stability: 0.5, similarity_boost: 0.75 } }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          input: { text: "Hello." },
+          voice: { languageCode: googleLang, name: googleVoice },
+          audioConfig: { audioEncoding: "MP3" },
+        }),
       });
       report.tts.httpStatus = probeRes.status;
       if (!probeRes.ok) {
@@ -895,7 +898,7 @@ router.get(
  * POST /api/v1/podcasts/episode/:id/finalize
  * Synthesize audio via TTS and mark episode 'ready'
  *
- * Fetches the orchestrator-cached script, runs ElevenLabs TTS,
+ * Fetches the orchestrator-cached script, runs Google Cloud TTS,
  * uploads audio (gracefully skipped if storage unconfigured), and
  * sets episode status to 'ready'.
  *

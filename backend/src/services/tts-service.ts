@@ -2,15 +2,21 @@
 /**
  * Text-to-Speech Service
  *
- * Integrates with ElevenLabs API for high-quality voice synthesis.
+ * Integrates with Google Cloud Text-to-Speech API for voice synthesis.
  * Manages audio streaming to Jam rooms for real-time playback.
  *
  * Features:
- * - Voice synthesis with ElevenLabs API
+ * - Voice synthesis via Google Cloud TTS REST API
  * - Audio streaming to Jam rooms
  * - Voice caching for performance
  * - WebSocket audio delivery
  * - Error handling and retries
+ *
+ * Env vars:
+ *   GOOGLE_TTS_API_KEY   — Google Cloud API key (required)
+ *   GOOGLE_TTS_VOICE     — Voice name (default: en-US-Neural2-D)
+ *   GOOGLE_TTS_VOICE_B   — Secondary voice for dialogue (default: en-US-Neural2-F)
+ *   GOOGLE_TTS_LANGUAGE  — Language code (default: en-US)
  */
 
 import { spawn } from "child_process";
@@ -19,13 +25,15 @@ import { ValidationError, ServiceUnavailableError } from "../utils/errors.js";
 import { getJamService } from "./jam-service.js";
 import { TTS_CONFIG } from "../config/media-config.js";
 
-// Voice configuration
-const DEFAULT_VOICE_ID = "21m00Tcm4TlvDq8ikWAM"; // ElevenLabs default voice
-const DEFAULT_MODEL_ID = "eleven_monolingual_v1";
+// Google Cloud TTS endpoint
+const GOOGLE_TTS_URL = "https://texttospeech.googleapis.com/v1/text:synthesize";
 
 interface TTSConfig {
   apiKey: string;
-  baseUrl: string;
+  defaultVoiceName: string;
+  defaultVoiceNameB: string;
+  languageCode: string;
+  // Keep these for backward compat with healthCheck / synthesizeDialogue callers
   defaultVoiceId: string;
   defaultModelId: string;
 }
@@ -52,17 +60,27 @@ export class TTSService {
   private voiceCache = new Map<string, Buffer>();
 
   constructor() {
+    const apiKey = process.env.GOOGLE_TTS_API_KEY || "";
+    const defaultVoiceName = process.env.GOOGLE_TTS_VOICE || "en-US-Neural2-D";
     this.config = {
-      apiKey: TTS_CONFIG.apiKey || process.env.ELEVENLABS_API_KEY || "",
-      baseUrl: TTS_CONFIG.baseUrl,
-      defaultVoiceId: TTS_CONFIG.defaultVoiceId,
-      defaultModelId: TTS_CONFIG.defaultModelId,
+      apiKey,
+      defaultVoiceName,
+      defaultVoiceNameB: process.env.GOOGLE_TTS_VOICE_B || "en-US-Neural2-F",
+      languageCode: process.env.GOOGLE_TTS_LANGUAGE || "en-US",
+      // legacy aliases
+      defaultVoiceId: defaultVoiceName,
+      defaultModelId: "google-cloud-tts",
     };
 
     if (!TTS_CONFIG.enabled) {
       logger.warn("TTS Service disabled via ENABLE_TTS=false");
     } else if (!this.config.apiKey) {
-      logger.warn("TTS Service initialized without ElevenLabs API key");
+      logger.warn("TTS Service initialized without GOOGLE_TTS_API_KEY");
+    } else {
+      logger.info("TTS Service using Google Cloud TTS", {
+        voice: this.config.defaultVoiceName,
+        language: this.config.languageCode,
+      });
     }
   }
 
@@ -98,11 +116,11 @@ export class TTSService {
       );
     }
 
-    const effectiveVoiceId = voiceId || this.config.defaultVoiceId;
-    const effectiveModelId = modelId || this.config.defaultModelId;
+    // voiceId here maps to a Google voice name (e.g. "en-US-Neural2-D")
+    const effectiveVoiceName = voiceId || this.config.defaultVoiceName;
 
     // Check cache for short messages
-    const cacheKey = `${effectiveVoiceId}-${text}`;
+    const cacheKey = `${effectiveVoiceName}-${text}`;
     if (text.length < 100 && this.voiceCache.has(cacheKey)) {
       logger.debug("TTS cache hit", { textLength: text.length });
       return {
@@ -113,50 +131,47 @@ export class TTSService {
     }
 
     try {
-      logger.info("Synthesizing speech", {
+      logger.info("Synthesizing speech via Google Cloud TTS", {
         textLength: text.length,
-        voiceId: effectiveVoiceId,
-        modelId: effectiveModelId,
+        voice: effectiveVoiceName,
+        language: this.config.languageCode,
       });
 
       const response = await fetch(
-        `${this.config.baseUrl}/text-to-speech/${effectiveVoiceId}`,
+        `${GOOGLE_TTS_URL}?key=${this.config.apiKey}`,
         {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "xi-api-key": this.config.apiKey,
-          },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            text,
-            model_id: effectiveModelId,
-            voice_settings: {
-              stability: stability ?? 0.5,
-              similarity_boost: similarityBoost ?? 0.75,
+            input: { text },
+            voice: {
+              languageCode: this.config.languageCode,
+              name: effectiveVoiceName,
             },
+            audioConfig: { audioEncoding: "MP3" },
           }),
         },
       );
 
       if (!response.ok) {
         const errorText = await response.text();
-        logger.error("ElevenLabs API error", {
+        logger.error("Google Cloud TTS API error", {
           status: response.status,
           error: errorText,
         });
-        throw new ServiceUnavailableError("ElevenLabs TTS", {
+        throw new ServiceUnavailableError("Google Cloud TTS", {
           status: response.status,
           error: errorText,
         });
       }
 
-      const audioBuffer = Buffer.from(await response.arrayBuffer());
+      const json = await response.json() as { audioContent: string };
+      const audioBuffer = Buffer.from(json.audioContent, "base64");
       const durationMs = this.estimateDuration(text);
 
       // Cache short messages
       if (text.length < 100) {
         this.voiceCache.set(cacheKey, audioBuffer);
-        // Limit cache size
         if (this.voiceCache.size > 1000) {
           const firstKey = this.voiceCache.keys().next().value;
           this.voiceCache.delete(firstKey);
@@ -169,11 +184,7 @@ export class TTSService {
         durationMs,
       });
 
-      return {
-        audioBuffer,
-        durationMs,
-        format: "mp3",
-      };
+      return { audioBuffer, durationMs, format: "mp3" };
     } catch (err) {
       logger.error("TTS synthesis failed", {
         error: err instanceof Error ? err.message : String(err),
@@ -376,11 +387,9 @@ export class TTSService {
     }
 
     try {
-      const response = await fetch(`${this.config.baseUrl}/voices`, {
-        headers: {
-          "xi-api-key": this.config.apiKey,
-        },
-      });
+      const response = await fetch(
+        `https://texttospeech.googleapis.com/v1/voices?key=${this.config.apiKey}`,
+      );
       return response.ok;
     } catch {
       return false;
