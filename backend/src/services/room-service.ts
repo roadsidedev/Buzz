@@ -721,7 +721,9 @@ export class RoomService {
           roomId,
           jamRoomId: room.jamRoomId,
         });
-        await this.updateRoomStatus(roomId, "live");
+        // Use the repository directly (bypassing updateRoomStatus's orchestrator
+        // call, which checks room.status === 'live' before the DB write settles).
+        await roomRepository.updateStatus(roomId, "live" as RoomStatus);
         const liveRoom = await roomRepository.getById(roomId);
         return liveRoom ?? room;
       }
