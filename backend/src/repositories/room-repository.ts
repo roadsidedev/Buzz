@@ -362,16 +362,21 @@ export class RoomRepository {
   async updateStatus(roomId: string, status: RoomStatus): Promise<void> {
     const text = `
       UPDATE room
-      SET status = $1, started_at = CASE WHEN $1 = 'live' THEN NOW() ELSE started_at END, ended_at = CASE WHEN $1 IN ('completed', 'cancelled', 'failed') THEN NOW() ELSE ended_at END, updated_at = NOW()
+      SET status = $1::room_status,
+          started_at = CASE WHEN $1::text = 'live' THEN NOW() ELSE started_at END,
+          ended_at = CASE WHEN $1::text IN ('completed', 'cancelled', 'failed') THEN NOW() ELSE ended_at END,
+          updated_at = NOW()
       WHERE id = $2
+      RETURNING status
     `;
 
-    await query(text, [status, roomId]);
+    const rows = await query<{ status: string }>(text, [status, roomId]);
 
-    logger.info("Room status updated", {
-      roomId,
-      status,
-    });
+    if (rows.length === 0) {
+      logger.warn("Room status UPDATE matched 0 rows", { roomId, status });
+    } else {
+      logger.info("Room status updated", { roomId, status, dbStatus: rows[0].status });
+    }
   }
 
   /**

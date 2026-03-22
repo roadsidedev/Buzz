@@ -713,8 +713,18 @@ export class RoomService {
   async initializeJamRoom(roomId: string): Promise<Room> {
     const room = await this.getRoomById(roomId);
 
-    // Already has Jam — nothing to do.
+    // Already has Jam — ensure the room is live (status may still be 'pending'
+    // if the status update was interrupted or skipped in a previous call).
     if (room.jamRoomId) {
+      if (room.status === "pending") {
+        logger.info("Jam already set up but room still pending — activating", {
+          roomId,
+          jamRoomId: room.jamRoomId,
+        });
+        await this.updateRoomStatus(roomId, "live");
+        const liveRoom = await roomRepository.getById(roomId);
+        return liveRoom ?? room;
+      }
       logger.info("Jam room already initialized, skipping", {
         roomId,
         jamRoomId: room.jamRoomId,
