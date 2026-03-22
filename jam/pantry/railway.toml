@@ -1,0 +1,14 @@
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "jam/pantry/Dockerfile"
+
+[deploy]
+startCommand = "node ./bin/www"
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 5
+
+[deploy.env]
+PORT = "3000"
+NODE_ENV = "production"
+# REDIS_URL — set this in Railway dashboard, shared with the backend service
+# JAM_HOST  — set to this service's own public Railway URL after first deploy
