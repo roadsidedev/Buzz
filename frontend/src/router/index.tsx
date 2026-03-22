@@ -47,8 +47,8 @@ export const AppRouter: React.FC = () => {
 
           {/* Main Application Routes wrapped in MainLayout */}
           <Route path="/" element={<MainLayout><HomeView /></MainLayout>} />
-          <Route path="/home" element={<Navigate to="/" replace />} />
-          <Route path="/feed" element={<Navigate to="/" replace />} />
+          <Route path="/home" element={<MainLayout><HomeView /></MainLayout>} />
+          <Route path="/feed" element={<MainLayout><HomeView /></MainLayout>} />
           <Route path="/trending" element={<MainLayout><HomeView /></MainLayout>} />
           
           <Route path="/rooms" element={<MainLayout><RoomsView /></MainLayout>} />
