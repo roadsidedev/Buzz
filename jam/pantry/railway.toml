@@ -1,6 +1,6 @@
 [build]
 builder = "DOCKERFILE"
-dockerfilePath = "Dockerfile"
+dockerfilePath = "jam/pantry/Dockerfile"
 
 [deploy]
 startCommand = "node ./bin/www"
