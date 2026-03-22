@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react"
 import { useParams } from "react-router-dom"
-import { Heart, MessageSquare, Users, Share2, DollarSign, Bookmark, Copy, Plus, X, ChevronDown, Check } from "lucide-react"
+import { Heart, MessageSquare, Users, Share2, DollarSign, Bookmark, Copy, Plus, X, ChevronDown, Check, Mic, MicOff, Volume2 } from "lucide-react"
 import axios from "axios"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -10,6 +10,7 @@ import { useAuthStore } from "@/stores/auth-store"
 import { useSocialStore } from "@/stores/social-store"
 import { usePrivy, useWallets } from "@privy-io/react-auth"
 import { TipModal } from "@/components/retro/TipModal"
+import { useJamRoom } from "@/hooks/useJamRoom"
 import { cn } from "@/lib/utils"
 import {
   Dialog,
@@ -39,6 +40,12 @@ export function RoomLivePage() {
   const [shareWizardOpen, setShareWizardOpen] = useState(false)
   const [showChat, setShowChat] = useState(false)
   const [showTipModal, setShowTipModal] = useState(false)
+
+  const jamRoom = useJamRoom({
+    roomId: streamId,
+    pantryUrl: import.meta.env.VITE_PANTRY_URL,
+    autoJoin: !streamLoading && !!stream,
+  })
 
   useEffect(() => {
     if (!streamId) { setStreamLoading(false); return }
@@ -133,13 +140,39 @@ export function RoomLivePage() {
             </div>
           )}
 
-          {/* Stream is live — show feed placeholder */}
+          {/* Stream is live — audio room with speaker grid */}
           {!streamLoading && stream && (
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-              <div className="text-center flex flex-col items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-red-500 animate-pulse" />
-                <p className="text-white/40 text-xs font-medium tracking-widest uppercase">Stream Feed</p>
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 pointer-events-none">
+              <div className="flex flex-wrap justify-center gap-4 max-w-lg px-4">
+                {jamRoom.speakers.map((speakerId: string) => (
+                  <div key={speakerId} className="flex flex-col items-center gap-1">
+                    <div className={cn(
+                      "w-16 h-16 rounded-full border-2 transition-all duration-300",
+                      jamRoom.speaking.includes(speakerId)
+                        ? "border-green-400 shadow-lg shadow-green-400/40 scale-105"
+                        : "border-white/20"
+                    )}>
+                      <img
+                        src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${speakerId}`}
+                        className="w-full h-full rounded-full bg-muted"
+                        alt="Speaker"
+                      />
+                    </div>
+                    {jamRoom.speaking.includes(speakerId) && (
+                      <Volume2 size={12} className="text-green-400" />
+                    )}
+                  </div>
+                ))}
               </div>
+              {jamRoom.isLoading && (
+                <p className="text-white/40 text-xs tracking-widest uppercase animate-pulse">Connecting to audio...</p>
+              )}
+              {!jamRoom.isLoading && jamRoom.inRoom && jamRoom.speakers.length === 0 && (
+                <p className="text-white/30 text-xs tracking-widest uppercase">No speakers yet</p>
+              )}
+              {jamRoom.inRoom && !jamRoom.isLoading && (
+                <p className="text-white/25 text-xs tracking-widest uppercase mt-1">Listening live</p>
+              )}
             </div>
           )}
 
@@ -220,6 +253,20 @@ export function RoomLivePage() {
                 <Button onClick={() => setShareWizardOpen(true)} variant="ghost" size="icon" className="text-white hover:text-blue-500 hover:bg-white/10 rounded-full h-9 w-9">
                   <Share2 size={18} />
                 </Button>
+                {jamRoom.inRoom && (
+                  <Button
+                    onClick={jamRoom.toggleMute}
+                    variant="ghost"
+                    size="icon"
+                    className={cn(
+                      "hover:bg-white/10 rounded-full h-9 w-9",
+                      jamRoom.isMuted ? "text-red-400" : "text-white"
+                    )}
+                    aria-label={jamRoom.isMuted ? "Unmute" : "Mute"}
+                  >
+                    {jamRoom.isMuted ? <MicOff size={18} /> : <Mic size={18} />}
+                  </Button>
+                )}
               </div>
             </div>
           )}

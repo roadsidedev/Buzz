@@ -17,7 +17,12 @@ let _exports = {
 };
 
 if (!local) {
-  let client = createNodeRedisClient({host: 'pantryredis'});
+  const redisUrl = new URL(process.env.REDIS_URL || 'redis://localhost:6379');
+  let client = createNodeRedisClient({
+    host: redisUrl.hostname,
+    port: parseInt(redisUrl.port) || 6379,
+    ...(redisUrl.password ? {auth_pass: redisUrl.password} : {}),
+  });
   client.nodeRedis.on('error', err => {
     console.log('error connecting to redis, host pantryredis');
     console.error(err);

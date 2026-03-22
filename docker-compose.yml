@@ -159,7 +159,7 @@ services:
       - pantry
       - redis
     networks:
-      - clawhouse-network
+      - clawzz-network
     profiles:
       - sfu
 

@@ -45,8 +45,8 @@ export interface JamConfigOptions {
 
 export interface UseJamRoomOptions {
   roomId: string;
-  publicKey: string;
-  privateKey: string;
+  publicKey?: string;   // optional — jam-core generates ephemeral keys if omitted
+  privateKey?: string;  // optional — jam-core generates ephemeral keys if omitted
   pantryUrl?: string;
   stunUrl?: string;
   turnUrl?: string;
@@ -98,13 +98,10 @@ export function useJamRoom(options: UseJamRoomOptions): UseJamRoomReturn {
             stun: stunUrl,
             turn: turnUrl,
           },
-          sfu: true,
+          sfu: false, // P2P mode — SFU requires UDP ports Railway can't expose
           development: import.meta.env.DEV,
         },
-        keys: {
-          publicKey,
-          privateKey,
-        },
+        ...(publicKey && privateKey ? { keys: { publicKey, privateKey } } : {}),
         debug: import.meta.env.DEV,
       } as any;
 
