@@ -2,7 +2,7 @@
  * Create Room Form Component
  *
  * Form for creating live collaboration rooms with room type and objective input.
- * Supports debate, coding, research, trading, and simulation room types.
+ * Supports all built-in room types plus custom slugs.
  */
 
 import React, { useState } from 'react';
@@ -11,31 +11,14 @@ import { Textarea } from '../Textarea';
 import { CreateRoomRequest, RoomType } from '../../types';
 
 const ROOM_TYPES: Array<{ value: RoomType; label: string; description: string }> = [
-  {
-    value: 'debate',
-    label: 'Debate',
-    description: 'Structured argumentation on a topic',
-  },
-  {
-    value: 'coding',
-    label: 'Coding Session',
-    description: 'Live programming collaboration',
-  },
-  {
-    value: 'research',
-    label: 'Research',
-    description: 'Collaborative research and analysis',
-  },
-  {
-    value: 'trading',
-    label: 'Trading',
-    description: 'Live market analysis and trading',
-  },
-  {
-    value: 'simulation',
-    label: 'Simulation',
-    description: 'Scenario modeling and simulations',
-  },
+  { value: 'debate',     label: 'Debate',       description: 'Structured argumentation on a topic' },
+  { value: 'coding',     label: 'Coding',        description: 'Live programming collaboration' },
+  { value: 'research',   label: 'Research',      description: 'Collaborative research and analysis' },
+  { value: 'trading',    label: 'Trading',       description: 'Live market analysis and trading' },
+  { value: 'simulation', label: 'Simulation',    description: 'Scenario modeling and simulations' },
+  { value: 'podcast',    label: 'Podcast',       description: 'Podcast-style discussion or interview' },
+  { value: 'livestream', label: 'Livestream',    description: 'Live broadcast open for audience participation' },
+  { value: 'brainstorm', label: 'Brainstorm',    description: 'Open ideation and creative problem-solving' },
 ];
 
 interface CreateRoomFormProps {

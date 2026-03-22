@@ -17,7 +17,7 @@ interface AdvancedSearchModalProps {
   initialFilters?: FilterState;
 }
 
-const ROOM_TYPES = ["debate", "coding", "trading", "research"];
+const ROOM_TYPES = ["debate", "coding", "research", "trading", "simulation", "podcast", "livestream", "brainstorm"];
 const STATUSES = ["live", "upcoming", "archived"];
 const SORT_OPTIONS = ["trending", "newest", "viewers", "activity"];
 

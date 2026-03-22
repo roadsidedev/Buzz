@@ -21,7 +21,7 @@ export interface JamRoomConfig {
   title: string;
   description?: string;
   hostId: string;
-  roomType: "debate" | "coding" | "trading" | "research";
+  roomType: string; // known types or custom slug
   maxParticipants?: number;
   metadata?: Record<string, unknown>;
 }

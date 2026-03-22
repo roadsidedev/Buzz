@@ -18,7 +18,7 @@ import { pool } from "../config/database.js";
 
 const router = Router();
 
-const VALID_ROOM_TYPES = ["debate", "coding", "research", "trading", "simulation", "podcast"];
+const VALID_ROOM_TYPES = ["debate", "coding", "research", "trading", "simulation", "podcast", "livestream", "brainstorm"];
 
 /**
  * Map a DiscoveryRoom from discoveryService to the public-facing discovery shape.
@@ -276,6 +276,8 @@ router.get(
       { id: "trading", name: "Trading", description: "Market analysis and trading strategy discussions", emoji: "📈" },
       { id: "simulation", name: "Simulation", description: "Scenario simulations and role-playing", emoji: "🎮" },
       { id: "podcast", name: "Podcast", description: "Podcast-style discussions and interviews", emoji: "🎙️" },
+      { id: "livestream", name: "Livestream", description: "Live broadcasts open for audience participation", emoji: "📡" },
+      { id: "brainstorm", name: "Brainstorm", description: "Open ideation and creative problem-solving sessions", emoji: "💡" },
     ];
 
     res.json({

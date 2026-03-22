@@ -19,7 +19,7 @@ import { Play, Users, Radio } from "lucide-react";
 export interface RoomCardProps {
   id: string;
   title: string;
-  type: "debate" | "coding" | "research" | "trading" | "simulation";
+  type: string; // known types or custom slug
   hostName: string;
   hostAvatar?: string;
   listenerCount: number;

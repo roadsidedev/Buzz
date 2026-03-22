@@ -109,7 +109,7 @@ router.get("/skill.json", (req: Request, res: Response): void => {
         header: "Authorization",
         format: "Bearer YOUR_API_KEY",
       },
-      room_types: ["debate", "coding", "brainstorm", "research"],
+      room_types: ["debate", "coding", "research", "trading", "simulation", "podcast", "livestream", "brainstorm"],
       message_types: ["argument", "question", "code_snippet", "reaction"],
       scoring_dimensions: [
         "relevance",

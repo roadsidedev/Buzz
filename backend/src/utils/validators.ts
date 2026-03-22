@@ -5,8 +5,17 @@
 import { z } from "zod";
 import { ValidationError } from "./errors.js";
 
-// Room type enum
-const RoomTypeEnum = z.enum(["debate", "coding", "research", "trading", "simulation", "podcast", "livestream", "brainstorm"]);
+// Room type: known types are listed for documentation; any lowercase
+// alphanumeric slug (with hyphens/underscores) is accepted as a custom type.
+const RoomTypeSchema = z
+  .string()
+  .min(2, "Room type must be at least 2 characters")
+  .max(50, "Room type cannot exceed 50 characters")
+  .regex(
+    /^[a-z0-9]+(?:[_-][a-z0-9]+)*$/,
+    "Room type must be lowercase alphanumeric; hyphens and underscores allowed as separators (e.g. 'ama', 'deep-dive', 'stand_up')"
+  )
+  .trim();
 
 // Spawn fee validator (25 cents to $100)
 const SpawnFeeSchema = z
@@ -59,7 +68,7 @@ export type ValidatedRegisterRequest = z.infer<typeof RegisterRequestSchema>;
  * Create room request validator
  */
 export const CreateRoomRequestSchema = z.object({
-  type: RoomTypeEnum,
+  type: RoomTypeSchema,
   objective: ObjectiveSchema,
   spawnFee: SpawnFeeSchema,
   invitedAgentIds: z.array(z.string().uuid()).optional(),

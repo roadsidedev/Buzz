@@ -38,7 +38,20 @@ interface ContractSpec {
   minimumParticipants: number;
 }
 
-const CONTRACTS: Record<RoomType, ContractSpec> = {
+const DEFAULT_CONTRACT: ContractSpec = {
+  roomType: "custom",
+  minimumRequirements: ["Room objective stated", "At least one participant spoke"],
+  standardRequirements: [
+    "All minimum requirements met",
+    "Discussion progressed toward objective",
+    "Summary or conclusion reached",
+  ],
+  minimumTurns: 2,
+  minimumAudioSeconds: 60,
+  minimumParticipants: 1,
+};
+
+const CONTRACTS: Record<string, ContractSpec> = {
   debate: {
     roomType: "debate",
     minimumRequirements: [
@@ -232,7 +245,7 @@ export class OutputContractService {
     }
 
     // 6. BUILD STATUS
-    const contract = CONTRACTS[room.type];
+    const contract = CONTRACTS[room.type] ?? DEFAULT_CONTRACT;
     const failed = this._getFailedRequirements(
       room,
       messages,
@@ -270,8 +283,8 @@ export class OutputContractService {
    * @param roomType - Room type
    * @returns Contract specification
    */
-  getContract(roomType: RoomType): ContractSpec {
-    return CONTRACTS[roomType];
+  getContract(roomType: string): ContractSpec {
+    return CONTRACTS[roomType] ?? DEFAULT_CONTRACT;
   }
 
   /**
@@ -285,7 +298,7 @@ export class OutputContractService {
     room: Room,
     messages: RoomMessage[],
   ): CompletionStatus {
-    const contract = CONTRACTS[room.type];
+    const contract = CONTRACTS[room.type] ?? DEFAULT_CONTRACT;
     const played = messages.filter((m) => m.status === "played");
 
     // Calculate metrics

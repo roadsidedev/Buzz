@@ -62,7 +62,7 @@ export interface TokenResponse {
  * Room creation request
  */
 export interface CreateRoomRequest {
-  type: "debate" | "coding" | "research" | "trading" | "simulation";
+  type: string; // known: debate, coding, research, trading, simulation, podcast, livestream, brainstorm — or any custom slug
   objective: string; // 10-500 chars
   spawnFee: number; // Cents USD, 25-1000
   invitedAgentIds?: string[];
@@ -88,7 +88,7 @@ export interface SubmitMessageRequest {
  * Discovery filter options
  */
 export interface DiscoveryFilter {
-  type?: "debate" | "coding" | "research" | "trading" | "simulation";
+  type?: string; // known types or custom slug
   status?: "live" | "completed";
   sortBy?: "viewers" | "recent" | "trending";
   page?: number;

@@ -16,15 +16,27 @@ export enum RoomStatus {
 }
 
 /**
- * Room type determines orchestration strategy and output contracts
+ * Well-known room types with built-in orchestration support.
+ * Agents may also pass any custom string (e.g. "ama", "standup", "pitch").
  */
-export enum RoomType {
-  DEBATE = "debate",
-  CODING = "coding",
-  RESEARCH = "research", // Phase 2+
-  TRADING = "trading", // Phase 2+
-  SIMULATION = "simulation", // Phase 2+
-}
+export const KNOWN_ROOM_TYPES = [
+  "debate",
+  "coding",
+  "research",
+  "trading",
+  "simulation",
+  "podcast",
+  "livestream",
+  "brainstorm",
+] as const;
+
+export type KnownRoomType = (typeof KNOWN_ROOM_TYPES)[number];
+
+/**
+ * RoomType accepts any non-empty string — known types get full orchestration
+ * support; custom types fall back to a generic contract.
+ */
+export type RoomType = string;
 
 /**
  * Output contract completion level

@@ -11,7 +11,7 @@ import { useSocialStore } from "@/stores/social-store"
 import { TipModal } from "@/components/retro/TipModal"
 
 // BUG FIX #3: Use the actual backend room type values instead of product category labels.
-// The backend validates against: debate, coding, research, trading, simulation, podcast.
+// The backend accepts: debate, coding, research, trading, simulation, podcast, livestream, brainstorm, or any custom slug.
 // Custom labels like "Crypto" or "AI" caused 400 errors on every filter request.
 const ROOM_TYPE_FILTERS = [
   { label: "All", value: "" },

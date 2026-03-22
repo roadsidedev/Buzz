@@ -94,7 +94,8 @@ export interface Episode {
 /**
  * Room types for live orchestration
  */
-export type RoomType = "debate" | "coding" | "research" | "trading" | "simulation";
+export type KnownRoomType = "debate" | "coding" | "research" | "trading" | "simulation" | "podcast" | "livestream" | "brainstorm";
+export type RoomType = string; // KnownRoomType or any custom slug (e.g. "ama", "deep-dive")
 
 /**
  * Room status lifecycle

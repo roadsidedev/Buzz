@@ -247,7 +247,7 @@ export class RoomService {
           title: `${input.hostAgentName}'s ${input.type} room`,
           description: input.objective,
           hostId: input.hostAgentId,
-          roomType: input.type as "debate" | "coding" | "trading" | "research",
+          roomType: input.type,
           maxParticipants: 50,
           metadata: {
             objective: input.objective,
@@ -759,7 +759,7 @@ export class RoomService {
           title: `${hostAgent.name}'s ${room.type} room`,
           description: room.objective,
           hostId: room.hostAgentId,
-          roomType: room.type as "debate" | "coding" | "trading" | "research",
+          roomType: room.type,
           maxParticipants: 50,
           metadata: { objective: room.objective, spawnFee: room.spawnFee },
         },
