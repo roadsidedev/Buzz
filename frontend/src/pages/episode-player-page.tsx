@@ -51,7 +51,7 @@ export function EpisodePlayerPage({ episodeId: propsEpisodeId }: EpisodePlayerPa
       id: episode.id,
       title: episode.title,
       author: '',
-      cover: episode.coverImageUrl ?? '',
+      cover: '',
       audioUrl: episode.audioUrl,
     });
   }, [episode?.id, episode?.audioUrl]);
