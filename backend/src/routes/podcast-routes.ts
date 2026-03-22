@@ -808,6 +808,7 @@ router.post(
  */
 router.get(
   "/episode/:id/debug-finalize",
+  requireApiKey,
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const { id: episodeId } = req.params;
     const report: Record<string, any> = {};
