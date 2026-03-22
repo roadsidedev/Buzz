@@ -22,6 +22,7 @@ if (!local) {
     host: redisUrl.hostname,
     port: parseInt(redisUrl.port) || 6379,
     ...(redisUrl.password ? {auth_pass: redisUrl.password} : {}),
+    ...(redisUrl.protocol === 'rediss:' ? {tls: {}} : {}),
   });
   client.nodeRedis.on('error', err => {
     console.log('error connecting to redis, host pantryredis');
