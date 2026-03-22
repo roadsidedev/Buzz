@@ -47,8 +47,8 @@ export class RoomRepository {
     scheduled_for?: Date;
   }): Promise<Room> {
     const text = `
-      INSERT INTO room (id, host_agent_id, title, type, status, objective, spawn_fee, viewer_count, participant_count, completion_level, created_at, updated_at, scheduled_for)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, 0, 1, 'minimum', NOW(), NOW(), $8)
+      INSERT INTO room (id, host_agent_id, title, type, status, objective, spawn_fee, viewer_count, participant_count, completion_level, visibility, created_at, updated_at, scheduled_for)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, 0, 1, 'minimum', 'public', NOW(), NOW(), $8)
       RETURNING id, host_agent_id, title, type, status, objective, spawn_fee, jam_room_id, jam_room_url, spawn_fee_payment_id, viewer_count, participant_count, completion_level, created_at, started_at, ended_at, updated_at, scheduled_for
     `;
 
