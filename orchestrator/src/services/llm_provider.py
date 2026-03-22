@@ -27,6 +27,37 @@ class LLMProvider(Protocol):
         """
 
 
+class FallbackProvider:
+    """Wraps an active provider with a fallback.
+
+    On any exception from the active provider, the call is retried once
+    against the fallback provider and a warning is logged.  This powers
+    the ACTIVE_LLM_GATEWAY toggle: set it to "bankr" to promote Bankr to
+    the active slot with the primary provider as fallback, or leave it as
+    "primary" (default) to keep the existing provider active with Bankr
+    catching failures.
+    """
+
+    def __init__(self, active: Any, fallback: Any, active_name: str, fallback_name: str):
+        self._active = active
+        self._fallback = fallback
+        self._active_name = active_name
+        self._fallback_name = fallback_name
+
+    def messages_create(self, *args, **kwargs) -> Any:
+        try:
+            return self._active.messages_create(*args, **kwargs)
+        except Exception as exc:
+            logger.warning(
+                "Active LLM gateway '%s' failed (%s: %s) — retrying with fallback '%s'",
+                self._active_name,
+                type(exc).__name__,
+                exc,
+                self._fallback_name,
+            )
+            return self._fallback.messages_create(*args, **kwargs)
+
+
 def _detect_provider_from_env() -> tuple[str | None, str | None]:
     """Detect provider name and API key from environment variables.
 
@@ -102,10 +133,10 @@ def get_provider(name: str | None = None, api_key: str | None = None) -> LLMProv
         for cls_name in class_names:
             provider_cls = getattr(mod, cls_name, None)
             if provider_cls:
-                return provider_cls(api_key=key)
+                return _wrap_with_bankr_fallback(provider_cls(api_key=key))
         # If module exists but class not found, try a factory function
         if hasattr(mod, "get_provider"):
-            return mod.get_provider(api_key=key)
+            return _wrap_with_bankr_fallback(mod.get_provider(api_key=key))
     except ModuleNotFoundError:
         logger.debug("No adapter module for provider '%s' (%s)", provider, module_name)
     except Exception as e:
@@ -118,7 +149,9 @@ def get_provider(name: str | None = None, api_key: str | None = None) -> LLMProv
         try:
             from .providers.generic_provider import GenericHTTPProvider
 
-            return GenericHTTPProvider(api_key=key, api_url=api_url, provider_name=provider)
+            return _wrap_with_bankr_fallback(
+                GenericHTTPProvider(api_key=key, api_url=api_url, provider_name=provider)
+            )
         except Exception as e:
             logger.error("Failed to initialize GenericHTTPProvider: %s", e)
             raise
@@ -126,3 +159,35 @@ def get_provider(name: str | None = None, api_key: str | None = None) -> LLMProv
     raise ImportError(
         f"No adapter found for provider '{provider}'. Add a provider adapter module 'providers/{provider}_provider.py' or set LLM_API_URL for a generic HTTP provider."
     )
+
+
+def _wrap_with_bankr_fallback(primary: Any) -> Any:
+    """Wrap *primary* with a Bankr fallback (or vice-versa) based on settings.
+
+    Controlled entirely by two env vars:
+      BANKR_API_KEY       — set to a bk_... key to enable Bankr; leave empty to disable.
+      ACTIVE_LLM_GATEWAY  — "primary" (default) keeps existing provider active with Bankr
+                            as fallback.  "bankr" promotes Bankr to active and demotes the
+                            existing provider to fallback.
+
+    Returns the original provider unchanged when BANKR_API_KEY is not set.
+    """
+    bankr_key = settings.BANKR_API_KEY
+    if not bankr_key:
+        return primary
+
+    try:
+        from .providers.bankr_provider import BankrProvider
+
+        bankr = BankrProvider(api_key=bankr_key, base_url=settings.BANKR_BASE_URL)
+    except Exception as exc:
+        logger.error("Failed to initialise BankrProvider — Bankr fallback disabled: %s", exc)
+        return primary
+
+    active_gateway = (settings.ACTIVE_LLM_GATEWAY or "primary").lower()
+    if active_gateway == "bankr":
+        logger.info("LLM gateway: Bankr is ACTIVE, primary provider is fallback")
+        return FallbackProvider(active=bankr, fallback=primary, active_name="bankr", fallback_name="primary")
+
+    logger.info("LLM gateway: primary provider is ACTIVE, Bankr is fallback")
+    return FallbackProvider(active=primary, fallback=bankr, active_name="primary", fallback_name="bankr")

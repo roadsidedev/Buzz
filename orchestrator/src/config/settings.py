@@ -34,6 +34,16 @@ class Settings(BaseSettings):
     LLM_API_KEY: str = ""
     # Optional: explicit API URL for providers that expose HTTP endpoints
     LLM_API_URL: str = ""
+
+    # Bankr LLM Gateway (https://llm.bankr.bot)
+    # ACTIVE_LLM_GATEWAY controls which gateway is used for every call:
+    #   "primary" (default) — existing provider is active, Bankr is the auto-fallback
+    #   "bankr"             — Bankr is active, existing provider is the auto-fallback
+    # Set BANKR_API_KEY to a bk_... key (from bankr.bot/api) to enable Bankr.
+    # Leave BANKR_API_KEY empty to disable Bankr entirely (no fallback, no routing).
+    ACTIVE_LLM_GATEWAY: str = "primary"
+    BANKR_API_KEY: str = ""
+    BANKR_BASE_URL: str = "https://llm.bankr.bot"
     
     # Model configurations (defaults per provider)
     # Anthropic models
