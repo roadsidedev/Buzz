@@ -723,7 +723,14 @@ export class RoomService {
         });
         // Use the repository directly (bypassing updateRoomStatus's orchestrator
         // call, which checks room.status === 'live' before the DB write settles).
-        await roomRepository.updateStatus(roomId, "live" as RoomStatus);
+        try {
+          await roomRepository.updateStatus(roomId, "live" as RoomStatus);
+        } catch (activateErr) {
+          logger.warn("Failed to activate room status to live", {
+            roomId,
+            error: activateErr instanceof Error ? activateErr.message : String(activateErr),
+          });
+        }
         const liveRoom = await roomRepository.getById(roomId);
         return liveRoom ?? room;
       }
