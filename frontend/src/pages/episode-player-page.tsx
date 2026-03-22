@@ -6,7 +6,7 @@
  * and keyboard shortcuts.
  */
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
   Play, 
@@ -22,6 +22,7 @@ import {
   DollarSign
 } from 'lucide-react';
 import { useEpisode } from '../hooks';
+import { usePlayerStore } from '../stores/player-store';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -39,72 +40,36 @@ export function EpisodePlayerPage({ episodeId: propsEpisodeId }: EpisodePlayerPa
   const navigate = useNavigate();
   const episodeId = propsEpisodeId || params.id;
   const { episode, isLoading, error, isGenerating, progress } = useEpisode(episodeId);
-  const audioRef = useRef<HTMLAudioElement>(null);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [currentTime, setCurrentTime] = useState(0);
-  const [playbackRate, setPlaybackRate] = useState(1);
+  const { isPlaying, currentTime, playbackRate, togglePlay, seekTo, setPlaybackRate, setPlayingPodcast } = usePlayerStore();
   const [showTranscript, setShowTranscript] = useState(true);
   const [showTipModal, setShowTipModal] = useState(false);
 
-  const togglePlayback = () => {
-    if (audioRef.current) {
-      if (isPlaying) {
-        audioRef.current.pause();
-      } else {
-        audioRef.current.play().catch(console.error);
-      }
-      setIsPlaying(!isPlaying);
-    }
-  };
-
-  const handlePlaybackRateChange = (rate: number) => {
-    if (audioRef.current) {
-      audioRef.current.playbackRate = rate;
-    }
-    setPlaybackRate(rate);
-  };
-
-  const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const time = parseFloat(e.target.value);
-    if (audioRef.current) {
-      audioRef.current.currentTime = time;
-    }
-    setCurrentTime(time);
-  };
-
+  // Register episode with global player when audio is ready
   useEffect(() => {
-    const audio = audioRef.current;
-    if (!audio) return;
-
-    const handleTimeUpdate = () => setCurrentTime(audio.currentTime);
-    const handleEnded = () => setIsPlaying(false);
-
-    audio.addEventListener('timeupdate', handleTimeUpdate);
-    audio.addEventListener('ended', handleEnded);
-
-    return () => {
-      audio.removeEventListener('timeupdate', handleTimeUpdate);
-      audio.removeEventListener('ended', handleEnded);
-    };
-  }, [episode?.audioUrl]);
+    if (!episode?.audioUrl) return;
+    setPlayingPodcast({
+      id: episode.id,
+      title: episode.title,
+      author: '',
+      cover: episode.coverImageUrl ?? '',
+      audioUrl: episode.audioUrl,
+    });
+  }, [episode?.id, episode?.audioUrl]);
 
   useEffect(() => {
     const handleKeyPress = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
       if (e.code === 'Space') {
         e.preventDefault();
-        togglePlayback();
+        togglePlay();
       }
-      if (e.code === 'ArrowRight') {
-        if (audioRef.current) audioRef.current.currentTime += 5;
-      }
-      if (e.code === 'ArrowLeft') {
-        if (audioRef.current) audioRef.current.currentTime -= 5;
-      }
+      if (e.code === 'ArrowRight') seekTo(currentTime + 5);
+      if (e.code === 'ArrowLeft') seekTo(Math.max(0, currentTime - 5));
     };
 
     window.addEventListener('keydown', handleKeyPress);
     return () => window.removeEventListener('keydown', handleKeyPress);
-  }, [isPlaying]);
+  }, [currentTime, isPlaying]);
 
   const formatTime = (seconds: number): string => {
     const mins = Math.floor(seconds / 60);
@@ -192,16 +157,15 @@ export function EpisodePlayerPage({ episodeId: propsEpisodeId }: EpisodePlayerPa
                   <Play size={12} fill="currentColor" /> Currently Playing
                 </div>
 
-                <audio ref={audioRef} src={episode.audioUrl} />
-
                 {/* Custom Progress Bar */}
                 <div className="space-y-3">
                   <input
                     type="range"
+                    title="Seek"
                     min="0"
                     max={episode.duration || 0}
                     value={currentTime}
-                    onChange={handleSeek}
+                    onChange={(e) => seekTo(parseFloat(e.target.value))}
                     disabled={isGenerating}
                     className="w-full h-1.5 bg-secondary rounded-lg appearance-none cursor-pointer accent-primary"
                   />
@@ -218,26 +182,26 @@ export function EpisodePlayerPage({ episodeId: propsEpisodeId }: EpisodePlayerPa
                       variant="outline" 
                       size="icon" 
                       className="rounded-full h-10 w-10 border-2"
-                      onClick={() => { if (audioRef.current) audioRef.current.currentTime -= 15 }}
+                      onClick={() => seekTo(Math.max(0, currentTime - 15))}
                       disabled={isGenerating || !episode.audioUrl}
                     >
                       <RotateCcw size={18} />
                     </Button>
-                    
+
                     <Button
                       size="icon"
                       className="h-14 w-14 rounded-full shadow-lg shadow-primary/20 transition-transform active:scale-95"
-                      onClick={togglePlayback}
+                      onClick={togglePlay}
                       disabled={isGenerating || !episode.audioUrl}
                     >
                       {isPlaying ? <Pause size={28} fill="currentColor" /> : <Play size={28} fill="currentColor" className="ml-1" />}
                     </Button>
 
-                    <Button 
-                      variant="outline" 
-                      size="icon" 
+                    <Button
+                      variant="outline"
+                      size="icon"
                       className="rounded-full h-10 w-10 border-2"
-                      onClick={() => { if (audioRef.current) audioRef.current.currentTime += 15 }}
+                      onClick={() => seekTo(currentTime + 15)}
                       disabled={isGenerating || !episode.audioUrl}
                     >
                       <RotateCw size={18} />
@@ -256,7 +220,7 @@ export function EpisodePlayerPage({ episodeId: propsEpisodeId }: EpisodePlayerPa
                           "rounded-full h-8 px-3 text-[10px] font-black uppercase tracking-wider",
                           playbackRate === rate && "bg-background shadow-sm"
                         )}
-                        onClick={() => handlePlaybackRateChange(rate)}
+                        onClick={() => setPlaybackRate(rate)}
                         disabled={isGenerating || !episode.audioUrl}
                       >
                         {rate}x

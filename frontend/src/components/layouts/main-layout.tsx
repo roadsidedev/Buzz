@@ -39,7 +39,7 @@ export function MainLayout({ children }: MainLayoutProps) {
   const location = useLocation()
   const audioRef = useRef<HTMLAudioElement>(null)
 
-  const { playingPodcast, isPlaying, replayTrigger, setPlayingPodcast, setIsPlaying, togglePlay } = usePlayerStore()
+  const { playingPodcast, isPlaying, replayTrigger, pendingSeekTime, playbackRate, setPlayingPodcast, setIsPlaying, togglePlay, seekTo, setCurrentTime: setCurrentTimeInStore, clearPendingSeek } = usePlayerStore()
   const [searchQuery, setSearchQuery] = useState("")
   const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false)
   const [currentTime, setCurrentTime] = useState(0)
@@ -85,7 +85,10 @@ export function MainLayout({ children }: MainLayoutProps) {
     const audio = audioRef.current;
     if (!audio) return;
 
-    const handleTimeUpdate = () => setCurrentTime(audio.currentTime);
+    const handleTimeUpdate = () => {
+      setCurrentTime(audio.currentTime);
+      setCurrentTimeInStore(audio.currentTime);
+    };
     const handleLoadedMetadata = () => setDuration(audio.duration);
     const handleEnded = () => setIsPlaying(false);
 
@@ -100,18 +103,25 @@ export function MainLayout({ children }: MainLayoutProps) {
     };
   }, []);
 
+  // Apply seeks triggered by episode page or other consumers
+  useEffect(() => {
+    if (pendingSeekTime !== null && audioRef.current) {
+      audioRef.current.currentTime = pendingSeekTime;
+      clearPendingSeek();
+    }
+  }, [pendingSeekTime]);
+
+  // Apply playback rate changes from episode page
+  useEffect(() => {
+    if (audioRef.current) {
+      audioRef.current.playbackRate = playbackRate;
+    }
+  }, [playbackRate]);
+
   const formatTime = (seconds: number): string => {
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
     return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
-
-  const handleSeek = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!audioRef.current || !duration) return;
-    const rect = e.currentTarget.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const percentage = x / rect.width;
-    audioRef.current.currentTime = percentage * duration;
   };
 
   const isActive = (path: string) => location.pathname === path || (path !== "/" && location.pathname.startsWith(path))
@@ -175,6 +185,7 @@ export function MainLayout({ children }: MainLayoutProps) {
         <header className="sticky top-0 z-40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b p-4 lg:px-8 flex items-center justify-between gap-4">
           {/* Mobile Search Button (Left) */}
           <button
+            title="Search"
             className="lg:hidden shrink-0 p-2 hover:bg-muted rounded-lg transition-colors"
             onClick={() => setIsMobileSearchOpen(true)}
           >
@@ -305,25 +316,29 @@ export function MainLayout({ children }: MainLayoutProps) {
                 <p className="text-xs text-muted-foreground truncate">{playingPodcast.author}</p>
               </div>
               <div className="flex items-center gap-4 px-4 shrink-0">
-                <button 
+                <button
+                  title="Skip back 10s"
                   className="text-muted-foreground hover:text-foreground transition-colors"
-                  onClick={() => { if (audioRef.current) audioRef.current.currentTime -= 10 }}
+                  onClick={() => seekTo(Math.max(0, currentTime - 10))}
                 >
                   <SkipBack size={20} />
                 </button>
                 <button
+                  title={isPlaying ? "Pause" : "Play"}
                   onClick={togglePlay}
                   className="w-10 h-10 bg-primary text-primary-foreground rounded-full flex items-center justify-center hover:bg-primary/90 transition-colors"
                 >
                   {isPlaying ? <Pause size={18} fill="currentColor" /> : <PlayIcon size={18} fill="currentColor" className="ml-0.5" />}
                 </button>
-                <button 
+                <button
+                  title="Skip forward 10s"
                   className="text-muted-foreground hover:text-foreground transition-colors"
-                  onClick={() => { if (audioRef.current) audioRef.current.currentTime += 10 }}
+                  onClick={() => seekTo(currentTime + 10)}
                 >
                   <SkipForward size={20} />
                 </button>
-                <button 
+                <button
+                  title="Close player"
                   onClick={() => setPlayingPodcast(null)}
                   className="ml-2 text-muted-foreground hover:text-foreground transition-colors"
                 >
@@ -334,15 +349,19 @@ export function MainLayout({ children }: MainLayoutProps) {
             
             <div className="w-full flex items-center gap-3 px-1">
               <span className="text-[10px] font-medium text-muted-foreground w-8 text-right shrink-0">{formatTime(currentTime)}</span>
-              <div 
-                className="h-1.5 flex-grow bg-secondary rounded-full overflow-hidden cursor-pointer relative"
-                onClick={handleSeek}
-              >
-                <div 
-                  className="absolute top-0 left-0 h-full bg-primary transition-all duration-100" 
-                  style={{ width: `${(currentTime / (duration || 1)) * 100}%` }}
-                ></div>
-              </div>
+              <input
+                type="range"
+                min="0"
+                max={duration || 0}
+                value={currentTime}
+                onChange={(e) => {
+                  const t = parseFloat(e.target.value);
+                  setCurrentTime(t);
+                  if (audioRef.current) audioRef.current.currentTime = t;
+                }}
+                title="Seek"
+                className="flex-grow h-1.5 accent-primary cursor-pointer"
+              />
               <span className="text-[10px] font-medium text-muted-foreground w-8 shrink-0">{formatTime(duration)}</span>
             </div>
           </div>
@@ -354,6 +373,7 @@ export function MainLayout({ children }: MainLayoutProps) {
             <div className="p-4 pt-6">
               <div className="flex items-center gap-3 mb-4">
                 <button
+                  title="Close search"
                   onClick={() => setIsMobileSearchOpen(false)}
                   className="p-2 hover:bg-muted rounded-lg transition-colors"
                 >
