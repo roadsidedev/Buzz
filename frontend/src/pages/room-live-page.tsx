@@ -31,6 +31,7 @@ export function RoomLivePage() {
   
   const [stream, setStream] = useState<any>(null)
   const [streamLoading, setStreamLoading] = useState(true)
+  const [viewerCount, setViewerCount] = useState(0)
   const [chat, setChat] = useState<{ user: string; msg: string; isAgent: boolean; isPriority: boolean }[]>([])
   const [message, setMessage] = useState("")
   const [qnaCredits, setQnaCredits] = useState(0)
@@ -42,10 +43,34 @@ export function RoomLivePage() {
   useEffect(() => {
     if (!streamId) { setStreamLoading(false); return }
     axios.get(`${apiUrl}/livestreams/${streamId}`)
-      .then(res => setStream(res.data?.data?.stream || null))
+      .then(res => {
+        const s = res.data?.data?.stream || null
+        setStream(s)
+        if (s) {
+          setViewerCount(s.viewerCount ?? 0)
+          // Register this view — fire and forget
+          axios.post(`${apiUrl}/livestreams/${streamId}/view`)
+            .then(r => { if (r.data?.data?.viewerCount !== undefined) setViewerCount(r.data.data.viewerCount) })
+            .catch(() => {})
+        }
+      })
       .catch(() => setStream(null))
       .finally(() => setStreamLoading(false))
   }, [streamId, apiUrl])
+
+  // Poll viewer count every 30 seconds
+  useEffect(() => {
+    if (!streamId || streamLoading) return
+    const interval = setInterval(() => {
+      axios.get(`${apiUrl}/livestreams/${streamId}`)
+        .then(res => {
+          const s = res.data?.data?.stream
+          if (s) setViewerCount(s.viewerCount ?? 0)
+        })
+        .catch(() => {})
+    }, 30000)
+    return () => clearInterval(interval)
+  }, [streamId, apiUrl, streamLoading])
 
   const requireAuth = (fn: () => void) => {
     if (!authenticated) {
@@ -82,7 +107,6 @@ export function RoomLivePage() {
 
   const hostName = stream?.hostAgentName || "Unknown Agent"
   const streamTitle = stream?.title || "Livestream"
-  const viewerCount = stream?.viewerCount ?? 0
   const viewerDisplay = viewerCount >= 1000
     ? `${(viewerCount / 1000).toFixed(1)}K`
     : String(viewerCount)
@@ -92,15 +116,32 @@ export function RoomLivePage() {
       {/* Full-width video player */}
       <div className="h-[calc(100vh-120px)] min-h-[600px]">
         <Card className="w-full h-full bg-black/95 overflow-hidden relative border-none rounded-xl">
-          {/* Spinner / connecting state */}
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div className="text-center flex flex-col items-center">
-              <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mb-6"></div>
-              <p className="text-white font-medium tracking-wide">
-                {streamLoading ? "Loading stream..." : stream ? "Connecting to Stream Node..." : "Stream not found or has ended."}
-              </p>
+          {/* Loading state */}
+          {streamLoading && (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="text-center flex flex-col items-center">
+                <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mb-6"></div>
+                <p className="text-white font-medium tracking-wide">Loading stream...</p>
+              </div>
             </div>
-          </div>
+          )}
+
+          {/* Stream not found */}
+          {!streamLoading && !stream && (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <p className="text-white/60 font-medium tracking-wide">Stream not found or has ended.</p>
+            </div>
+          )}
+
+          {/* Stream is live — show feed placeholder */}
+          {!streamLoading && stream && (
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <div className="text-center flex flex-col items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-red-500 animate-pulse" />
+                <p className="text-white/40 text-xs font-medium tracking-widest uppercase">Stream Feed</p>
+              </div>
+            </div>
+          )}
 
           {/* Top-left: Live badge */}
           {stream && (

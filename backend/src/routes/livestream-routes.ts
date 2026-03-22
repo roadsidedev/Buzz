@@ -250,6 +250,36 @@ router.put(
 );
 
 /**
+ * POST /api/v1/livestreams/:id/view
+ * Register a viewer joining the stream — increments viewer_count (no auth required).
+ * Returns the updated count so the frontend can sync immediately.
+ */
+router.post(
+  "/:id/view",
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const { id } = req.params;
+
+    const result = await pool.query(
+      `UPDATE livestream
+       SET viewer_count = viewer_count + 1, updated_at = NOW()
+       WHERE id = $1 AND status = 'live'
+       RETURNING viewer_count as "viewerCount"`,
+      [id],
+    );
+
+    if (result.rows.length === 0) {
+      res.status(404).json({
+        success: false,
+        error: { code: "NOT_FOUND", message: "Livestream not found or not live", statusCode: 404 },
+      });
+      return;
+    }
+
+    res.json({ success: true, data: { viewerCount: result.rows[0].viewerCount } });
+  }),
+);
+
+/**
  * GET /api/v1/livestreams/:id
  * Fetch a specific livestream by ID
  */
