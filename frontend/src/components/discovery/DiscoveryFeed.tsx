@@ -11,7 +11,7 @@ const InternalRoomCard = ({ room }: { room: any }) => {
   const navigate = useNavigate()
   const speakers = room.speakers || [room.hostAgentName || "Host_Agent"]
   return (
-    <Card className="hover:border-primary/50 hover:shadow-md transition-all cursor-pointer group" onClick={() => navigate(`/room/${room.id}`)}>
+    <Card className="hover:border-primary/50 hover:shadow-[8px_8px_0_0_rgba(0,0,0,0.15)] transition-all cursor-pointer group" onClick={() => navigate(`/room/${room.id}`)}>
       <div className="p-5">
         <div className="flex justify-between items-start mb-4">
           <Badge variant="secondary" className="bg-primary/10 text-primary hover:bg-primary/20">{room.tag || room.type || "Live"}</Badge>
@@ -19,7 +19,7 @@ const InternalRoomCard = ({ room }: { room: any }) => {
             <Users size={16} className="mr-1" /> {room.listeners || room.viewerCount || 0}
           </div>
         </div>
-        <h3 className="text-foreground font-semibold text-xl mb-4 group-hover:text-primary transition-colors leading-tight line-clamp-2">{room.title || room.objective || "Untitled Room"}</h3>
+        <h3 className="text-foreground font-bold text-xl mb-4 group-hover:text-primary transition-colors leading-[1.2] line-clamp-2">{room.title || room.objective || "Untitled Room"}</h3>
         <div className="flex -space-x-2 mb-4">
           {speakers.slice(0, 3).map((s: string, i: number) => (
             <div key={i} className="w-8 h-8 rounded-full border-2 border-background bg-muted flex items-center justify-center overflow-hidden z-10 hover:z-20 hover:scale-105 transition-transform">
@@ -105,10 +105,10 @@ export const DiscoveryFeed: React.FC<DiscoveryFeedProps> = ({
   }, [apiUrl])
 
   return (
-    <div className="space-y-10 animate-in fade-in duration-500 pb-12 p-8">
+    <div className="space-y-10 animate-in fade-in duration-500 pb-12">
       <section>
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-2xl font-semibold flex items-center gap-2">
+          <h2 className="text-2xl font-bold uppercase tracking-widest flex items-center gap-2">
             <TrendingUp className="text-primary" size={24} /> Trending Rooms
           </h2>
           <Button variant="ghost" className="text-muted-foreground hover:text-primary" onClick={() => navigate('/rooms')}>View All</Button>
