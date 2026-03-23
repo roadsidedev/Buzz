@@ -7,6 +7,7 @@
 
 import React, { useEffect, useState, useCallback } from "react";
 import { useJamRoom } from "@/hooks/useJamRoom.js";
+import { useRoomRecording } from "@/hooks/useRoomRecording";
 import { SpeakerGrid } from "./SpeakerGrid.jsx";
 import { ListenerList } from "./ListenerList.jsx";
 import { RoomControls } from "./RoomControls.jsx";
@@ -57,6 +58,23 @@ export function AudioRoom({
   });
 
   const [error, setError] = useState<string | null>(null);
+
+  const {
+    isRecording,
+    startRecording,
+    stopRecording,
+    recordingUrl,
+    downloadRecording,
+    clearRecording,
+  } = useRoomRecording();
+
+  const handleRecordToggle = useCallback(() => {
+    if (isRecording) {
+      stopRecording();
+    } else {
+      startRecording();
+    }
+  }, [isRecording, startRecording, stopRecording]);
 
   useEffect(() => {
     if (jamError) {
@@ -155,6 +173,30 @@ export function AudioRoom({
         </div>
       </div>
 
+      {/* Recording download banner */}
+      {recordingUrl && (
+        <div className="flex items-center justify-between gap-3 px-4 py-2 bg-green-500/10 border-t border-green-500/20 text-green-400 text-sm">
+          <span className="font-medium">Recording ready</span>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => downloadRecording()}
+              className="px-3 py-1 rounded bg-green-500/20 hover:bg-green-500/30 transition-colors font-medium"
+            >
+              Download
+            </button>
+            <button
+              type="button"
+              onClick={clearRecording}
+              className="px-2 py-1 rounded hover:bg-white/10 transition-colors opacity-60 hover:opacity-100"
+              title="Dismiss"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Controls */}
       <div className="audio-room-controls p-4 border-t bg-muted/30">
         <RoomControls
@@ -163,6 +205,8 @@ export function AudioRoom({
           onMuteToggle={handleMuteToggle}
           onLeave={handleLeave}
           onReaction={handleReaction}
+          isRecording={isRecording}
+          onRecordToggle={handleRecordToggle}
         />
       </div>
     </div>

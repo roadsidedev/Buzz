@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react"
-import { useParams } from "react-router-dom"
+import { useParams, useMatch } from "react-router-dom"
 import { Heart, MessageSquare, Users, Share2, DollarSign, Bookmark, Copy, Plus, X, ChevronDown, Check, Mic, MicOff, Volume2 } from "lucide-react"
 import axios from "axios"
 import { Card } from "@/components/ui/card"
@@ -24,6 +24,7 @@ export function RoomLivePage() {
   const params = useParams()
   const streamId = params.id || ""
   const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:4000/api/v1'
+  const isAudioRoom = !!useMatch('/room/:id/live')
 
   const { authenticated } = useAuthStore()
   const { login } = usePrivy()
@@ -49,25 +50,51 @@ export function RoomLivePage() {
 
   useEffect(() => {
     if (!streamId) { setStreamLoading(false); return }
-    axios.get(`${apiUrl}/livestreams/${streamId}`)
-      .then(res => {
-        const s = res.data?.data?.stream || null
-        setStream(s)
-        if (s) {
-          setViewerCount(s.viewerCount ?? 0)
-          // Register this view — fire and forget
-          axios.post(`${apiUrl}/livestreams/${streamId}/view`)
-            .then(r => { if (r.data?.data?.viewerCount !== undefined) setViewerCount(r.data.data.viewerCount) })
-            .catch(() => {})
-        }
-      })
-      .catch(() => setStream(null))
-      .finally(() => setStreamLoading(false))
-  }, [streamId, apiUrl])
+    if (isAudioRoom) {
+      // Audio room: fetch from /rooms/:id and map fields to stream shape
+      axios.get(`${apiUrl}/rooms/${streamId}`)
+        .then(res => {
+          const room = res.data?.data?.room || res.data?.data || null
+          if (room) {
+            setStream({
+              id: room.id,
+              title: room.title || room.objective || 'Audio Room',
+              description: room.objective || '',
+              category: room.type || 'podcast',
+              hostAgentName: room.hostAgent?.name || room.hostAgentName || 'Host',
+              hostAgentId: room.hostAgent?.id || room.hostAgentId || '',
+              hostAgentAvatar: room.hostAgent?.avatar || null,
+              viewerCount: room.viewerCount ?? 0,
+              status: room.status,
+            })
+            setViewerCount(room.viewerCount ?? 0)
+          } else {
+            setStream(null)
+          }
+        })
+        .catch(() => setStream(null))
+        .finally(() => setStreamLoading(false))
+    } else {
+      axios.get(`${apiUrl}/livestreams/${streamId}`)
+        .then(res => {
+          const s = res.data?.data?.stream || null
+          setStream(s)
+          if (s) {
+            setViewerCount(s.viewerCount ?? 0)
+            // Register this view — fire and forget
+            axios.post(`${apiUrl}/livestreams/${streamId}/view`)
+              .then(r => { if (r.data?.data?.viewerCount !== undefined) setViewerCount(r.data.data.viewerCount) })
+              .catch(() => {})
+          }
+        })
+        .catch(() => setStream(null))
+        .finally(() => setStreamLoading(false))
+    }
+  }, [streamId, apiUrl, isAudioRoom])
 
-  // Poll viewer count every 30 seconds
+  // Poll viewer count every 30 seconds (livestreams only)
   useEffect(() => {
-    if (!streamId || streamLoading) return
+    if (!streamId || streamLoading || isAudioRoom) return
     const interval = setInterval(() => {
       axios.get(`${apiUrl}/livestreams/${streamId}`)
         .then(res => {
@@ -77,7 +104,7 @@ export function RoomLivePage() {
         .catch(() => {})
     }, 30000)
     return () => clearInterval(interval)
-  }, [streamId, apiUrl, streamLoading])
+  }, [streamId, apiUrl, streamLoading, isAudioRoom])
 
   const requireAuth = (fn: () => void) => {
     if (!authenticated) {

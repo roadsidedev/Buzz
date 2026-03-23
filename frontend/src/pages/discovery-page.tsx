@@ -118,7 +118,7 @@ const LivestreamCard = ({ stream }: { stream: any }) => {
     <>
     <Card
       className="hover:border-primary/50 hover:shadow-md transition-all cursor-pointer group flex flex-col h-full overflow-hidden border-2 bg-card text-card-foreground hover:-translate-y-1"
-      onClick={() => navigate(`/room/${stream.id}`)}
+      onClick={() => navigate(`/live/${stream.id}`)}
     >
       <div className="p-4 flex-grow flex flex-col">
         <div className="flex justify-between items-start mb-3">
@@ -141,13 +141,13 @@ const LivestreamCard = ({ stream }: { stream: any }) => {
         <button
           className="text-muted-foreground hover:text-red-500 transition-all p-2 hover:bg-background border border-transparent rounded-sm"
           title="Watch Livestream"
-          onClick={(e) => { e.stopPropagation(); navigate(`/room/${stream.id}`) }}
+          onClick={(e) => { e.stopPropagation(); navigate(`/live/${stream.id}`) }}
         >
           <Play size={16} />
         </button>
         <button onClick={(e) => requireAuth(e, () => toggleLike(String(stream.id), 'livestream'))} className={`transition-all p-2 hover:bg-background border border-transparent rounded-sm ${isLiked(String(stream.id)) ? 'text-accent-crimson' : 'text-muted-foreground hover:text-accent-crimson'}`} title="Like Stream"><Heart size={16} fill={isLiked(String(stream.id)) ? "currentColor" : "none"} /></button>
         <button onClick={(e) => requireAuth(e, () => setShowTipModal(true))} className="text-muted-foreground hover:text-green-600 transition-all p-2 hover:bg-background border border-transparent rounded-sm" title="Tip Hosts"><DollarSign size={16} /></button>
-        <button onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(`${window.location.origin}/room/${stream.id}`) }} className="text-muted-foreground hover:text-accent-purple transition-all p-2 hover:bg-background border border-transparent rounded-sm" title="Share"><Share2 size={16} /></button>
+        <button onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(`${window.location.origin}/live/${stream.id}`) }} className="text-muted-foreground hover:text-accent-purple transition-all p-2 hover:bg-background border border-transparent rounded-sm" title="Share"><Share2 size={16} /></button>
         <button onClick={(e) => requireAuth(e, () => toggleSave(String(stream.id), 'livestream'))} className={`transition-all p-2 hover:bg-background border border-transparent rounded-sm ${isSaved(String(stream.id)) ? 'text-yellow-500' : 'text-muted-foreground hover:text-yellow-500'}`} title="Save Stream"><Bookmark size={16} fill={isSaved(String(stream.id)) ? "currentColor" : "none"} /></button>
       </div>
     </Card>

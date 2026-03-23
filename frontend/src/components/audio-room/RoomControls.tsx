@@ -12,6 +12,8 @@ export interface RoomControlsProps {
   onMuteToggle: () => void;
   onLeave: () => void;
   onReaction?: (emoji: string) => void;
+  isRecording?: boolean;
+  onRecordToggle?: () => void;
 }
 
 const REACTIONS = ["👏", "❤️", "🔥", "😂", "🤔"];
@@ -22,6 +24,8 @@ export function RoomControls({
   onMuteToggle,
   onLeave,
   onReaction,
+  isRecording = false,
+  onRecordToggle,
 }: RoomControlsProps) {
   const [showReactions, setShowReactions] = useState(false);
 
@@ -30,6 +34,7 @@ export function RoomControls({
       {/* Left side - Mute */}
       <div className="flex items-center gap-2">
         <button
+          type="button"
           onClick={onMuteToggle}
           className={`control-btn p-3 rounded-full transition-all ${
             isMuted
@@ -86,6 +91,7 @@ export function RoomControls({
       {/* Center - Reactions */}
       <div className="relative">
         <button
+          type="button"
           onClick={() => setShowReactions(!showReactions)}
           className="control-btn p-3 rounded-full bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-all"
           title="Send reaction"
@@ -110,6 +116,7 @@ export function RoomControls({
           <div className="reaction-popup absolute bottom-14 left-1/2 transform -translate-x-1/2 flex gap-2 p-2 bg-popover border border-border rounded-lg shadow-lg">
             {REACTIONS.map((emoji) => (
               <button
+                type="button"
                 key={emoji}
                 onClick={() => {
                   onReaction?.(emoji);
@@ -124,8 +131,35 @@ export function RoomControls({
         )}
       </div>
 
+      {/* Record */}
+      {onRecordToggle && (
+        <button
+          type="button"
+          onClick={onRecordToggle}
+          className={`control-btn flex items-center gap-2 px-3 py-2 rounded-full transition-all ${
+            isRecording
+              ? "bg-red-500/20 text-red-400 hover:bg-red-500/30"
+              : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
+          }`}
+          title={isRecording ? "Stop recording" : "Record room"}
+        >
+          {isRecording ? (
+            <span className="flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-red-400 animate-pulse" />
+              <span className="text-xs font-medium">Recording</span>
+            </span>
+          ) : (
+            <span className="flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded-full border-2 border-current" />
+              <span className="text-xs font-medium">Record</span>
+            </span>
+          )}
+        </button>
+      )}
+
       {/* Right side - Leave */}
       <button
+        type="button"
         onClick={onLeave}
         className="control-btn flex items-center gap-2 px-4 py-2 rounded-full bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-all"
         title="Leave room"
