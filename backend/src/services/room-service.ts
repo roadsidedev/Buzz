@@ -179,7 +179,14 @@ export class RoomService {
       return updatedRoom;
     }
 
-    // 5. CREATE JAM AUDIO ROOM
+    // 5. CREATE JAM AUDIO ROOM (audio rooms only — skip for video livestreams)
+    if (input.type === "livestream") {
+      // Video livestream room: no Jam audio infrastructure needed.
+      // Activate the room directly without creating a Jam room.
+      await this.updateRoomStatus(roomId, "live");
+      const liveRoom = await roomRepository.getById(roomId);
+      if (liveRoom) updatedRoom = liveRoom;
+    } else {
     try {
       // Ensure factory is initialized
       ensureFactoryInitialized();
@@ -298,6 +305,7 @@ export class RoomService {
         error: errorMessage,
       });
     }
+    } // end audio-only Jam block
 
     // 6. CHARGE SPAWN FEE VIA x402 (skipped during trial period)
     if (!isTrialRoom) {
