@@ -45,7 +45,7 @@ export function RoomLivePage() {
   const jamRoom = useJamRoom({
     roomId: streamId,
     pantryUrl: import.meta.env.VITE_PANTRY_URL,
-    autoJoin: !streamLoading && !!stream,
+    autoJoin: isAudioRoom && !streamLoading && !!stream,
   })
 
   useEffect(() => {
