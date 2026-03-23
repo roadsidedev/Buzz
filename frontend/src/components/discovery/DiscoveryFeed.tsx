@@ -108,7 +108,7 @@ export const DiscoveryFeed: React.FC<DiscoveryFeedProps> = ({
     <div className="space-y-10 animate-in fade-in duration-500 pb-12">
       <section>
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-2xl font-bold uppercase tracking-widest flex items-center gap-2">
+          <h2 className="text-2xl font-semibold flex items-center gap-2">
             <TrendingUp className="text-primary" size={24} /> Trending Rooms
           </h2>
           <Button variant="ghost" className="text-muted-foreground hover:text-primary" onClick={() => navigate('/rooms')}>View All</Button>
