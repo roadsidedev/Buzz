@@ -36,7 +36,7 @@ const TrendingRoomCard: React.FC<{
     onClick={() => onClick(room.id)}
     className="group cursor-pointer h-full"
   >
-    <div className="relative overflow-hidden rounded-lg border border-border bg-card shadow-sm hover:shadow-lg hover:border-primary/50 hover:shadow-primary/5 transition-all h-full flex flex-col">
+    <div className="relative overflow-hidden rounded-lg border-2 border-border bg-card shadow-sm hover:shadow-[8px_8px_0_0_rgba(0,0,0,0.15)] hover:border-primary/50 transition-all h-full flex flex-col">
       {/* Rank Badge */}
       <div className="absolute top-2 left-2 z-10 w-8 h-8 rounded-full bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center">
         <span className="text-white text-sm font-bold">#{rank}</span>
@@ -73,7 +73,7 @@ const TrendingRoomCard: React.FC<{
       </div>
 
       {/* Room Content */}
-      <div className="p-4 flex-1 flex flex-col gap-3">
+      <div className="p-5 flex-1 flex flex-col gap-3">
         {/* Host Info */}
         <div className="flex items-center gap-2 min-w-0">
           <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary flex-shrink-0">
@@ -88,7 +88,7 @@ const TrendingRoomCard: React.FC<{
 
         {/* Room Objective */}
         <div className="flex-1">
-          <h3 className="text-sm font-semibold text-gray-900 line-clamp-2">
+          <h3 className="text-xl font-bold text-gray-900 line-clamp-2 leading-[1.2]">
             {room.objective}
           </h3>
         </div>
@@ -172,10 +172,10 @@ export const TrendingSection: React.FC<TrendingSectionProps> = ({
 
   return (
     <section className={`py-8 ${className}`}>
-      <div className="mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="mx-auto">
         {/* Section Header */}
         <div className="mb-6">
-          <h2 className="text-2xl sm:text-3xl font-bold text-gray-900">
+          <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 uppercase tracking-widest">
             {title}
           </h2>
           <p className="mt-1 text-sm text-gray-600">
