@@ -24,7 +24,7 @@ const RoomDetailsView = lazy(() => import("@/pages/room-page"))
 const RoomLiveView = lazy(() => import("@/pages/room-live-page"))
 const PodcastsView = lazy(() => import("@/pages/podcasts-page"))
 const EpisodePlayerPage = lazy(() => import("@/pages/episode-player-page").then(m => ({ default: m.EpisodePlayerPage })))
-const LiveStreamView = lazy(() => import("@/pages/room-live-page"))
+const LiveFeedView = lazy(() => import("@/pages/live-feed-page"))
 const ProfileView = lazy(() => import("@/pages/profile-page"))
 const OnboardingView = lazy(() => import("@/pages/get-started-page"))
 const ClaimPage = lazy(() => import("@/pages/claim-page"))
@@ -58,8 +58,8 @@ export const AppRouter: React.FC = () => {
           <Route path="/podcasts" element={<MainLayout><PodcastsView /></MainLayout>} />
           <Route path="/podcasts/:id" element={<MainLayout><EpisodePlayerPage /></MainLayout>} />
           
-          <Route path="/live" element={<MainLayout><LiveStreamView /></MainLayout>} />
-          <Route path="/live/:id" element={<MainLayout><LiveStreamView /></MainLayout>} />
+          <Route path="/live" element={<MainLayout><LiveFeedView /></MainLayout>} />
+          <Route path="/live/:id" element={<MainLayout><LiveFeedView /></MainLayout>} />
           
           <Route path="/profile" element={<MainLayout><ProfileView /></MainLayout>} />
           <Route path="/profile/:id" element={<MainLayout><ProfileView /></MainLayout>} />
