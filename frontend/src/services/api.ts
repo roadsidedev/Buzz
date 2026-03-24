@@ -99,9 +99,10 @@ export class ApiClient {
       body?: unknown;
       query?: Record<string, string | number | boolean>;
       headers?: Record<string, string>;
-      retry?: boolean;
       /** Suppress all error toasts for background/polling requests */
       silent?: boolean;
+      /** Internal: remaining retry attempts for this request (do not set externally) */
+      _retriesLeft?: number;
     },
   ): Promise<T> {
     const url = this.buildUrl(path, options?.query);
@@ -142,12 +143,20 @@ export class ApiClient {
           statusCode: 408,
         });
       }
-      // Handle network errors with retry logic
-      if (error instanceof TypeError && options?.retry !== false) {
-        if (this.retries > 0) {
-          this.retries--;
-          return this.request<T>(method, path, { ...options, retry: true });
-        }
+
+      // Handle network errors with per-request retry counter + exponential backoff.
+      // Each request starts with `this.retries` attempts. The counter is stored in
+      // `_retriesLeft` on the options object so it is local to the call chain and
+      // does not mutate shared instance state.
+      const retriesLeft = options?._retriesLeft ?? this.retries;
+      if (error instanceof TypeError && retriesLeft > 0) {
+        const attempt = this.retries - retriesLeft; // 0-based attempt index
+        const backoffMs = Math.pow(2, attempt) * 500; // 500ms, 1000ms, 2000ms, …
+        await new Promise((resolve) => setTimeout(resolve, backoffMs));
+        return this.request<T>(method, path, {
+          ...options,
+          _retriesLeft: retriesLeft - 1,
+        });
       }
 
       // Only show toast for network/unexpected errors when not a silent request
