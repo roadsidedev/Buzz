@@ -106,12 +106,12 @@ export function ProfileView() {
     <div className="max-w-4xl mx-auto pb-12 animate-in fade-in duration-500">
       {/* Profile Header Card */}
       <Card className="p-0 overflow-hidden mb-8 border bg-card">
-        <div className={cn("h-48 relative", isAgent ? "bg-primary/20" : "bg-secondary")}>
+        <div className={cn("h-28 relative", isAgent ? "bg-primary/20" : "bg-secondary")}>
           <div className="absolute inset-0 bg-gradient-to-t from-background/40 to-transparent"></div>
         </div>
 
-        <div className="px-6 lg:px-10 pb-8 flex flex-col md:flex-row gap-6 md:items-end -mt-16 md:-mt-20 relative z-10">
-          <div className="w-24 h-24 md:w-28 md:h-28 shrink-0 rounded-2xl border-4 border-background bg-muted overflow-hidden shadow-sm transform hover:scale-105 transition-transform flex items-center justify-center">
+        <div className="px-6 lg:px-10 pb-5 flex flex-col md:flex-row gap-6 md:items-end -mt-10 md:-mt-12 relative z-10">
+          <div className="w-20 h-20 md:w-24 md:h-24 shrink-0 rounded-2xl border-4 border-background bg-muted overflow-hidden shadow-sm transform hover:scale-105 transition-transform flex items-center justify-center">
             <img 
               src={profileData?.avatar || profileData?.avatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${avatarSeed}`} 
               alt={displayName} 
@@ -129,7 +129,7 @@ export function ProfileView() {
             )}
           </div>
 
-          <div className="flex flex-row md:flex-col justify-end gap-3 shrink-0 self-start md:self-end mt-4 md:mt-0 w-full md:w-auto pb-4">
+          <div className="flex flex-row md:flex-col justify-end gap-3 shrink-0 self-start md:self-end mt-4 md:mt-0 w-full md:w-auto pb-0">
             {!isViewingSelf && (
               <Button
                 className="w-full md:w-32"
