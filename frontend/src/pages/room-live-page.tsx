@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from "react"
+import React, { useState, useEffect, useRef, useCallback } from "react"
 import { useParams, useNavigate } from "react-router-dom"
 import {
   Heart, MessageSquare, Users, Share2, DollarSign, Bookmark,
-  Copy, ChevronDown, Check, Mic, MicOff, Headphones, ArrowLeft, Volume2,
+  Copy, ChevronDown, Check, Mic, MicOff, Headphones, ArrowLeft, Volume2, Circle,
 } from "lucide-react"
 import axios from "axios"
 import { Card, CardContent } from "@/components/ui/card"
@@ -44,6 +44,12 @@ export function RoomLivePage() {
   const [shareWizardOpen, setShareWizardOpen] = useState(false)
   const [showChat, setShowChat] = useState(false)
   const [showTipModal, setShowTipModal] = useState(false)
+  const [isRecording, setIsRecording] = useState(false)
+  const [recordingUploading, setRecordingUploading] = useState(false)
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
+  const chunksRef = useRef<BlobPart[]>([])
+  const recordingStreamRef = useRef<MediaStream | null>(null)
+  const recordingStartRef = useRef<Date | null>(null)
 
   const jamRoom = useJamRoom({
     roomId: streamId,
@@ -81,6 +87,76 @@ export function RoomLivePage() {
   const requireAuth = (fn: () => void) => {
     if (!authenticated) { login() } else { fn() }
   }
+
+  const uploadRecording = useCallback(async (blob: Blob) => {
+    const token = apiClient.getToken()
+    if (!token) return
+    setRecordingUploading(true)
+    try {
+      const form = new FormData()
+      form.append('audio', blob, 'recording.webm')
+      if (recordingStartRef.current) form.append('startedAt', recordingStartRef.current.toISOString())
+      form.append('endedAt', new Date().toISOString())
+      await axios.post(`${apiUrl}/rooms/${streamId}/recording`, form, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+    } catch {
+      // best-effort — don't surface upload errors to the user
+    } finally {
+      setRecordingUploading(false)
+    }
+  }, [apiUrl, streamId])
+
+  const stopRecording = useCallback(() => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop()
+    }
+    recordingStreamRef.current?.getTracks().forEach(t => t.stop())
+    recordingStreamRef.current = null
+    setIsRecording(false)
+  }, [])
+
+  const startRecording = useCallback(async () => {
+    if (!stream?.recordingEnabled || isRecording) return
+    try {
+      const captureStream = await navigator.mediaDevices.getDisplayMedia({
+        video: false,
+        audio: true,
+      } as DisplayMediaStreamOptions)
+      recordingStreamRef.current = captureStream
+      chunksRef.current = []
+      recordingStartRef.current = new Date()
+
+      const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/ogg'
+      const recorder = new MediaRecorder(captureStream, { mimeType })
+      recorder.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data) }
+      recorder.onstop = () => {
+        const blob = new Blob(chunksRef.current, { type: mimeType })
+        uploadRecording(blob)
+      }
+      // Stop recording if user stops sharing the tab
+      captureStream.getTracks().forEach(track => {
+        track.onended = () => stopRecording()
+      })
+      recorder.start(5000)
+      mediaRecorderRef.current = recorder
+      setIsRecording(true)
+    } catch {
+      // User cancelled the share dialog or permission denied — silent fail
+    }
+  }, [stream?.recordingEnabled, isRecording, uploadRecording, stopRecording])
+
+  // Auto-start recording when room is joined and recording is enabled
+  useEffect(() => {
+    if (jamRoom.inRoom && stream?.recordingEnabled && !isRecording) {
+      startRecording()
+    }
+  }, [jamRoom.inRoom, stream?.recordingEnabled, isRecording, startRecording])
+
+  // Stop recording on unmount
+  useEffect(() => {
+    return () => { stopRecording() }
+  }, [stopRecording])
 
   const sendMsg = (e: React.FormEvent) => {
     e.preventDefault()
@@ -139,12 +215,32 @@ export function RoomLivePage() {
           <Headphones size={16} className="text-primary" />
           <span className="text-sm font-bold text-primary uppercase tracking-wider">Audio Room</span>
         </div>
-        <Badge
-          variant="secondary"
-          className="bg-primary/10 text-primary border-primary/20 text-xs font-bold uppercase tracking-wider"
-        >
-          {stream.category}
-        </Badge>
+        <div className="flex items-center gap-2">
+          {isRecording && (
+            <span className="flex items-center gap-1 text-[10px] font-black text-red-500 uppercase tracking-wider">
+              <Circle size={8} className="fill-red-500 animate-pulse" /> REC
+            </span>
+          )}
+          {recordingUploading && (
+            <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Saving…</span>
+          )}
+          {!isRecording && !recordingUploading && stream?.recordingEnabled && jamRoom.inRoom && (
+            <button
+              type="button"
+              onClick={startRecording}
+              className="text-[10px] text-muted-foreground uppercase tracking-wider hover:text-foreground transition-colors"
+              title="Start recording (browser will ask to share tab audio)"
+            >
+              ● Start Rec
+            </button>
+          )}
+          <Badge
+            variant="secondary"
+            className="bg-primary/10 text-primary border-primary/20 text-xs font-bold uppercase tracking-wider"
+          >
+            {stream.category}
+          </Badge>
+        </div>
       </div>
 
       {/* Host info card */}

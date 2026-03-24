@@ -9,6 +9,7 @@
  */
 
 import { Router, Request, Response } from "express";
+import multer from "multer";
 import type { CreateRoomRequest } from "../types/api.js";
 import {
   asyncHandler,
@@ -19,8 +20,13 @@ import {
 } from "../middleware/index.js";
 import { validate, CreateRoomRequestSchema } from "../utils/validators.js";
 import { roomService, paymentService, orchestratorClient } from "../services/index.js";
+import { roomRepository } from "../repositories/room-repository.js";
+import { getAudioStorageService } from "../services/audio-storage-service.js";
 import { notificationRepository } from "../repositories/notification-repository.js";
 import { logger } from "../utils/logger.js";
+
+// Multer config — memory storage, 200 MB limit for audio recordings
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 200 * 1024 * 1024 } });
 
 const router = Router();
 
@@ -51,21 +57,21 @@ function normalizeRoomRequest(body: Record<string, unknown>): Record<string, unk
     normalized.spawnFee = 250;
   }
 
-  // Map title → objective if objective is missing (agents often send title as the key description)
-  if (normalized.objective === undefined && normalized.title !== undefined) {
-    normalized.objective = normalized.title;
-  }
-
   // Clean up extra fields that aren't in the schema (Zod strict mode would reject them)
   // These are accepted by the skill docs but not needed for the Zod validation
   delete normalized.spawn_fee_currency;
   delete normalized.max_participants;
   delete normalized.min_duration_minutes;
-  delete normalized.title;
 
   if (normalized.scheduled_for !== undefined && normalized.scheduledFor === undefined) {
     normalized.scheduledFor = normalized.scheduled_for;
     delete normalized.scheduled_for;
+  }
+
+  // Normalize recording_enabled snake_case → camelCase
+  if (normalized.recording_enabled !== undefined && normalized.recordingEnabled === undefined) {
+    normalized.recordingEnabled = normalized.recording_enabled;
+    delete normalized.recording_enabled;
   }
 
   return normalized;
@@ -90,6 +96,7 @@ async function handleCreateRoom(req: Request, res: Response): Promise<void> {
     hostAgentId: agent.agentId,
     hostAgentName: agent.name,
     authenticatedUser, // JWT payload with optional walletAddress
+    recordingEnabled: input.recordingEnabled !== false, // default true
   });
 
   logger.info("Room created successfully", {
@@ -176,6 +183,7 @@ router.get(
         room: {
           id: room.id,
           type: room.type,
+          title: room.title || null,
           objective: room.objective,
           status: room.status,
           spawnFee: room.spawnFee,
@@ -184,6 +192,10 @@ router.get(
           participantCount: room.participantCount,
           createdAt: room.createdAt,
           startedAt: room.startedAt,
+          recordingEnabled: room.recordingEnabled,
+          recordingUrl: room.recordingUrl || null,
+          recordingStartedAt: room.recordingStartedAt || null,
+          recordingEndedAt: room.recordingEndedAt || null,
         },
       },
     });
@@ -524,6 +536,93 @@ router.post(
       data: {
         message: "Room closed successfully and revenue distributed",
       },
+    });
+  })
+);
+
+/**
+ * POST /rooms/:id/recording
+ * Upload a recorded audio file for a room (host only).
+ * Recording is stored in S3/R2 via AudioStorageService and the URL is
+ * persisted on the room record. Body: multipart/form-data, field "audio".
+ */
+router.post(
+  "/:id/recording",
+  requireApiKey,
+  upload.single("audio"),
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const { id } = req.params;
+    const agent = req.agent!;
+
+    const room = await roomService.getRoomById(id);
+
+    if (room.hostAgentId !== agent.agentId) {
+      res.status(403).json({
+        success: false,
+        error: { code: "UNAUTHORIZED", message: "Only the room host can upload a recording", statusCode: 403 },
+      });
+      return;
+    }
+
+    if (!room.recordingEnabled) {
+      res.status(400).json({
+        success: false,
+        error: { code: "RECORDING_DISABLED", message: "Recording is disabled for this room", statusCode: 400 },
+      });
+      return;
+    }
+
+    if (!req.file || !req.file.buffer) {
+      res.status(400).json({
+        success: false,
+        error: { code: "NO_FILE", message: "No audio file provided. Use field name 'audio'.", statusCode: 400 },
+      });
+      return;
+    }
+
+    const storageService = getAudioStorageService();
+    if (!storageService.isConfigured()) {
+      res.status(503).json({
+        success: false,
+        error: { code: "STORAGE_UNAVAILABLE", message: "Audio storage is not configured on this server", statusCode: 503 },
+      });
+      return;
+    }
+
+    const contentType = req.file.mimetype || "audio/webm";
+    const ext = contentType.includes("ogg") ? "ogg" : contentType.includes("mp4") ? "mp4" : "webm";
+    const recordingUrl = await storageService.uploadFile(
+      req.file.buffer,
+      `recordings/${id}.${ext}`,
+      contentType,
+    );
+
+    if (!recordingUrl) {
+      res.status(500).json({
+        success: false,
+        error: { code: "UPLOAD_FAILED", message: "Failed to upload recording to storage", statusCode: 500 },
+      });
+      return;
+    }
+
+    let startedAt: Date | undefined;
+    if (req.body.startedAt) {
+      const d = new Date(req.body.startedAt);
+      if (!isNaN(d.getTime())) startedAt = d;
+    }
+    let endedAt: Date = new Date();
+    if (req.body.endedAt) {
+      const d = new Date(req.body.endedAt);
+      if (!isNaN(d.getTime())) endedAt = d;
+    }
+
+    await roomRepository.updateRecordingUrl(id, recordingUrl, startedAt, endedAt);
+
+    logger.info("Room recording uploaded", { roomId: id, recordingUrl, agentId: agent.agentId });
+
+    res.json({
+      success: true,
+      data: { recordingUrl },
     });
   })
 );

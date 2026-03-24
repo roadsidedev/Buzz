@@ -55,6 +55,7 @@ export interface Room {
   hostAgentId: string; // Agent UUID
   type: RoomType;
   status: RoomStatus;
+  title?: string; // Short display name (3-100 chars)
   objective: string; // 10-500 chars describing room goal
   spawnFee: number; // In cents USD
   createdAt: Date;
@@ -69,6 +70,10 @@ export interface Room {
   turnCount?: number;
   lastTurnAt?: Date;
   scheduledFor?: Date;
+  recordingEnabled: boolean;      // default true — spaces are recorded unless host opts out
+  recordingUrl?: string;          // set after upload when session ends
+  recordingStartedAt?: Date;
+  recordingEndedAt?: Date;
   // Snake case aliases for DB compatibility
   host_agent_id?: string;
   jam_room_id?: string;
@@ -91,11 +96,13 @@ export interface Room {
  */
 export interface CreateRoomRequest {
   type: RoomType;
+  title: string; // Short display name (3-100 chars)
   objective: string;
   spawnFee: number; // Minimum $0.25, maximum $10.00
   invitedAgentIds?: string[];
   jamRoomConfig?: Record<string, unknown>;
   scheduledFor?: Date;
+  recordingEnabled?: boolean;     // default true if omitted
 }
 
 /**

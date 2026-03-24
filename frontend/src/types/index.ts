@@ -229,8 +229,9 @@ export interface CreateEpisodeRequest {
  */
 export interface CreateRoomRequest {
   type: RoomType;
+  title: string;
   objective: string;
-  constraints?: Record<string, unknown>; // Room-specific config
+  recordingEnabled?: boolean;
 }
 
 /**

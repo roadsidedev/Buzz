@@ -1,12 +1,12 @@
 /**
  * Discovery Routes
- * GET /discover/live-now  - Currently live + pending rooms (original)
+ * GET /discover/live-now  - Currently live rooms
  * GET /discover/live      - Currently live rooms (alias)
  * GET /discover/trending  - Trending rooms (24h)
  * GET /discover/search    - Unified global search (rooms, agents, podcasts)
- * GET /discover/categories - List room categories
+ * GET /discover/categories - List room categories (open; no fixed types)
  * GET /discover/episodes  - List past episodes/recordings
- * GET /discover/by-type/:type - Rooms by type
+ * GET /discover/by-type/:type - Rooms by type (any custom slug)
  * GET /discover/upcoming  - Upcoming scheduled rooms
  */
 
@@ -17,8 +17,6 @@ import { logger } from "../utils/logger.js";
 import { pool } from "../config/database.js";
 
 const router = Router();
-
-const VALID_ROOM_TYPES = ["debate", "coding", "research", "trading", "simulation", "podcast", "livestream", "brainstorm"];
 
 /**
  * Map a DiscoveryRoom from discoveryService to the public-facing discovery shape.
@@ -64,19 +62,6 @@ async function handleLiveRooms(req: Request, res: Response): Promise<void> {
   const page = Math.max(parseInt(req.query.page as string) || 1, 1);
   const offset = parseInt(req.query.offset as string) || (page - 1) * limit;
   const type = (req.query.type as string) || undefined;
-
-  // Validate room type if provided
-  if (type && !VALID_ROOM_TYPES.includes(type)) {
-    res.status(400).json({
-      success: false,
-      error: {
-        code: "INVALID_ROOM_TYPE",
-        message: `Invalid room type. Valid types: ${VALID_ROOM_TYPES.join(", ")}`,
-        statusCode: 400,
-      },
-    });
-    return;
-  }
 
   // Use discoveryService (has rich JOINs including agent + category)
   const pageNum = Math.floor(offset / limit) + 1;
@@ -174,19 +159,6 @@ router.get(
     const limit = Math.min(parseInt(req.query.limit as string) || 10, 50);
     const type = (req.query.type as string) || undefined;
 
-    // Validate room type if provided
-    if (type && !VALID_ROOM_TYPES.includes(type)) {
-      res.status(400).json({
-        success: false,
-        error: {
-          code: "INVALID_ROOM_TYPE",
-          message: `Invalid room type. Valid types: ${VALID_ROOM_TYPES.join(", ")}`,
-          statusCode: 400,
-        },
-      });
-      return;
-    }
-
     // discoveryService.getTrendingRooms has agent + category JOINs
     let rooms;
     try {
@@ -263,22 +235,17 @@ router.get(
 
 /**
  * GET /discover/categories
- * List available room categories/types
+ * Room types are open-ended — agents define any custom slug.
+ * Returns the distinct types currently in use.
  */
 router.get(
   "/categories",
   optionalApiKey,
   asyncHandler(async (_req: Request, res: Response): Promise<void> => {
-    const categories = [
-      { id: "debate", name: "Debate", description: "Structured debates with turn-taking and scoring", emoji: "⚔️" },
-      { id: "coding", name: "Coding", description: "Collaborative coding sessions and pair programming", emoji: "💻" },
-      { id: "research", name: "Research", description: "Research collaboration and knowledge sharing", emoji: "🔬" },
-      { id: "trading", name: "Trading", description: "Market analysis and trading strategy discussions", emoji: "📈" },
-      { id: "simulation", name: "Simulation", description: "Scenario simulations and role-playing", emoji: "🎮" },
-      { id: "podcast", name: "Podcast", description: "Podcast-style discussions and interviews", emoji: "🎙️" },
-      { id: "livestream", name: "Livestream", description: "Live broadcasts open for audience participation", emoji: "📡" },
-      { id: "brainstorm", name: "Brainstorm", description: "Open ideation and creative problem-solving sessions", emoji: "💡" },
-    ];
+    const { rows } = await pool.query(
+      `SELECT DISTINCT type FROM room WHERE status IN ('live', 'scheduled') ORDER BY type`
+    );
+    const categories = rows.map((r) => ({ id: r.type, name: r.type }));
 
     res.json({
       success: true,
@@ -336,10 +303,7 @@ router.get(
 
 /**
  * GET /discover/by-type/:type
- * Get rooms by type (debate, coding, research, etc.)
- *
- * BUG FIX: Switched from roomService to discoveryService.getLiveNow() with
- * client-side type filtering to get full hostAgent shape.
+ * Get rooms by type — any custom slug is accepted.
  */
 router.get(
   "/by-type/:type",
@@ -348,18 +312,6 @@ router.get(
     const { type } = req.params;
     const limit = Math.min(parseInt(req.query.limit as string) || 20, 100);
     const page = Math.max(parseInt(req.query.page as string) || 1, 1);
-
-    if (!VALID_ROOM_TYPES.includes(type)) {
-      res.status(400).json({
-        success: false,
-        error: {
-          code: "INVALID_ROOM_TYPE",
-          message: `Invalid room type. Valid types: ${VALID_ROOM_TYPES.join(", ")}`,
-          statusCode: 400,
-        },
-      });
-      return;
-    }
 
     // Fetch all live rooms, then filter by type
     // For MVP scale this is fine; at scale, push the WHERE r.type = $n into discoveryService

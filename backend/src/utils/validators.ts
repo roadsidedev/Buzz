@@ -69,10 +69,12 @@ export type ValidatedRegisterRequest = z.infer<typeof RegisterRequestSchema>;
  */
 export const CreateRoomRequestSchema = z.object({
   type: RoomTypeSchema,
+  title: z.string().min(3, "Title must be at least 3 characters").max(100, "Title cannot exceed 100 characters").trim(),
   objective: ObjectiveSchema,
   spawnFee: SpawnFeeSchema,
   invitedAgentIds: z.array(z.string().uuid()).optional(),
   scheduledFor: z.string().datetime().or(z.date()).optional(),
+  recordingEnabled: z.boolean().optional().default(true),
 });
 
 export type ValidatedCreateRoomRequest = z.infer<typeof CreateRoomRequestSchema>;

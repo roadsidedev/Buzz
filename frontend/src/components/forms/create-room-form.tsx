@@ -1,8 +1,8 @@
 /**
  * Create Room Form Component
  *
- * Form for creating live collaboration rooms with room type and objective input.
- * Supports all built-in room types plus custom slugs.
+ * Free-form room creation: agents define their own space type as any custom slug.
+ * Required fields: type (any slug), title, objective/description.
  */
 
 import React, { useState } from 'react';
@@ -10,16 +10,18 @@ import { Button } from '../Button';
 import { Textarea } from '../Textarea';
 import { CreateRoomRequest, RoomType } from '../../types';
 
-const ROOM_TYPES: Array<{ value: RoomType; label: string; description: string }> = [
-  { value: 'debate',     label: 'Debate',       description: 'Structured argumentation on a topic' },
-  { value: 'coding',     label: 'Coding',        description: 'Live programming collaboration' },
-  { value: 'research',   label: 'Research',      description: 'Collaborative research and analysis' },
-  { value: 'trading',    label: 'Trading',       description: 'Live market analysis and trading' },
-  { value: 'simulation', label: 'Simulation',    description: 'Scenario modeling and simulations' },
-  { value: 'podcast',    label: 'Podcast',       description: 'Podcast-style discussion or interview' },
-  { value: 'livestream', label: 'Livestream',    description: 'Live broadcast open for audience participation' },
-  { value: 'brainstorm', label: 'Brainstorm',    description: 'Open ideation and creative problem-solving' },
-];
+interface FormState {
+  type: string;
+  title: string;
+  objective: string;
+  recordingEnabled: boolean;
+}
+
+interface ValidationErrors {
+  type?: string;
+  title?: string;
+  objective?: string;
+}
 
 interface CreateRoomFormProps {
   onSubmit: (payload: CreateRoomRequest) => Promise<void>;
@@ -28,111 +30,88 @@ interface CreateRoomFormProps {
   onSuccess?: () => void;
 }
 
-/**
- * Form component for creating new live rooms
- */
 export function CreateRoomForm({
   onSubmit,
   isLoading = false,
   error = null,
   onSuccess,
 }: CreateRoomFormProps) {
-  const [formData, setFormData] = useState<CreateRoomRequest>({
-    type: 'debate',
+  const [formData, setFormData] = useState<FormState>({
+    type: '',
+    title: '',
     objective: '',
-    constraints: {},
+    recordingEnabled: true,
   });
 
-  const [validationErrors, setValidationErrors] = useState<
-    Partial<Record<'type' | 'objective', string>>
-  >({});
+  const [validationErrors, setValidationErrors] = useState<ValidationErrors>({});
 
-  /**
-   * Validate form data
-   */
   const validate = (): boolean => {
-    const errors: typeof validationErrors = {};
+    const errors: ValidationErrors = {};
 
-    if (!formData.type) {
-      errors.type = 'Room type is required';
+    const type = formData.type.trim();
+    if (!type) {
+      errors.type = 'Space type is required';
+    } else if (type.length < 2) {
+      errors.type = 'Space type must be at least 2 characters';
+    } else if (type.length > 50) {
+      errors.type = 'Space type must be 50 characters or less';
+    }
+
+    const title = formData.title.trim();
+    if (!title) {
+      errors.title = 'Title is required';
+    } else if (title.length < 3) {
+      errors.title = 'Title must be at least 3 characters';
+    } else if (title.length > 100) {
+      errors.title = 'Title must be 100 characters or less';
     }
 
     if (!formData.objective.trim()) {
-      errors.objective = 'Objective is required';
+      errors.objective = 'Description is required';
     } else if (formData.objective.length < 10) {
-      errors.objective = 'Objective must be at least 10 characters';
+      errors.objective = 'Description must be at least 10 characters';
     } else if (formData.objective.length > 500) {
-      errors.objective = 'Objective must be less than 500 characters';
+      errors.objective = 'Description must be less than 500 characters';
     }
 
     setValidationErrors(errors);
     return Object.keys(errors).length === 0;
   };
 
-  /**
-   * Handle form submission
-   */
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-
-    if (!validate()) {
-      return;
-    }
+    if (!validate()) return;
 
     try {
-      await onSubmit(formData);
-      onSuccess?.();
-      // Reset form
-      setFormData({
-        type: 'debate',
-        objective: '',
-        constraints: {},
+      await onSubmit({
+        type: formData.type.trim().toLowerCase() as RoomType,
+        title: formData.title.trim(),
+        objective: formData.objective.trim(),
+        recordingEnabled: formData.recordingEnabled,
       });
+      onSuccess?.();
+      setFormData({ type: '', title: '', objective: '', recordingEnabled: true });
     } catch {
-      // Error is handled by parent component
+      // Error handled by parent
     }
   };
 
-  /**
-   * Handle room type selection
-   */
-  const handleRoomTypeChange = (type: RoomType) => {
-    setFormData((prev) => ({
-      ...prev,
-      type,
-    }));
-    if (validationErrors.type) {
-      setValidationErrors((prev) => ({
-        ...prev,
-        type: undefined,
-      }));
-    }
-  };
-
-  /**
-   * Handle objective change
-   */
-  const handleObjectiveChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const { value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      objective: value,
-    }));
-    if (validationErrors.objective) {
-      setValidationErrors((prev) => ({
-        ...prev,
-        objective: undefined,
-      }));
+  const handleChange = (field: keyof FormState) => (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+  ) => {
+    setFormData((prev) => ({ ...prev, [field]: e.target.value }));
+    const errField = field as keyof ValidationErrors;
+    if (validationErrors[errField]) {
+      setValidationErrors((prev) => ({ ...prev, [errField]: undefined }));
     }
   };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6 p-6 border-2 border-black">
       <div>
-        <h2 className="text-2xl font-bold uppercase mb-4">Create Live Room</h2>
+        <h2 className="text-2xl font-bold uppercase mb-4">Launch a Space</h2>
       </div>
 
-      {/* API Error */}
       {error && (
         <div className="p-4 border-2 border-red-500 bg-red-50">
           <p className="text-red-700 font-semibold">Error</p>
@@ -140,53 +119,93 @@ export function CreateRoomForm({
         </div>
       )}
 
-      {/* Room Type Selection */}
+      {/* Space Type */}
       <div>
-        <label className="block text-sm font-semibold mb-3 uppercase">Room Type</label>
+        <label htmlFor="room-type" className="block text-sm font-semibold mb-1 uppercase">
+          Space Type
+        </label>
+        <p className="text-xs text-gray-500 mb-2">
+          Any custom label — e.g. <em>ama, deep-dive, philosophy, stand-up, trading</em>
+        </p>
         {validationErrors.type && (
-          <p className="text-red-600 text-sm mb-2">{validationErrors.type}</p>
+          <p className="text-red-600 text-sm mb-1">{validationErrors.type}</p>
         )}
-        <div className="space-y-2">
-          {ROOM_TYPES.map((roomType) => (
-            <button
-              key={roomType.value}
-              type="button"
-              onClick={() => handleRoomTypeChange(roomType.value)}
-              disabled={isLoading}
-              className={`w-full p-4 border-2 text-left transition-all ${
-                formData.type === roomType.value
-                  ? 'border-black bg-black text-white'
-                  : 'border-black bg-white hover:bg-gray-50'
-              } ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
-            >
-              <div className="font-bold uppercase text-sm">{roomType.label}</div>
-              <div className="text-xs opacity-75">{roomType.description}</div>
-            </button>
-          ))}
-        </div>
+        <input
+          id="room-type"
+          type="text"
+          value={formData.type}
+          onChange={handleChange('type')}
+          placeholder="e.g. philosophy, ama, deep-dive"
+          disabled={isLoading}
+          maxLength={50}
+          className={`w-full p-3 border-2 font-medium text-sm focus:outline-none ${
+            validationErrors.type ? 'border-red-500' : 'border-black'
+          } ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+        />
       </div>
 
-      {/* Objective Textarea */}
+      {/* Title */}
+      <div>
+        <label htmlFor="room-title" className="block text-sm font-semibold mb-1 uppercase">
+          Title
+        </label>
+        {validationErrors.title && (
+          <p className="text-red-600 text-sm mb-1">{validationErrors.title}</p>
+        )}
+        <input
+          id="room-title"
+          type="text"
+          value={formData.title}
+          onChange={handleChange('title')}
+          placeholder="What is this space called?"
+          disabled={isLoading}
+          maxLength={100}
+          className={`w-full p-3 border-2 font-medium text-sm focus:outline-none ${
+            validationErrors.title ? 'border-red-500' : 'border-black'
+          } ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+        />
+      </div>
+
+      {/* Objective / Description */}
       <Textarea
-        label="Room Objective"
+        label="Objective / Description"
         name="objective"
         value={formData.objective}
-        onChange={handleObjectiveChange}
-        placeholder="What is the goal or topic for this room?"
+        onChange={handleChange('objective') as React.ChangeEventHandler<HTMLTextAreaElement>}
+        placeholder="What is the goal or topic for this space?"
         error={validationErrors.objective}
         disabled={isLoading}
         maxLength={500}
-        rows={5}
+        rows={4}
       />
 
-      {/* Submit Button */}
+      {/* Recording toggle */}
+      <div className="flex items-start justify-between gap-4 p-3 border-2 border-black bg-gray-50">
+        <div>
+          <p className="text-sm font-bold uppercase">Record This Space</p>
+          <p className="text-xs text-gray-500 mt-0.5">
+            Spaces are recorded by default so listeners can replay them. Turn off for private or confidential sessions.
+          </p>
+        </div>
+        <label htmlFor="recording-enabled" className="sr-only">Record this space</label>
+        <input
+          type="checkbox"
+          id="recording-enabled"
+          title="Record this space"
+          checked={formData.recordingEnabled}
+          onChange={(e) => setFormData(prev => ({ ...prev, recordingEnabled: e.target.checked }))}
+          disabled={isLoading}
+          className="mt-1 w-5 h-5 accent-black shrink-0 cursor-pointer"
+        />
+      </div>
+
       <Button
         type="submit"
         variant="primary"
         disabled={isLoading}
         className="w-full"
       >
-        {isLoading ? 'Creating Room...' : 'Create & Launch Room'}
+        {isLoading ? 'Launching...' : 'Launch Space'}
       </Button>
     </form>
   );

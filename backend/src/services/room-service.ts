@@ -141,12 +141,13 @@ export class RoomService {
     const room = await roomRepository.create({
       id: roomId,
       host_agent_id: input.hostAgentId,
-      title: `${input.hostAgentName}'s ${input.type} room`,
+      title: input.title || `${input.hostAgentName}'s ${input.type} room`,
       type: input.type,
       status: initialStatus,
       objective: input.objective,
       spawn_fee: input.spawnFee,
       scheduled_for: input.scheduledFor ? new Date(input.scheduledFor) : undefined,
+      recording_enabled: input.recordingEnabled !== false, // default true
     });
 
     let updatedRoom = room;

@@ -12,6 +12,7 @@ interface RoomRow {
   host_agent_id: string;
   type: string;
   status: string;
+  title: string | null;
   objective: string;
   spawn_fee: number;
   jam_room_id: string | null;
@@ -25,6 +26,10 @@ interface RoomRow {
   ended_at: string | null;
   updated_at: string;
   scheduled_for: string | null;
+  recording_enabled: boolean;
+  recording_url: string | null;
+  recording_started_at: string | null;
+  recording_ended_at: string | null;
   [key: string]: unknown;
 }
 
@@ -45,11 +50,12 @@ export class RoomRepository {
     objective: string;
     spawn_fee: number;
     scheduled_for?: Date;
+    recording_enabled?: boolean;
   }): Promise<Room> {
     const text = `
-      INSERT INTO room (id, host_agent_id, title, type, status, objective, spawn_fee, viewer_count, participant_count, completion_level, visibility, created_at, updated_at, scheduled_for)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, 0, 1, 'minimum', 'public', NOW(), NOW(), $8)
-      RETURNING id, host_agent_id, title, type, status, objective, spawn_fee, jam_room_id, jam_room_url, spawn_fee_payment_id, viewer_count, participant_count, completion_level, created_at, started_at, ended_at, updated_at, scheduled_for
+      INSERT INTO room (id, host_agent_id, title, type, status, objective, spawn_fee, viewer_count, participant_count, completion_level, visibility, recording_enabled, created_at, updated_at, scheduled_for)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, 0, 1, 'minimum', 'public', $8, NOW(), NOW(), $9)
+      RETURNING id, host_agent_id, title, type, status, objective, spawn_fee, jam_room_id, jam_room_url, spawn_fee_payment_id, viewer_count, participant_count, completion_level, recording_enabled, recording_url, recording_started_at, recording_ended_at, created_at, started_at, ended_at, updated_at, scheduled_for
     `;
 
     const row = await queryOne<RoomRow>(text, [
@@ -60,6 +66,7 @@ export class RoomRepository {
       room.status,
       room.objective,
       room.spawn_fee,
+      room.recording_enabled !== false, // default true
       room.scheduled_for || null,
     ]);
 
@@ -81,7 +88,7 @@ export class RoomRepository {
    */
   async getById(id: string): Promise<Room | null> {
     const text = `
-      SELECT id, host_agent_id, type, status, objective, spawn_fee, jam_room_id, jam_room_url, spawn_fee_payment_id, viewer_count, participant_count, completion_level, created_at, started_at, ended_at, updated_at, scheduled_for
+      SELECT id, host_agent_id, type, status, title, objective, spawn_fee, jam_room_id, jam_room_url, spawn_fee_payment_id, viewer_count, participant_count, completion_level, recording_enabled, recording_url, recording_started_at, recording_ended_at, created_at, started_at, ended_at, updated_at, scheduled_for
       FROM room
       WHERE id = $1
     `;
@@ -124,7 +131,7 @@ export class RoomRepository {
     type?: string,
   ): Promise<Room[]> {
     let text = `
-      SELECT id, host_agent_id, type, status, objective, spawn_fee, jam_room_id, jam_room_url, spawn_fee_payment_id, viewer_count, participant_count, completion_level, created_at, started_at, ended_at, updated_at, scheduled_for
+      SELECT id, host_agent_id, type, status, title, objective, spawn_fee, jam_room_id, jam_room_url, spawn_fee_payment_id, viewer_count, participant_count, completion_level, recording_enabled, recording_url, recording_started_at, recording_ended_at, created_at, started_at, ended_at, updated_at, scheduled_for
       FROM room
       WHERE status = 'live'
     `;
@@ -214,7 +221,7 @@ export class RoomRepository {
     type?: string,
   ): Promise<Room[]> {
     let text = `
-      SELECT id, host_agent_id, type, status, objective, spawn_fee, jam_room_id, jam_room_url, spawn_fee_payment_id, viewer_count, participant_count, completion_level, created_at, started_at, ended_at, updated_at, scheduled_for
+      SELECT id, host_agent_id, type, status, title, objective, spawn_fee, jam_room_id, jam_room_url, spawn_fee_payment_id, viewer_count, participant_count, completion_level, recording_enabled, recording_url, recording_started_at, recording_ended_at, created_at, started_at, ended_at, updated_at, scheduled_for
       FROM room
       WHERE status IN ('live', 'pending')
     `;
@@ -288,7 +295,7 @@ export class RoomRepository {
     type?: string,
   ): Promise<Room[]> {
     let text = `
-      SELECT id, host_agent_id, type, status, objective, spawn_fee, jam_room_id, jam_room_url, spawn_fee_payment_id, viewer_count, participant_count, completion_level, created_at, started_at, ended_at, updated_at, scheduled_for
+      SELECT id, host_agent_id, type, status, title, objective, spawn_fee, jam_room_id, jam_room_url, spawn_fee_payment_id, viewer_count, participant_count, completion_level, recording_enabled, recording_url, recording_started_at, recording_ended_at, created_at, started_at, ended_at, updated_at, scheduled_for
       FROM room
       WHERE status IN ('live', 'completed')
         AND created_at > NOW() - INTERVAL '${hours} hours'
@@ -331,7 +338,7 @@ export class RoomRepository {
     offset: number,
   ): Promise<Room[]> {
     const text = `
-      SELECT id, host_agent_id, type, status, objective, spawn_fee, jam_room_id, jam_room_url, spawn_fee_payment_id, viewer_count, participant_count, completion_level, created_at, started_at, ended_at, updated_at, scheduled_for
+      SELECT id, host_agent_id, type, status, title, objective, spawn_fee, jam_room_id, jam_room_url, spawn_fee_payment_id, viewer_count, participant_count, completion_level, recording_enabled, recording_url, recording_started_at, recording_ended_at, created_at, started_at, ended_at, updated_at, scheduled_for
       FROM room
       WHERE status = 'scheduled' AND scheduled_for > NOW()
       ORDER BY scheduled_for ASC
@@ -347,7 +354,7 @@ export class RoomRepository {
    */
   async getReadyScheduledRooms(): Promise<Room[]> {
     const text = `
-      SELECT id, host_agent_id, type, status, objective, spawn_fee, jam_room_id, jam_room_url, spawn_fee_payment_id, viewer_count, participant_count, completion_level, created_at, started_at, ended_at, updated_at, scheduled_for
+      SELECT id, host_agent_id, type, status, title, objective, spawn_fee, jam_room_id, jam_room_url, spawn_fee_payment_id, viewer_count, participant_count, completion_level, recording_enabled, recording_url, recording_started_at, recording_ended_at, created_at, started_at, ended_at, updated_at, scheduled_for
       FROM room
       WHERE status = 'scheduled' AND scheduled_for <= NOW()
     `;
@@ -462,7 +469,7 @@ export class RoomRepository {
       UPDATE room
       SET turn_count = $1, last_turn_at = NOW(), updated_at = NOW()
       WHERE id = $2
-      RETURNING id, host_agent_id, type, status, objective, spawn_fee, jam_room_id, jam_room_url, spawn_fee_payment_id, viewer_count, participant_count, completion_level, created_at, started_at, ended_at, updated_at, scheduled_for
+      RETURNING id, host_agent_id, type, status, title, objective, spawn_fee, jam_room_id, jam_room_url, spawn_fee_payment_id, viewer_count, participant_count, completion_level, recording_enabled, recording_url, recording_started_at, recording_ended_at, created_at, started_at, ended_at, updated_at, scheduled_for
     `;
 
     const row = await queryOne<RoomRow>(text, [turnCount, roomId]);
@@ -586,6 +593,29 @@ export class RoomRepository {
   }
 
   /**
+   * Save recording URL and timestamps after upload completes
+   */
+  async updateRecordingUrl(
+    roomId: string,
+    recordingUrl: string,
+    startedAt?: Date,
+    endedAt?: Date,
+  ): Promise<void> {
+    const text = `
+      UPDATE room
+      SET recording_url = $1,
+          recording_started_at = $2,
+          recording_ended_at = $3,
+          updated_at = NOW()
+      WHERE id = $4
+    `;
+
+    await query(text, [recordingUrl, startedAt || null, endedAt || null, roomId]);
+
+    logger.info("Room recording URL saved", { roomId, recordingUrl });
+  }
+
+  /**
    * Map database row to Room
    */
   private mapRowToRoom(row: RoomRow): Room {
@@ -594,6 +624,7 @@ export class RoomRepository {
       hostAgentId: row.host_agent_id,
       type: row.type as any,
       status: row.status as RoomStatus,
+      title: row.title || undefined,
       objective: row.objective,
       spawnFee: row.spawn_fee,
       jamRoomId: row.jam_room_id || undefined,
@@ -606,6 +637,10 @@ export class RoomRepository {
       startedAt: row.started_at ? new Date(row.started_at) : undefined,
       endedAt: row.ended_at ? new Date(row.ended_at) : undefined,
       scheduledFor: row.scheduled_for ? new Date(row.scheduled_for) : undefined,
+      recordingEnabled: row.recording_enabled ?? true,
+      recordingUrl: row.recording_url || undefined,
+      recordingStartedAt: row.recording_started_at ? new Date(row.recording_started_at) : undefined,
+      recordingEndedAt: row.recording_ended_at ? new Date(row.recording_ended_at) : undefined,
     };
   }
 }
