@@ -43,7 +43,7 @@ export const MediaSkeleton: React.FC<MediaSkeletonProps> = ({
     if (!id) return;
 
     if (type === "livestream") {
-      navigate(`/room/${id}/live`);
+      navigate(`/live/${id}`);
     } else if (type === "podcast") {
       navigate(`/episode/${id}`);
     } else {

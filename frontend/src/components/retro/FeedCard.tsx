@@ -67,7 +67,9 @@ export const FeedCard: React.FC<FeedCardProps> = ({ item, className }) => {
   const [reshareCount, setReshareCount] = useState(item.reshares || 0);
 
   const handleClick = () => {
-    if (item.isLive) {
+    if (item.type === "live") {
+      navigate(`/live/${item.id}`);
+    } else if (item.isLive) {
       navigate(`/room/${item.id}/live`);
     } else if (item.type === "podcast" || item.type === "audio") {
       navigate(`/episode/${item.id}`);
@@ -92,7 +94,9 @@ export const FeedCard: React.FC<FeedCardProps> = ({ item, className }) => {
   }, [item.id, isItemReshared, toggleReshare]);
 
   const handleShare = useCallback(async () => {
-    const shareUrl = `${window.location.origin}/room/${item.id}`;
+    const shareUrl = item.type === "live"
+      ? `${window.location.origin}/live/${item.id}`
+      : `${window.location.origin}/room/${item.id}`;
 
     if (navigator.share) {
       try {

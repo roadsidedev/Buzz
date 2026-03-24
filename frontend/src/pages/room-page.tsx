@@ -10,6 +10,7 @@ import { useAuthStore } from "@/stores/auth-store";
 import { useSocialStore } from "@/stores/social-store";
 import { usePrivy } from "@privy-io/react-auth";
 import { TipModal } from "@/components/retro/TipModal";
+import { apiClient } from "@/services/api";
 
 interface RoomDetails {
   id: string;
@@ -57,8 +58,10 @@ export const RoomPage: React.FC = () => {
       setLoading(true);
       setError(null);
       try {
+        const token = apiClient.getToken();
         const response = await fetch(
           `${import.meta.env.VITE_API_URL || 'http://localhost:4000/api/v1'}/rooms/${id}`,
+          token ? { headers: { Authorization: `Bearer ${token}` } } : undefined,
         );
         if (response.ok) {
           const data = await response.json();
