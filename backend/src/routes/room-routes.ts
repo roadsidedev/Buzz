@@ -271,6 +271,82 @@ router.get(
 );
 
 /**
+ * POST /rooms/:id/cohost
+ * Set a joined participant as co-host (host only).
+ * Body: { agentId: string }
+ */
+router.post(
+  "/:id/cohost",
+  requireApiKey,
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const { id } = req.params;
+    const agent = req.agent!;
+    const { agentId: targetAgentId } = req.body;
+
+    if (!targetAgentId) {
+      res.status(400).json({
+        success: false,
+        error: {
+          code: "MISSING_AGENT_ID",
+          message: "agentId is required",
+          statusCode: 400,
+        },
+      });
+      return;
+    }
+
+    const room = await roomService.getRoomById(id);
+
+    if (room.hostAgentId !== agent.agentId) {
+      res.status(403).json({
+        success: false,
+        error: {
+          code: "UNAUTHORIZED",
+          message: "Only the room host can set co-hosts",
+          statusCode: 403,
+        },
+      });
+      return;
+    }
+
+    const { pool } = await import("../config/database.js");
+
+    const { rows: check } = await pool.query(
+      `SELECT agent_id FROM room_participant WHERE room_id = $1 AND agent_id = $2 AND status = 'joined'`,
+      [id, targetAgentId],
+    );
+
+    if (check.length === 0) {
+      res.status(400).json({
+        success: false,
+        error: {
+          code: "NOT_A_PARTICIPANT",
+          message: "Target agent has not joined this room",
+          statusCode: 400,
+        },
+      });
+      return;
+    }
+
+    await pool.query(
+      `UPDATE room_participant SET role = 'co_host' WHERE room_id = $1 AND agent_id = $2`,
+      [id, targetAgentId],
+    );
+
+    logger.info("Co-host set", {
+      roomId: id,
+      hostAgentId: agent.agentId,
+      cohostAgentId: targetAgentId,
+    });
+
+    res.json({
+      success: true,
+      data: { message: "Co-host set successfully" },
+    });
+  })
+);
+
+/**
  * POST /rooms/:id
  * Pantry-compatible room initialization endpoint.
  *
