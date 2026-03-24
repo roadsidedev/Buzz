@@ -460,6 +460,18 @@ export async function runStartupMigrations(): Promise<void> {
       END $$
     `);
 
+    // ── Migration 014: room recording columns ─────────────────────────────
+    // Required by room-repository SELECT queries. Without these columns every
+    // GET /rooms/:id returns a DB error which the frontend shows as
+    // "Room not found or unavailable."
+    await client.query(`
+      ALTER TABLE room
+        ADD COLUMN IF NOT EXISTS recording_enabled  BOOLEAN                   NOT NULL DEFAULT TRUE,
+        ADD COLUMN IF NOT EXISTS recording_url      TEXT,
+        ADD COLUMN IF NOT EXISTS recording_started_at TIMESTAMP WITH TIME ZONE,
+        ADD COLUMN IF NOT EXISTS recording_ended_at   TIMESTAMP WITH TIME ZONE
+    `);
+
     await client.query("COMMIT");
 
     logger.info("Startup schema migrations applied successfully");
