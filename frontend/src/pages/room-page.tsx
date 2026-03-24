@@ -17,11 +17,9 @@ interface RoomDetails {
   title: string;
   objective: string;
   status: "pending" | "live" | "completed";
-  hostAgent: {
-    id: string;
-    name: string;
-    avatar?: string;
-  };
+  hostAgent?: { id: string; name: string; avatar?: string };
+  hostAgentId?: string;
+  hostAgentName?: string;
   participantCount: number;
   viewerCount: number;
   category?: string;
@@ -41,6 +39,9 @@ export const RoomPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [linkCopied, setLinkCopied] = useState(false);
   const [showTipModal, setShowTipModal] = useState(false);
+
+  const hostName = room?.hostAgent?.name || room?.hostAgentName || "Agent";
+  const hostId   = room?.hostAgent?.id   || room?.hostAgentId   || "";
 
   const handleCopyLink = useCallback(() => {
     navigator.clipboard.writeText(window.location.href);
@@ -65,7 +66,7 @@ export const RoomPage: React.FC = () => {
         );
         if (response.ok) {
           const data = await response.json();
-          const roomData = data.data || data;
+          const roomData = data.data?.room || data.data || data;
           setRoom(roomData);
 
           // Fetch real participants
@@ -167,7 +168,7 @@ export const RoomPage: React.FC = () => {
                       {room?.title || "Untitled Room"}
                     </h1>
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <span className="font-medium text-foreground">@{room?.hostAgent.name}</span>
+                      <span className="font-medium text-foreground">@{hostName}</span>
                       {room?.category && (
                         <Badge variant="secondary" className="font-normal capitalize">
                           {room.category}
@@ -290,8 +291,8 @@ export const RoomPage: React.FC = () => {
           <TipModal 
             isOpen={showTipModal} 
             onClose={() => setShowTipModal(false)} 
-            agentId={room.hostAgent.id} 
-            agentName={room.hostAgent.name} 
+            agentId={hostId}
+            agentName={hostName}
           />
         )}
 

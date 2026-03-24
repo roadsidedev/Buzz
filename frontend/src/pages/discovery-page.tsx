@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react"
-import { Mic2, Users, Headphones, Heart, DollarSign, Share2, Bookmark, Calendar, Bell, Radio, Play } from "lucide-react"
+import { Mic2, Users, Headphones, Heart, DollarSign, Share2, Bookmark, Calendar, Bell } from "lucide-react"
 import axios from "axios"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -88,81 +88,12 @@ const RoomCard = ({ room }: { room: any }) => {
   )
 }
 
-// ─── Livestream Card ──────────────────────────────────────────────────────────
-
-/**
- * BUG FIX #6: Livestream card component — previously livestreams were never shown
- * on the discovery page. Agents create them via POST /api/v1/livestreams but the
- * frontend never fetched GET /api/v1/livestreams for the discovery grid.
- */
-const LivestreamCard = ({ stream }: { stream: any }) => {
-  const navigate = useNavigate()
-  const { authenticated } = useAuthStore()
-  const { login } = usePrivy()
-  const { toggleLike, toggleSave, isLiked, isSaved } = useSocialStore()
-  const [showTipModal, setShowTipModal] = useState(false)
-
-  const title = stream.title || "Untitled Livestream"
-  const category = stream.category || "General"
-  const viewers = stream.viewerCount || 0
-  const hostName = stream.hostAgentName || "Agent"
-  const hostAgentId = stream.hostAgentId || stream.id
-
-  const requireAuth = (e: React.MouseEvent, fn: () => void) => {
-    e.stopPropagation()
-    if (!authenticated) { login(); return }
-    fn()
-  }
-
-  return (
-    <>
-    <Card
-      className="hover:border-primary/50 hover:shadow-md transition-all cursor-pointer group flex flex-col h-full overflow-hidden border-2 bg-card text-card-foreground hover:-translate-y-1"
-      onClick={() => navigate(`/live/${stream.id}`)}
-    >
-      <div className="p-4 flex-grow flex flex-col">
-        <div className="flex justify-between items-start mb-3">
-          <Badge variant="secondary" className="bg-red-500/10 text-red-500 border border-transparent uppercase font-black text-[10px] tracking-widest flex items-center gap-1">
-            <Radio size={10} className="animate-pulse" /> LIVE
-          </Badge>
-          <div className="flex items-center text-muted-foreground text-xs font-black uppercase">
-            <Users size={14} className="mr-1 text-red-500" /> {viewers}
-          </div>
-        </div>
-        <h3 className="text-foreground font-black text-lg mb-3 group-hover:text-red-500 transition-colors leading-tight line-clamp-2 min-h-[2.5rem] uppercase tracking-tighter">{title}</h3>
-        <div className="mt-auto">
-          <Badge variant="outline" className="text-[10px] uppercase tracking-widest text-muted-foreground mb-3">{category}</Badge>
-          <div className="text-[10px] font-black uppercase tracking-widest truncate">
-            <span className="text-muted-foreground">{hostName}</span>
-          </div>
-        </div>
-      </div>
-      <div className="flex items-center justify-between border-t bg-muted/50 px-4 py-3" onClick={(e) => e.stopPropagation()}>
-        <button
-          className="text-muted-foreground hover:text-red-500 transition-all p-2 hover:bg-background border border-transparent rounded-sm"
-          title="Watch Livestream"
-          onClick={(e) => { e.stopPropagation(); navigate(`/live/${stream.id}`) }}
-        >
-          <Play size={16} />
-        </button>
-        <button onClick={(e) => requireAuth(e, () => toggleLike(String(stream.id), 'livestream'))} className={`transition-all p-2 hover:bg-background border border-transparent rounded-sm ${isLiked(String(stream.id)) ? 'text-accent-crimson' : 'text-muted-foreground hover:text-accent-crimson'}`} title="Like Stream"><Heart size={16} fill={isLiked(String(stream.id)) ? "currentColor" : "none"} /></button>
-        <button onClick={(e) => requireAuth(e, () => setShowTipModal(true))} className="text-muted-foreground hover:text-green-600 transition-all p-2 hover:bg-background border border-transparent rounded-sm" title="Tip Hosts"><DollarSign size={16} /></button>
-        <button onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(`${window.location.origin}/live/${stream.id}`) }} className="text-muted-foreground hover:text-accent-purple transition-all p-2 hover:bg-background border border-transparent rounded-sm" title="Share"><Share2 size={16} /></button>
-        <button onClick={(e) => requireAuth(e, () => toggleSave(String(stream.id), 'livestream'))} className={`transition-all p-2 hover:bg-background border border-transparent rounded-sm ${isSaved(String(stream.id)) ? 'text-yellow-500' : 'text-muted-foreground hover:text-yellow-500'}`} title="Save Stream"><Bookmark size={16} fill={isSaved(String(stream.id)) ? "currentColor" : "none"} /></button>
-      </div>
-    </Card>
-    <TipModal isOpen={showTipModal} onClose={() => setShowTipModal(false)} agentId={hostAgentId} agentName={hostName} />
-    </>
-  )
-}
-
 // ─── Main RoomsView ───────────────────────────────────────────────────────────
 
 export function RoomsView() {
   // BUG FIX #3: activeFilter now holds an actual room type value (or "" for All)
   const [activeFilter, setActiveFilter] = useState("")
   const [rooms, setRooms] = useState<any[]>([])
-  const [livestreams, setLivestreams] = useState<any[]>([])  // BUG FIX #6
   const [upcomingRooms, setUpcomingRooms] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [loadingUpcoming, setLoadingUpcoming] = useState(true)
@@ -190,18 +121,6 @@ export function RoomsView() {
       }
     }
 
-    // BUG FIX #6: Fetch active livestreams from the dedicated endpoint
-    const fetchLivestreams = async () => {
-      try {
-        const params: Record<string, string> = {}
-        if (activeFilter) params.category = activeFilter
-        const res = await axios.get(`${apiUrl}/livestreams`, { params })
-        setLivestreams(res.data?.data?.streams || [])
-      } catch {
-        setLivestreams([])
-      }
-    }
-
     const fetchUpcomingRooms = async () => {
       setLoadingUpcoming(true)
       try {
@@ -217,14 +136,8 @@ export function RoomsView() {
     }
 
     fetchRooms()
-    fetchLivestreams()
     fetchUpcomingRooms()
   }, [apiUrl, activeFilter])
-
-  const allContent = [
-    ...rooms,
-    ...livestreams.map(s => ({ ...s, _isLivestream: true })),
-  ]
 
   return (
     <div className="animate-in slide-in-from-right duration-500 pb-20 p-4 md:p-6 min-h-screen bg-background text-foreground">
@@ -305,17 +218,15 @@ export function RoomsView() {
         ))}
       </div>
 
-      {/* Unified grid: Audio Rooms + Livestreams */}
+      {/* Audio Rooms grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6">
         {loading ? (
              <div className="col-span-full border border-dashed border-border p-20 text-center bg-card rounded-lg">
                 <div className="w-10 h-10 border-4 border-muted border-t-accent-purple animate-spin mx-auto mb-4 rounded-full" />
                 <p className="font-bold uppercase tracking-widest text-muted-foreground text-sm">Scanning for active frequencies...</p>
              </div>
-        ) : allContent.length > 0 ? allContent.map(item =>
-          item._isLivestream
-            ? <LivestreamCard key={`ls-${item.id}`} stream={item} />
-            : <RoomCard key={`rm-${item.id}`} room={item} />
+        ) : rooms.length > 0 ? rooms.map(item =>
+          <RoomCard key={item.id} room={item} />
         ) : (
           <div className="col-span-full border p-12 md:p-20 text-center bg-card rounded-lg flex flex-col items-center gap-6">
             <Mic2 size={48} className="text-muted-foreground animate-pulse" />
