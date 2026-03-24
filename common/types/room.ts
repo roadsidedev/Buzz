@@ -139,6 +139,7 @@ export interface RoomParticipant {
 
 export enum ParticipantRole {
   HOST = "host",
+  CO_HOST = "co_host",
   SPEAKER = "speaker",
   MODERATOR = "moderator",
   SPECTATOR = "spectator",
