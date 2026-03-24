@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react"
+import React, { useCallback, useEffect, useMemo, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { TrendingUp, Podcast, Tv, Play, Users } from "lucide-react"
 import axios from "axios"
@@ -10,6 +10,17 @@ import { Badge } from "@/components/ui/badge"
 const InternalRoomCard = ({ room }: { room: any }) => {
   const navigate = useNavigate()
   const speakers = room.speakers || [room.hostAgentName || "Host_Agent"]
+
+  // Memoize avatar URLs so the same string reference is reused across re-renders,
+  // preventing browsers from treating identity changes as new image requests.
+  const avatarUrls = useMemo(
+    () =>
+      speakers
+        .slice(0, 3)
+        .map((s: string) => `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(s)}`),
+    [speakers],
+  )
+
   return (
     <Card className="hover:border-primary/50 hover:shadow-[8px_8px_0_0_rgba(0,0,0,0.15)] transition-all cursor-pointer group" onClick={() => navigate(`/room/${room.id}`)}>
       <div className="p-5">
@@ -21,9 +32,10 @@ const InternalRoomCard = ({ room }: { room: any }) => {
         </div>
         <h3 className="text-foreground font-bold text-xl mb-4 group-hover:text-primary transition-colors leading-[1.2] line-clamp-2">{room.title || room.objective || "Untitled Room"}</h3>
         <div className="flex -space-x-2 mb-4">
-          {speakers.slice(0, 3).map((s: string, i: number) => (
+          {avatarUrls.map((src: string, i: number) => (
             <div key={i} className="w-8 h-8 rounded-full border-2 border-background bg-muted flex items-center justify-center overflow-hidden z-10 hover:z-20 hover:scale-105 transition-transform">
-              <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${s}`} alt="avatar" />
+              {/* loading="lazy" defers off-screen avatar requests until needed */}
+              <img src={src} alt={speakers[i]} loading="lazy" />
             </div>
           ))}
         </div>
@@ -54,55 +66,62 @@ export const DiscoveryFeed: React.FC<DiscoveryFeedProps> = ({
   const [podcasts, setPodcasts] = useState<any[]>([])
   const [liveStreams, setLiveStreams] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [hasError, setHasError] = useState(false)
 
   // VITE_API_URL already contains /api/v1 (e.g. https://...railway.app/api/v1)
   // Never append /api/v1 again — that causes double-prefix 404/500s.
   const apiUrl = (import.meta.env.VITE_API_URL || 'http://localhost:4000/api/v1').replace(/\/+$/, '')
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [roomsRes, podsRes, liveRes] = await Promise.all([
-          axios.get(`${apiUrl}/discover/trending`).catch(() => null),
-          axios.get(`${apiUrl}/podcasts/trending`).catch(() => null),
-          axios.get(`${apiUrl}/livestreams`).catch(() => null),
-        ])
+  const fetchData = useCallback(async () => {
+    setLoading(true)
+    setHasError(false)
+    try {
+      const [roomsRes, podsRes, liveRes] = await Promise.all([
+        axios.get(`${apiUrl}/discover/trending`).catch(() => null),
+        axios.get(`${apiUrl}/podcasts/trending`).catch(() => null),
+        axios.get(`${apiUrl}/livestreams`).catch(() => null),
+      ])
 
-        if (roomsRes?.data?.data?.rooms?.length) {
-          const normalizedRooms = roomsRes.data.data.rooms.map((r: any) => ({
-             ...r,
-             speakers: r.speakers || [r.hostAgentName || "Host_Agent"],
-             listeners: r.viewerCount || 0,
-             tag: r.type || "Live"
-          }))
-          setRooms(normalizedRooms)
-        } else {
-          setRooms([])
-        }
-
-        if (podsRes?.data?.data?.podcasts?.length) {
-          setPodcasts(podsRes.data.data.podcasts)
-        } else {
-          setPodcasts([])
-        }
-
-        if (liveRes?.data?.data?.streams?.length) {
-          setLiveStreams(liveRes.data.data.streams)
-        } else {
-          setLiveStreams([])
-        }
-
-      } catch {
-        setRooms([])
-        setPodcasts([])
-        setLiveStreams([])
-      } finally {
-        setLoading(false)
+      // If every request failed (all null), treat as a network error
+      if (!roomsRes && !podsRes && !liveRes) {
+        setHasError(true)
+        return
       }
-    }
 
-    fetchData()
+      if (roomsRes?.data?.data?.rooms?.length) {
+        const normalizedRooms = roomsRes.data.data.rooms.map((r: any) => ({
+           ...r,
+           speakers: r.speakers || [r.hostAgentName || "Host_Agent"],
+           listeners: r.viewerCount || 0,
+           tag: r.type || "Live"
+        }))
+        setRooms(normalizedRooms)
+      } else {
+        setRooms([])
+      }
+
+      if (podsRes?.data?.data?.podcasts?.length) {
+        setPodcasts(podsRes.data.data.podcasts)
+      } else {
+        setPodcasts([])
+      }
+
+      if (liveRes?.data?.data?.streams?.length) {
+        setLiveStreams(liveRes.data.data.streams)
+      } else {
+        setLiveStreams([])
+      }
+
+    } catch {
+      setHasError(true)
+    } finally {
+      setLoading(false)
+    }
   }, [apiUrl])
+
+  useEffect(() => {
+    fetchData()
+  }, [fetchData])
 
   return (
     <div className="space-y-10 animate-in fade-in duration-500 pb-12">
@@ -118,6 +137,12 @@ export const DiscoveryFeed: React.FC<DiscoveryFeedProps> = ({
              <div className="md:col-span-2 xl:col-span-3 border border-dashed rounded-lg p-12 text-center text-muted-foreground font-medium">
                 Loading Discovery Feed...
              </div>
+          ) : hasError ? (
+            <div className="md:col-span-2 xl:col-span-3 border border-dashed rounded-lg p-12 text-center text-muted-foreground font-medium flex flex-col items-center gap-3">
+              <TrendingUp size={32} className="opacity-40" />
+              <p>Failed to load content. Check your connection.</p>
+              <Button variant="outline" size="sm" onClick={fetchData}>Retry</Button>
+            </div>
           ) : rooms.length > 0 ? rooms.slice(0, 3).map(room => (
             <InternalRoomCard key={room.id} room={room} />
           )) : (

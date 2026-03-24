@@ -93,9 +93,15 @@ export function useEpisode(episodeId?: string) {
    * Poll for episode status updates (for generation progress)
    */
   const startPolling = useCallback((id: string) => {
+    // Track consecutive failures so we can stop polling and surface the error
+    // rather than leaving the user with an indefinitely-spinning "generating" UI.
+    let consecutiveErrors = 0;
+    const MAX_CONSECUTIVE_ERRORS = 3;
+
     const poll = async () => {
       try {
         const status = await apiClient.getEpisodeStatus(id);
+        consecutiveErrors = 0; // reset on success
 
         setState((prev) => {
           const isStillGenerating = status.status === 'generating';
@@ -119,7 +125,17 @@ export function useEpisode(episodeId?: string) {
           stopPolling();
         }
       } catch (error) {
-        console.error('Polling error:', error);
+        consecutiveErrors++;
+        console.error(`Polling error (${consecutiveErrors}/${MAX_CONSECUTIVE_ERRORS}):`, error);
+
+        if (consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
+          stopPolling();
+          const err =
+            error instanceof Error
+              ? error
+              : new Error('Lost connection while checking generation status');
+          setState((prev) => ({ ...prev, isGenerating: false, error: err }));
+        }
       }
     };
 
