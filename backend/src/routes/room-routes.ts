@@ -192,11 +192,49 @@ router.get(
           participantCount: room.participantCount,
           createdAt: room.createdAt,
           startedAt: room.startedAt,
+          scheduledFor: room.scheduledFor || null,
+          hostAgentId: room.hostAgentId || null,
           recordingEnabled: room.recordingEnabled,
           recordingUrl: room.recordingUrl || null,
           recordingStartedAt: room.recordingStartedAt || null,
           recordingEndedAt: room.recordingEndedAt || null,
         },
+      },
+    });
+  })
+);
+
+/**
+ * GET /rooms/:id/participants
+ * Get current participants in a room
+ */
+router.get(
+  "/:id/participants",
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const { id } = req.params;
+
+    // Verify room exists
+    await roomService.getRoomById(id);
+
+    const { rows } = await (await import("../config/database.js")).pool.query(
+      `SELECT rp.agent_id as id, a.name, a.avatar, rp.role, rp.joined_at
+       FROM room_participant rp
+       LEFT JOIN agent a ON rp.agent_id = a.id
+       WHERE rp.room_id = $1 AND rp.status = 'joined'
+       ORDER BY rp.joined_at ASC`,
+      [id]
+    );
+
+    res.json({
+      success: true,
+      data: {
+        participants: rows.map((p) => ({
+          id: p.id,
+          name: p.name || "Agent",
+          avatar: p.avatar || null,
+          role: p.role || "speaker",
+          joinedAt: p.joined_at,
+        })),
       },
     });
   })

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react"
-import { Users, Headphones, Heart, DollarSign, Share2, Bookmark, Calendar, Bell, Search, Radio, Clock } from "lucide-react"
+import { Users, Headphones, Heart, DollarSign, Share2, Bookmark, Calendar, Bell, Search, Radio, Clock, PlayCircle } from "lucide-react"
 import axios from "axios"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -182,14 +182,59 @@ const UpcomingCard = ({ room, apiUrl, walletAddress, login }: { room: any; apiUr
   )
 }
 
+// ─── Replay Card ─────────────────────────────────────────────────────────────
+
+const ReplayCard = ({ episode }: { episode: any }) => {
+  const navigate = useNavigate()
+  const tag = capitalizeType(episode.type)
+  const endedAt = episode.endedAt ? new Date(episode.endedAt) : null
+
+  return (
+    <Card
+      className="hover:border-primary/50 hover:shadow-lg transition-all cursor-pointer group flex flex-col h-full overflow-hidden border-2 bg-card text-card-foreground hover:-translate-y-1"
+      onClick={() => navigate(`/room/${episode.id}/live`)}
+    >
+      <div className="p-4 flex-grow flex flex-col gap-3">
+        <div className="flex justify-between items-start">
+          <Badge variant="secondary" className="bg-accent-purple/10 text-accent-purple border border-transparent uppercase font-black text-[10px] tracking-widest">
+            {tag}
+          </Badge>
+          <span className="flex items-center gap-1 text-[10px] font-black uppercase text-muted-foreground tracking-widest">
+            <PlayCircle size={11} className="text-primary" /> Replay
+          </span>
+        </div>
+        <h3 className="text-foreground font-black text-base leading-tight line-clamp-2 uppercase tracking-tighter group-hover:text-accent-purple transition-colors">
+          {episode.title || episode.objective || "Untitled Space"}
+        </h3>
+        <div className="mt-auto flex items-center justify-between">
+          <div className="text-[10px] font-black text-muted-foreground uppercase truncate">
+            {episode.hostAgentName || "Agent"}
+          </div>
+          {endedAt && (
+            <div className="text-[10px] font-black text-muted-foreground uppercase">
+              {endedAt.toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+            </div>
+          )}
+        </div>
+      </div>
+      <div className="flex items-center gap-2 border-t bg-muted/50 px-4 py-3">
+        <Users size={12} className="text-muted-foreground" />
+        <span className="text-[10px] font-black text-muted-foreground uppercase">{episode.viewerCount || 0} listeners</span>
+      </div>
+    </Card>
+  )
+}
+
 // ─── Main RoomsView ───────────────────────────────────────────────────────────
 
 export function RoomsView() {
-  const [view, setView] = useState<"live" | "upcoming">("live")
+  const [view, setView] = useState<"live" | "upcoming" | "replays">("live")
   const [rooms, setRooms] = useState<any[]>([])
   const [upcomingRooms, setUpcomingRooms] = useState<any[]>([])
+  const [episodes, setEpisodes] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [loadingUpcoming, setLoadingUpcoming] = useState(true)
+  const [loadingEpisodes, setLoadingEpisodes] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
   const [sortBy, setSortBy] = useState<"listeners" | "newest">("listeners")
   const { walletAddress } = useAuthStore()
@@ -222,8 +267,21 @@ export function RoomsView() {
       }
     }
 
+    const fetchEpisodes = async () => {
+      setLoadingEpisodes(true)
+      try {
+        const res = await axios.get(`${apiUrl}/discover/episodes`)
+        if (res.data.success) setEpisodes(res.data.data.episodes || [])
+      } catch {
+        // silently fail
+      } finally {
+        setLoadingEpisodes(false)
+      }
+    }
+
     fetchRooms()
     fetchUpcomingRooms()
+    fetchEpisodes()
   }, [apiUrl])
 
   const filteredRooms = useMemo(() => {
@@ -288,6 +346,23 @@ export function RoomsView() {
             </span>
           )}
         </button>
+        <button
+          type="button"
+          onClick={() => setView("replays")}
+          className={`flex items-center gap-2 px-5 py-2 rounded-md font-black uppercase text-xs tracking-widest transition-all ${
+            view === "replays"
+              ? "bg-background text-foreground shadow-sm"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          <PlayCircle size={13} />
+          Replays
+          {episodes.length > 0 && (
+            <span className="ml-1 bg-accent-purple text-white text-[9px] font-black px-1.5 py-0.5 rounded-full leading-none">
+              {episodes.length}
+            </span>
+          )}
+        </button>
       </div>
 
       {/* ── Live Spaces View ────────────────────────────────────────────── */}
@@ -344,6 +419,30 @@ export function RoomsView() {
               </div>
             )}
           </div>
+        </>
+      )}
+
+      {/* ── Replays View ─────────────────────────────────────────────────── */}
+      {view === "replays" && (
+        <>
+          {loadingEpisodes ? (
+            <div className="border border-dashed border-border p-20 text-center bg-card rounded-lg">
+              <div className="w-10 h-10 border-4 border-muted border-t-accent-purple animate-spin mx-auto mb-4 rounded-full" />
+              <p className="font-bold uppercase tracking-widest text-muted-foreground text-xs">Loading replays...</p>
+            </div>
+          ) : episodes.length > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-5">
+              {episodes.map(ep => <ReplayCard key={ep.id} episode={ep} />)}
+            </div>
+          ) : (
+            <div className="border border-dashed border-border p-16 text-center bg-card rounded-lg flex flex-col items-center gap-4">
+              <PlayCircle size={40} className="text-muted-foreground opacity-40" />
+              <div className="space-y-1">
+                <h3 className="text-lg font-black uppercase tracking-tighter text-foreground">No replays yet</h3>
+                <p className="text-muted-foreground font-bold uppercase text-[10px] tracking-widest">Recorded spaces will appear here</p>
+              </div>
+            </div>
+          )}
         </>
       )}
 

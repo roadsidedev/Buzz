@@ -36,6 +36,7 @@ export function RoomLivePage() {
   const { toggleLike, toggleSave, toggleFollow, isLiked, isSaved, isFollowing } = useSocialStore()
 
   const [stream, setStream] = useState<any>(null)
+  const audioPlayerRef = useRef<HTMLAudioElement | null>(null)
   const [streamLoading, setStreamLoading] = useState(true)
   const [chat, setChat] = useState<{ user: string; msg: string; isAgent: boolean; isPriority: boolean }[]>([])
   const [message, setMessage] = useState("")
@@ -75,6 +76,8 @@ export function RoomLivePage() {
             hostAgentAvatar: room.hostAgent?.avatar || null,
             viewerCount: room.viewerCount ?? 0,
             status: room.status,
+            recordingUrl: room.recordingUrl || null,
+            recordingEnabled: room.recordingEnabled ?? true,
           })
         } else {
           setStream(null)
@@ -194,6 +197,107 @@ export function RoomLivePage() {
         <div className="text-center flex flex-col items-center gap-4">
           <Headphones size={48} className="text-muted-foreground/40" />
           <p className="text-muted-foreground font-semibold">Room not found or has ended.</p>
+          <Button variant="secondary" onClick={() => navigate(-1)}>
+            <ArrowLeft className="w-4 h-4 mr-2" /> Go Back
+          </Button>
+        </div>
+      </div>
+    )
+  }
+
+  // ── Replay UI (completed room with recording) ─────────────────────────────
+  const isReplay = stream?.status === "completed" || stream?.status === "failed"
+  if (isReplay && stream?.recordingUrl) {
+    return (
+      <div className="animate-in fade-in duration-500 pb-24 max-w-2xl mx-auto px-4 pt-4">
+        <div className="flex items-center justify-between mb-6">
+          <Button variant="ghost" size="sm" onClick={() => navigate(-1)} className="text-muted-foreground">
+            <ArrowLeft className="w-4 h-4 mr-1" /> Back
+          </Button>
+          <div className="flex items-center gap-2">
+            <Headphones size={16} className="text-primary" />
+            <span className="text-sm font-bold text-primary uppercase tracking-wider">Replay</span>
+          </div>
+          <Badge variant="secondary" className="text-xs uppercase tracking-wider">Ended</Badge>
+        </div>
+
+        <Card className="mb-6 border-2">
+          <CardContent className="p-4 flex items-center gap-4">
+            <img
+              src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${stream.hostAgentId}`}
+              alt={stream.hostAgentName}
+              className="w-12 h-12 rounded-full border-2 border-primary/30 bg-muted shrink-0"
+            />
+            <div className="min-w-0">
+              <p className="font-bold text-foreground truncate">{stream.hostAgentName}</p>
+              <p className="text-sm text-muted-foreground line-clamp-2 leading-snug mt-0.5">{stream.title}</p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="mb-6 border-2">
+          <CardContent className="p-6 flex flex-col items-center gap-4">
+            <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Recording</p>
+            <audio
+              ref={audioPlayerRef}
+              src={stream.recordingUrl}
+              controls
+              className="w-full"
+              style={{ colorScheme: "normal" }}
+            />
+            <p className="text-xs text-muted-foreground text-center">
+              This space has ended. Listen to the full recording above.
+            </p>
+          </CardContent>
+        </Card>
+
+        <div className="fixed bottom-0 inset-x-0 bg-background/95 backdrop-blur-sm border-t px-4 py-3 flex items-center justify-between max-w-2xl mx-auto">
+          <div className="flex items-center gap-1">
+            <Button variant="ghost" size="icon" className={cn("rounded-full h-9 w-9", isLiked(streamId) && "text-red-500")} onClick={() => requireAuth(() => toggleLike(streamId, 'room'))}>
+              <Heart size={18} fill={isLiked(streamId) ? "currentColor" : "none"} />
+            </Button>
+            <Button variant="ghost" size="icon" className="rounded-full h-9 w-9 text-green-600" onClick={() => requireAuth(() => setShowTipModal(true))}>
+              <DollarSign size={18} />
+            </Button>
+          </div>
+          <div className="flex items-center gap-1">
+            <Button variant="ghost" size="icon" className={cn("rounded-full h-9 w-9", isSaved(streamId) && "text-yellow-500")} onClick={() => requireAuth(() => toggleSave(streamId, 'room'))}>
+              <Bookmark size={18} fill={isSaved(streamId) ? "currentColor" : "none"} />
+            </Button>
+            <Button variant="ghost" size="icon" className="rounded-full h-9 w-9" onClick={() => setShareWizardOpen(true)}>
+              <Share2 size={18} />
+            </Button>
+          </div>
+        </div>
+
+        <Dialog open={shareWizardOpen} onOpenChange={setShareWizardOpen}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader className="pb-4">
+              <DialogTitle className="text-xl font-bold tracking-tight">Share Replay</DialogTitle>
+              <DialogDescription>Share this recording with others.</DialogDescription>
+            </DialogHeader>
+            <div className="flex gap-2">
+              <input value={`${window.location.origin}/room/${streamId}/live`} readOnly className="flex-1 bg-muted/50 font-mono text-xs px-3 py-2 rounded border" />
+              <Button size="icon" variant="secondary" className="shrink-0 w-10" onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/room/${streamId}/live`); setShareWizardOpen(false) }}>
+                <Copy size={14} />
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {stream && <TipModal isOpen={showTipModal} onClose={() => setShowTipModal(false)} agentId={stream.hostAgentId} agentName={stream.hostAgentName} />}
+      </div>
+    )
+  }
+
+  // Ended room with no recording
+  if (isReplay && !stream?.recordingUrl) {
+    return (
+      <div className="flex items-center justify-center h-[60vh]">
+        <div className="text-center flex flex-col items-center gap-4">
+          <Headphones size={48} className="text-muted-foreground/40" />
+          <p className="text-muted-foreground font-semibold">This space has ended.</p>
+          <p className="text-sm text-muted-foreground">No recording was saved for this room.</p>
           <Button variant="secondary" onClick={() => navigate(-1)}>
             <ArrowLeft className="w-4 h-4 mr-2" /> Go Back
           </Button>

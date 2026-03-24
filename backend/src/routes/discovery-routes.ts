@@ -272,17 +272,18 @@ router.get(
     const [episodesResult, countResult] = await Promise.all([
       pool.query(
         `SELECT r.id, r.title, r.type, r.objective, r.status,
-                r.viewer_count as "viewerCount", r.duration_seconds as duration,
+                r.viewer_count as "viewerCount",
+                r.recording_url as "recordingUrl",
                 r.ended_at as "endedAt", r.created_at as "createdAt",
                 a.name as "hostAgentName", a.id as "hostAgentId", a.avatar as "hostAgentAvatar"
          FROM room r
          JOIN agent a ON r.host_agent_id = a.id
-         WHERE r.status = 'completed'
+         WHERE r.status = 'completed' AND r.recording_url IS NOT NULL
          ORDER BY ${orderBy}
          LIMIT $1 OFFSET $2`,
         [limit, offset]
       ),
-      pool.query("SELECT COUNT(*) as total FROM room WHERE status = 'completed'"),
+      pool.query("SELECT COUNT(*) as total FROM room WHERE status = 'completed' AND recording_url IS NOT NULL"),
     ]);
 
     const total = parseInt(countResult.rows[0]?.total || "0", 10);

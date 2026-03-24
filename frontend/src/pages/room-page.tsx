@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, Users, Target, Clock, Hash, Play, Heart, DollarSign, Share2, Bookmark } from "lucide-react";
+import { ArrowLeft, Users, Target, Clock, Play, Heart, DollarSign, Share2, Bookmark, Bell, Headphones } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -16,7 +16,7 @@ interface RoomDetails {
   id: string;
   title: string;
   objective: string;
-  status: "pending" | "live" | "completed";
+  status: "pending" | "live" | "scheduled" | "completed" | "cancelled" | "failed";
   hostAgent?: { id: string; name: string; avatar?: string };
   hostAgentId?: string;
   hostAgentName?: string;
@@ -24,6 +24,9 @@ interface RoomDetails {
   viewerCount: number;
   category?: string;
   createdAt: string;
+  scheduledFor?: string | null;
+  recordingUrl?: string | null;
+  recordingEnabled?: boolean;
 }
 
 export const RoomPage: React.FC = () => {
@@ -149,6 +152,9 @@ export const RoomPage: React.FC = () => {
         </div>
         <div className="flex items-center gap-2">
           {room?.status === "live" && <Badge variant="destructive" className="animate-pulse">Live</Badge>}
+          {room?.status === "pending" && <Badge className="bg-yellow-500 text-white animate-pulse">Starting</Badge>}
+          {room?.status === "scheduled" && <Badge variant="outline" className="text-primary border-primary">Scheduled</Badge>}
+          {(room?.status === "completed" || room?.status === "failed") && <Badge variant="secondary">{room.recordingUrl ? "Replay Available" : "Ended"}</Badge>}
         </div>
       </header>
 
@@ -211,14 +217,49 @@ export const RoomPage: React.FC = () => {
 
               {/* Right: Actions */}
               <div className="lg:w-48 flex flex-col gap-3">
-                <Button
-                  size="lg"
-                  className="w-full"
-                  onClick={() => navigate(`/room/${id}/live`)}
-                >
-                  <Play className="w-4 h-4 mr-2 fill-current" />
-                  Join Live
-                </Button>
+                {/* Primary CTA: depends on room status */}
+                {(room?.status === "live" || room?.status === "pending") && (
+                  <Button
+                    size="lg"
+                    className="w-full"
+                    onClick={() => navigate(`/room/${id}/live`)}
+                  >
+                    <Play className="w-4 h-4 mr-2 fill-current" />
+                    Join Live
+                  </Button>
+                )}
+                {room?.status === "scheduled" && (
+                  <Button
+                    size="lg"
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => requireAuth(() => {
+                      fetch(
+                        `${import.meta.env.VITE_API_URL || 'http://localhost:4000/api/v1'}/rooms/${id}/notify`,
+                        { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userId: hostId }) }
+                      ).then(() => alert("You'll be notified when this space goes live!")).catch(() => {});
+                    })}
+                  >
+                    <Bell className="w-4 h-4 mr-2" />
+                    Notify Me
+                  </Button>
+                )}
+                {(room?.status === "completed" || room?.status === "failed") && room?.recordingUrl && (
+                  <Button
+                    size="lg"
+                    className="w-full"
+                    onClick={() => navigate(`/room/${id}/live`)}
+                  >
+                    <Headphones className="w-4 h-4 mr-2" />
+                    Play Replay
+                  </Button>
+                )}
+                {(room?.status === "completed" || room?.status === "failed") && !room?.recordingUrl && (
+                  <Button size="lg" className="w-full" disabled variant="outline">
+                    <Clock className="w-4 h-4 mr-2" />
+                    Ended
+                  </Button>
+                )}
 
                 <div className="grid grid-cols-2 gap-2">
                   <Button 
