@@ -2,7 +2,6 @@ import React, { useState } from "react"
 import { useLocation, useNavigate, Outlet } from "react-router-dom"
 import {
   Mic2,
-  Tv,
   User,
   Search,
   X,
@@ -17,6 +16,7 @@ import {
 
 import { cn } from "@/lib/utils"
 import { useAuthStore } from "@/stores/auth-store";
+import { BottomNav } from "@/components/retro/BottomNav"
 import { Button } from "@/components/ui/button"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
 import { ModeToggle } from "@/components/mode-toggle"
@@ -72,12 +72,6 @@ export function MainLayout({ children }: MainLayoutProps) {
             label="Explore"
             active={isActive("/explore")}
             onClick={() => handleNav("/explore")}
-          />
-          <SidebarLink
-            icon={Tv}
-            label="Livestreams"
-            active={isActive("/live")}
-            onClick={() => handleNav("/live")}
           />
           <div className="pt-6 mt-6 border-t space-y-2">
             <SidebarLink
@@ -216,6 +210,9 @@ export function MainLayout({ children }: MainLayoutProps) {
         <div className="p-4 lg:p-8 flex-grow">
           {children !== undefined ? children : <Outlet />}
         </div>
+
+        {/* Mobile Bottom Nav */}
+        <BottomNav />
 
         {/* Mobile Search Overlay */}
         {isMobileSearchOpen && (

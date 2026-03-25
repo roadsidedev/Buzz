@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react"
-import { Users, Headphones, Heart, DollarSign, Share2, Bookmark, Calendar, Bell, Search, Radio, Clock, Video, Mic } from "lucide-react"
+import { Users, Headphones, Heart, DollarSign, Share2, Bookmark, Calendar, Bell, Radio, Clock, Video, Mic } from "lucide-react"
+import { LiveFeedPage } from "./live-feed-page"
 import axios from "axios"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -263,19 +264,16 @@ const RecentCard = ({ room }: { room: any }) => {
 
 // ─── Format Filter ────────────────────────────────────────────────────────────
 
-type FormatFilter = "all" | "audio" | "video"
+type FormatFilter = "spaces" | "livestreams"
 
 // ─── Main LiveView ────────────────────────────────────────────────────────────
 
 export function RoomsView() {
-  const [format, setFormat] = useState<FormatFilter>("all")
+  const [format, setFormat] = useState<FormatFilter>("spaces")
   const [rooms, setRooms] = useState<any[]>([])
   const [upcomingRooms, setUpcomingRooms] = useState<any[]>([])
-  const [livestreams, setLivestreams] = useState<any[]>([])
   const [recentRooms, setRecentRooms] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [searchQuery, setSearchQuery] = useState("")
-  const [sortBy, setSortBy] = useState<"listeners" | "newest">("listeners")
   const { walletAddress } = useAuthStore()
   const { login } = usePrivy()
 
@@ -284,16 +282,14 @@ export function RoomsView() {
   useEffect(() => {
     const fetchAll = async () => {
       setLoading(true)
-      const [liveRes, upcomingRes, livestreamsRes, recentRes] = await Promise.allSettled([
+      const [liveRes, upcomingRes, recentRes] = await Promise.allSettled([
         axios.get(`${apiUrl}/discover/live-now`),
         axios.get(`${apiUrl}/discover/upcoming`, { withCredentials: true }),
-        axios.get(`${apiUrl}/livestreams`),
         axios.get(`${apiUrl}/discover/recently-ended?limit=8`),
       ])
 
       if (liveRes.status === "fulfilled") setRooms(liveRes.value.data?.data?.rooms || [])
       if (upcomingRes.status === "fulfilled") setUpcomingRooms(upcomingRes.value.data?.data?.rooms || [])
-      if (livestreamsRes.status === "fulfilled") setLivestreams(livestreamsRes.value.data?.data?.streams || [])
       if (recentRes.status === "fulfilled") setRecentRooms(recentRes.value.data?.data?.rooms || [])
 
       setLoading(false)
@@ -301,33 +297,12 @@ export function RoomsView() {
     fetchAll()
   }, [apiUrl])
 
-  // Merged + filtered content based on format filter
   const displayItems = useMemo(() => {
-    let audioItems = rooms.map(r => ({ ...r, _format: "audio" }))
-    let videoItems = livestreams.map(r => ({ ...r, _format: "video" }))
-
-    let result: any[] = []
-    if (format === "all") result = [...audioItems, ...videoItems]
-    else if (format === "audio") result = audioItems
-    else result = videoItems
-
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase()
-      result = result.filter(r =>
-        (r.title || r.objective || "").toLowerCase().includes(q) ||
-        (r.type || r.category || "").toLowerCase().includes(q) ||
-        (r.hostAgent?.name || r.hostAgentName || r.host_agent_name || "").toLowerCase().includes(q)
-      )
-    }
-
-    if (sortBy === "listeners") {
-      result.sort((a, b) => (b.viewerCount || b.viewer_count || 0) - (a.viewerCount || a.viewer_count || 0))
-    } else {
-      result.sort((a, b) => new Date(b.startedAt || b.createdAt || b.created_at || 0).getTime() - new Date(a.startedAt || a.createdAt || a.created_at || 0).getTime())
-    }
-
-    return result
-  }, [rooms, livestreams, format, searchQuery, sortBy])
+    if (format === "livestreams") return []
+    return rooms
+      .map(r => ({ ...r, _format: "audio" }))
+      .sort((a, b) => (b.viewerCount || b.viewer_count || 0) - (a.viewerCount || a.viewer_count || 0))
+  }, [rooms, format])
 
   const featuredRoom = displayItems[0] ?? null
   const gridItems = displayItems.slice(1)
@@ -337,57 +312,29 @@ export function RoomsView() {
   return (
     <div className="animate-in slide-in-from-right duration-500 pb-24 p-4 md:p-6 min-h-screen bg-background text-foreground">
 
-      {/* ── Format Filter + Search + Sort ──────────────────────────────── */}
-      <div className="flex flex-col sm:flex-row gap-3 mb-6 items-start sm:items-center">
-        {/* Format pills */}
-        <div className="flex items-center gap-1 p-1 bg-muted rounded-lg shrink-0">
-          {(["all", "audio", "video"] as FormatFilter[]).map((f) => (
-            <button
-              key={f}
-              type="button"
-              onClick={() => setFormat(f)}
-              className={`flex items-center gap-1.5 px-4 py-1.5 rounded-md font-black uppercase text-[10px] tracking-widest transition-all ${
-                format === f ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {f === "audio" && <Mic size={10} />}
-              {f === "video" && <Video size={10} />}
-              {f}
-            </button>
-          ))}
-        </div>
-
-        {/* Search */}
-        <div className="relative flex-1">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search spaces, hosts, topics..."
-            className="w-full pl-9 pr-4 py-2 bg-card border-2 border-border rounded text-sm font-medium focus:outline-none focus:border-primary placeholder:text-muted-foreground"
-          />
-        </div>
-
-        {/* Sort */}
-        <div className="flex gap-1 shrink-0">
-          {(["listeners", "newest"] as const).map((s) => (
-            <button
-              key={s}
-              type="button"
-              onClick={() => setSortBy(s)}
-              className={`px-4 py-2 text-[10px] font-black uppercase border-2 rounded transition-all ${
-                sortBy === s ? "bg-primary text-primary-foreground border-primary" : "bg-card text-muted-foreground border-border hover:border-primary/50"
-              }`}
-            >
-              {s === "listeners" ? "Top" : "New"}
-            </button>
-          ))}
-        </div>
+      {/* ── Format Toggle ──────────────────────────────────────────────── */}
+      <div className="flex items-center gap-1 p-1 bg-muted rounded-lg mb-6 self-start">
+        {(["spaces", "livestreams"] as FormatFilter[]).map((f) => (
+          <button
+            key={f}
+            type="button"
+            onClick={() => setFormat(f)}
+            className={`flex items-center gap-1.5 px-5 py-2 rounded-md font-black uppercase text-[10px] tracking-widest transition-all ${
+              format === f ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {f === "spaces" ? <Mic size={10} /> : <Video size={10} />}
+            {f === "spaces" ? "Live Spaces" : "Livestreams"}
+          </button>
+        ))}
       </div>
 
-      {/* ── Live Content ─────────────────────────────────────────────────── */}
-      {loading ? (
+      {/* ── Livestreams Tab ──────────────────────────────────────────────── */}
+      {format === "livestreams" ? (
+        <div className="-mx-4 md:-mx-6 -mb-24">
+          <LiveFeedPage />
+        </div>
+      ) : loading ? (
         <div className="border border-dashed border-border p-20 text-center bg-card rounded-lg">
           <div className="w-10 h-10 border-4 border-muted border-t-accent-purple animate-spin mx-auto mb-4 rounded-full" />
           <p className="font-bold uppercase tracking-widest text-muted-foreground text-xs">Scanning for active frequencies...</p>
@@ -412,17 +359,17 @@ export function RoomsView() {
           <div className="border border-dashed border-border p-12 text-center bg-card rounded-lg flex flex-col items-center gap-3">
             <Radio size={36} className="text-muted-foreground opacity-40" />
             <h3 className="text-lg font-black uppercase tracking-tighter text-foreground">
-              {searchQuery ? "No matches found" : "Nothing live right now"}
+              Nothing live right now
             </h3>
             <p className="text-muted-foreground font-bold uppercase text-[10px] tracking-widest">
-              {searchQuery ? "Try a different search term" : "Check back soon or be the first to go live"}
+              Check back soon or be the first to go live
             </p>
           </div>
         </div>
       )}
 
       {/* ── Starting Soon Strip ──────────────────────────────────────────── */}
-      {hasUpcoming && (
+      {format === "spaces" && hasUpcoming && (
         <div className="mt-10">
           <div className="flex items-center gap-2 mb-4">
             <Calendar size={14} className="text-accent-purple" />
@@ -444,7 +391,7 @@ export function RoomsView() {
       )}
 
       {/* ── Recently Ended Strip (shown when nothing live) ───────────────── */}
-      {!hasLive && !loading && recentRooms.length > 0 && (
+      {format === "spaces" && !hasLive && !loading && recentRooms.length > 0 && (
         <div className="mt-6">
           <div className="flex items-center gap-2 mb-4">
             <Clock size={14} className="text-muted-foreground" />
