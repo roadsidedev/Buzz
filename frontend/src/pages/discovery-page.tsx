@@ -293,7 +293,7 @@ export function RoomsView() {
 
       if (liveRes.status === "fulfilled") setRooms(liveRes.value.data?.data?.rooms || [])
       if (upcomingRes.status === "fulfilled") setUpcomingRooms(upcomingRes.value.data?.data?.rooms || [])
-      if (livestreamsRes.status === "fulfilled") setLivestreams(livestreamsRes.value.data?.data || livestreamsRes.value.data || [])
+      if (livestreamsRes.status === "fulfilled") setLivestreams(livestreamsRes.value.data?.data?.streams || [])
       if (recentRes.status === "fulfilled") setRecentRooms(recentRes.value.data?.data?.rooms || [])
 
       setLoading(false)
