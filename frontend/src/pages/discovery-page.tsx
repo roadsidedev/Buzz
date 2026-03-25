@@ -1,17 +1,15 @@
 import React, { useState, useEffect, useMemo } from "react"
-import { Users, Headphones, Heart, DollarSign, Share2, Bookmark, Calendar, Bell, Radio, Clock, Video, Mic } from "lucide-react"
+import { Users, Calendar, Bell, Radio, Clock, Video, Mic } from "lucide-react"
 import { LiveFeedPage } from "./live-feed-page"
 import axios from "axios"
-import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { useNavigate } from "react-router-dom"
 import { useAuthStore } from "@/stores/auth-store"
 import { usePrivy } from "@privy-io/react-auth"
-import { useSocialStore } from "@/stores/social-store"
-import { TipModal } from "@/components/retro/TipModal"
+import { useRoomStore } from "@/stores/room-store"
 import { API_BASE } from "@/services/discovery"
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function formatRelativeTime(dateStr: string): string {
   const date = new Date(dateStr)
@@ -33,10 +31,109 @@ function capitalizeType(type: string): string {
   return type.charAt(0).toUpperCase() + type.slice(1).replace(/[-_]/g, " ")
 }
 
-// ─── Hero Card (Featured Room) ────────────────────────────────────────────────
+// ─── Speaker avatar grid (Clubhouse-style right column) ───────────────────────
 
-const HeroCard = ({ room }: { room: any }) => {
-  const navigate = useNavigate()
+const SpeakerGrid = ({ speakers, size = "md" }: { speakers: string[]; size?: "sm" | "md" }) => {
+  const avatarSize = size === "sm" ? "w-9 h-9" : "w-11 h-11"
+  const visible = speakers.slice(0, 4)
+  const overflow = speakers.length - 4
+
+  return (
+    <div className="flex flex-col items-end gap-1.5 shrink-0">
+      <div className="grid grid-cols-2 gap-1.5">
+        {visible.map((s, i) => (
+          <div key={i} className={`${avatarSize} rounded-full bg-white/10 overflow-hidden border border-white/10`}>
+            <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${s}`} alt="speaker" className="w-full h-full object-cover" />
+          </div>
+        ))}
+        {/* Fill empty slots so the grid always looks balanced */}
+        {visible.length === 1 && <div className={`${avatarSize} rounded-full bg-white/5 border border-white/5`} />}
+      </div>
+      {overflow > 0 && (
+        <span className="text-[10px] font-bold text-white/40">+{overflow} more</span>
+      )}
+    </div>
+  )
+}
+
+// ─── Clubhouse-style Room Card ────────────────────────────────────────────────
+
+const RoomCard = ({
+  room,
+  isVideo = false,
+  onJoin,
+}: {
+  room: any
+  isVideo?: boolean
+  onJoin: (id: string) => void
+}) => {
+  const title = room.title || room.objective || "Untitled Space"
+  const tag = capitalizeType(room.category?.name || room.type)
+  const listeners = room.viewerCount || room.viewer_count || 0
+  const hostName = room.hostAgent?.name || room.hostAgentName || room.host_agent_name || "Agent"
+  const speakers = room.speakers || [hostName]
+
+  return (
+    <div
+      className="rounded-2xl p-4 cursor-pointer active:scale-[0.98] transition-transform select-none bg-[#1c1c1e]"
+      onClick={() => onJoin(room.id)}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => e.key === "Enter" && onJoin(room.id)}
+    >
+      <div className="flex gap-3">
+        {/* Left: meta + title + names */}
+        <div className="flex-grow min-w-0 flex flex-col gap-2">
+          {/* Category + live badge */}
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-black uppercase tracking-widest text-white/40">
+              {tag}
+            </span>
+            <span className="flex items-center gap-1 text-[10px] font-black uppercase text-red-400 tracking-widest">
+              <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse" />
+              Live
+            </span>
+            {isVideo && <Video size={10} className="text-white/30" />}
+          </div>
+
+          {/* Title */}
+          <h3 className="text-white font-bold text-[15px] leading-snug line-clamp-3">
+            {title}
+          </h3>
+
+          {/* Speaker names */}
+          <p className="text-white/40 text-[11px] truncate">
+            {speakers.slice(0, 3).join(", ")}{speakers.length > 3 ? ` +${speakers.length - 3}` : ""}
+          </p>
+        </div>
+
+        {/* Right: speaker avatar grid */}
+        <SpeakerGrid speakers={speakers} />
+      </div>
+
+      {/* Bottom row */}
+      <div className="flex items-center justify-between mt-3 pt-3 border-t border-white/5">
+        <div className="flex items-center gap-1.5 text-white/30 text-[11px]">
+          <Users size={12} />
+          {listeners > 0 ? `${listeners.toLocaleString()} listening` : "Live now"}
+        </div>
+        <span className="text-[11px] font-bold text-violet-400 uppercase tracking-widest">
+          Join →
+        </span>
+      </div>
+    </div>
+  )
+}
+
+// ─── Clubhouse-style Hero Card (featured room) ────────────────────────────────
+
+const HeroCard = ({
+  room,
+  onJoin,
+}: {
+  room: any
+  onJoin: (id: string) => void
+}) => {
   const title = room.title || room.objective || "Untitled Space"
   const tag = capitalizeType(room.category?.name || room.type)
   const listeners = room.viewerCount || room.viewer_count || 0
@@ -45,195 +142,111 @@ const HeroCard = ({ room }: { room: any }) => {
   const isVideo = room.format === "video" || room.stream_capabilities?.includes("video")
 
   return (
-    <Card
-      className="w-full mb-6 cursor-pointer group overflow-hidden border-2 bg-card hover:border-primary/50 transition-all hover:-translate-y-0.5 hover:shadow-xl"
-      onClick={() => navigate(isVideo ? `/live/${room.id}` : `/room/${room.id}`)}
+    <div
+      className="rounded-2xl p-5 cursor-pointer active:scale-[0.99] transition-transform select-none mb-3 bg-[#1c1c1e]"
+      onClick={() => onJoin(room.id)}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => e.key === "Enter" && onJoin(room.id)}
     >
-      <div className="p-5 md:p-6 flex flex-col md:flex-row md:items-center gap-5">
-        {/* Left: badge + title + host */}
-        <div className="flex-grow">
-          <div className="flex items-center gap-3 mb-3">
-            <Badge className="bg-accent-crimson/10 text-accent-crimson border-0 uppercase font-black text-[10px] tracking-widest">
+      <div className="flex gap-4">
+        {/* Left */}
+        <div className="flex-grow min-w-0 flex flex-col gap-2.5">
+          <div className="flex items-center gap-2">
+            <Badge className="bg-accent-crimson/20 text-accent-crimson border-0 uppercase font-black text-[10px] tracking-widest">
               {tag}
             </Badge>
-            <span className="flex items-center gap-1.5 text-[10px] font-black uppercase text-accent-crimson tracking-widest">
-              <span className="w-2 h-2 rounded-full bg-accent-crimson animate-pulse inline-block" />
+            <span className="flex items-center gap-1.5 text-[10px] font-black uppercase text-red-400 tracking-widest">
+              <span className="w-2 h-2 rounded-full bg-red-400 animate-pulse" />
               Live
             </span>
-            {isVideo ? <Video size={12} className="text-muted-foreground" /> : <Mic size={12} className="text-muted-foreground" />}
+            {isVideo ? <Video size={11} className="text-white/30" /> : <Mic size={11} className="text-white/30" />}
           </div>
-          <h2 className="text-foreground font-black text-2xl md:text-3xl leading-tight uppercase tracking-tighter group-hover:text-accent-purple transition-colors mb-4 line-clamp-2">
+
+          <h2 className="text-white font-black text-xl leading-tight line-clamp-3">
             {title}
           </h2>
-          {/* Speaker stack */}
-          <div className="flex items-center gap-3">
-            <div className="flex -space-x-2">
-              {speakers.slice(0, 5).map((s: string, i: number) => (
-                <div key={i} className="w-8 h-8 rounded-full border-2 border-background bg-accent-purple/20 flex items-center justify-center overflow-hidden">
-                  <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${s}`} alt="avatar" />
-                </div>
-              ))}
-            </div>
-            <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-              {speakers.slice(0, 2).join(", ")}{speakers.length > 2 && ` +${speakers.length - 2}`}
-            </span>
-          </div>
+
+          <p className="text-white/40 text-[12px] truncate">
+            {speakers.slice(0, 2).join(", ")}{speakers.length > 2 ? ` +${speakers.length - 2}` : ""}
+          </p>
         </div>
-        {/* Right: viewers + join CTA */}
-        <div className="flex md:flex-col items-center md:items-end gap-4 md:gap-3 shrink-0">
-          <div className="flex items-center gap-1.5 text-sm font-black uppercase text-muted-foreground">
-            <Users size={15} className="text-accent-purple" />
-            {listeners.toLocaleString()} listening
-          </div>
-          <button
-            type="button"
-            className="px-6 py-2.5 bg-accent-purple text-white font-black uppercase text-xs tracking-widest rounded transition-all hover:bg-accent-purple/90 hover:scale-105 active:scale-95 whitespace-nowrap"
-            onClick={(e) => { e.stopPropagation(); navigate(isVideo ? `/live/${room.id}` : `/room/${room.id}`) }}
-          >
-            Join Now
-          </button>
-        </div>
+
+        {/* Right: speaker grid */}
+        <SpeakerGrid speakers={speakers} size="md" />
       </div>
-    </Card>
-  )
-}
 
-// ─── Live Room Card ───────────────────────────────────────────────────────────
-
-const RoomCard = ({ room, isVideo = false }: { room: any; isVideo?: boolean }) => {
-  const navigate = useNavigate()
-  const { authenticated } = useAuthStore()
-  const { login } = usePrivy()
-  const { toggleLike, toggleSave, isLiked, isSaved } = useSocialStore()
-  const [showTipModal, setShowTipModal] = useState(false)
-
-  const title = room.title || room.objective || "Untitled Space"
-  const tag = capitalizeType(room.category?.name || room.type)
-  const listeners = room.viewerCount || room.viewer_count || 0
-  const hostName = room.hostAgent?.name || room.hostAgentName || room.host_agent_name || "Agent"
-  const speakers = room.speakers || [hostName]
-  const hostAgentId = room.hostAgent?.id || room.hostAgentId || room.host_agent_id || room.id
-
-  const requireAuth = (e: React.MouseEvent, fn: () => void) => {
-    e.stopPropagation()
-    if (!authenticated) { login(); return }
-    fn()
-  }
-
-  const handleClick = () => navigate(isVideo ? `/live/${room.id}` : `/room/${room.id}`)
-
-  return (
-    <>
-      <Card
-        className="hover:border-primary/50 hover:shadow-lg transition-all cursor-pointer group flex flex-col h-full overflow-hidden border-2 bg-card text-card-foreground hover:-translate-y-1"
-        onClick={handleClick}
-      >
-        <div className="p-4 flex-grow flex flex-col">
-          <div className="flex justify-between items-start mb-3">
-            <div className="flex items-center gap-2">
-              <Badge variant="secondary" className="bg-accent-purple/10 text-accent-purple border border-transparent uppercase font-black text-[10px] tracking-widest">
-                {tag}
-              </Badge>
-              <span className="flex items-center gap-1 text-[10px] font-black uppercase text-accent-crimson tracking-widest">
-                <span className="w-1.5 h-1.5 rounded-full bg-accent-crimson animate-pulse inline-block" />
-                Live
-              </span>
-              {isVideo && <Video size={10} className="text-muted-foreground" />}
-            </div>
-            <div className="flex items-center text-muted-foreground text-xs font-black uppercase">
-              <Users size={13} className="mr-1 text-accent-purple" />
-              {listeners}
-            </div>
-          </div>
-          <h3 className="text-foreground font-black text-lg mb-3 group-hover:text-accent-purple transition-colors leading-tight line-clamp-2 min-h-[2.5rem] uppercase tracking-tighter">
-            {title}
-          </h3>
-          <div className="mt-auto">
-            <div className="flex -space-x-2 mb-2">
-              {speakers.slice(0, 4).map((s: string, i: number) => (
-                <div key={i} className="w-8 h-8 rounded-full border-2 border-background bg-accent-purple/20 flex items-center justify-center overflow-hidden hover:scale-110 hover:z-20 transition-transform relative">
-                  <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${s}`} alt="avatar" />
-                </div>
-              ))}
-            </div>
-            <div className="text-[10px] font-black uppercase tracking-widest truncate text-muted-foreground">
-              {speakers.slice(0, 3).join(", ")}{speakers.length > 3 && ` +${speakers.length - 3}`}
-            </div>
-          </div>
+      <div className="flex items-center justify-between mt-4 pt-3 border-t border-white/5">
+        <div className="flex items-center gap-1.5 text-white/30 text-[12px]">
+          <Users size={13} />
+          {listeners > 0 ? `${listeners.toLocaleString()} listening` : "Live now"}
         </div>
-        <div className="flex items-center justify-between border-t bg-muted/50 px-4 py-3" onClick={(e) => e.stopPropagation()}>
-          <button type="button" className="text-muted-foreground hover:text-accent-purple transition-all p-2 hover:bg-background border border-transparent rounded-sm" title="Listen/Watch" onClick={(e) => { e.stopPropagation(); handleClick() }}>
-            <Headphones size={15} />
-          </button>
-          <button type="button" onClick={(e) => requireAuth(e, () => toggleLike(String(room.id), 'room'))} className={`transition-all p-2 hover:bg-background border border-transparent rounded-sm ${isLiked(String(room.id)) ? 'text-accent-crimson' : 'text-muted-foreground hover:text-accent-crimson'}`} title="Like">
-            <Heart size={15} fill={isLiked(String(room.id)) ? "currentColor" : "none"} />
-          </button>
-          <button type="button" onClick={(e) => requireAuth(e, () => setShowTipModal(true))} className="text-muted-foreground hover:text-green-600 transition-all p-2 hover:bg-background border border-transparent rounded-sm" title="Tip">
-            <DollarSign size={15} />
-          </button>
-          <button type="button" onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(`${window.location.origin}/room/${room.id}`) }} className="text-muted-foreground hover:text-accent-purple transition-all p-2 hover:bg-background border border-transparent rounded-sm" title="Share">
-            <Share2 size={15} />
-          </button>
-          <button type="button" onClick={(e) => requireAuth(e, () => toggleSave(String(room.id), 'room'))} className={`transition-all p-2 hover:bg-background border border-transparent rounded-sm ${isSaved(String(room.id)) ? 'text-yellow-500' : 'text-muted-foreground hover:text-yellow-500'}`} title="Save">
-            <Bookmark size={15} fill={isSaved(String(room.id)) ? "currentColor" : "none"} />
-          </button>
-        </div>
-      </Card>
-      <TipModal isOpen={showTipModal} onClose={() => setShowTipModal(false)} agentId={hostAgentId} agentName={hostName} />
-    </>
+        <span className="px-4 py-1.5 bg-violet-600 text-white font-bold text-[12px] uppercase tracking-wide rounded-full pointer-events-none">
+          Join Now
+        </span>
+      </div>
+    </div>
   )
 }
 
 // ─── Upcoming Space Card ──────────────────────────────────────────────────────
 
-const UpcomingCard = ({ room, apiUrl, walletAddress, login }: { room: any; apiUrl: string; walletAddress: string | null; login: () => void }) => {
+const UpcomingCard = ({
+  room,
+  apiUrl,
+  walletAddress,
+  login,
+}: {
+  room: any
+  apiUrl: string
+  walletAddress: string | null
+  login: () => void
+}) => {
   const navigate = useNavigate()
   const tag = capitalizeType(room.type)
   const scheduled = room.scheduledFor ? new Date(room.scheduledFor) : null
 
   return (
-    <Card
-      className="min-w-[300px] md:min-w-[340px] snap-center hover:border-primary/50 transition-all cursor-pointer group flex flex-col overflow-hidden border-2 bg-card text-card-foreground"
+    <div
+      className="min-w-[280px] snap-center rounded-2xl p-4 cursor-pointer flex flex-col gap-3 bg-[#1c1c1e]"
       onClick={() => navigate(`/room/${room.id}`)}
     >
-      <div className="p-4 flex flex-col gap-3">
-        <div className="flex justify-between items-center">
-          <Badge variant="secondary" className="bg-primary/10 text-primary border border-transparent uppercase font-black text-[10px] tracking-widest">
-            {tag}
-          </Badge>
-          {scheduled && (
-            <div className="flex items-center gap-1 text-[10px] font-black uppercase text-accent-purple border border-accent-purple/30 px-2 py-1 rounded">
-              <Clock size={10} />
-              {formatRelativeTime(room.scheduledFor)}
-            </div>
-          )}
-        </div>
-        <h3 className="text-foreground font-black text-base leading-tight line-clamp-2 uppercase tracking-tighter group-hover:text-accent-purple transition-colors">
-          {room.title || room.objective || "Untitled Space"}
-        </h3>
-        <div className="flex justify-between items-center pt-2 border-t border-border" onClick={(e) => e.stopPropagation()}>
-          <div className="text-[10px] font-black text-muted-foreground uppercase">
-            {scheduled ? scheduled.toLocaleDateString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "TBA"}
+      <div className="flex justify-between items-center">
+        <span className="text-[10px] font-black uppercase tracking-widest text-white/40">{tag}</span>
+        {scheduled && (
+          <div className="flex items-center gap-1 text-[10px] font-bold text-violet-400">
+            <Clock size={10} />
+            {formatRelativeTime(room.scheduledFor)}
           </div>
-          <button
-            type="button"
-            className="flex items-center gap-1 text-[10px] font-bold uppercase bg-primary text-primary-foreground hover:bg-primary/90 px-3 py-1.5 rounded transition-colors"
-            onClick={async (e) => {
-              e.stopPropagation()
-              if (!walletAddress) { login(); return }
-              try {
-                await axios.post(`${apiUrl}/rooms/${room.id}/notify`, { userId: walletAddress }, { withCredentials: true })
-                alert("You'll be notified when this space starts!")
-              } catch {
-                alert("Failed to subscribe to notifications.")
-              }
-            }}
-          >
-            <Bell size={11} /> Notify Me
-          </button>
-        </div>
+        )}
       </div>
-    </Card>
+      <h3 className="text-white font-bold text-[14px] leading-tight line-clamp-2">
+        {room.title || room.objective || "Untitled Space"}
+      </h3>
+      <div className="flex justify-between items-center pt-2 border-t border-white/5" onClick={(e) => e.stopPropagation()}>
+        <div className="text-[10px] font-bold text-white/30 uppercase">
+          {scheduled
+            ? scheduled.toLocaleDateString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })
+            : "TBA"}
+        </div>
+        <button
+          type="button"
+          className="flex items-center gap-1 text-[10px] font-bold uppercase bg-violet-600 text-white hover:bg-violet-500 px-3 py-1.5 rounded-full transition-colors"
+          onClick={async (e) => {
+            e.stopPropagation()
+            if (!walletAddress) { login(); return }
+            try {
+              await axios.post(`${apiUrl}/rooms/${room.id}/notify`, { userId: walletAddress }, { withCredentials: true })
+              alert("You'll be notified when this space starts!")
+            } catch {
+              alert("Failed to subscribe to notifications.")
+            }
+          }}
+        >
+          <Bell size={11} /> Notify Me
+        </button>
+      </div>
+    </div>
   )
 }
 
@@ -242,23 +255,21 @@ const UpcomingCard = ({ room, apiUrl, walletAddress, login }: { room: any; apiUr
 const RecentCard = ({ room }: { room: any }) => {
   const navigate = useNavigate()
   return (
-    <Card
-      className="min-w-[260px] snap-center cursor-pointer group border-2 hover:border-primary/30 transition-all bg-muted/30"
+    <div
+      className="min-w-[220px] snap-center rounded-2xl p-4 cursor-pointer flex flex-col gap-2 bg-[#1c1c1e]"
       onClick={() => navigate(`/room/${room.id}`)}
     >
-      <div className="p-4 flex flex-col gap-2">
-        <div className="flex items-center justify-between">
-          <Badge variant="outline" className="uppercase font-black text-[9px] tracking-widest text-muted-foreground">
-            {capitalizeType(room.type)}
-          </Badge>
-          <span className="text-[9px] font-bold text-muted-foreground uppercase">Ended</span>
-        </div>
-        <h4 className="text-sm font-black uppercase tracking-tighter line-clamp-2 group-hover:text-accent-purple transition-colors">
-          {room.title || room.objective || "Untitled Space"}
-        </h4>
-        <p className="text-[10px] text-muted-foreground font-medium truncate">{room.hostAgentName || "Unknown Agent"}</p>
+      <div className="flex items-center justify-between">
+        <span className="text-[10px] font-black uppercase tracking-widest text-white/30">
+          {capitalizeType(room.type)}
+        </span>
+        <span className="text-[9px] font-bold text-white/20 uppercase">Ended</span>
       </div>
-    </Card>
+      <h4 className="text-sm font-bold text-white/70 line-clamp-2 leading-snug">
+        {room.title || room.objective || "Untitled Space"}
+      </h4>
+      <p className="text-[10px] text-white/30 truncate">{room.hostAgentName || "Unknown Agent"}</p>
+    </div>
   )
 }
 
@@ -269,6 +280,7 @@ type FormatFilter = "spaces" | "livestreams"
 // ─── Main LiveView ────────────────────────────────────────────────────────────
 
 export function RoomsView() {
+  const navigate = useNavigate()
   const [format, setFormat] = useState<FormatFilter>("spaces")
   const [rooms, setRooms] = useState<any[]>([])
   const [upcomingRooms, setUpcomingRooms] = useState<any[]>([])
@@ -276,6 +288,15 @@ export function RoomsView() {
   const [loading, setLoading] = useState(true)
   const { walletAddress } = useAuthStore()
   const { login } = usePrivy()
+  const { setRoom } = useRoomStore()
+
+  const [isMobile, setIsMobile] = useState(() => typeof window !== "undefined" && window.innerWidth < 1024)
+
+  useEffect(() => {
+    const handler = () => setIsMobile(window.innerWidth < 1024)
+    window.addEventListener("resize", handler)
+    return () => window.removeEventListener("resize", handler)
+  }, [])
 
   const apiUrl = API_BASE
 
@@ -297,10 +318,19 @@ export function RoomsView() {
     fetchAll()
   }, [apiUrl])
 
+  // On mobile → open dock; on desktop → navigate to full page
+  const handleJoin = (roomId: string) => {
+    if (isMobile) {
+      setRoom(roomId)
+    } else {
+      navigate(`/room/${roomId}/live`)
+    }
+  }
+
   const displayItems = useMemo(() => {
     if (format === "livestreams") return []
     return rooms
-      .map(r => ({ ...r, _format: "audio" }))
+      .map((r) => ({ ...r, _format: "audio" }))
       .sort((a, b) => (b.viewerCount || b.viewer_count || 0) - (a.viewerCount || a.viewer_count || 0))
   }, [rooms, format])
 
@@ -329,7 +359,7 @@ export function RoomsView() {
         ))}
       </div>
 
-      {/* ── Livestreams Tab ──────────────────────────────────────────────── */}
+      {/* ── Livestreams Tab ─────────────────────────────────────────────── */}
       {format === "livestreams" ? (
         <div className="-mx-4 md:-mx-6 -mb-24">
           <LiveFeedPage />
@@ -337,47 +367,42 @@ export function RoomsView() {
       ) : loading ? (
         <div className="border border-dashed border-border p-20 text-center bg-card rounded-lg">
           <div className="w-10 h-10 border-4 border-muted border-t-accent-purple animate-spin mx-auto mb-4 rounded-full" />
-          <p className="font-bold uppercase tracking-widest text-muted-foreground text-xs">Scanning for active frequencies...</p>
+          <p className="font-bold uppercase tracking-widest text-muted-foreground text-xs">Scanning for active frequencies…</p>
         </div>
       ) : hasLive ? (
         <>
-          {/* Hero: featured top room */}
-          {featuredRoom && <HeroCard room={featuredRoom} />}
+          {featuredRoom && <HeroCard room={featuredRoom} onJoin={handleJoin} />}
 
-          {/* Grid: remaining live rooms */}
           {gridItems.length > 0 && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-5">
-              {gridItems.map(item => (
-                <RoomCard key={item.id} room={item} isVideo={item._format === "video"} />
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mt-3">
+              {gridItems.map((item) => (
+                <RoomCard key={item.id} room={item} isVideo={item._format === "video"} onJoin={handleJoin} />
               ))}
             </div>
           )}
         </>
       ) : (
-        /* ── Smart Empty State ───────────────────────────────────────── */
-        <div className="space-y-8">
-          <div className="border border-dashed border-border p-12 text-center bg-card rounded-lg flex flex-col items-center gap-3">
-            <Radio size={36} className="text-muted-foreground opacity-40" />
-            <h3 className="text-lg font-black uppercase tracking-tighter text-foreground">
-              Nothing live right now
-            </h3>
-            <p className="text-muted-foreground font-bold uppercase text-[10px] tracking-widest">
-              Check back soon or be the first to go live
-            </p>
-          </div>
+        <div className="border border-dashed border-border p-12 text-center bg-card rounded-lg flex flex-col items-center gap-3">
+          <Radio size={36} className="text-muted-foreground opacity-40" />
+          <h3 className="text-lg font-black uppercase tracking-tighter text-foreground">Nothing live right now</h3>
+          <p className="text-muted-foreground font-bold uppercase text-[10px] tracking-widest">
+            Check back soon or be the first to go live
+          </p>
         </div>
       )}
 
-      {/* ── Starting Soon Strip ──────────────────────────────────────────── */}
+      {/* ── Starting Soon Strip ──────────────────────────────────────── */}
       {format === "spaces" && hasUpcoming && (
         <div className="mt-10">
           <div className="flex items-center gap-2 mb-4">
             <Calendar size={14} className="text-accent-purple" />
             <h2 className="font-black uppercase tracking-widest text-sm text-foreground">Starting Soon</h2>
-            <span className="bg-accent-purple/10 text-accent-purple text-[9px] font-black px-1.5 py-0.5 rounded-full">{upcomingRooms.length}</span>
+            <span className="bg-accent-purple/10 text-accent-purple text-[9px] font-black px-1.5 py-0.5 rounded-full">
+              {upcomingRooms.length}
+            </span>
           </div>
-          <div className="flex gap-4 overflow-x-auto pb-4 snap-x -mx-4 px-4">
-            {upcomingRooms.map(room => (
+          <div className="flex gap-3 overflow-x-auto pb-4 snap-x -mx-4 px-4">
+            {upcomingRooms.map((room) => (
               <UpcomingCard
                 key={room.id}
                 room={room}
@@ -390,15 +415,15 @@ export function RoomsView() {
         </div>
       )}
 
-      {/* ── Recently Ended Strip (shown when nothing live) ───────────────── */}
+      {/* ── Recently Ended Strip ─────────────────────────────────────── */}
       {format === "spaces" && !hasLive && !loading && recentRooms.length > 0 && (
         <div className="mt-6">
           <div className="flex items-center gap-2 mb-4">
             <Clock size={14} className="text-muted-foreground" />
             <h2 className="font-black uppercase tracking-widest text-sm text-muted-foreground">Recently Ended</h2>
           </div>
-          <div className="flex gap-4 overflow-x-auto pb-4 snap-x -mx-4 px-4">
-            {recentRooms.map(room => (
+          <div className="flex gap-3 overflow-x-auto pb-4 snap-x -mx-4 px-4">
+            {recentRooms.map((room) => (
               <RecentCard key={room.id} room={room} />
             ))}
           </div>

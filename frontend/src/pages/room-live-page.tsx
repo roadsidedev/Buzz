@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from "react"
 import { useParams, useNavigate } from "react-router-dom"
 import {
   MessageSquare, Share2, DollarSign,
-  Copy, ChevronDown, Mic, MicOff, Headphones, ArrowLeft, PhoneOff,
+  Copy, ChevronDown, Mic, MicOff, Headphones, ArrowLeft, PhoneOff, Send, Users,
 } from "lucide-react"
 import axios from "axios"
 import { Button } from "@/components/ui/button"
@@ -62,8 +62,12 @@ function ScoreBar({ score }: { score?: number }) {
 
 // ── Waveform (speaking indicator) ─────────────────────────────────────────────
 
-function Waveform({ size = "sm" }: { size?: "sm" | "md" }) {
-  const h = size === "md" ? ["h-3", "h-5", "h-3"] : ["h-2.5", "h-3.5", "h-2.5"]
+function Waveform({ size = "sm" }: { size?: "sm" | "md" | "lg" }) {
+  const h = size === "lg"
+    ? ["h-4", "h-7", "h-4"]
+    : size === "md"
+      ? ["h-3", "h-5", "h-3"]
+      : ["h-2.5", "h-3.5", "h-2.5"]
   return (
     <span className="flex items-end gap-px">
       {h.map((cls, i) => (
@@ -83,16 +87,19 @@ function HostTile({
   participant,
   isSpeaking,
   score,
+  large,
 }: {
   participant: ParticipantInfo
   isSpeaking: boolean
   score?: number
+  large?: boolean
 }) {
+  const avatarClass = large ? "w-32 h-32 border-4" : "w-24 h-24 border-4"
   return (
     <div className="flex flex-col items-center gap-2">
       <div
         className={cn(
-          "w-24 h-24 rounded-full border-4 border-background transition-all duration-300 overflow-hidden bg-muted",
+          `${avatarClass} rounded-full border-background transition-all duration-300 overflow-hidden bg-muted`,
           isSpeaking && "ring-4 ring-primary ring-offset-4 ring-offset-background shadow-2xl shadow-primary/30",
         )}
       >
@@ -104,10 +111,10 @@ function HostTile({
       </div>
 
       <div className="h-5 flex items-center justify-center">
-        {isSpeaking ? <Waveform size="md" /> : <MicOff size={12} className="text-muted-foreground/40" strokeWidth={1.5} />}
+        {isSpeaking ? <Waveform size={large ? "lg" : "md"} /> : <MicOff size={12} className="text-muted-foreground/40" strokeWidth={1.5} />}
       </div>
 
-      <p className="font-bold text-base text-white/90 text-center leading-tight">
+      <p className={cn("font-bold text-white/90 text-center leading-tight", large ? "text-lg" : "text-base")}>
         {participant.name}
       </p>
       <span className="text-[10px] font-black uppercase tracking-widest text-violet-400">
@@ -124,42 +131,33 @@ function SpeakerTile({
   participant,
   isSpeaking,
   score,
+  compact,
 }: {
   participant: ParticipantInfo
   isSpeaking: boolean
   score?: number
+  compact?: boolean
 }) {
+  const sz = compact ? "w-14 h-14 border-2" : "w-[68px] h-[68px] border-2"
   return (
-    <div className="flex flex-col items-center gap-1.5">
-      <div
-        className={cn(
-          "w-[68px] h-[68px] rounded-full border-2 border-background transition-all duration-300 overflow-hidden bg-muted",
-          isSpeaking && "ring-2 ring-primary ring-offset-2 ring-offset-background shadow-lg shadow-primary/20",
-        )}
-      >
+    <div className={cn("flex flex-col items-center gap-1.5", compact && "gap-1")}>
+      <div className={cn(`${sz} rounded-full border-background transition-all duration-300 overflow-hidden bg-muted`, isSpeaking && "ring-2 ring-primary ring-offset-2 ring-offset-background shadow-lg shadow-primary/20")}>
         <img
           src={participant.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${participant.id}`}
           className="w-full h-full object-cover"
           alt={participant.name}
         />
       </div>
-
       <div className="h-4 flex items-center justify-center">
         {isSpeaking ? <Waveform size="sm" /> : <MicOff size={10} className="text-muted-foreground/40" strokeWidth={1.5} />}
       </div>
-
-      <p className="text-[11px] font-semibold text-white/80 text-center leading-tight w-16 truncate">
+      <p className={cn("font-semibold text-white/80 text-center leading-tight truncate", compact ? "text-[10px] w-14" : "text-[11px] w-16")}>
         {participant.name}
       </p>
-      <p
-        className={cn(
-          "text-[10px] font-medium",
-          participant.role === "co_host" ? "text-violet-400" : "text-white/40",
-        )}
-      >
+      <p className={cn("text-[10px] font-medium", participant.role === "co_host" ? "text-violet-400" : "text-white/40")}>
         {ROLE_LABEL[participant.role] || "Speaker"}
       </p>
-      <ScoreBar score={score} />
+      {!compact && <ScoreBar score={score} />}
     </div>
   )
 }
@@ -192,6 +190,15 @@ export function RoomLivePage() {
   const chunksRef = useRef<BlobPart[]>([])
   const recordingStreamRef = useRef<MediaStream | null>(null)
   const recordingStartRef = useRef<Date | null>(null)
+  const chatEndRef = useRef<HTMLDivElement>(null)
+
+  // Responsive
+  const [isDesktop, setIsDesktop] = useState(() => typeof window !== "undefined" && window.innerWidth >= 1024)
+  useEffect(() => {
+    const handler = () => setIsDesktop(window.innerWidth >= 1024)
+    window.addEventListener("resize", handler)
+    return () => window.removeEventListener("resize", handler)
+  }, [])
 
   const jamRoom = useJamRoom({
     roomId: streamId,
@@ -249,6 +256,11 @@ export function RoomLivePage() {
       .catch(() => {})
   }, [streamId, stream, apiUrl])
 
+  // Scroll chat to bottom
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" })
+  }, [chat.length])
+
   // ── Stage participants ──────────────────────────────────────────────────────
   const stageParticipants = React.useMemo<ParticipantInfo[]>(() => {
     if (participants.length > 0) {
@@ -263,7 +275,9 @@ export function RoomLivePage() {
   const host = stageParticipants.find((p) => p.role === "host") ?? stageParticipants[0] ?? null
   const supporters = stageParticipants.filter((p) => p !== host)
 
-  const isHostSpeaking = host ? (jamRoom.speaking.includes(host.id) || (jamRoom.speaking.length > 0 && stageParticipants.indexOf(host) < jamRoom.speaking.length)) : false
+  const isHostSpeaking = host
+    ? (jamRoom.speaking.includes(host.id) || (jamRoom.speaking.length > 0 && stageParticipants.indexOf(host) < jamRoom.speaking.length))
+    : false
 
   const requireAuth = (fn: () => void) => {
     if (!authenticated) { login() } else { fn() }
@@ -379,11 +393,7 @@ export function RoomLivePage() {
         </div>
 
         <div className="mb-6 border-2 rounded-lg p-4 flex items-center gap-4">
-          <img
-            src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${stream.hostAgentId}`}
-            alt={stream.hostAgentName}
-            className="w-12 h-12 rounded-full border-2 border-primary/30 bg-muted shrink-0"
-          />
+          <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${stream.hostAgentId}`} alt={stream.hostAgentName} className="w-12 h-12 rounded-full border-2 border-primary/30 bg-muted shrink-0" />
           <div className="min-w-0">
             <p className="font-bold text-foreground truncate">{stream.hostAgentName}</p>
             <p className="text-sm text-muted-foreground line-clamp-2 leading-snug mt-0.5">{stream.title}</p>
@@ -451,12 +461,261 @@ export function RoomLivePage() {
   // ── LIVE ROOM ───────────────────────────────────────────────────────────────
   const totalListeners = jamRoom.listeners.length + (stream.viewerCount || 0)
 
+  // ── DESKTOP: Three-column Clubhouse layout ──────────────────────────────────
+  if (isDesktop) {
+    return (
+      <div
+        className="animate-in fade-in duration-500 flex flex-col h-full min-h-screen"
+        style={{ background: "linear-gradient(180deg, #0f0a1e 0%, #0d0d14 100%)" }}
+      >
+        {/* ── Desktop Header ── */}
+        <div className="flex items-center gap-4 px-6 py-4 border-b border-white/8 shrink-0">
+          <button
+            type="button"
+            onClick={() => navigate(-1)}
+            className="p-1.5 rounded-full text-white/40 hover:text-white/80 hover:bg-white/5 transition-all"
+            aria-label="Back"
+          >
+            <ArrowLeft size={18} />
+          </button>
+
+          <div className="flex-grow min-w-0">
+            <div className="flex items-center gap-2.5 flex-wrap">
+              <span className="flex items-center gap-1.5 bg-red-500/15 text-red-400 text-[11px] font-black uppercase tracking-widest px-2.5 py-0.5 rounded-full">
+                <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse" />
+                Live
+              </span>
+              <Badge variant="secondary" className="capitalize text-xs font-semibold bg-white/8 text-white/60 border-0">
+                {stream.category}
+              </Badge>
+              {totalListeners > 0 && (
+                <span className="text-sm font-bold text-white/30 flex items-center gap-1">
+                  <Users size={12} /> {totalListeners.toLocaleString()}
+                </span>
+              )}
+              {isRecording && (
+                <span className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-red-400 animate-pulse" />
+                  <span className="text-[11px] font-black text-red-400 uppercase tracking-widest">REC</span>
+                </span>
+              )}
+            </div>
+            <h1 className="text-base font-bold text-white/90 leading-snug mt-0.5 truncate">{streamTitle}</h1>
+          </div>
+
+          <div className="flex items-center gap-1 shrink-0">
+            <button type="button" onClick={() => setShareWizardOpen(true)} className="p-2 text-white/40 hover:text-white/80 transition-colors" aria-label="Share">
+              <Share2 size={17} />
+            </button>
+          </div>
+        </div>
+
+        {/* ── THREE-COLUMN BODY ── */}
+        <div className="flex flex-1 overflow-hidden min-h-0">
+
+          {/* ── LEFT: Stage (speakers) ── */}
+          <div className="flex flex-col flex-1 min-w-0 overflow-y-auto px-8 py-8 relative">
+            {/* Ambient background */}
+            <div
+              className="absolute inset-0 pointer-events-none"
+              style={{ background: "radial-gradient(ellipse at 50% 0%, rgba(108,92,231,0.22) 0%, transparent 65%)" }}
+            />
+
+            {jamRoom.isLoading ? (
+              <div className="flex flex-col items-center gap-3 py-16">
+                <div className="w-8 h-8 border-4 border-violet-500/30 border-t-violet-400 rounded-full animate-spin" />
+                <p className="text-xs text-white/40 animate-pulse tracking-widest uppercase">Connecting…</p>
+              </div>
+            ) : stageParticipants.length === 0 ? (
+              <div className="flex flex-col items-center gap-3 py-16 text-white/20">
+                <Headphones size={40} />
+                <p className="text-xs uppercase tracking-widest">No speakers yet</p>
+              </div>
+            ) : (
+              <div className="relative z-10">
+                {/* Host — center, large */}
+                {host && (
+                  <div className="flex justify-center mb-12">
+                    <HostTile
+                      participant={host}
+                      isSpeaking={isHostSpeaking}
+                      score={agentScores[host.id]}
+                      large
+                    />
+                  </div>
+                )}
+
+                {/* Supporting speakers */}
+                {supporters.length > 0 && (
+                  <div className="flex justify-center gap-10 flex-wrap">
+                    {supporters.map((p, idx) => (
+                      <SpeakerTile
+                        key={p.id}
+                        participant={p}
+                        isSpeaking={jamRoom.speaking.includes(p.id) || (jamRoom.speaking.length > 0 && idx + 1 < jamRoom.speaking.length)}
+                        score={agentScores[p.id]}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ── Desktop action bar (below the stage) ── */}
+            <div className="mt-auto pt-10 flex items-center justify-center gap-8">
+              <button
+                type="button"
+                onClick={handleLeave}
+                className="flex items-center gap-1.5 text-red-400 hover:text-red-300 transition-colors bg-red-500/10 hover:bg-red-500/20 px-4 py-2 rounded-full"
+                aria-label="Leave"
+              >
+                <PhoneOff size={16} />
+                <span className="text-xs font-bold uppercase tracking-wide">Leave</span>
+              </button>
+
+              {/* Mic — primary CTA */}
+              <button
+                type="button"
+                onClick={jamRoom.inRoom ? jamRoom.toggleMute : undefined}
+                className={cn(
+                  "w-16 h-16 rounded-full border-2 flex items-center justify-center transition-all duration-200 shadow-lg",
+                  !jamRoom.inRoom
+                    ? "border-white/10 text-white/20 cursor-default"
+                    : jamRoom.isMuted
+                      ? "border-white/20 bg-white/5 text-white/40"
+                      : "border-violet-500 bg-violet-600 text-white shadow-violet-500/40",
+                )}
+                aria-label={jamRoom.isMuted ? "Unmute" : "Mute"}
+              >
+                {jamRoom.isMuted || !jamRoom.inRoom ? <MicOff size={24} /> : <Mic size={24} />}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => requireAuth(() => setShowTipModal(true))}
+                className="flex items-center gap-1.5 text-white/40 hover:text-green-400 transition-colors bg-white/5 hover:bg-green-500/10 px-4 py-2 rounded-full"
+                aria-label="Tip"
+              >
+                <DollarSign size={16} />
+                <span className="text-xs font-bold uppercase tracking-wide">Tip</span>
+              </button>
+
+              {!isRecording && !recordingUploading && stream?.recordingEnabled && jamRoom.inRoom && (
+                <button
+                  type="button"
+                  onClick={startRecording}
+                  className="flex items-center gap-1.5 text-white/25 hover:text-white/50 transition-colors bg-white/5 hover:bg-white/10 px-4 py-2 rounded-full"
+                >
+                  <span className="w-1.5 h-1.5 rounded-full border border-current" />
+                  <span className="text-xs uppercase tracking-widest">Start Rec</span>
+                </button>
+              )}
+              {recordingUploading && (
+                <span className="text-[11px] text-white/30 uppercase tracking-widest">Saving…</span>
+              )}
+            </div>
+          </div>
+
+          {/* ── MIDDLE: Listeners ── */}
+          <div className="w-[200px] shrink-0 border-l border-white/8 flex flex-col overflow-hidden">
+            <div className="px-4 py-3 border-b border-white/8 shrink-0 flex items-center justify-between">
+              <span className="font-black text-[11px] uppercase tracking-widest text-white/30">Listeners</span>
+              <span className="text-[10px] font-bold text-white/20">{totalListeners}</span>
+            </div>
+            <div className="flex-grow overflow-y-auto p-3 space-y-2 scrollbar-hide">
+              {jamRoom.listeners.length === 0 && (
+                <p className="text-[11px] text-white/20 text-center mt-6">No listeners yet</p>
+              )}
+              {jamRoom.listeners.map((listenerId: string) => (
+                <div key={listenerId} className="flex items-center gap-2">
+                  <img
+                    src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${listenerId}`}
+                    className="w-7 h-7 rounded-full border border-white/10 bg-white/5"
+                    alt="Listener"
+                  />
+                  <span className="text-xs text-white/40 font-medium truncate">{listenerId.slice(0, 8)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* ── RIGHT: Persistent Chat ── */}
+          <div
+            className="w-[280px] shrink-0 border-l border-white/8 flex flex-col overflow-hidden"
+            style={{ background: "rgba(15,10,30,0.85)" }}
+          >
+            {/* Chat header */}
+            <div className="px-4 py-3 border-b border-white/8 shrink-0 flex items-center gap-2">
+              <MessageSquare size={14} className="text-white/30" />
+              <span className="font-black text-[11px] uppercase tracking-widest text-white/30">Live Chat</span>
+            </div>
+
+            {/* Messages */}
+            <div className="flex-grow overflow-y-auto p-3 space-y-2.5 scrollbar-hide">
+              {chat.length === 0 ? (
+                <p className="text-center text-white/20 text-xs font-medium pt-8">Be the first to say something!</p>
+              ) : chat.map((c, i) => (
+                <div
+                  key={i}
+                  className={cn(
+                    "animate-in slide-in-from-bottom-2 duration-200 p-2 rounded-lg",
+                    c.isPriority ? "bg-primary/10 border-l-2 border-primary" : "hover:bg-white/5 transition-colors",
+                  )}
+                >
+                  <span className={cn("font-semibold text-xs mr-1.5", c.user === "You" ? "text-violet-400" : "text-white/70")}>
+                    {c.user}:
+                  </span>
+                  <span className="text-white/45 text-xs leading-snug">{c.msg}</span>
+                </div>
+              ))}
+              <div ref={chatEndRef} />
+            </div>
+
+            {/* Chat input */}
+            <div className="p-2.5 border-t border-white/8 shrink-0">
+              <form onSubmit={sendMsg} className="flex gap-2">
+                <Input
+                  type="text"
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value)}
+                  placeholder={authenticated ? "Send a message…" : "Login to chat…"}
+                  className="flex-grow h-8 text-xs bg-white/5 border-white/10 text-white placeholder:text-white/20 focus-visible:ring-primary/40"
+                />
+                <Button type="submit" size="icon" className="h-8 w-8 shrink-0 bg-primary hover:bg-primary/80">
+                  <Send size={13} />
+                </Button>
+              </form>
+            </div>
+          </div>
+        </div>
+
+        {/* Share dialog */}
+        <Dialog open={shareWizardOpen} onOpenChange={setShareWizardOpen}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader className="pb-4">
+              <DialogTitle className="text-xl font-bold tracking-tight">Share Room</DialogTitle>
+              <DialogDescription>Spread the word across your networks.</DialogDescription>
+            </DialogHeader>
+            <div className="flex gap-2">
+              <Input value={`${window.location.origin}/room/${streamId}/live`} readOnly className="bg-muted/50 font-mono text-xs" />
+              <Button size="icon" variant="secondary" className="shrink-0 w-10" onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/room/${streamId}/live`); setShareWizardOpen(false) }}>
+                <Copy size={14} />
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {stream && <TipModal isOpen={showTipModal} onClose={() => setShowTipModal(false)} agentId={stream.hostAgentId} agentName={stream.hostAgentName} />}
+      </div>
+    )
+  }
+
+  // ── MOBILE LAYOUT (original, preserved exactly) ──────────────────────────────
   return (
     <div
       className="animate-in fade-in duration-500 min-h-screen pb-28"
       style={{ background: "linear-gradient(180deg, #0f0a1e 0%, #0d0d14 100%)" }}
     >
-
       {/* ── Header ── */}
       <div className="flex items-center justify-between px-4 pt-4 pb-3">
         <button
@@ -468,7 +727,6 @@ export function RoomLivePage() {
           <ChevronDown size={24} />
         </button>
 
-        {/* LIVE pill + listener count */}
         <div className="flex items-center gap-2">
           <span className="flex items-center gap-1.5 bg-red-500/15 text-red-400 text-[11px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full">
             <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse" />
@@ -481,14 +739,8 @@ export function RoomLivePage() {
           )}
         </div>
 
-        {/* Right actions */}
         <div className="flex items-center gap-1">
-          <button
-            type="button"
-            onClick={() => setShareWizardOpen(true)}
-            className="p-2 text-white/50 hover:text-white/80 transition-colors"
-            aria-label="Share"
-          >
+          <button type="button" onClick={() => setShareWizardOpen(true)} className="p-2 text-white/50 hover:text-white/80 transition-colors" aria-label="Share">
             <Share2 size={18} />
           </button>
         </div>
@@ -496,9 +748,7 @@ export function RoomLivePage() {
 
       {/* ── Room title + category ── */}
       <div className="px-5 pb-2">
-        <h1 className="text-xl font-bold text-white leading-snug mb-2 line-clamp-2">
-          {streamTitle}
-        </h1>
+        <h1 className="text-xl font-bold text-white leading-snug mb-2 line-clamp-2">{streamTitle}</h1>
         <Badge variant="secondary" className="capitalize text-xs font-semibold bg-white/10 text-white/70 border-0">
           {stream.category}
         </Badge>
@@ -506,12 +756,9 @@ export function RoomLivePage() {
 
       {/* ── Stage ── */}
       <div className="relative px-5 pt-8 pb-6">
-        {/* Ambient background */}
         <div
           className="absolute inset-0 pointer-events-none"
-          style={{
-            background: "radial-gradient(ellipse at 50% 0%, rgba(108,92,231,0.22) 0%, transparent 65%)",
-          }}
+          style={{ background: "radial-gradient(ellipse at 50% 0%, rgba(108,92,231,0.22) 0%, transparent 65%)" }}
         />
 
         {jamRoom.isLoading ? (
@@ -526,18 +773,11 @@ export function RoomLivePage() {
           </div>
         ) : (
           <>
-            {/* Host — center, large */}
             {host && (
               <div className="flex justify-center mb-8">
-                <HostTile
-                  participant={host}
-                  isSpeaking={isHostSpeaking}
-                  score={agentScores[host.id]}
-                />
+                <HostTile participant={host} isSpeaking={isHostSpeaking} score={agentScores[host.id]} />
               </div>
             )}
-
-            {/* Supporting speakers — row */}
             {supporters.length > 0 && (
               <div className="flex justify-center gap-8 flex-wrap">
                 {supporters.map((p, idx) => (
@@ -560,19 +800,12 @@ export function RoomLivePage() {
           {jamRoom.listeners.length > 0 && (
             <div className="flex -space-x-2">
               {jamRoom.listeners.slice(0, 8).map((listenerId: string) => (
-                <img
-                  key={listenerId}
-                  src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${listenerId}`}
-                  className="w-8 h-8 rounded-full border-2 border-white/10 bg-white/5"
-                  alt="Listener"
-                />
+                <img key={listenerId} src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${listenerId}`} className="w-8 h-8 rounded-full border-2 border-white/10 bg-white/5" alt="Listener" />
               ))}
             </div>
           )}
           <span className="text-sm font-semibold text-white/50">
-            {totalListeners > 0
-              ? `${totalListeners > 8 ? `+${totalListeners - 8} ` : ""}listening`
-              : "No listeners yet"}
+            {totalListeners > 0 ? `${totalListeners > 8 ? `+${totalListeners - 8} ` : ""}listening` : "No listeners yet"}
           </span>
         </div>
       </div>
@@ -606,53 +839,26 @@ export function RoomLivePage() {
         style={{ background: "rgba(13,13,20,0.95)" }}
       >
         <div className="max-w-2xl mx-auto px-6 py-3 flex items-center justify-between">
-
-          {/* Leave */}
-          <button
-            type="button"
-            onClick={handleLeave}
-            className="flex flex-col items-center gap-0.5 text-red-400 hover:text-red-300 transition-colors"
-            aria-label="Leave"
-          >
+          <button type="button" onClick={handleLeave} className="flex flex-col items-center gap-0.5 text-red-400 hover:text-red-300 transition-colors" aria-label="Leave">
             <PhoneOff size={20} />
             <span className="text-[9px] font-bold uppercase tracking-wide">Leave</span>
           </button>
-
-          {/* Tip */}
-          <button
-            type="button"
-            onClick={() => requireAuth(() => setShowTipModal(true))}
-            className="flex flex-col items-center gap-0.5 text-white/50 hover:text-green-400 transition-colors"
-            aria-label="Tip"
-          >
+          <button type="button" onClick={() => requireAuth(() => setShowTipModal(true))} className="flex flex-col items-center gap-0.5 text-white/50 hover:text-green-400 transition-colors" aria-label="Tip">
             <DollarSign size={22} />
             <span className="text-[9px] font-bold uppercase tracking-wide">Tip</span>
           </button>
-
-          {/* Mic — primary CTA, center */}
           <button
             type="button"
             onClick={jamRoom.inRoom ? jamRoom.toggleMute : undefined}
             className={cn(
               "w-16 h-16 rounded-full border-2 flex items-center justify-center transition-all duration-200 shadow-lg",
-              !jamRoom.inRoom
-                ? "border-white/10 text-white/20 cursor-default"
-                : jamRoom.isMuted
-                  ? "border-white/20 bg-white/5 text-white/40"
-                  : "border-violet-500 bg-violet-600 text-white shadow-violet-500/40",
+              !jamRoom.inRoom ? "border-white/10 text-white/20 cursor-default" : jamRoom.isMuted ? "border-white/20 bg-white/5 text-white/40" : "border-violet-500 bg-violet-600 text-white shadow-violet-500/40",
             )}
             aria-label={jamRoom.isMuted ? "Unmute" : "Mute"}
           >
             {jamRoom.isMuted || !jamRoom.inRoom ? <MicOff size={24} /> : <Mic size={24} />}
           </button>
-
-          {/* Chat with unread badge */}
-          <button
-            type="button"
-            onClick={() => setShowChat(true)}
-            className="relative flex flex-col items-center gap-0.5 text-white/50 hover:text-white/80 transition-colors"
-            aria-label="Chat"
-          >
+          <button type="button" onClick={() => setShowChat(true)} className="relative flex flex-col items-center gap-0.5 text-white/50 hover:text-white/80 transition-colors" aria-label="Chat">
             <MessageSquare size={22} />
             <span className="text-[9px] font-bold uppercase tracking-wide">Chat</span>
             {chat.length > 0 && (
@@ -661,22 +867,14 @@ export function RoomLivePage() {
               </span>
             )}
           </button>
-
-          {/* Share */}
-          <button
-            type="button"
-            onClick={() => setShareWizardOpen(true)}
-            className="flex flex-col items-center gap-0.5 text-white/50 hover:text-white/80 transition-colors"
-            aria-label="Share"
-          >
+          <button type="button" onClick={() => setShareWizardOpen(true)} className="flex flex-col items-center gap-0.5 text-white/50 hover:text-white/80 transition-colors" aria-label="Share">
             <Share2 size={22} />
             <span className="text-[9px] font-bold uppercase tracking-wide">Share</span>
           </button>
-
         </div>
       </div>
 
-      {/* ── Chat bottom sheet ── */}
+      {/* ── Mobile Chat bottom sheet ── */}
       {showChat && (
         <>
           <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-[2px]" onClick={() => setShowChat(false)} aria-hidden="true" />
@@ -703,33 +901,23 @@ export function RoomLivePage() {
                 <p className="text-center text-white/40 font-medium pt-8">Be the first to say something!</p>
               ) : chat.map((c, i) => (
                 <div key={i} className="animate-in slide-in-from-bottom-2 duration-300 p-2.5 rounded-lg hover:bg-white/5 transition-colors">
-                  <span className={cn("font-semibold mr-2", c.user === "You" ? "text-violet-400" : "text-white/80")}>
-                    {c.user}:
-                  </span>
+                  <span className={cn("font-semibold mr-2", c.user === "You" ? "text-violet-400" : "text-white/80")}>{c.user}:</span>
                   <span className="text-white/50 leading-snug">{c.msg}</span>
                 </div>
               ))}
+              <div ref={chatEndRef} />
             </div>
             <div className="p-3 border-t border-white/10 bg-black/20 shrink-0">
               <form onSubmit={sendMsg} className="flex gap-2">
-                <Input
-                  type="text"
-                  value={message}
-                  onChange={(e) => setMessage(e.target.value)}
-                  placeholder={authenticated ? "Send a message..." : "Login to chat..."}
-                  className="flex-grow"
-                  autoFocus
-                />
-                <Button type="submit" size="icon" className="shrink-0 shadow-sm">
-                  <MessageSquare size={16} />
-                </Button>
+                <Input type="text" value={message} onChange={(e) => setMessage(e.target.value)} placeholder={authenticated ? "Send a message..." : "Login to chat..."} className="flex-grow" autoFocus />
+                <Button type="submit" size="icon" className="shrink-0 shadow-sm"><MessageSquare size={16} /></Button>
               </form>
             </div>
           </div>
         </>
       )}
 
-      {/* ── Share dialog ── */}
+      {/* Share dialog */}
       <Dialog open={shareWizardOpen} onOpenChange={setShareWizardOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader className="pb-4">
@@ -745,15 +933,7 @@ export function RoomLivePage() {
         </DialogContent>
       </Dialog>
 
-      {/* ── Tip Modal ── */}
-      {stream && (
-        <TipModal
-          isOpen={showTipModal}
-          onClose={() => setShowTipModal(false)}
-          agentId={stream.hostAgentId}
-          agentName={stream.hostAgentName}
-        />
-      )}
+      {stream && <TipModal isOpen={showTipModal} onClose={() => setShowTipModal(false)} agentId={stream.hostAgentId} agentName={stream.hostAgentName} />}
     </div>
   )
 }

@@ -13,6 +13,8 @@ import {
   Sparkles,
   Compass,
 } from "lucide-react"
+import { RoomDock } from "@/components/room/RoomDock"
+import { useRoomStore } from "@/stores/room-store"
 
 import { cn } from "@/lib/utils"
 import { useAuthStore } from "@/stores/auth-store";
@@ -34,6 +36,7 @@ export function MainLayout({ children }: MainLayoutProps) {
   const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false)
 
   const { authenticated } = useAuthStore()
+  const { isExpanded: isDockExpanded } = useRoomStore()
 
   const handleNav = (path: string) => {
     navigate(path)
@@ -210,12 +213,17 @@ export function MainLayout({ children }: MainLayoutProps) {
           {children !== undefined ? children : <Outlet />}
         </div>
 
-        {/* Mobile Bottom Nav — mirrors desktop sidebar */}
-        <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-t flex items-center justify-between px-4 py-2">
-          <MobileNavLink icon={Mic2} label="Live" active={isActive("/rooms") || isActive("/room")} onClick={() => handleNav("/rooms")} />
-          <MobileNavLink icon={Compass} label="Explore" active={isActive("/explore")} onClick={() => handleNav("/explore")} />
-          <MobileNavLink icon={User} label="Profile" active={isActive("/profile") || isActive("/agents")} onClick={() => handleNav("/profile")} />
-        </nav>
+        {/* Room dock (mobile only — slides up as Clubhouse-style sheet) */}
+        <RoomDock />
+
+        {/* Mobile Bottom Nav — hidden when room dock is expanded */}
+        {!isDockExpanded && (
+          <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-t flex items-center justify-between px-4 py-2">
+            <MobileNavLink icon={Mic2} label="Live" active={isActive("/rooms") || isActive("/room")} onClick={() => handleNav("/rooms")} />
+            <MobileNavLink icon={Compass} label="Explore" active={isActive("/explore")} onClick={() => handleNav("/explore")} />
+            <MobileNavLink icon={User} label="Profile" active={isActive("/profile") || isActive("/agents")} onClick={() => handleNav("/profile")} />
+          </nav>
+        )}
 
         {/* Mobile Search Overlay */}
         {isMobileSearchOpen && (

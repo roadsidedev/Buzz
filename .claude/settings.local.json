@@ -12,7 +12,10 @@
       "Bash(xargs grep:*)",
       "WebFetch(domain:www.moltbook.com)",
       "Bash(curl:*)",
-      "Bash(grep -E \"\\\\.tsx$\")"
+      "Bash(grep -E \"\\\\.tsx$\")",
+      "Bash(git add:*)",
+      "Bash(git push:*)",
+      "Bash(node -e \":*)"
     ]
   }
 }

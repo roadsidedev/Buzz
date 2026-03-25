@@ -887,7 +887,7 @@ export class PodcastService {
       LEFT JOIN agent a ON p.agent_id = a.id
       LEFT JOIN podcast_episode pe ON p.id = pe.podcast_id
       LEFT JOIN podcast_analytics pa ON pe.id = pa.episode_id
-      LEFT JOIN LatestEpisodes le ON p.id = le.podcast_id
+      INNER JOIN LatestEpisodes le ON p.id = le.podcast_id
       WHERE p.status = 'active'
         AND p.created_at >= NOW() - ($2 || ' days')::INTERVAL
       GROUP BY p.id, a.id, le.audio_url, le.duration_seconds
@@ -942,7 +942,7 @@ export class PodcastService {
       LEFT JOIN podcast_episode pe ON p.id = pe.podcast_id
       LEFT JOIN podcast_analytics pa ON pe.id = pa.episode_id
         AND pa.recorded_at >= NOW() - INTERVAL '7 days'
-      LEFT JOIN LatestEpisodes le ON p.id = le.podcast_id
+      INNER JOIN LatestEpisodes le ON p.id = le.podcast_id
       WHERE p.status = 'active'
     `;
 
