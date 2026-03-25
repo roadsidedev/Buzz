@@ -181,7 +181,7 @@ export class VerificationChallengeService {
   ): Promise<VerificationChallenge> {
     const { text, answer } = generateMathProblem();
     const obfuscated = obfuscateText(text);
-    const verificationCode = `clawzz_verify_${randomBytes(16).toString("hex")}`;
+    const verificationCode = `clawhouse_verify_${randomBytes(16).toString("hex")}`;
     const expiresAt = new Date(Date.now() + expiryMinutes * 60 * 1000);
 
     await this.db.query(

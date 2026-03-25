@@ -58,39 +58,40 @@ export function MainLayout({ children }: MainLayoutProps) {
       <main className="flex-grow flex flex-col overflow-y-auto pb-24 lg:pb-0 relative bg-background">
         {/* Header (Sticky) */}
         <header className="sticky top-0 z-40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b p-4 lg:px-6 flex items-center gap-4">
-          {/* Desktop: Logo + Nav tabs */}
-          <div className="hidden lg:flex items-center gap-1 mr-2 shrink-0">
-            <span className="text-xl font-bold tracking-tight text-primary cursor-pointer mr-4" onClick={() => handleNav("/rooms")}>
-              clawzz
+          {/* LEFT: Logo + Search (desktop) | Search button (mobile) */}
+          <div className="flex items-center gap-3 shrink-0">
+            <span className="hidden lg:block text-xl font-bold tracking-tight text-primary cursor-pointer" onClick={() => handleNav("/rooms")}>
+              CLAWHOUSE
             </span>
+            <div className="relative hidden lg:block w-44">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                type="search"
+                placeholder="Search agents, rooms..."
+                className="w-full pl-9 bg-muted/50 border-transparent focus-visible:bg-background"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={handleSearch}
+              />
+            </div>
+            <button
+              type="button"
+              title="Search"
+              className="lg:hidden shrink-0 p-2 hover:bg-muted rounded-lg transition-colors"
+              onClick={() => setIsMobileSearchOpen(true)}
+            >
+              <Search size={20} />
+            </button>
+          </div>
+
+          {/* CENTER: Nav tabs (desktop only) */}
+          <div className="hidden lg:flex flex-1 items-center justify-center gap-1">
             <TopNavLink icon={Mic2}    label="Live"    active={isActive("/rooms") || isActive("/room")} onClick={() => handleNav("/rooms")} />
             <TopNavLink icon={Compass} label="Explore" active={isActive("/explore")}                    onClick={() => handleNav("/explore")} />
             <TopNavLink icon={User}    label="Profile" active={isActive("/profile") || isActive("/agents")} onClick={() => handleNav("/profile")} />
           </div>
 
-          {/* Mobile Search Button (Left) */}
-          <button
-            title="Search"
-            className="lg:hidden shrink-0 p-2 hover:bg-muted rounded-lg transition-colors"
-            onClick={() => setIsMobileSearchOpen(true)}
-          >
-            <Search size={20} />
-          </button>
-
-          {/* Desktop Search */}
-          <div className="relative flex-1 max-w-sm hidden sm:block">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              type="search"
-              placeholder="Search agents, rooms..."
-              className="w-full pl-9 bg-muted/50 border-transparent focus-visible:bg-background"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              onKeyDown={handleSearch}
-            />
-          </div>
-
-          <div className="flex items-center gap-4 shrink-0 ml-auto">
+          <div className="flex items-center gap-4 shrink-0 ml-auto lg:ml-0">
             <NotificationBell />
             <ModeToggle />
             <DropdownMenu>
@@ -104,7 +105,7 @@ export function MainLayout({ children }: MainLayoutProps) {
                 {/* Header */}
                 <div className="px-4 pt-4 pb-3 border-b border-border bg-muted/30">
                   <span className="text-primary font-bold text-xl tracking-tight">
-                  clawzz
+                  CLAWHOUSE
                 </span>
                   <p className="text-xs text-muted-foreground mt-0.5">AI-first live streaming — pick your path</p>
                 </div>

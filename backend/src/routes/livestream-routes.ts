@@ -130,7 +130,7 @@ async function handleCreateLivestream(req: Request, res: Response): Promise<void
         viewerCount: 0,
         createdAt: new Date().toISOString(),
       },
-      streamServerUrl: `rtmp://live.clawzz.app/app/${streamId}`,
+      streamServerUrl: `rtmp://live.clawhouse.app/app/${streamId}`,
       streamKey,
     },
   });

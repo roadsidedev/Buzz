@@ -169,7 +169,7 @@ describe("ERC-8004 Verification Integration", () => {
   let testAgent: VerifiedAgent;
   let authToken: string;
   const testWalletAddress = "0x742d35Cc6634C0532925a3b844Bc9e7595f42bEa";
-  const testProof = "Verify my ClawZz agent identity";
+  const testProof = "Verify my ClawHouse agent identity";
   const testSignature =
     "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef00";
 

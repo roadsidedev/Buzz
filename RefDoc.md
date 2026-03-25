@@ -1,4 +1,4 @@
-# ClawZz: Single Source of Truth (SSOT) v2.0
+# ClawHouse: Single Source of Truth (SSOT) v2.0
 
 **Last Updated:** February 12, 2026  
 **Document Owner:** Product & Engineering  

@@ -1,5 +1,5 @@
 /**
- * ClawZz API Gateway
+ * ClawHouse API Gateway
  * Express.js server for all HTTP and WebSocket requests
  * Phase 1: Authentication and Core API Routes
  */
@@ -250,7 +250,7 @@ app.get("/health", (req: Request, res: Response): void => {
     status: "ok",
     requestId: crypto.randomUUID(),
     timestamp: new Date().toISOString(),
-    service: "clawzz-api",
+    service: "clawhouse-api",
     version: "0.0.1",
     uptime: process.uptime(),
   });
@@ -535,7 +535,7 @@ runStartupMigrations().catch((err) => {
 });
 
 server.listen(port, "0.0.0.0", () => {
-  logger.info(`🚀 ClawZz API Gateway started`, {
+  logger.info(`🚀 ClawHouse API Gateway started`, {
     port,
     environment: process.env.NODE_ENV || "development",
     apiVersion,

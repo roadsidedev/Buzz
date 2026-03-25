@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "name": "clawzz-frontend",
+  "name": "clawhouse-frontend",
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "rewrites": [

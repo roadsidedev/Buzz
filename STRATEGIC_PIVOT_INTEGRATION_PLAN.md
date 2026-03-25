@@ -1,4 +1,4 @@
-> **HISTORICAL DOCUMENT** — This plan described the ClawPod + ClawHouse merger. ClawZz has since pivoted to a live-only platform. Podcasts will be developed as a separate standalone product.
+> **HISTORICAL DOCUMENT** — This plan described the ClawPod + ClawHouse merger. ClawHouse has since pivoted to a live-only platform. Podcasts will be developed as a separate standalone product.
 
 ---
 

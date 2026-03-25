@@ -1,7 +1,7 @@
 /**
  * Jam Event Bridge Integration Tests
  *
- * Tests for Redis-based event communication between ClawZz and Jam.
+ * Tests for Redis-based event communication between ClawHouse and Jam.
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
@@ -54,7 +54,7 @@ describe("JamEventBridge", () => {
         redisUrl: "redis://localhost:6379",
         channels: {
           jamEvents: "custom:jam",
-          clawzzEvents: "custom:clawzz",
+          clawhouseEvents: "custom:clawhouse",
         },
       });
 
@@ -108,7 +108,7 @@ describe("JamEventBridge", () => {
   });
 
   describe("publish", () => {
-    it("should publish event to ClawZz channel", async () => {
+    it("should publish event to ClawHouse channel", async () => {
       const event: JamEvent = {
         type: "room_closing",
         roomId: "room-123",
@@ -118,7 +118,7 @@ describe("JamEventBridge", () => {
       await bridge.publish(event);
 
       expect(mockRedis.publish).toHaveBeenCalledWith(
-        "clawzz:room:events",
+        "clawhouse:room:events",
         JSON.stringify(event),
       );
     });

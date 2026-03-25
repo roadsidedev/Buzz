@@ -6,7 +6,7 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    container_name: clawzz-frontend
+    container_name: clawhouse-frontend
     ports:
       - "3000:3000"
     environment:
@@ -27,7 +27,7 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - clawzz-network
+      - clawhouse-network
 
   # ============================================
   # API GATEWAY (Node.js Express)
@@ -36,7 +36,7 @@ services:
     build:
       context: .
       dockerfile: backend/Dockerfile
-    container_name: clawzz-backend
+    container_name: clawhouse-backend
     ports:
       - "4000:4000"
     environment:
@@ -57,7 +57,7 @@ services:
       # Coturn configuration
       - COTURN_SECRET=${COTURN_SECRET}
       - COTURN_EXTERNAL_IP=${COTURN_EXTERNAL_IP:-}
-      - COTURN_REALM=${COTURN_REALM:-clawzz.dev}
+      - COTURN_REALM=${COTURN_REALM:-clawhouse.dev}
     depends_on:
       postgres:
         condition: service_healthy
@@ -75,7 +75,7 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - clawzz-network
+      - clawhouse-network
 
   # ============================================
   # ORCHESTRATOR (Python FastAPI)
@@ -84,7 +84,7 @@ services:
     build:
       context: .
       dockerfile: orchestrator/Dockerfile
-    container_name: clawzz-orchestrator
+    container_name: clawhouse-orchestrator
     ports:
       - "5000:5000"
     environment:
@@ -109,7 +109,7 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - clawzz-network
+      - clawhouse-network
 
   # ============================================
   # JAM STACK - SELF HOSTED AUDIO ROOMS
@@ -120,7 +120,7 @@ services:
     build:
       context: ./jam/pantry
       dockerfile: Dockerfile
-    container_name: clawzz-pantry
+    container_name: clawhouse-pantry
     ports:
       - "3003:3000"
     environment:
@@ -137,14 +137,14 @@ services:
       timeout: 10s
       retries: 3
     networks:
-      - clawzz-network
+      - clawhouse-network
 
   # Pantry-SFU - Mediasoup SFU for Large Rooms
   pantry-sfu:
     build:
       context: ./jam/pantry-sfu
       dockerfile: Dockerfile
-    container_name: clawzz-sfu
+    container_name: clawhouse-sfu
     environment:
       - JAM_SFU=true
       - JAM_SFU_EXTERNAL_IP=${COTURN_EXTERNAL_IP:-}
@@ -159,7 +159,7 @@ services:
       - pantry
       - redis
     networks:
-      - clawzz-network
+      - clawhouse-network
     profiles:
       - sfu
 
@@ -168,18 +168,18 @@ services:
     build:
       context: ./coturn
       dockerfile: Dockerfile
-    container_name: clawzz-coturn
+    container_name: clawhouse-coturn
     environment:
       - COTURN_SECRET=${COTURN_SECRET}
       - COTURN_EXTERNAL_IP=${COTURN_EXTERNAL_IP:-}
-      - COTURN_REALM=${COTURN_REALM:-clawzz.dev}
+      - COTURN_REALM=${COTURN_REALM:-clawhouse.dev}
     ports:
       - "3478:3478/udp"
       - "3478:3478/tcp"
       - "5349:5349/tcp"
       - "49152-65535:49152-65535/udp"
     networks:
-      - clawzz-network
+      - clawhouse-network
     restart: unless-stopped
 
   # ============================================
@@ -187,7 +187,7 @@ services:
   # ============================================
   jam:
     image: ghcr.io/jam-systems/jam:latest
-    container_name: clawzz-jam-legacy
+    container_name: clawhouse-jam-legacy
     ports:
       - "3001:3000"
     environment:
@@ -200,7 +200,7 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - clawzz-network
+      - clawhouse-network
     profiles:
       - legacy-jam
 
@@ -209,30 +209,30 @@ services:
   # ============================================
   postgres:
     image: postgres:15-alpine
-    container_name: clawzz-postgres
+    container_name: clawhouse-postgres
     ports:
       - "5432:5432"
     environment:
-      - POSTGRES_USER=${POSTGRES_USER:-clawzz}
+      - POSTGRES_USER=${POSTGRES_USER:-clawhouse}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-      - POSTGRES_DB=${POSTGRES_DB:-clawzz}
+      - POSTGRES_DB=${POSTGRES_DB:-clawhouse}
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./migrations:/docker-entrypoint-initdb.d
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U clawzz"]
+      test: ["CMD-SHELL", "pg_isready -U clawhouse"]
       interval: 10s
       timeout: 5s
       retries: 5
     networks:
-      - clawzz-network
+      - clawhouse-network
 
   # ============================================
   # REDIS (Shared Cache & Event Bus)
   # ============================================
   redis:
     image: redis:7-alpine
-    container_name: clawzz-redis
+    container_name: clawhouse-redis
     ports:
       - "6379:6379"
     command: redis-server --appendonly yes
@@ -244,12 +244,12 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - clawzz-network
+      - clawhouse-network
 
 volumes:
   postgres_data:
   redis_data:
 
 networks:
-  clawzz-network:
+  clawhouse-network:
     driver: bridge

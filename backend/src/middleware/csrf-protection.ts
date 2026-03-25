@@ -29,7 +29,7 @@
  *    - Path=/ ensures cookie sent to all routes
  *
  * Environment Variables:
- * - COOKIE_DOMAIN: Domain for cookie scope (e.g., "clawzz.com")
+ * - COOKIE_DOMAIN: Domain for cookie scope (e.g., "clawhouse.com")
  * - NODE_ENV: Set to "production" for secure cookie flags
  */
 

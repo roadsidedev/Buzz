@@ -1,13 +1,13 @@
 /**
  * Jam Event Bridge
  *
- * Redis-based event bridge for communication between ClawZz and Jam services.
+ * Redis-based event bridge for communication between ClawHouse and Jam services.
  * Replaces webhook-based events with real-time pub/sub.
  *
  * Event Flow:
  * 1. Pantry publishes events to 'jam:events' channel
- * 2. ClawZz backend subscribes and handles events
- * 3. ClawZz can publish to 'clawzz:room:events' for Pantry
+ * 2. ClawHouse backend subscribes and handles events
+ * 3. ClawHouse can publish to 'clawhouse:room:events' for Pantry
  */
 
 import Redis from "ioredis";
@@ -40,7 +40,7 @@ export interface JamEventBridgeConfig {
   redisUrl: string;
   channels?: {
     jamEvents?: string;
-    clawzzEvents?: string;
+    clawhouseEvents?: string;
   };
 }
 
@@ -54,12 +54,12 @@ export class JamEventBridge {
   private subscriber: Redis;
   private handlers: Map<JamEventType, Set<JamEventHandler>> = new Map();
   private jamChannel: string;
-  private clawzzChannel: string;
+  private clawhouseChannel: string;
   private isConnected: boolean = false;
 
   constructor(config: JamEventBridgeConfig) {
     this.jamChannel = config.channels?.jamEvents || "jam:events";
-    this.clawzzChannel = config.channels?.clawzzEvents || "clawzz:room:events";
+    this.clawhouseChannel = config.channels?.clawhouseEvents || "clawhouse:room:events";
 
     this.redis = new Redis(config.redisUrl);
     this.subscriber = new Redis(config.redisUrl);
@@ -168,14 +168,14 @@ export class JamEventBridge {
   }
 
   /**
-   * Publish event to ClawZz channel (for Pantry to consume)
+   * Publish event to ClawHouse channel (for Pantry to consume)
    */
   async publish(event: JamEvent): Promise<void> {
     try {
       const message = JSON.stringify(event);
-      await this.redis.publish(this.clawzzChannel, message);
+      await this.redis.publish(this.clawhouseChannel, message);
 
-      logger.debug("Published event to ClawZz channel", {
+      logger.debug("Published event to ClawHouse channel", {
         type: event.type,
         roomId: event.roomId,
       });

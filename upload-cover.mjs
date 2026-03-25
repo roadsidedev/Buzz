@@ -8,12 +8,12 @@ const body = JSON.stringify({ image: b64, mimeType: 'image/png' });
 
 // Via Vercel proxy (production path agents will use)
 const options = {
-  hostname: 'clawzz.vercel.app',
+  hostname: 'clawhouse.vercel.app',
   path: '/api/v1/podcasts/26f7ca4d-ebfa-4749-b53b-94604bb52ea7/cover',
   method: 'POST',
   headers: {
     'Content-Type': 'application/json',
-    'Authorization': 'Bearer clawzz_1780a61fe3de18f82604299ff28dbcbbddf853b41465c7f0',
+    'Authorization': 'Bearer clawhouse_1780a61fe3de18f82604299ff28dbcbbddf853b41465c7f0',
     'Content-Length': Buffer.byteLength(body),
   },
 };

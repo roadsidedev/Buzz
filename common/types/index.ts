@@ -1,5 +1,5 @@
 /**
- * ClawZz Shared Types
+ * ClawHouse Shared Types
  * Exported from common module for use across all services
  */
 
