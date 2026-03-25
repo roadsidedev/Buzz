@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=1280" />
+  <title>ClawZz Financial Feed</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      width: 1280px;
+      height: 720px;
+      overflow: hidden;
+      background: #0d0d1a;
+      color: #e0e0f0;
+      font-family: 'Segoe UI', 'Inter', system-ui, sans-serif;
+    }
+
+    /* ── Header ─────────────────────────────── */
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 24px;
+      background: #111128;
+      border-bottom: 1px solid #1e1e40;
+      height: 52px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .brand-name {
+      font-size: 18px;
+      font-weight: 800;
+      letter-spacing: 3px;
+      color: #00ff88;
+      text-transform: uppercase;
+    }
+
+    .live-badge {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(255, 40, 40, 0.15);
+      border: 1px solid rgba(255, 40, 40, 0.4);
+      border-radius: 4px;
+      padding: 3px 8px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      color: #ff4444;
+      text-transform: uppercase;
+    }
+
+    .dot {
+      width: 7px;
+      height: 7px;
+      background: #ff4444;
+      border-radius: 50%;
+      animation: pulse 1.2s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.2; }
+    }
+
+    .header-right {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 2px;
+    }
+
+    .clock {
+      font-size: 15px;
+      font-weight: 600;
+      color: #a0a0c0;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: 1px;
+    }
+
+    .subtitle {
+      font-size: 10px;
+      color: #555580;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+
+    /* ── Ticker tape ─────────────────────────── */
+    .ticker-wrap {
+      background: #080814;
+      border-bottom: 1px solid #1e1e40;
+      overflow: hidden;
+      height: 28px;
+      display: flex;
+      align-items: center;
+    }
+
+    .ticker {
+      display: flex;
+      gap: 0;
+      white-space: nowrap;
+      animation: scroll 40s linear infinite;
+    }
+
+    @keyframes scroll {
+      0%   { transform: translateX(0); }
+      100% { transform: translateX(-50%); }
+    }
+
+    .ticker-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 0 20px;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      border-right: 1px solid #1e1e40;
+    }
+
+    .ticker-sym { color: #8888bb; }
+    .ticker-price { color: #d0d0f0; font-variant-numeric: tabular-nums; }
+    .ticker-chg.up { color: #00cc66; }
+    .ticker-chg.dn { color: #ff4455; }
+
+    /* ── Grid ────────────────────────────────── */
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+      padding: 12px 16px;
+    }
+
+    .card {
+      background: #111128;
+      border: 1px solid #1e1e40;
+      border-radius: 8px;
+      padding: 12px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      transition: border-color 0.3s;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .card:hover { border-color: #3a3a70; }
+
+    .card-top {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .coin-logo {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      background: #1a1a35;
+    }
+
+    .coin-info { flex: 1; min-width: 0; }
+
+    .coin-name {
+      font-size: 12px;
+      font-weight: 700;
+      color: #d0d0f0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .coin-symbol {
+      font-size: 10px;
+      color: #6060a0;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .coin-change {
+      font-size: 13px;
+      font-weight: 700;
+      text-align: right;
+      flex-shrink: 0;
+    }
+
+    .coin-change.up { color: #00cc66; }
+    .coin-change.dn { color: #ff4455; }
+
+    .coin-price {
+      font-size: 20px;
+      font-weight: 800;
+      color: #f0f0ff;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: -0.5px;
+    }
+
+    /* Sparkline */
+    .sparkline-wrap {
+      height: 40px;
+      width: 100%;
+    }
+
+    .sparkline-wrap svg {
+      width: 100%;
+      height: 40px;
+    }
+
+    /* Volume bar */
+    .vol-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 2px;
+    }
+
+    .vol-label { font-size: 9px; color: #44447a; text-transform: uppercase; letter-spacing: 0.5px; }
+    .vol-value { font-size: 10px; color: #6060a0; font-variant-numeric: tabular-nums; }
+
+    /* Rank badge */
+    .rank {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      font-size: 9px;
+      color: #333360;
+      font-weight: 700;
+    }
+
+    /* ── Footer ──────────────────────────────── */
+    .footer {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 26px;
+      background: #080814;
+      border-top: 1px solid #1e1e40;
+      display: flex;
+      align-items: center;
+      padding: 0 16px;
+      justify-content: space-between;
+    }
+
+    .footer-left { font-size: 9px; color: #33336a; letter-spacing: 1px; text-transform: uppercase; }
+    .footer-right { font-size: 9px; color: #33336a; letter-spacing: 0.5px; }
+
+    /* Loading state */
+    .loading {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 500px;
+      font-size: 14px;
+      color: #444488;
+      gap: 10px;
+    }
+
+    .spinner {
+      width: 20px;
+      height: 20px;
+      border: 2px solid #222244;
+      border-top-color: #00ff88;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <div class="header">
+    <div class="brand">
+      <div class="brand-name">ClawZz</div>
+      <div class="live-badge">
+        <div class="dot"></div>
+        Live
+      </div>
+      <div style="font-size:11px;color:#555580;letter-spacing:1px;margin-left:4px;">FINANCIAL FEED</div>
+    </div>
+    <div class="header-right">
+      <div class="clock" id="clock">--:--:-- UTC</div>
+      <div class="subtitle">Powered by CoinGecko</div>
+    </div>
+  </div>
+
+  <!-- Ticker tape -->
+  <div class="ticker-wrap">
+    <div class="ticker" id="ticker">
+      <span style="color:#333360;font-size:11px;padding:0 16px;">Loading market data...</span>
+    </div>
+  </div>
+
+  <!-- Coin grid -->
+  <div id="grid-container">
+    <div class="loading">
+      <div class="spinner"></div>
+      Fetching live prices...
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div class="footer">
+    <div class="footer-left">Data: CoinGecko API · Refreshes every 30s · For display purposes only</div>
+    <div class="footer-right" id="last-update">Last update: —</div>
+  </div>
+
+  <script>
+    const COINS = 'bitcoin,ethereum,solana,cardano,polkadot,chainlink,uniswap,avalanche-2';
+    const API_URL = `https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=${COINS}&order=market_cap_desc&sparkline=true&price_change_percentage=24h`;
+
+    let coinsData = [];
+
+    // ── Clock ──────────────────────────────────
+    function updateClock() {
+      const now = new Date();
+      const h = String(now.getUTCHours()).padStart(2,'0');
+      const m = String(now.getUTCMinutes()).padStart(2,'0');
+      const s = String(now.getUTCSeconds()).padStart(2,'0');
+      document.getElementById('clock').textContent = `${h}:${m}:${s} UTC`;
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    // ── Formatting ─────────────────────────────
+    function fmtPrice(n) {
+      if (n >= 1000) return '$' + n.toLocaleString('en-US', {maximumFractionDigits: 0});
+      if (n >= 1)    return '$' + n.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+      return '$' + n.toLocaleString('en-US', {minimumFractionDigits: 4, maximumFractionDigits: 6});
+    }
+
+    function fmtVol(n) {
+      if (n >= 1e9) return '$' + (n/1e9).toFixed(1) + 'B';
+      if (n >= 1e6) return '$' + (n/1e6).toFixed(1) + 'M';
+      return '$' + n.toLocaleString('en-US');
+    }
+
+    function fmtChg(n) {
+      if (n == null) return '—';
+      const sign = n >= 0 ? '+' : '';
+      return sign + n.toFixed(2) + '%';
+    }
+
+    // ── Sparkline SVG ──────────────────────────
+    function buildSparkline(prices, isUp) {
+      if (!prices || prices.length < 2) return '';
+      const w = 200, h = 38;
+      const min = Math.min(...prices);
+      const max = Math.max(...prices);
+      const range = max - min || 1;
+      const pts = prices.map((p, i) => {
+        const x = (i / (prices.length - 1)) * w;
+        const y = h - ((p - min) / range) * (h - 4) - 2;
+        return `${x.toFixed(1)},${y.toFixed(1)}`;
+      });
+      const color = isUp ? '#00cc66' : '#ff4455';
+      const fillColor = isUp ? 'rgba(0,204,102,0.08)' : 'rgba(255,68,85,0.08)';
+      const lastPt = pts[pts.length - 1].split(',');
+      const polyline = `M ${pts.join(' L ')}`;
+      const fill = `${polyline} L ${lastPt[0]},${h} L 0,${h} Z`;
+      return `
+        <svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
+          <path d="${fill}" fill="${fillColor}" />
+          <path d="${polyline}" fill="none" stroke="${color}" stroke-width="1.5" stroke-linejoin="round" />
+        </svg>`;
+    }
+
+    // ── Ticker tape ────────────────────────────
+    function buildTicker(coins) {
+      const items = coins.map(c => {
+        const chg = c.price_change_percentage_24h;
+        const cls = chg >= 0 ? 'up' : 'dn';
+        return `<span class="ticker-item">
+          <span class="ticker-sym">${c.symbol.toUpperCase()}</span>
+          <span class="ticker-price">${fmtPrice(c.current_price)}</span>
+          <span class="ticker-chg ${cls}">${fmtChg(chg)}</span>
+        </span>`;
+      }).join('');
+      // Duplicate for seamless loop
+      return items + items;
+    }
+
+    // ── Card ───────────────────────────────────
+    function buildCard(coin, rank) {
+      const chg = coin.price_change_percentage_24h;
+      const isUp = chg >= 0;
+      const chgCls = isUp ? 'up' : 'dn';
+      const spark = buildSparkline(coin.sparkline_in_7d?.price, isUp);
+      return `
+        <div class="card">
+          <span class="rank">#${rank}</span>
+          <div class="card-top">
+            <img class="coin-logo" src="${coin.image}" alt="${coin.symbol}" width="28" height="28"
+                 onerror="this.style.display='none'" />
+            <div class="coin-info">
+              <div class="coin-name">${coin.name}</div>
+              <div class="coin-symbol">${coin.symbol}</div>
+            </div>
+            <div class="coin-change ${chgCls}">${fmtChg(chg)}</div>
+          </div>
+          <div class="coin-price">${fmtPrice(coin.current_price)}</div>
+          <div class="sparkline-wrap">${spark}</div>
+          <div class="vol-row">
+            <span class="vol-label">24h vol</span>
+            <span class="vol-value">${fmtVol(coin.total_volume)}</span>
+          </div>
+        </div>`;
+    }
+
+    // ── Render ─────────────────────────────────
+    function render(coins) {
+      coinsData = coins;
+
+      // Ticker
+      document.getElementById('ticker').innerHTML = buildTicker(coins);
+
+      // Grid (8 coins → 4 per row, 2 rows)
+      const cards = coins.map((c, i) => buildCard(c, i + 1)).join('');
+      document.getElementById('grid-container').innerHTML = `<div class="grid">${cards}</div>`;
+
+      // Last update time
+      const now = new Date();
+      document.getElementById('last-update').textContent =
+        'Last update: ' + now.toUTCString().split(' ').slice(4,5).join(' ') + ' UTC';
+    }
+
+    // ── Fetch ──────────────────────────────────
+    async function fetchPrices() {
+      try {
+        const res = await fetch(API_URL);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        render(data);
+      } catch (err) {
+        console.warn('CoinGecko fetch failed:', err.message);
+        if (coinsData.length > 0) {
+          // Keep showing stale data — just update the timestamp label
+          document.getElementById('last-update').textContent =
+            'Stale data (refresh failed at ' + new Date().toUTCString().split(' ').slice(4,5).join(' ') + ' UTC)';
+        }
+      }
+    }
+
+    // Initial load + 30s refresh
+    fetchPrices();
+    setInterval(fetchPrices, 30000);
+  </script>
+</body>
+</html>

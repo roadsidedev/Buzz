@@ -741,4 +741,139 @@ router.post(
   })
 );
 
+/**
+ * POST /rooms/:id/events
+ * Emit a typed event into a room's event stream.
+ *
+ * Body: { type: string, payload: object }
+ *
+ * Used by the radio-runner daemon to inject MUSIC_BREAK events and
+ * any future room-level events (e.g., POLL, ANNOUNCEMENT).
+ *
+ * Events are stored in the room_event table and can be consumed by
+ * the frontend via polling GET /rooms/:id/events or a future
+ * WebSocket/SSE subscription.
+ */
+router.post(
+  "/:id/events",
+  optionalApiKey,
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const { id } = req.params;
+    const { type, payload } = req.body;
+
+    if (!type || typeof type !== "string") {
+      res.status(400).json({
+        success: false,
+        error: {
+          code: "INVALID_EVENT",
+          message: "Event 'type' (string) is required",
+          statusCode: 400,
+        },
+      });
+      return;
+    }
+
+    // Verify room exists
+    const room = await roomService.getRoomById(id);
+    if (!room) {
+      res.status(404).json({
+        success: false,
+        error: {
+          code: "ROOM_NOT_FOUND",
+          message: `Room ${id} not found`,
+          statusCode: 404,
+        },
+      });
+      return;
+    }
+
+    // Store the event
+    const { pool } = await import("../config/database.js");
+    const eventId = require("crypto").randomUUID();
+    await pool.query(
+      `INSERT INTO room_event (id, room_id, type, payload, created_at)
+       VALUES ($1, $2, $3, $4, NOW())
+       ON CONFLICT DO NOTHING`,
+      [eventId, id, type, JSON.stringify(payload || {})],
+    ).catch((err: Error) => {
+      // If room_event table doesn't exist yet, log and continue
+      // The event is still returned to the caller
+      logger.warn("room_event table may not exist — event not persisted", {
+        roomId: id,
+        type,
+        error: err.message,
+      });
+    });
+
+    logger.info("Room event emitted", {
+      roomId: id,
+      type,
+      eventId,
+    });
+
+    res.json({
+      success: true,
+      data: {
+        eventId,
+        type,
+        roomId: id,
+      },
+    });
+  })
+);
+
+/**
+ * GET /rooms/:id/events
+ * Retrieve recent events for a room (paginated, newest first).
+ *
+ * Query params:
+ *   limit  — max events to return (default 20, max 100)
+ *   after  — ISO timestamp, return events after this time
+ */
+router.get(
+  "/:id/events",
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const { id } = req.params;
+    const limit = Math.min(parseInt(req.query.limit as string) || 20, 100);
+    const after = req.query.after as string || null;
+
+    // Verify room exists
+    await roomService.getRoomById(id);
+
+    const { pool } = await import("../config/database.js");
+
+    try {
+      const query = after
+        ? `SELECT id, type, payload, created_at FROM room_event
+           WHERE room_id = $1 AND created_at > $2
+           ORDER BY created_at DESC LIMIT $3`
+        : `SELECT id, type, payload, created_at FROM room_event
+           WHERE room_id = $1
+           ORDER BY created_at DESC LIMIT $2`;
+
+      const params = after ? [id, after, limit] : [id, limit];
+      const { rows } = await pool.query(query, params);
+
+      res.json({
+        success: true,
+        data: {
+          events: rows.map((e: any) => ({
+            id: e.id,
+            type: e.type,
+            payload: e.payload,
+            createdAt: e.created_at,
+          })),
+          count: rows.length,
+        },
+      });
+    } catch {
+      // Table may not exist yet
+      res.json({
+        success: true,
+        data: { events: [], count: 0 },
+      });
+    }
+  })
+);
+
 export default router;

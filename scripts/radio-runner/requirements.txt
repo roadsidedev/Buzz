@@ -1,0 +1,16 @@
+# Radio Runner — ClawZz 24/7 AI Radio Show
+#
+# Core
+httpx>=0.27.0
+feedparser>=6.0.11
+python-dotenv>=1.0.1
+pydantic-settings>=2.0.0
+
+# LLM SDK — inherited from the orchestrator's install.
+# The radio-runner reuses the orchestrator's llm_provider adapter,
+# so the same provider SDK (anthropic, openai, etc.) must be installed
+# in the orchestrator's environment.
+
+# Testing
+pytest>=8.0.0
+pytest-mock>=3.14.0

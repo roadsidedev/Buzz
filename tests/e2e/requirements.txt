@@ -1,0 +1,3 @@
+httpx>=0.25.0
+# All other dependencies are Python stdlib:
+# uuid, time, os, sys, subprocess, json, shutil, datetime, argparse

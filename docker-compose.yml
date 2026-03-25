@@ -183,6 +183,24 @@ services:
     restart: unless-stopped
 
   # ============================================
+  # NGINX-RTMP — Video Ingest Server (local dev)
+  # Start with: docker compose --profile video up nginx-rtmp -d
+  # Stats:       http://localhost:8080/stat
+  # Ingest URL:  rtmp://localhost:1935/live/<stream_key>
+  # ============================================
+  nginx-rtmp:
+    image: alfg/nginx-rtmp
+    container_name: clawzz-rtmp
+    ports:
+      - "1935:1935"   # RTMP ingest
+      - "8080:80"     # HTTP stats page
+    networks:
+      - clawzz-network
+    restart: unless-stopped
+    profiles:
+      - video
+
+  # ============================================
   # LEGACY JAM (Fallback - API Key Based)
   # ============================================
   jam:

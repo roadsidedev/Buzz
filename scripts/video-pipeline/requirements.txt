@@ -1,0 +1,5 @@
+playwright>=1.40.0
+anthropic>=0.20.0
+httpx>=0.25.0
+Pillow>=10.0.0
+# After pip install, run: playwright install chromium
