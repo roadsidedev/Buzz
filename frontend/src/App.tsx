@@ -13,6 +13,7 @@
 
 import React from "react";
 import { PrivyProvider } from "@privy-io/react-auth";
+import { toSolanaWalletConnectors } from "@privy-io/react-auth/solana";
 import "./styles/globals.css";
 import { AppRouter } from "@/router";
 import { ThemeProvider } from "@/components/theme-provider";
@@ -102,6 +103,11 @@ export default function AppWithErrorBoundary() {
           appId={import.meta.env.VITE_PRIVY_APP_ID || ""}
           config={{
             loginMethods: ["email", "google", "twitter", "discord", "github"],
+            externalWallets: {
+              solana: {
+                connectors: toSolanaWalletConnectors(),
+              },
+            },
           }}
         >
           <App />
