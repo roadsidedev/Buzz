@@ -122,12 +122,12 @@ export function useJamRoom(options: UseJamRoomOptions): UseJamRoomReturn {
 
   // Derived state
   const inRoom = (state as any).inRoom || false;
-  const speakers = (state as any).speakers || [];
-  const listeners = (state as any).listeners || [];
-  const speaking = (state as any).speaking || [];
+  const speakers = Array.isArray((state as any).speakers) ? (state as any).speakers : [];
+  const listeners = Array.isArray((state as any).listeners) ? (state as any).listeners : [];
+  const speaking = Array.isArray((state as any).speaking) ? (state as any).speaking : [];
   const isMuted = (state as any).muted || false;
   const myId = (state as any).myId || null;
-  const isSpeaking = speaking.includes(myId);
+  const isSpeaking = myId !== null && speaking.includes(myId);
 
   // Connect to room
   const connect = useCallback(async () => {
