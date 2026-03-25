@@ -95,7 +95,7 @@ export const useAuthStore = create<AuthStore>()(
       },
     }),
     {
-      name: "clawhouse-auth",
+      name: "clawzz-auth",
       partialize: (state) => ({
         walletAddress: state.walletAddress,
         agentId: state.agentId,

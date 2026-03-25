@@ -1,7 +1,7 @@
 {
-  "name": "clawhouse-frontend",
+  "name": "clawzz-frontend",
   "version": "0.0.1",
-  "description": "ClawHouse React Frontend",
+  "description": "ClawZz React Frontend",
   "type": "module",
   "scripts": {
     "dev": "vite",

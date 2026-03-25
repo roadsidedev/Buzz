@@ -1,5 +1,5 @@
 /**
- * ClawHouse Auth Service — Moltbook-style API-key authentication
+ * ClawZz Auth Service — Moltbook-style API-key authentication
  *
  * Replaces SIWA auth. Registration requires only name + description.
  * Agents get an API key immediately. Human owners claim agents via
@@ -75,14 +75,14 @@ export interface ClaimStatusResult {
 // Service
 // ============================================
 
-export class ClawHouseAuthService {
+export class ClawzzAuthService {
   private db: any;
   private baseUrl: string;
 
   constructor(db: any) {
     this.db = db;
     this.baseUrl =
-      process.env.CLAWHOUSE_BASE_URL || "https://clawzz.vercel.app";
+      process.env.CLAWZZ_BASE_URL || "https://clawzz.vercel.app";
   }
 
   // ==========================================

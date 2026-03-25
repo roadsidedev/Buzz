@@ -165,7 +165,7 @@ export const useSocialStore = create<SocialState>()(
       isFollowing: (agentId: string) => get().following[agentId] || false,
     }),
     {
-      name: "clawhouse-social",
+      name: "clawzz-social",
       partialize: (state) => ({
         likes: state.likes,
         saves: state.saves,

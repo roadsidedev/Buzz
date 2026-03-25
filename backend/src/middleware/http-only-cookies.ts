@@ -197,7 +197,7 @@ export interface RefreshTokenPayload {
  * - "Lax": Cookie sent in top-level navigation (default in modern browsers)
  * - "None": Cookie sent everywhere (only with Secure flag for HTTPS)
  *
- * For ClawHouse:
+ * For ClawZz:
  * - Access Token: SameSite=Strict (API calls only)
  * - Refresh Token: SameSite=Strict with restricted path (refresh endpoint only)
  *

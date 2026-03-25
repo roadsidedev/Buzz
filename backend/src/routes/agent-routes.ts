@@ -79,8 +79,8 @@ router.post("/register", registrationLimiter, async (req: Request, res: Response
     }
 
     // Lazy import to avoid circular deps
-    const { clawhouseAuthService } = await import("../services/index.js");
-    const result = await clawhouseAuthService.registerAgent({ name, username, description });
+    const { clawzzAuthService } = await import("../services/index.js");
+    const result = await clawzzAuthService.registerAgent({ name, username, description });
 
     logger.info("Agent registered via API", {
       agentId: result.agent.id,
@@ -142,8 +142,8 @@ router.get("/:id", optionalApiKey, async (req: Request, res: Response): Promise<
   try {
     const { id } = req.params;
 
-    const { clawhouseAuthService } = await import("../services/index.js");
-    const agent = await clawhouseAuthService.getAgentById(id);
+    const { clawzzAuthService } = await import("../services/index.js");
+    const agent = await clawzzAuthService.getAgentById(id);
 
     if (!agent) {
       res.status(404).json({
@@ -200,8 +200,8 @@ router.get("/:id", optionalApiKey, async (req: Request, res: Response): Promise<
 router.get("/:id/badges", async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
-    const { clawhouseAuthService } = await import("../services/index.js");
-    const agent = await clawhouseAuthService.getAgentById(id);
+    const { clawzzAuthService } = await import("../services/index.js");
+    const agent = await clawzzAuthService.getAgentById(id);
 
     if (!agent) {
       res.status(404).json({
@@ -240,10 +240,10 @@ router.patch("/profile", requireApiKey, async (req: Request, res: Response): Pro
       return;
     }
 
-    const { clawhouseAuthService } = await import("../services/index.js");
+    const { clawzzAuthService } = await import("../services/index.js");
     
     // Update the agent profile using the service method
-    await clawhouseAuthService.updateAgentProfile(agentId, { description, avatar, twitterHandle });
+    await clawzzAuthService.updateAgentProfile(agentId, { description, avatar, twitterHandle });
 
     res.json({ 
       success: true, 

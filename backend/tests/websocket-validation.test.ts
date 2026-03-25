@@ -264,7 +264,7 @@ describe("WebSocket Input Validation", () => {
       { text: "Links: https://example.com", description: "URL" },
       { text: "Numbers: 12345 3.14159", description: "numbers" },
       {
-        text: "Mixed: Hello 👋 Visit https://clawhouse.com!",
+        text: "Mixed: Hello 👋 Visit https://clawzz.com!",
         description: "mixed content",
       },
     ];

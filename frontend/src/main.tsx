@@ -11,7 +11,7 @@ import AppWithErrorBoundary from "./App";
 import { logger } from "@/utils/logger";
 
 // Log app initialization
-logger.info("clawhouse frontend starting up");
+logger.info("clawzz frontend starting up");
 
 const root = ReactDOM.createRoot(document.getElementById("root")!);
 
@@ -21,4 +21,4 @@ root.render(
   </React.StrictMode>,
 );
 
-logger.info("clawhouse frontend mounted");
+logger.info("clawzz frontend mounted");

@@ -1,7 +1,7 @@
 import React, { useState } from "react"
 import { useLocation, useNavigate, Outlet } from "react-router-dom"
 import {
-  Mic2,
+  Home,
   User,
   Search,
   X,
@@ -10,7 +10,6 @@ import {
   BookOpen,
   ArrowRight,
   Terminal,
-  Sparkles,
   Compass,
 } from "lucide-react"
 import { RoomDock } from "@/components/room/RoomDock"
@@ -61,7 +60,7 @@ export function MainLayout({ children }: MainLayoutProps) {
           {/* LEFT: Logo + Search (desktop) | Search button (mobile) */}
           <div className="flex items-center gap-3 shrink-0">
             <span className="hidden lg:block text-xl font-bold tracking-tight text-primary cursor-pointer" onClick={() => handleNav("/rooms")}>
-              CLAWHOUSE
+              clawzz
             </span>
             <div className="relative hidden lg:block w-44">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -86,7 +85,7 @@ export function MainLayout({ children }: MainLayoutProps) {
 
           {/* CENTER: Nav tabs (desktop only) */}
           <div className="hidden lg:flex flex-1 items-center justify-center gap-1">
-            <TopNavLink icon={Mic2}    label="Live"    active={isActive("/rooms") || isActive("/room")} onClick={() => handleNav("/rooms")} />
+            <TopNavLink icon={Home}    label="Home"    active={isActive("/rooms") || isActive("/room")} onClick={() => handleNav("/rooms")}  />
             <TopNavLink icon={Compass} label="Explore" active={isActive("/explore")}                    onClick={() => handleNav("/explore")} />
             <TopNavLink icon={User}    label="Profile" active={isActive("/profile") || isActive("/agents")} onClick={() => handleNav("/profile")} />
           </div>
@@ -96,8 +95,7 @@ export function MainLayout({ children }: MainLayoutProps) {
             <ModeToggle />
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="default" className="font-semibold gap-1.5">
-                  <Sparkles size={14} />
+                <Button variant="default" className="font-semibold">
                   ONBOARDING
                 </Button>
               </DropdownMenuTrigger>
@@ -105,7 +103,7 @@ export function MainLayout({ children }: MainLayoutProps) {
                 {/* Header */}
                 <div className="px-4 pt-4 pb-3 border-b border-border bg-muted/30">
                   <span className="text-primary font-bold text-xl tracking-tight">
-                  CLAWHOUSE
+                  clawzz
                 </span>
                   <p className="text-xs text-muted-foreground mt-0.5">AI-first live streaming — pick your path</p>
                 </div>
@@ -198,7 +196,7 @@ export function MainLayout({ children }: MainLayoutProps) {
         {/* Mobile Bottom Nav — hidden when room dock is expanded */}
         {!isDockExpanded && (
           <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-t flex items-center justify-between px-4 py-2">
-            <MobileNavLink icon={Mic2} label="Live" active={isActive("/rooms") || isActive("/room")} onClick={() => handleNav("/rooms")} />
+            <MobileNavLink icon={Home} label="Home" active={isActive("/rooms") || isActive("/room")} onClick={() => handleNav("/rooms")}  />
             <MobileNavLink icon={Compass} label="Explore" active={isActive("/explore")} onClick={() => handleNav("/explore")} />
             <MobileNavLink icon={User} label="Profile" active={isActive("/profile") || isActive("/agents")} onClick={() => handleNav("/profile")} />
           </nav>

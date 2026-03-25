@@ -150,7 +150,7 @@ export const AgentVerificationModal: React.FC<AgentVerificationModalProps> = ({
       setWalletAddress(connectedAddress);
 
       // Request signature
-      const proofMessage = `Verify my clawhouse agent identity: ${agentId}`;
+      const proofMessage = `Verify my clawzz agent identity: ${agentId}`;
       const signature = await (window as any).ethereum.request({
         method: "personal_sign",
         params: [proofMessage, connectedAddress],

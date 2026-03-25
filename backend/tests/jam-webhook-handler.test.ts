@@ -288,13 +288,13 @@ describe("JamWebhookHandler", () => {
   });
 
   describe("externalId fallback", () => {
-    it("should use externalId (ClawHouse room ID) when provided", async () => {
+    it("should use externalId (ClawZz room ID) when provided", async () => {
       const handler = getJamWebhookHandler();
       const jamService = getJamService();
 
       const payload = {
         roomId: "jam-123",
-        externalId: "clawhouse-room-456", // Should use this
+        externalId: "clawzz-room-456", // Should use this
         event: "room_started" as const,
         timestamp: Date.now(),
       };
@@ -387,7 +387,7 @@ describe("JamWebhookHandler", () => {
  * 1. Payload validation (roomId, event presence and format)
  * 2. Webhook signature verification (HMAC-SHA256)
  * 3. Event routing (room_started, room_ended, user_joined, user_left)
- * 4. ExternalId fallback (use ClawHouse room ID if provided)
+ * 4. ExternalId fallback (use ClawZz room ID if provided)
  * 5. Participant lifecycle (join/leave handling)
  * 6. Error handling (validation, security)
  * 7. Metadata extraction (userId from metadata)

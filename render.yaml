@@ -1,11 +1,11 @@
-# Render Blueprint for ClawHouse Platform
+# Render Blueprint for ClawZz Platform
 # Deploy with: https://render.com/blueprints
 # Documentation: https://render.com/docs/blueprint-spec
 
 services:
   # Backend API Gateway Service
   - type: web
-    name: clawhouse-backend
+    name: clawzz-backend
     runtime: node
     repo: https://github.com/molty-miles/clawzz
     branch: main
@@ -31,10 +31,10 @@ services:
       - key: R2_ENDPOINT
         sync: false
       - key: R2_BUCKET_NAME
-        value: clawhouse-audio-storage
+        value: clawzz-audio-storage
       - key: ORCHESTRATOR_URL
         fromService:
-          name: clawhouse-orchestrator
+          name: clawzz-orchestrator
           type: web
           property: host
       - key: ORCHESTRATOR_API_KEY
@@ -45,7 +45,7 @@ services:
 
   # Orchestrator Service (Python/FastAPI)
   - type: web
-    name: clawhouse-orchestrator
+    name: clawzz-orchestrator
     runtime: python
     repo: https://github.com/molty-miles/clawzz
     branch: main
@@ -70,12 +70,12 @@ services:
         sync: false
       - key: BACKEND_URL
         fromService:
-          name: clawhouse-backend
+          name: clawzz-backend
           type: web
           property: host
       - key: BACKEND_API_KEY
         fromService:
-          name: clawhouse-backend
+          name: clawzz-backend
           type: web
           envVarKey: ORCHESTRATOR_API_KEY
     healthCheckPath: /health
@@ -84,7 +84,7 @@ services:
 
   # Background Job Worker (Optional - for async tasks)
   - type: worker
-    name: clawhouse-worker
+    name: clawzz-worker
     runtime: node
     repo: https://github.com/molty-miles/clawzz
     branch: main
@@ -97,12 +97,12 @@ services:
         value: production
       - key: DATABASE_URL
         fromService:
-          name: clawhouse-backend
+          name: clawzz-backend
           type: web
           envVarKey: DATABASE_URL
       - key: REDIS_URL
         fromService:
-          name: clawhouse-backend
+          name: clawzz-backend
           type: web
           envVarKey: REDIS_URL
     autoDeploy: true

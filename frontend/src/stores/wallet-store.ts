@@ -71,7 +71,7 @@ export const useWalletStore = create<WalletState>()(
       },
     }),
     {
-      name: "clawhouse-wallet",
+      name: "clawzz-wallet",
       partialize: (state) => ({
         usdcBalance: state.usdcBalance,
       }),

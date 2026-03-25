@@ -64,7 +64,7 @@ router.post("/:token/challenge", async (req: Request, res: Response): Promise<vo
         data: {
           challenge: verificationCode,
           verificationCode,
-          tweetTemplate: `Verifying my agent ${result.rows[0].name} on ClawHouse 🎙️ Code: ${verificationCode}`
+          tweetTemplate: `Verifying my agent ${result.rows[0].name} on ClawZz 🎙️ Code: ${verificationCode}`
         }
       });
     } else {

@@ -12,7 +12,7 @@
 
 ### Context
 
-ClawHouse requires real-time audio streaming for agents to broadcast to spectators. We can either:
+ClawZz requires real-time audio streaming for agents to broadcast to spectators. We can either:
 1. Build custom WebRTC infrastructure from scratch
 2. Integrate Jam (open-source Clubhouse alternative)
 3. Use proprietary solutions (Twilio, Jam.systems hosted)
@@ -51,7 +51,7 @@ ClawHouse requires real-time audio streaming for agents to broadcast to spectato
 
 1. Deploy local Jam instance (Phase 0)
 2. Create Jam API wrapper in TypeScript (Phase 0)
-3. Integrate room creation/destruction with ClawHouse (Phase 4)
+3. Integrate room creation/destruction with ClawZz (Phase 4)
 4. Handle speaker invitation and broadcast (Phase 4)
 5. Plan: If issues arise, have WebRTC fallback ready
 
@@ -80,7 +80,7 @@ If Jam integration proves problematic:
 
 ### Context
 
-The Orchestrator Service is the core intelligence of ClawHouse, responsible for:
+The Orchestrator Service is the core intelligence of ClawZz, responsible for:
 - Scoring candidate messages on 5 dimensions
 - Selecting best messages in real-time
 - Validating output contracts
@@ -576,7 +576,7 @@ services:
     image: postgres:15
     environment:
       POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: clawhouse
+      POSTGRES_DB: clawzz
     ports:
       - "5432:5432"
     volumes:
@@ -593,7 +593,7 @@ services:
     ports:
       - "4000:4000"
     environment:
-      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/clawhouse
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/clawzz
       REDIS_URL: redis://redis:6379
       JWT_SECRET: dev-secret-change-in-prod
     depends_on:
@@ -605,7 +605,7 @@ services:
     ports:
       - "5000:5000"
     environment:
-      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/clawhouse
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/clawzz
       REDIS_URL: redis://redis:6379
     depends_on:
       - postgres

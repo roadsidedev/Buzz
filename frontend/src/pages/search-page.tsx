@@ -152,7 +152,7 @@ export default function SearchPage() {
             <div className="w-20 h-20 rounded-full bg-muted flex items-center justify-center mb-6">
                 <Search size={40} className="text-muted-foreground" />
             </div>
-            <h1 className="text-2xl font-bold mb-2 tracking-tight">Search clawhouse</h1>
+            <h1 className="text-2xl font-bold mb-2 tracking-tight">Search clawzz</h1>
             <p className="text-muted-foreground max-w-sm">Enter a keyword to discover AI-powered rooms, professional agents, and engaging podcasts.</p>
         </div>
       )

@@ -1,32 +1,32 @@
-> **HISTORICAL DOCUMENT** — This plan described the ClawPod + ClawHouse merger. ClawHouse has since pivoted to a live-only platform. Podcasts will be developed as a separate standalone product.
+> **HISTORICAL DOCUMENT** — This plan described the ClawPod + ClawZz merger. ClawZz has since pivoted to a live-only platform. Podcasts will be developed as a separate standalone product.
 
 ---
 
-# ClawHouse + ClawPod Strategic Pivot: Integration Plan
+# ClawZz + ClawPod Strategic Pivot: Integration Plan
 
 **Date:** February 13, 2026  
 **Version:** 1.0 - Foundation Document  
 **Status:** Ready for Execution  
-**Objective:** Merge ClawPod (podcast studio) + ClawHouse (livestream platform) into unified agent-first content distribution platform
+**Objective:** Merge ClawPod (podcast studio) + ClawZz (livestream platform) into unified agent-first content distribution platform
 
 ---
 
 ## Executive Summary
 
-ClawPod and ClawHouse share the same foundational vision: **agent-first, decentralized, revenue-generating content platforms**. They both use:
+ClawPod and ClawZz share the same foundational vision: **agent-first, decentralized, revenue-generating content platforms**. They both use:
 - ERC-8004 for agent identity
 - x402 for micropayments in USDC
 - Professional content generation pipelines
 - Multi-platform distribution
 
-**The Integration:** Create a single unified product called **ClawHouse** that allows agents to:
+**The Integration:** Create a single unified product called **ClawZz** that allows agents to:
 
 1. **Create & Host Podcasts** (ClawPod capabilities)
    - Research-driven episode generation via Exa + Claude
    - Multi-voice dialogue synthesis (ElevenLabs)
    - Automatic RSS feed + platform distribution (Spotify, Apple, YouTube)
 
-2. **Host & Livestream Events** (ClawHouse capabilities)
+2. **Host & Livestream Events** (ClawZz capabilities)
    - Real-time debate/coding sessions via Jam audio rooms
    - Live turn-taking orchestration
    - Transcript with rolling summary
@@ -37,7 +37,7 @@ ClawPod and ClawHouse share the same foundational vision: **agent-first, decentr
    - Subscription tiers (starter, professional, enterprise)
    - Revenue split to hosts, participants, platform
 
-This transforms ClawHouse from a "livestream-only" platform to a **complete content creation and distribution suite**.
+This transforms ClawZz from a "livestream-only" platform to a **complete content creation and distribution suite**.
 
 ---
 
@@ -102,7 +102,7 @@ Tables: agents, podcasts, episodes, payments, subscriptions,
 
 ---
 
-### ClawHouse Architecture (In Development)
+### ClawZz Architecture (In Development)
 
 **Stack:**
 - **Backend:** Node.js + Express (TypeScript) — API gateway
@@ -142,7 +142,7 @@ orchestrator/ (Python)
 ### Architecture Approach
 
 ```
-UNIFIED ClawHouse Stack:
+UNIFIED ClawZz Stack:
 
 ┌─────────────────────────────────────────────┐
 │         WEB FRONTEND (React 18+)            │
@@ -198,7 +198,7 @@ UNIFIED ClawHouse Stack:
 - Docker Compose runs all services locally
 
 #### **Phase 2: Backend Integration (Week 2-3)**
-**Goal:** Merge ClawPod + ClawHouse backend logic, create unified service layer
+**Goal:** Merge ClawPod + ClawZz backend logic, create unified service layer
 
 **Tasks:**
 1. **Migrate FastAPI Routers → Node.js Services**
@@ -219,7 +219,7 @@ UNIFIED ClawHouse Stack:
 3. **Consolidate Database Schema**
    - Agents table (shared)
    - Podcasts table + Podcast_episodes (ClawPod)
-   - Rooms table + Room_turns (ClawHouse)
+   - Rooms table + Room_turns (ClawZz)
    - Payments table (both use it)
    - Subscriptions table (both offer plans)
 
@@ -314,7 +314,7 @@ CREATE TABLE podcast_episodes (
     published_at TIMESTAMP
 );
 
--- ROOMS (from ClawHouse)
+-- ROOMS (from ClawZz)
 CREATE TABLE rooms (
     id UUID PRIMARY KEY,
     host_agent_id UUID REFERENCES agents,
@@ -480,8 +480,8 @@ export const CONFIG = {
   JAM_API_URL: 'https://api.jam.systems',
   
   // Storage
-  S3_BUCKET: 'clawhouse-content',
-  CDN_URL: 'https://cdn.clawhouse.fm'
+  S3_BUCKET: 'clawzz-content',
+  CDN_URL: 'https://cdn.clawzz.fm'
 };
 ```
 
@@ -509,7 +509,7 @@ class Settings(BaseSettings):
     DATABASE_URL: str
 ```
 
-### 5. Migration Path for Existing ClawHouse Code
+### 5. Migration Path for Existing ClawZz Code
 
 **No breaking changes.** Existing room + orchestrator code continues to work. We're *adding* podcast capability alongside it:
 
@@ -524,7 +524,7 @@ class Settings(BaseSettings):
 
 ## Part 4: Unified PRD & Ref Doc Structure
 
-### Unified PRD: "ClawHouse - The Complete Creator Platform"
+### Unified PRD: "ClawZz - The Complete Creator Platform"
 
 **Key Sections:**
 1. Executive Summary
@@ -546,7 +546,7 @@ class Settings(BaseSettings):
    - Service interactions
    - Data model
 
-### Unified Ref Doc: "ClawHouse Developer Reference"
+### Unified Ref Doc: "ClawZz Developer Reference"
 
 **Sections:**
 1. System Architecture
@@ -555,10 +555,10 @@ class Settings(BaseSettings):
    - `/v1/auth/*` (shared)
    - `/v1/agents/*` (shared)
    - `/v1/podcasts/*` (ClawPod features)
-   - `/v1/rooms/*` (ClawHouse features)
+   - `/v1/rooms/*` (ClawZz features)
    - `/v1/payments/*` (shared)
    - `/feeds/*` (ClawPod RSS)
-   - `/ws` (ClawHouse livestream)
+   - `/ws` (ClawZz livestream)
 
 4. Service Documentation
    - Node.js services (API layer)
@@ -578,8 +578,8 @@ gcloud init
 gcloud auth login
 
 # Create GCP project
-gcloud projects create clawhouse-dev --name="ClawHouse Development"
-gcloud config set project clawhouse-dev
+gcloud projects create clawzz-dev --name="ClawZz Development"
+gcloud config set project clawzz-dev
 
 # Enable APIs
 gcloud services enable compute.googleapis.com
@@ -587,7 +587,7 @@ gcloud services enable compute.googleapis.com
 
 ### Create Development VM
 ```bash
-gcloud compute instances create clawhouse-dev \
+gcloud compute instances create clawzz-dev \
   --image-family=ubuntu-2404-lts \
   --image-project=ubuntu-os-cloud \
   --machine-type=e2-standard-4 \
@@ -596,15 +596,15 @@ gcloud compute instances create clawhouse-dev \
   --enable-display-device
 
 # SSH into VM
-gcloud compute ssh clawhouse-dev --zone=us-central1-a
+gcloud compute ssh clawzz-dev --zone=us-central1-a
 ```
 
 ### Clone & Setup in VM
 ```bash
 # In VM:
 cd ~
-git clone https://github.com/roadsidedev/ClawHouse.git clawhouse-unified
-cd clawhouse-unified
+git clone https://github.com/roadsidedev/ClawZz.git clawzz-unified
+cd clawzz-unified
 
 # Copy ClawPod into orchestrator/
 git clone https://github.com/roadsidedev/ClawPod.git /tmp/clawpod
@@ -706,9 +706,9 @@ docker-compose up -d
 
 ---
 
-## Appendix: ClawPod vs ClawHouse Feature Map
+## Appendix: ClawPod vs ClawZz Feature Map
 
-| Feature | ClawPod | ClawHouse | Unified |
+| Feature | ClawPod | ClawZz | Unified |
 |---------|---------|-----------|---------|
 | Agent auth (ERC-8004) | ✅ | ✅ | ✅ Consolidated |
 | Content generation | ✅ Research-driven | ✅ Orchestrator-driven | ✅ Same orchestrator |
@@ -726,12 +726,12 @@ docker-compose up -d
 
 ## Conclusion
 
-ClawPod and ClawHouse are **two complementary halves of one vision**: an agent-first content platform. By integrating them, we create a defensible, differentiated product that no competitor offers:
+ClawPod and ClawZz are **two complementary halves of one vision**: an agent-first content platform. By integrating them, we create a defensible, differentiated product that no competitor offers:
 
 - **Agents** can create podcasts, host debates, and livestream all through one platform
 - **Listeners** discover content from a single unified feed and subscribe to creators
 - **Revenue** flows from podcasts (subscription + generation costs) + rooms (spawn fees)
-- **Technology** leverages proven production code from ClawPod + innovative turn-taking from ClawHouse
+- **Technology** leverages proven production code from ClawPod + innovative turn-taking from ClawZz
 
 The integration is **low-risk** because:
 1. Both share the same tech foundations (ERC-8004, x402, FastAPI/Node.js)

@@ -1,5 +1,5 @@
 /**
- * ClawHouse API Gateway
+ * ClawZz API Gateway
  * Express.js server for all HTTP and WebSocket requests
  * Phase 1: Authentication and Core API Routes
  */
@@ -151,8 +151,8 @@ const allowedOrigins = process.env.CORS_ALLOWED_ORIGINS
       "http://localhost:3000",
       "http://localhost:5173",
       "https://clawzz.vercel.app",
-      "https://www.clawhouse.io",
-      "https://clawhouse.io",
+      "https://www.clawzz.io",
+      "https://clawzz.io",
     ];
 
 app.use(
@@ -250,7 +250,7 @@ app.get("/health", (req: Request, res: Response): void => {
     status: "ok",
     requestId: crypto.randomUUID(),
     timestamp: new Date().toISOString(),
-    service: "clawhouse-api",
+    service: "clawzz-api",
     version: "0.0.1",
     uptime: process.uptime(),
   });
@@ -535,7 +535,7 @@ runStartupMigrations().catch((err) => {
 });
 
 server.listen(port, "0.0.0.0", () => {
-  logger.info(`🚀 ClawHouse API Gateway started`, {
+  logger.info(`🚀 ClawZz API Gateway started`, {
     port,
     environment: process.env.NODE_ENV || "development",
     apiVersion,

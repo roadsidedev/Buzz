@@ -24,8 +24,8 @@ const router = Router();
  */
 router.get("/me", requireApiKey, async (req: Request, res: Response): Promise<void> => {
   try {
-    const { clawhouseAuthService } = await import("../services/index.js");
-    const agent = await clawhouseAuthService.getAgentById(req.agent!.id);
+    const { clawzzAuthService } = await import("../services/index.js");
+    const agent = await clawzzAuthService.getAgentById(req.agent!.id);
 
     if (!agent) {
       res.status(404).json({
@@ -52,8 +52,8 @@ router.get("/me", requireApiKey, async (req: Request, res: Response): Promise<vo
  */
 router.get("/status", requireApiKey, async (req: Request, res: Response): Promise<void> => {
   try {
-    const { clawhouseAuthService } = await import("../services/index.js");
-    const status = await clawhouseAuthService.getClaimStatus(req.agent!.id);
+    const { clawzzAuthService } = await import("../services/index.js");
+    const status = await clawzzAuthService.getClaimStatus(req.agent!.id);
 
     res.json({ success: true, data: status });
   } catch (err: any) {
@@ -87,8 +87,8 @@ router.post("/claim", async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    const { clawhouseAuthService } = await import("../services/index.js");
-    const result = await clawhouseAuthService.startClaim(claim_token, email);
+    const { clawzzAuthService } = await import("../services/index.js");
+    const result = await clawzzAuthService.startClaim(claim_token, email);
 
     // Send verification email via SendGrid
     await emailService.sendVerificationEmail(email, result.agentName, result.emailToken);
@@ -134,8 +134,8 @@ router.post("/verify-email", async (req: Request, res: Response): Promise<void> 
       return;
     }
 
-    const { clawhouseAuthService } = await import("../services/index.js");
-    const result = await clawhouseAuthService.verifyEmail(token);
+    const { clawzzAuthService } = await import("../services/index.js");
+    const result = await clawzzAuthService.verifyEmail(token);
 
     res.json({
       success: true,
@@ -185,8 +185,8 @@ router.post("/verify-twitter", async (req: Request, res: Response): Promise<void
       return;
     }
 
-    const { clawhouseAuthService } = await import("../services/index.js");
-    await clawhouseAuthService.verifyTwitter(agent_id, twitter_handle);
+    const { clawzzAuthService } = await import("../services/index.js");
+    await clawzzAuthService.verifyTwitter(agent_id, twitter_handle);
 
     res.json({
       success: true,
@@ -225,8 +225,8 @@ router.post(
         return;
       }
 
-      const { clawhouseAuthService } = await import("../services/index.js");
-      const emailToken = await clawhouseAuthService.setupOwnerEmail(req.agent!.id, email);
+      const { clawzzAuthService } = await import("../services/index.js");
+      const emailToken = await clawzzAuthService.setupOwnerEmail(req.agent!.id, email);
 
       await emailService.sendVerificationEmail(email, req.agent!.name, emailToken);
 
@@ -267,8 +267,8 @@ router.post(
         return;
       }
 
-      const { clawhouseAuthService } = await import("../services/index.js");
-      const newKey = await clawhouseAuthService.rotateApiKey(req.agent!.id);
+      const { clawzzAuthService } = await import("../services/index.js");
+      const newKey = await clawzzAuthService.rotateApiKey(req.agent!.id);
 
       res.json({
         success: true,

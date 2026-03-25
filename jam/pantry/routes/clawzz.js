@@ -1,14 +1,14 @@
 /**
- * ClawHouse Routes for Pantry
+ * ClawZz Routes for Pantry
  *
- * Custom endpoints for ClawHouse orchestration integration.
+ * Custom endpoints for ClawZz orchestration integration.
  * Enables turn-taking signaling, audio lifecycle events, and room coordination.
  */
 
 const express = require('express');
 const router = express.Router();
 
-// Redis client (shared with ClawHouse)
+// Redis client (shared with ClawZz)
 let redisClient = null;
 
 /**
@@ -31,7 +31,7 @@ function broadcastToRoom(roomId, topic, type, payload) {
 }
 
 /**
- * Publish event to Redis for ClawHouse backend
+ * Publish event to Redis for ClawZz backend
  */
 async function publishToRedis(channel, event) {
   if (redisClient) {
@@ -40,10 +40,10 @@ async function publishToRedis(channel, event) {
 }
 
 /**
- * POST /api/v1/clawhouse/rooms/:id/turn
+ * POST /api/v1/clawzz/rooms/:id/turn
  *
  * Signal turn-taking event for orchestrator coordination.
- * Used by ClawHouse orchestrator to indicate which agent should speak.
+ * Used by ClawZz orchestrator to indicate which agent should speak.
  */
 router.post('/rooms/:id/turn', async (req, res) => {
   const {id: roomId} = req.params;
@@ -55,15 +55,15 @@ router.post('/rooms/:id/turn', async (req, res) => {
 
   try {
     // Broadcast turn-started to room
-    broadcastToRoom(roomId, 'clawhouse', 'turn-started', {
+    broadcastToRoom(roomId, 'clawzz', 'turn-started', {
       agentId,
       duration,
       messageId,
       timestamp: Date.now(),
     });
 
-    // Publish to Redis for ClawHouse backend
-    await publishToRedis('clawhouse:room:events', {
+    // Publish to Redis for ClawZz backend
+    await publishToRedis('clawzz:room:events', {
       type: 'turn_started',
       roomId,
       agentId,
@@ -79,7 +79,7 @@ router.post('/rooms/:id/turn', async (req, res) => {
 });
 
 /**
- * POST /api/v1/clawhouse/rooms/:id/turn/end
+ * POST /api/v1/clawzz/rooms/:id/turn/end
  *
  * Signal end of turn for current speaker.
  */
@@ -88,12 +88,12 @@ router.post('/rooms/:id/turn/end', async (req, res) => {
   const {agentId} = req.body;
 
   try {
-    broadcastToRoom(roomId, 'clawhouse', 'turn-ended', {
+    broadcastToRoom(roomId, 'clawzz', 'turn-ended', {
       agentId,
       timestamp: Date.now(),
     });
 
-    await publishToRedis('clawhouse:room:events', {
+    await publishToRedis('clawzz:room:events', {
       type: 'turn_ended',
       roomId,
       agentId,
@@ -108,7 +108,7 @@ router.post('/rooms/:id/turn/end', async (req, res) => {
 });
 
 /**
- * POST /api/v1/clawhouse/rooms/:id/audio/start
+ * POST /api/v1/clawzz/rooms/:id/audio/start
  *
  * Signal audio stream start from AI agent.
  */
@@ -117,7 +117,7 @@ router.post('/rooms/:id/audio/start', async (req, res) => {
   const {agentId, messageId, duration} = req.body;
 
   try {
-    broadcastToRoom(roomId, 'clawhouse', 'audio-started', {
+    broadcastToRoom(roomId, 'clawzz', 'audio-started', {
       agentId,
       messageId,
       duration,
@@ -140,7 +140,7 @@ router.post('/rooms/:id/audio/start', async (req, res) => {
 });
 
 /**
- * POST /api/v1/clawhouse/rooms/:id/audio/end
+ * POST /api/v1/clawzz/rooms/:id/audio/end
  *
  * Signal audio stream end.
  */
@@ -149,7 +149,7 @@ router.post('/rooms/:id/audio/end', async (req, res) => {
   const {agentId, messageId} = req.body;
 
   try {
-    broadcastToRoom(roomId, 'clawhouse', 'audio-ended', {
+    broadcastToRoom(roomId, 'clawzz', 'audio-ended', {
       agentId,
       messageId,
       timestamp: Date.now(),
@@ -171,7 +171,7 @@ router.post('/rooms/:id/audio/end', async (req, res) => {
 });
 
 /**
- * POST /api/v1/clawhouse/rooms/:id/score
+ * POST /api/v1/clawzz/rooms/:id/score
  *
  * Receive message score from orchestrator.
  * Broadcasts score to room for real-time feedback.
@@ -181,7 +181,7 @@ router.post('/rooms/:id/score', async (req, res) => {
   const {messageId, score, dimensions} = req.body;
 
   try {
-    broadcastToRoom(roomId, 'clawhouse', 'message-scored', {
+    broadcastToRoom(roomId, 'clawzz', 'message-scored', {
       messageId,
       score,
       dimensions,
@@ -196,7 +196,7 @@ router.post('/rooms/:id/score', async (req, res) => {
 });
 
 /**
- * POST /api/v1/clawhouse/rooms/:id/objective/update
+ * POST /api/v1/clawzz/rooms/:id/objective/update
  *
  * Update room objective progress.
  */
@@ -205,7 +205,7 @@ router.post('/rooms/:id/objective/update', async (req, res) => {
   const {progress, status, message} = req.body;
 
   try {
-    broadcastToRoom(roomId, 'clawhouse', 'objective-updated', {
+    broadcastToRoom(roomId, 'clawzz', 'objective-updated', {
       progress,
       status,
       message,
@@ -220,7 +220,7 @@ router.post('/rooms/:id/objective/update', async (req, res) => {
 });
 
 /**
- * POST /api/v1/clawhouse/rooms/:id/closing
+ * POST /api/v1/clawzz/rooms/:id/closing
  *
  * Signal room is about to close.
  * Gives clients time to finish operations.
@@ -230,7 +230,7 @@ router.post('/rooms/:id/closing', async (req, res) => {
   const {reason, delay} = req.body;
 
   try {
-    broadcastToRoom(roomId, 'clawhouse', 'room-closing', {
+    broadcastToRoom(roomId, 'clawzz', 'room-closing', {
       reason,
       delay: delay || 5000,
       timestamp: Date.now(),

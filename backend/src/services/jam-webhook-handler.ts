@@ -19,7 +19,7 @@ import { roomService } from "./room-service.js";
 
 export interface JamWebhookPayload {
   roomId: string; // Jam room ID
-  externalId?: string; // ClawHouse room ID
+  externalId?: string; // ClawZz room ID
   event: "room_started" | "room_ended" | "user_joined" | "user_left";
   timestamp: number;
   metadata?: Record<string, unknown>;
@@ -88,29 +88,29 @@ export class JamWebhookHandler {
     });
 
     // 3. ROUTE TO HANDLER
-    const clawhouseRoomId = externalId || roomId;
+    const clawzzRoomId = externalId || roomId;
 
     try {
       switch (event) {
         case "room_started": {
-          await this._handleRoomStarted(clawhouseRoomId, roomId);
+          await this._handleRoomStarted(clawzzRoomId, roomId);
           break;
         }
 
         case "room_ended": {
-          await this._handleRoomEnded(clawhouseRoomId, roomId);
+          await this._handleRoomEnded(clawzzRoomId, roomId);
           break;
         }
 
         case "user_joined": {
           const userId = metadata?.userId as string | undefined;
-          await this._handleUserJoined(clawhouseRoomId, userId);
+          await this._handleUserJoined(clawzzRoomId, userId);
           break;
         }
 
         case "user_left": {
           const userId = metadata?.userId as string | undefined;
-          await this._handleUserLeft(clawhouseRoomId, userId);
+          await this._handleUserLeft(clawzzRoomId, userId);
           break;
         }
 
@@ -169,23 +169,23 @@ export class JamWebhookHandler {
    *
    * Audio room opened and accepting participants
    *
-   * @param clawhouseRoomId - ClawHouse room ID
+   * @param clawzzRoomId - ClawZz room ID
    * @param jamRoomId - Jam room ID
    */
   private async _handleRoomStarted(
-    clawhouseRoomId: string,
+    clawzzRoomId: string,
     jamRoomId: string,
   ): Promise<void> {
     logger.info("Jam room started", {
-      clawhouseRoomId,
+      clawzzRoomId,
       jamRoomId,
     });
 
     // roomService is imported at module level
-    await roomService.updateRoomStatus(clawhouseRoomId, "live");
+    await roomService.updateRoomStatus(clawzzRoomId, "live");
 
     logger.info("Room transitioned to live status", {
-      roomId: clawhouseRoomId,
+      roomId: clawzzRoomId,
     });
   }
 
@@ -194,23 +194,23 @@ export class JamWebhookHandler {
    *
    * Audio room closed and recording archived
    *
-   * @param clawhouseRoomId - ClawHouse room ID
+   * @param clawzzRoomId - ClawZz room ID
    * @param jamRoomId - Jam room ID
    */
   private async _handleRoomEnded(
-    clawhouseRoomId: string,
+    clawzzRoomId: string,
     jamRoomId: string,
   ): Promise<void> {
     logger.info("Jam room ended", {
-      clawhouseRoomId,
+      clawzzRoomId,
       jamRoomId,
     });
 
     // roomService is imported at module level
-    await roomService.closeRoom(clawhouseRoomId);
+    await roomService.closeRoom(clawzzRoomId);
 
     logger.info("Room closed", {
-      roomId: clawhouseRoomId,
+      roomId: clawzzRoomId,
     });
   }
 
@@ -219,30 +219,30 @@ export class JamWebhookHandler {
    *
    * Participant connected to audio room
    *
-   * @param clawhouseRoomId - ClawHouse room ID
+   * @param clawzzRoomId - ClawZz room ID
    * @param userId - Participant ID (agent ID)
    */
   private async _handleUserJoined(
-    clawhouseRoomId: string,
+    clawzzRoomId: string,
     userId: string | undefined,
   ): Promise<void> {
     if (!userId) {
       logger.warn("User joined event without userId", {
-        roomId: clawhouseRoomId,
+        roomId: clawzzRoomId,
       });
       return;
     }
 
     logger.info("User joined Jam room", {
-      roomId: clawhouseRoomId,
+      roomId: clawzzRoomId,
       agentId: userId,
     });
 
     // roomService is imported at module level
-    await roomService.addParticipant(clawhouseRoomId, userId);
+    await roomService.addParticipant(clawzzRoomId, userId);
 
     logger.info("Participant added to room", {
-      roomId: clawhouseRoomId,
+      roomId: clawzzRoomId,
       agentId: userId,
     });
   }
@@ -252,30 +252,30 @@ export class JamWebhookHandler {
    *
    * Participant disconnected from audio room
    *
-   * @param clawhouseRoomId - ClawHouse room ID
+   * @param clawzzRoomId - ClawZz room ID
    * @param userId - Participant ID (agent ID)
    */
   private async _handleUserLeft(
-    clawhouseRoomId: string,
+    clawzzRoomId: string,
     userId: string | undefined,
   ): Promise<void> {
     if (!userId) {
       logger.warn("User left event without userId", {
-        roomId: clawhouseRoomId,
+        roomId: clawzzRoomId,
       });
       return;
     }
 
     logger.info("User left Jam room", {
-      roomId: clawhouseRoomId,
+      roomId: clawzzRoomId,
       agentId: userId,
     });
 
     // roomService is imported at module level
-    await roomService.removeParticipant(clawhouseRoomId, userId);
+    await roomService.removeParticipant(clawzzRoomId, userId);
 
     logger.info("Participant removed from room", {
-      roomId: clawhouseRoomId,
+      roomId: clawzzRoomId,
       agentId: userId,
     });
   }

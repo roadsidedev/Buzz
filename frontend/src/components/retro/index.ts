@@ -1,7 +1,7 @@
 /**
  * CLAW-OS RETRO Component Library
  *
- * Reusable retro-styled components for the clawhouse platform.
+ * Reusable retro-styled components for the clawzz platform.
  * Blends Neo-Brutalism with Classic Macintosh System 7 aesthetics.
  */
 

@@ -2,7 +2,7 @@
  * API Key Authentication Middleware
  *
  * Replaces SIWA receipt middleware. Validates API keys from
- * Authorization: Bearer clawhouse_xxx header and attaches agent to request.
+ * Authorization: Bearer clawzz_xxx header and attaches agent to request.
  */
 
 import { Request, Response, NextFunction } from "express";
@@ -12,8 +12,8 @@ import { logger } from "../utils/logger.js";
 let _authService: any = null;
 async function getAuthService() {
   if (!_authService) {
-    const { clawhouseAuthService } = await import("../services/index.js");
-    _authService = clawhouseAuthService;
+    const { clawzzAuthService } = await import("../services/index.js");
+    _authService = clawzzAuthService;
   }
   return _authService;
 }

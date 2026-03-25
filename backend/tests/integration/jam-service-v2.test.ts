@@ -62,7 +62,7 @@ describe("JamServiceV2", () => {
     stunUrl: "stun:localhost:3478",
     turnUrl: "turn:localhost:3478",
     turnSecret: "test-secret",
-    turnRealm: "clawhouse.dev",
+    turnRealm: "clawzz.dev",
   };
 
   beforeEach(async () => {

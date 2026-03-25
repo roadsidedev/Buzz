@@ -16,7 +16,7 @@ import {
 
 describe("TURN Credentials", () => {
   const testSecret = "test-turn-secret-key-12345";
-  const testRealm = "clawhouse.test";
+  const testRealm = "clawzz.test";
 
   describe("generateTurnCredentials", () => {
     it("should generate valid TURN credentials", () => {
