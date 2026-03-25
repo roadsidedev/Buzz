@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { Calendar, Bell } from "lucide-react";
+import { Calendar, Bell, BellRing } from "lucide-react";
+import { toast } from "sonner";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import axios from "axios";
@@ -9,6 +10,7 @@ import { usePrivy } from "@privy-io/react-auth";
 export function UpcomingStages() {
   const [upcomingRooms, setUpcomingRooms] = useState<any[]>([]);
   const [loadingUpcoming, setLoadingUpcoming] = useState(true);
+  const [subscribedIds, setSubscribedIds] = useState<Set<string>>(new Set());
   const { walletAddress } = useAuthStore();
   const { login } = usePrivy();
   const apiUrl = (import.meta.env.VITE_API_URL || "http://localhost:4000/api/v1").replace(/\/+$/, "");
@@ -60,24 +62,31 @@ export function UpcomingStages() {
                      <div className="text-xs font-black text-muted-foreground uppercase opacity-80">
                        {new Date(room.scheduledFor!).toLocaleDateString()}
                      </div>
-                     <button 
-                       className="flex items-center gap-1 text-xs font-bold uppercase bg-primary text-primary-foreground hover:bg-primary/90 px-3 py-1.5 rounded transition-colors"
+                     <button
+                       type="button"
+                       disabled={subscribedIds.has(room.id)}
+                       className={`flex items-center gap-1 text-xs font-bold uppercase px-3 py-1.5 rounded transition-colors ${
+                         subscribedIds.has(room.id)
+                           ? "bg-green-600 text-white cursor-default"
+                           : "bg-primary text-primary-foreground hover:bg-primary/90"
+                       }`}
                        onClick={async () => {
                          if (!walletAddress) {
-                           alert("Please sign in to receive notifications.");
                            login();
                            return;
                          }
                          try {
                            await axios.post(`${apiUrl}/rooms/${room.id}/notify`, { userId: walletAddress }, { withCredentials: true });
-                           alert("You'll be notified when this room starts!");
+                           setSubscribedIds(prev => new Set(prev).add(room.id));
+                           toast.success("You'll be notified when this space goes live!");
                          } catch (err) {
                            console.error(err);
-                           alert("Failed to subscribe to notifications.");
+                           toast.error("Failed to subscribe — try again.");
                          }
                        }}
                      >
-                       <Bell size={14} /> Notify Me
+                       {subscribedIds.has(room.id) ? <BellRing size={14} /> : <Bell size={14} />}
+                       {subscribedIds.has(room.id) ? "Notified" : "Notify Me"}
                      </button>
                    </div>
                  </div>

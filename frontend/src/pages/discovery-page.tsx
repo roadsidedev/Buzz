@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react"
-import { Users, Calendar, Bell, Radio, Clock, Video, Mic } from "lucide-react"
+import { Users, Calendar, Bell, BellRing, Radio, Clock, Video, Mic } from "lucide-react"
+import { toast } from "sonner"
 import { LiveFeedPage } from "./live-feed-page"
 import axios from "axios"
 import { Badge } from "@/components/ui/badge"
@@ -42,15 +43,15 @@ const SpeakerGrid = ({ speakers, size = "md" }: { speakers: string[]; size?: "sm
     <div className="flex flex-col items-end gap-1.5 shrink-0">
       <div className="grid grid-cols-2 gap-1.5">
         {visible.map((s, i) => (
-          <div key={i} className={`${avatarSize} rounded-full bg-white/10 overflow-hidden border border-white/10`}>
+          <div key={i} className={`${avatarSize} rounded-full bg-muted overflow-hidden border border-border`}>
             <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${s}`} alt="speaker" className="w-full h-full object-cover" />
           </div>
         ))}
         {/* Fill empty slots so the grid always looks balanced */}
-        {visible.length === 1 && <div className={`${avatarSize} rounded-full bg-white/5 border border-white/5`} />}
+        {visible.length === 1 && <div className={`${avatarSize} rounded-full bg-muted/50 border border-border`} />}
       </div>
       {overflow > 0 && (
-        <span className="text-[10px] font-bold text-white/40">+{overflow} more</span>
+        <span className="text-[10px] font-bold text-muted-foreground">+{overflow} more</span>
       )}
     </div>
   )
@@ -75,7 +76,7 @@ const RoomCard = ({
 
   return (
     <div
-      className="rounded-2xl p-4 cursor-pointer active:scale-[0.98] transition-transform select-none bg-[#1c1c1e]"
+      className="rounded-2xl p-4 cursor-pointer active:scale-[0.98] transition-transform select-none bg-card border border-border"
       onClick={() => onJoin(room.id)}
       role="button"
       tabIndex={0}
@@ -86,23 +87,23 @@ const RoomCard = ({
         <div className="flex-grow min-w-0 flex flex-col gap-2">
           {/* Category + live badge */}
           <div className="flex items-center gap-2">
-            <span className="text-[10px] font-black uppercase tracking-widest text-white/40">
+            <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
               {tag}
             </span>
-            <span className="flex items-center gap-1 text-[10px] font-black uppercase text-red-400 tracking-widest">
-              <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse" />
+            <span className="flex items-center gap-1 text-[10px] font-black uppercase text-red-500 tracking-widest">
+              <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
               Live
             </span>
-            {isVideo && <Video size={10} className="text-white/30" />}
+            {isVideo && <Video size={10} className="text-muted-foreground" />}
           </div>
 
           {/* Title */}
-          <h3 className="text-white font-bold text-[15px] leading-snug line-clamp-3">
+          <h3 className="text-card-foreground font-bold text-[15px] leading-snug line-clamp-3">
             {title}
           </h3>
 
           {/* Speaker names */}
-          <p className="text-white/40 text-[11px] truncate">
+          <p className="text-muted-foreground text-[11px] truncate">
             {speakers.slice(0, 3).join(", ")}{speakers.length > 3 ? ` +${speakers.length - 3}` : ""}
           </p>
         </div>
@@ -112,12 +113,12 @@ const RoomCard = ({
       </div>
 
       {/* Bottom row */}
-      <div className="flex items-center justify-between mt-3 pt-3 border-t border-white/5">
-        <div className="flex items-center gap-1.5 text-white/30 text-[11px]">
+      <div className="flex items-center justify-between mt-3 pt-3 border-t border-border">
+        <div className="flex items-center gap-1.5 text-muted-foreground text-[11px]">
           <Users size={12} />
           {listeners > 0 ? `${listeners.toLocaleString()} listening` : "Live now"}
         </div>
-        <span className="text-[11px] font-bold text-violet-400 uppercase tracking-widest">
+        <span className="text-[11px] font-bold text-violet-500 uppercase tracking-widest">
           Join →
         </span>
       </div>
@@ -143,7 +144,7 @@ const HeroCard = ({
 
   return (
     <div
-      className="rounded-2xl p-5 cursor-pointer active:scale-[0.99] transition-transform select-none mb-3 bg-[#1c1c1e]"
+      className="rounded-2xl p-5 cursor-pointer active:scale-[0.99] transition-transform select-none mb-3 bg-card border border-border"
       onClick={() => onJoin(room.id)}
       role="button"
       tabIndex={0}
@@ -156,18 +157,18 @@ const HeroCard = ({
             <Badge className="bg-accent-crimson/20 text-accent-crimson border-0 uppercase font-black text-[10px] tracking-widest">
               {tag}
             </Badge>
-            <span className="flex items-center gap-1.5 text-[10px] font-black uppercase text-red-400 tracking-widest">
-              <span className="w-2 h-2 rounded-full bg-red-400 animate-pulse" />
+            <span className="flex items-center gap-1.5 text-[10px] font-black uppercase text-red-500 tracking-widest">
+              <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
               Live
             </span>
-            {isVideo ? <Video size={11} className="text-white/30" /> : <Mic size={11} className="text-white/30" />}
+            {isVideo ? <Video size={11} className="text-muted-foreground" /> : <Mic size={11} className="text-muted-foreground" />}
           </div>
 
-          <h2 className="text-white font-black text-xl leading-tight line-clamp-3">
+          <h2 className="text-card-foreground font-black text-xl leading-tight line-clamp-3">
             {title}
           </h2>
 
-          <p className="text-white/40 text-[12px] truncate">
+          <p className="text-muted-foreground text-[12px] truncate">
             {speakers.slice(0, 2).join(", ")}{speakers.length > 2 ? ` +${speakers.length - 2}` : ""}
           </p>
         </div>
@@ -176,8 +177,8 @@ const HeroCard = ({
         <SpeakerGrid speakers={speakers} size="md" />
       </div>
 
-      <div className="flex items-center justify-between mt-4 pt-3 border-t border-white/5">
-        <div className="flex items-center gap-1.5 text-white/30 text-[12px]">
+      <div className="flex items-center justify-between mt-4 pt-3 border-t border-border">
+        <div className="flex items-center gap-1.5 text-muted-foreground text-[12px]">
           <Users size={13} />
           {listeners > 0 ? `${listeners.toLocaleString()} listening` : "Live now"}
         </div>
@@ -202,17 +203,14 @@ const UpcomingCard = ({
   walletAddress: string | null
   login: () => void
 }) => {
-  const navigate = useNavigate()
   const tag = capitalizeType(room.type)
   const scheduled = room.scheduledFor ? new Date(room.scheduledFor) : null
+  const [subscribed, setSubscribed] = useState(false)
 
   return (
-    <div
-      className="min-w-[280px] snap-center rounded-2xl p-4 cursor-pointer flex flex-col gap-3 bg-[#1c1c1e]"
-      onClick={() => navigate(`/room/${room.id}`)}
-    >
+    <div className="min-w-[280px] snap-center rounded-2xl p-4 flex flex-col gap-3 bg-card border border-border">
       <div className="flex justify-between items-center">
-        <span className="text-[10px] font-black uppercase tracking-widest text-white/40">{tag}</span>
+        <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">{tag}</span>
         {scheduled && (
           <div className="flex items-center gap-1 text-[10px] font-bold text-violet-400">
             <Clock size={10} />
@@ -220,30 +218,37 @@ const UpcomingCard = ({
           </div>
         )}
       </div>
-      <h3 className="text-white font-bold text-[14px] leading-tight line-clamp-2">
+      <h3 className="text-card-foreground font-bold text-[14px] leading-tight line-clamp-2">
         {room.title || room.objective || "Untitled Space"}
       </h3>
-      <div className="flex justify-between items-center pt-2 border-t border-white/5" onClick={(e) => e.stopPropagation()}>
-        <div className="text-[10px] font-bold text-white/30 uppercase">
+      <div className="flex justify-between items-center pt-2 border-t border-border">
+        <div className="text-[10px] font-bold text-muted-foreground uppercase">
           {scheduled
             ? scheduled.toLocaleDateString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })
             : "TBA"}
         </div>
         <button
           type="button"
-          className="flex items-center gap-1 text-[10px] font-bold uppercase bg-violet-600 text-white hover:bg-violet-500 px-3 py-1.5 rounded-full transition-colors"
+          disabled={subscribed}
+          className={`flex items-center gap-1 text-[10px] font-bold uppercase px-3 py-1.5 rounded-full transition-colors ${
+            subscribed
+              ? "bg-green-600 text-white cursor-default"
+              : "bg-violet-600 text-white hover:bg-violet-500"
+          }`}
           onClick={async (e) => {
             e.stopPropagation()
             if (!walletAddress) { login(); return }
             try {
               await axios.post(`${apiUrl}/rooms/${room.id}/notify`, { userId: walletAddress }, { withCredentials: true })
-              alert("You'll be notified when this space starts!")
+              setSubscribed(true)
+              toast.success("You'll be notified when this space goes live!")
             } catch {
-              alert("Failed to subscribe to notifications.")
+              toast.error("Failed to subscribe — try again.")
             }
           }}
         >
-          <Bell size={11} /> Notify Me
+          {subscribed ? <BellRing size={11} /> : <Bell size={11} />}
+          {subscribed ? "Notified" : "Notify Me"}
         </button>
       </div>
     </div>
@@ -256,19 +261,19 @@ const RecentCard = ({ room }: { room: any }) => {
   const navigate = useNavigate()
   return (
     <div
-      className="min-w-[220px] snap-center rounded-2xl p-4 cursor-pointer flex flex-col gap-2 bg-[#1c1c1e]"
+      className="min-w-[220px] snap-center rounded-2xl p-4 cursor-pointer flex flex-col gap-2 bg-card border border-border"
       onClick={() => navigate(`/room/${room.id}`)}
     >
       <div className="flex items-center justify-between">
-        <span className="text-[10px] font-black uppercase tracking-widest text-white/30">
+        <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
           {capitalizeType(room.type)}
         </span>
-        <span className="text-[9px] font-bold text-white/20 uppercase">Ended</span>
+        <span className="text-[9px] font-bold text-muted-foreground/60 uppercase">Ended</span>
       </div>
-      <h4 className="text-sm font-bold text-white/70 line-clamp-2 leading-snug">
+      <h4 className="text-sm font-bold text-card-foreground/70 line-clamp-2 leading-snug">
         {room.title || room.objective || "Untitled Space"}
       </h4>
-      <p className="text-[10px] text-white/30 truncate">{room.hostAgentName || "Unknown Agent"}</p>
+      <p className="text-[10px] text-muted-foreground truncate">{room.hostAgentName || "Unknown Agent"}</p>
     </div>
   )
 }

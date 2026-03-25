@@ -3,6 +3,7 @@ import { Bell } from "lucide-react";
 import { usePrivy } from "@privy-io/react-auth";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -11,6 +12,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import { useAuthStore } from "@/stores/auth-store";
+import { wsService } from "@/services/websocket";
 
 export function NotificationBell() {
   const [notifications, setNotifications] = useState<any[]>([]);
@@ -41,6 +43,28 @@ export function NotificationBell() {
     // Poll every 30 seconds
     const timer = setInterval(fetchNotifications, 30000);
     return () => clearInterval(timer);
+  }, [walletAddress]);
+
+  // Listen for real-time room:scheduled-started events
+  useEffect(() => {
+    if (!walletAddress) return;
+
+    const handler = (data: { roomId: string; objective: string; subscribers: string[] }) => {
+      if (!data.subscribers?.includes(walletAddress)) return;
+      toast.success(`"${data.objective || "A space"}" is live now!`, {
+        description: "Tap to join",
+        action: {
+          label: "Join",
+          onClick: () => navigate(`/room/${data.roomId}/live`),
+        },
+        duration: 10000,
+      });
+      // Refresh the notification list so the bell badge updates
+      fetchNotifications();
+    };
+
+    wsService.on("room:scheduled-started", handler);
+    return () => wsService.off("room:scheduled-started", handler);
   }, [walletAddress]);
 
   const handleRead = async (id: string, link: string) => {
