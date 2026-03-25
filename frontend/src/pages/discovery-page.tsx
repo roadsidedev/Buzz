@@ -355,7 +355,7 @@ export function RoomsView() {
             type="button"
             onClick={() => setFormat(f)}
             className={`flex items-center gap-1.5 px-5 py-2 rounded-md font-black uppercase text-[10px] tracking-widest transition-all ${
-              format === f ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+              format === f ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
             }`}
           >
             {f === "spaces" ? <Mic size={10} /> : <Video size={10} />}

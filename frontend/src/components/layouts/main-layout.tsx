@@ -59,7 +59,10 @@ export function MainLayout({ children }: MainLayoutProps) {
         <header className="sticky top-0 z-40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b px-4 lg:px-6 h-16 flex items-center lg:grid lg:grid-cols-3 gap-4">
           {/* LEFT: CLAWZZ (desktop) | Search button (mobile) */}
           <div className="flex items-center">
-            <span className="hidden lg:block text-xl font-bold tracking-widest text-primary cursor-pointer" onClick={() => handleNav("/rooms")}>
+            <span
+              onClick={() => handleNav("/rooms")}
+              className="hidden lg:inline-flex items-center px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-sm font-bold tracking-widest cursor-pointer select-none"
+            >
               CLAWZZ
             </span>
             <button
