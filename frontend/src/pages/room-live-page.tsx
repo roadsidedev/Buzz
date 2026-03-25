@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from "react"
 import { useParams, useNavigate } from "react-router-dom"
 import {
   MessageSquare, Share2, DollarSign,
-  Copy, ChevronDown, Mic, MicOff, Headphones, ArrowLeft,
+  Copy, ChevronDown, Mic, MicOff, Headphones, ArrowLeft, PhoneOff,
 } from "lucide-react"
 import axios from "axios"
 import { Button } from "@/components/ui/button"
@@ -46,11 +46,16 @@ const ROLE_LABEL: Record<string, string> = {
 function ScoreBar({ score }: { score?: number }) {
   if (score === undefined) return null
   return (
-    <div className="w-20 h-1 bg-muted rounded-full overflow-hidden mt-1">
-      <div
-        className="h-full bg-primary rounded-full transition-all duration-700"
-        style={{ width: `${Math.min(100, Math.max(0, score))}%` }}
-      />
+    <div className="flex items-center gap-1.5 mt-1">
+      <div className="w-16 h-1.5 bg-white/10 rounded-full overflow-hidden">
+        <div
+          className="h-full bg-violet-400 rounded-full transition-all duration-700"
+          style={{ width: `${Math.min(100, Math.max(0, score))}%` }}
+        />
+      </div>
+      <span className="text-[9px] font-bold text-violet-300 tabular-nums">
+        {Math.round(score)}
+      </span>
     </div>
   )
 }
@@ -102,10 +107,10 @@ function HostTile({
         {isSpeaking ? <Waveform size="md" /> : <MicOff size={12} className="text-muted-foreground/40" strokeWidth={1.5} />}
       </div>
 
-      <p className="font-bold text-base text-foreground text-center leading-tight">
+      <p className="font-bold text-base text-white/90 text-center leading-tight">
         {participant.name}
       </p>
-      <span className="text-[10px] font-black uppercase tracking-widest text-primary">
+      <span className="text-[10px] font-black uppercase tracking-widest text-violet-400">
         {ROLE_LABEL[participant.role] || "Host"}
       </span>
       <ScoreBar score={score} />
@@ -143,13 +148,13 @@ function SpeakerTile({
         {isSpeaking ? <Waveform size="sm" /> : <MicOff size={10} className="text-muted-foreground/40" strokeWidth={1.5} />}
       </div>
 
-      <p className="text-[11px] font-semibold text-foreground text-center leading-tight w-16 truncate">
+      <p className="text-[11px] font-semibold text-white/80 text-center leading-tight w-16 truncate">
         {participant.name}
       </p>
       <p
         className={cn(
           "text-[10px] font-medium",
-          participant.role === "co_host" ? "text-violet-400" : "text-muted-foreground",
+          participant.role === "co_host" ? "text-violet-400" : "text-white/40",
         )}
       >
         {ROLE_LABEL[participant.role] || "Speaker"}
@@ -447,14 +452,17 @@ export function RoomLivePage() {
   const totalListeners = jamRoom.listeners.length + (stream.viewerCount || 0)
 
   return (
-    <div className="animate-in fade-in duration-500 min-h-screen bg-background pb-28">
+    <div
+      className="animate-in fade-in duration-500 min-h-screen pb-28"
+      style={{ background: "linear-gradient(180deg, #0f0a1e 0%, #0d0d14 100%)" }}
+    >
 
       {/* ── Header ── */}
       <div className="flex items-center justify-between px-4 pt-4 pb-3">
         <button
           type="button"
           onClick={() => navigate(-1)}
-          className="p-1 text-muted-foreground hover:text-foreground transition-colors"
+          className="p-1 text-white/50 hover:text-white/80 transition-colors"
           aria-label="Back"
         >
           <ChevronDown size={24} />
@@ -462,12 +470,12 @@ export function RoomLivePage() {
 
         {/* LIVE pill + listener count */}
         <div className="flex items-center gap-2">
-          <span className="flex items-center gap-1.5 bg-red-500/10 text-red-500 text-[11px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full">
-            <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+          <span className="flex items-center gap-1.5 bg-red-500/15 text-red-400 text-[11px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full">
+            <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse" />
             Live
           </span>
           {totalListeners > 0 && (
-            <span className="text-sm font-bold text-muted-foreground">
+            <span className="text-sm font-bold text-white/50">
               {totalListeners.toLocaleString()}
             </span>
           )}
@@ -478,27 +486,20 @@ export function RoomLivePage() {
           <button
             type="button"
             onClick={() => setShareWizardOpen(true)}
-            className="p-2 text-muted-foreground hover:text-foreground transition-colors"
+            className="p-2 text-white/50 hover:text-white/80 transition-colors"
             aria-label="Share"
           >
             <Share2 size={18} />
-          </button>
-          <button
-            type="button"
-            onClick={handleLeave}
-            className="ml-1 px-3 py-1.5 text-red-500 font-bold text-sm hover:text-red-400 transition-colors rounded-full border border-red-500/30 hover:border-red-400/50"
-          >
-            Leave
           </button>
         </div>
       </div>
 
       {/* ── Room title + category ── */}
       <div className="px-5 pb-2">
-        <h1 className="text-xl font-bold text-foreground leading-snug mb-2 line-clamp-2">
+        <h1 className="text-xl font-bold text-white leading-snug mb-2 line-clamp-2">
           {streamTitle}
         </h1>
-        <Badge variant="secondary" className="capitalize text-xs font-semibold">
+        <Badge variant="secondary" className="capitalize text-xs font-semibold bg-white/10 text-white/70 border-0">
           {stream.category}
         </Badge>
       </div>
@@ -509,17 +510,17 @@ export function RoomLivePage() {
         <div
           className="absolute inset-0 pointer-events-none"
           style={{
-            background: "radial-gradient(ellipse at 50% 20%, hsl(262 83% 58% / 0.07) 0%, transparent 65%)",
+            background: "radial-gradient(ellipse at 50% 0%, rgba(108,92,231,0.22) 0%, transparent 65%)",
           }}
         />
 
         {jamRoom.isLoading ? (
           <div className="flex flex-col items-center gap-3 py-10">
-            <div className="w-8 h-8 border-4 border-primary/30 border-t-primary rounded-full animate-spin" />
-            <p className="text-xs text-muted-foreground animate-pulse tracking-widest uppercase">Connecting…</p>
+            <div className="w-8 h-8 border-4 border-violet-500/30 border-t-violet-400 rounded-full animate-spin" />
+            <p className="text-xs text-white/40 animate-pulse tracking-widest uppercase">Connecting…</p>
           </div>
         ) : stageParticipants.length === 0 ? (
-          <div className="flex flex-col items-center gap-3 py-10 text-muted-foreground/40">
+          <div className="flex flex-col items-center gap-3 py-10 text-white/20">
             <Headphones size={40} />
             <p className="text-xs uppercase tracking-widest">No speakers yet</p>
           </div>
@@ -554,7 +555,7 @@ export function RoomLivePage() {
       </div>
 
       {/* ── Listeners ── */}
-      <div className="px-5 pt-4 pb-3 border-t border-border/50">
+      <div className="px-5 pt-4 pb-3 border-t border-white/10">
         <div className="flex items-center gap-3">
           {jamRoom.listeners.length > 0 && (
             <div className="flex -space-x-2">
@@ -562,13 +563,13 @@ export function RoomLivePage() {
                 <img
                   key={listenerId}
                   src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${listenerId}`}
-                  className="w-8 h-8 rounded-full border-2 border-background bg-muted"
+                  className="w-8 h-8 rounded-full border-2 border-white/10 bg-white/5"
                   alt="Listener"
                 />
               ))}
             </div>
           )}
-          <span className="text-sm font-semibold text-muted-foreground">
+          <span className="text-sm font-semibold text-white/50">
             {totalListeners > 0
               ? `${totalListeners > 8 ? `+${totalListeners - 8} ` : ""}listening`
               : "No listeners yet"}
@@ -580,18 +581,18 @@ export function RoomLivePage() {
       <div className="px-5 py-2 min-h-[28px] flex items-center gap-3">
         {isRecording && (
           <span className="flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-            <span className="text-[11px] font-black text-red-500 uppercase tracking-widest">REC</span>
+            <span className="w-2 h-2 rounded-full bg-red-400 animate-pulse" />
+            <span className="text-[11px] font-black text-red-400 uppercase tracking-widest">REC</span>
           </span>
         )}
         {recordingUploading && (
-          <span className="text-[11px] text-muted-foreground uppercase tracking-widest">Saving…</span>
+          <span className="text-[11px] text-white/40 uppercase tracking-widest">Saving…</span>
         )}
         {!isRecording && !recordingUploading && stream?.recordingEnabled && jamRoom.inRoom && (
           <button
             type="button"
             onClick={startRecording}
-            className="text-[11px] text-muted-foreground/60 hover:text-muted-foreground uppercase tracking-widest transition-colors flex items-center gap-1.5"
+            className="text-[11px] text-white/30 hover:text-white/50 uppercase tracking-widest transition-colors flex items-center gap-1.5"
           >
             <span className="w-1.5 h-1.5 rounded-full border border-current" />
             Start Rec
@@ -600,14 +601,28 @@ export function RoomLivePage() {
       </div>
 
       {/* ── Fixed bottom action bar ── */}
-      <div className="fixed bottom-0 inset-x-0 bg-background/95 backdrop-blur-sm border-t z-30">
+      <div
+        className="fixed bottom-0 inset-x-0 backdrop-blur-sm border-t border-white/10 z-30"
+        style={{ background: "rgba(13,13,20,0.95)" }}
+      >
         <div className="max-w-2xl mx-auto px-6 py-3 flex items-center justify-between">
+
+          {/* Leave */}
+          <button
+            type="button"
+            onClick={handleLeave}
+            className="flex flex-col items-center gap-0.5 text-red-400 hover:text-red-300 transition-colors"
+            aria-label="Leave"
+          >
+            <PhoneOff size={20} />
+            <span className="text-[9px] font-bold uppercase tracking-wide">Leave</span>
+          </button>
 
           {/* Tip */}
           <button
             type="button"
             onClick={() => requireAuth(() => setShowTipModal(true))}
-            className="flex flex-col items-center gap-0.5 text-muted-foreground hover:text-green-500 transition-colors"
+            className="flex flex-col items-center gap-0.5 text-white/50 hover:text-green-400 transition-colors"
             aria-label="Tip"
           >
             <DollarSign size={22} />
@@ -621,10 +636,10 @@ export function RoomLivePage() {
             className={cn(
               "w-16 h-16 rounded-full border-2 flex items-center justify-center transition-all duration-200 shadow-lg",
               !jamRoom.inRoom
-                ? "border-border text-muted-foreground/40 cursor-default"
+                ? "border-white/10 text-white/20 cursor-default"
                 : jamRoom.isMuted
-                  ? "border-border bg-muted/70 text-muted-foreground"
-                  : "border-primary bg-primary text-primary-foreground shadow-primary/40",
+                  ? "border-white/20 bg-white/5 text-white/40"
+                  : "border-violet-500 bg-violet-600 text-white shadow-violet-500/40",
             )}
             aria-label={jamRoom.isMuted ? "Unmute" : "Mute"}
           >
@@ -635,7 +650,7 @@ export function RoomLivePage() {
           <button
             type="button"
             onClick={() => setShowChat(true)}
-            className="relative flex flex-col items-center gap-0.5 text-muted-foreground hover:text-foreground transition-colors"
+            className="relative flex flex-col items-center gap-0.5 text-white/50 hover:text-white/80 transition-colors"
             aria-label="Chat"
           >
             <MessageSquare size={22} />
@@ -651,7 +666,7 @@ export function RoomLivePage() {
           <button
             type="button"
             onClick={() => setShareWizardOpen(true)}
-            className="flex flex-col items-center gap-0.5 text-muted-foreground hover:text-foreground transition-colors"
+            className="flex flex-col items-center gap-0.5 text-white/50 hover:text-white/80 transition-colors"
             aria-label="Share"
           >
             <Share2 size={22} />
@@ -666,35 +681,36 @@ export function RoomLivePage() {
         <>
           <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-[2px]" onClick={() => setShowChat(false)} aria-hidden="true" />
           <div
-            className="fixed inset-x-0 bottom-0 z-50 flex flex-col h-[55vh] animate-in slide-in-from-bottom duration-300 rounded-t-2xl overflow-hidden border-t bg-background/98 backdrop-blur-sm shadow-2xl"
+            className="fixed inset-x-0 bottom-0 z-50 flex flex-col h-[55vh] animate-in slide-in-from-bottom duration-300 rounded-t-2xl overflow-hidden border-t border-white/10 shadow-2xl"
+            style={{ background: "rgba(15,10,30,0.98)", backdropFilter: "blur(12px)" }}
             role="dialog"
             aria-label="Live Chat"
           >
-            <div className="flex justify-center pt-3 pb-1 bg-muted shrink-0">
-              <div className="w-10 h-1.5 rounded-full bg-border" />
+            <div className="flex justify-center pt-3 pb-1 bg-white/5 shrink-0">
+              <div className="w-10 h-1.5 rounded-full bg-white/20" />
             </div>
-            <div className="px-4 py-3 border-b bg-muted/30 shrink-0 flex items-center justify-between">
-              <span className="font-semibold tracking-tight text-sm flex items-center gap-2 text-foreground">
-                <MessageSquare size={16} className="text-muted-foreground" />
+            <div className="px-4 py-3 border-b border-white/10 bg-white/5 shrink-0 flex items-center justify-between">
+              <span className="font-semibold tracking-tight text-sm flex items-center gap-2 text-white/80">
+                <MessageSquare size={16} className="text-white/40" />
                 Live Chat
               </span>
-              <button type="button" title="Close chat" className="text-muted-foreground hover:text-foreground transition-colors" onClick={() => setShowChat(false)}>
+              <button type="button" title="Close chat" className="text-white/40 hover:text-white/70 transition-colors" onClick={() => setShowChat(false)}>
                 <ChevronDown size={18} />
               </button>
             </div>
             <div className="flex-grow p-4 overflow-y-auto space-y-3 text-sm font-medium">
               {chat.length === 0 ? (
-                <p className="text-center text-muted-foreground font-medium pt-8">Be the first to say something!</p>
+                <p className="text-center text-white/40 font-medium pt-8">Be the first to say something!</p>
               ) : chat.map((c, i) => (
-                <div key={i} className="animate-in slide-in-from-bottom-2 duration-300 p-2.5 rounded-lg hover:bg-muted/50 transition-colors">
-                  <span className={cn("font-semibold mr-2", c.user === "You" ? "text-primary" : "text-foreground")}>
+                <div key={i} className="animate-in slide-in-from-bottom-2 duration-300 p-2.5 rounded-lg hover:bg-white/5 transition-colors">
+                  <span className={cn("font-semibold mr-2", c.user === "You" ? "text-violet-400" : "text-white/80")}>
                     {c.user}:
                   </span>
-                  <span className="text-muted-foreground leading-snug">{c.msg}</span>
+                  <span className="text-white/50 leading-snug">{c.msg}</span>
                 </div>
               ))}
             </div>
-            <div className="p-3 border-t bg-background shrink-0">
+            <div className="p-3 border-t border-white/10 bg-black/20 shrink-0">
               <form onSubmit={sendMsg} className="flex gap-2">
                 <Input
                   type="text"
