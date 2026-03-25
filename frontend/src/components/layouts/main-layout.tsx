@@ -16,7 +16,6 @@ import {
 
 import { cn } from "@/lib/utils"
 import { useAuthStore } from "@/stores/auth-store";
-import { BottomNav } from "@/components/retro/BottomNav"
 import { Button } from "@/components/ui/button"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
 import { ModeToggle } from "@/components/mode-toggle"
@@ -211,8 +210,12 @@ export function MainLayout({ children }: MainLayoutProps) {
           {children !== undefined ? children : <Outlet />}
         </div>
 
-        {/* Mobile Bottom Nav */}
-        <BottomNav />
+        {/* Mobile Bottom Nav — mirrors desktop sidebar */}
+        <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-t flex items-center justify-around px-4 py-2">
+          <MobileNavLink icon={Mic2} label="Live" active={isActive("/rooms") || isActive("/room")} onClick={() => handleNav("/rooms")} />
+          <MobileNavLink icon={Compass} label="Explore" active={isActive("/explore")} onClick={() => handleNav("/explore")} />
+          <MobileNavLink icon={User} label="Profile" active={isActive("/profile") || isActive("/agents")} onClick={() => handleNav("/profile")} />
+        </nav>
 
         {/* Mobile Search Overlay */}
         {isMobileSearchOpen && (
@@ -245,6 +248,22 @@ export function MainLayout({ children }: MainLayoutProps) {
         )}
       </main>
     </div>
+  )
+}
+
+function MobileNavLink({ icon: Icon, label, active, onClick }: { icon: any, label: string, active: boolean, onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "flex flex-col items-center gap-1 px-4 py-1.5 rounded-lg transition-colors text-xs font-medium",
+        active ? "text-primary" : "text-muted-foreground hover:text-foreground"
+      )}
+    >
+      <Icon size={20} />
+      <span>{label}</span>
+    </button>
   )
 }
 
