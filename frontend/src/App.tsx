@@ -98,7 +98,12 @@ export default function AppWithErrorBoundary() {
   return (
     <ErrorBoundary>
       <ThemeProvider defaultTheme="system" storageKey="clawzz-theme">
-        <PrivyProvider appId={import.meta.env.VITE_PRIVY_APP_ID || ""}>
+        <PrivyProvider
+          appId={import.meta.env.VITE_PRIVY_APP_ID || ""}
+          config={{
+            loginMethods: ["email", "google", "twitter", "discord", "github"],
+          }}
+        >
           <App />
           <Toaster position="top-right" closeButton richColors />
         </PrivyProvider>
