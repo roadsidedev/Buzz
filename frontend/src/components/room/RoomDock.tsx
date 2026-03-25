@@ -221,6 +221,11 @@ export function RoomDock() {
       .catch(() => {})
   }, [activeRoomId, stream, apiUrl])
 
+  // Safely coerce jam-core arrays — they may arrive as non-arrays before WebRTC init
+  const safeSpeakers: string[] = Array.isArray(jamRoom.speakers) ? jamRoom.speakers : []
+  const safeListeners: string[] = Array.isArray(jamRoom.listeners) ? jamRoom.listeners : []
+  const safeSpeaking: string[] = Array.isArray(jamRoom.speaking) ? jamRoom.speaking : []
+
   const stageParticipants = useMemo<ParticipantInfo[]>(() => {
     if (participants.length > 0) {
       const order: Record<string, number> = { host: 0, co_host: 1, moderator: 2, speaker: 3 }
@@ -228,17 +233,17 @@ export function RoomDock() {
         .filter((p) => p.role !== "spectator")
         .sort((a, b) => (order[a.role] ?? 99) - (order[b.role] ?? 99))
     }
-    return jamRoom.speakers.map((id: string) => ({ id, name: id.slice(0, 8), avatar: null, role: "speaker" }))
-  }, [participants, jamRoom.speakers])
+    return safeSpeakers.map((id: string) => ({ id, name: id.slice(0, 8), avatar: null, role: "speaker" }))
+  }, [participants, safeSpeakers])
 
   const listenerParticipants = useMemo<ParticipantInfo[]>(() => {
     const speakerIds = new Set(stageParticipants.map((p) => p.id))
     const apiListeners = participants.filter((p) => p.role === "spectator")
     if (apiListeners.length > 0) return apiListeners
-    return jamRoom.listeners
+    return safeListeners
       .filter((id: string) => !speakerIds.has(id))
       .map((id: string) => ({ id, name: id.slice(0, 6), avatar: null, role: "spectator" }))
-  }, [participants, stageParticipants, jamRoom.listeners])
+  }, [participants, stageParticipants, safeListeners])
 
   // Recording
   const uploadRecording = useCallback(async (blob: Blob) => {
@@ -305,7 +310,7 @@ export function RoomDock() {
     setMessage("")
   }
 
-  const totalListeners = jamRoom.listeners.length + (stream?.viewerCount || 0)
+  const totalListeners = safeListeners.length + (stream?.viewerCount || 0)
 
   if (!activeRoomId) return null
 
@@ -338,6 +343,7 @@ export function RoomDock() {
         >
           {jamRoom.isMuted || !jamRoom.inRoom ? <MicOff size={16} /> : <Mic size={16} />}
         </button>
+
         <button
           type="button"
           onClick={(e) => { e.stopPropagation(); handleLeave() }}
@@ -437,8 +443,8 @@ export function RoomDock() {
                     <SpeakerCell
                       participant={p}
                       isSpeaking={
-                        jamRoom.speaking.includes(p.id) ||
-                        (jamRoom.speaking.length > 0 && idx < jamRoom.speaking.length)
+                        safeSpeaking.includes(p.id) ||
+                        (safeSpeaking.length > 0 && idx < safeSpeaking.length)
                       }
                       score={agentScores[p.id]}
                     />

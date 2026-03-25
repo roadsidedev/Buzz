@@ -262,6 +262,11 @@ export function RoomLivePage() {
   }, [chat.length])
 
   // ── Stage participants ──────────────────────────────────────────────────────
+  // Safely coerce jam-core arrays — they may arrive as non-arrays before WebRTC init
+  const safeSpeakers: string[] = Array.isArray(jamRoom.speakers) ? jamRoom.speakers : []
+  const safeListeners: string[] = Array.isArray(jamRoom.listeners) ? jamRoom.listeners : []
+  const safeSpeaking: string[] = Array.isArray(jamRoom.speaking) ? jamRoom.speaking : []
+
   const stageParticipants = React.useMemo<ParticipantInfo[]>(() => {
     if (participants.length > 0) {
       const order: Record<string, number> = { host: 0, co_host: 1, moderator: 2, speaker: 3 }
@@ -269,14 +274,14 @@ export function RoomLivePage() {
         .filter((p) => p.role !== "spectator")
         .sort((a, b) => (order[a.role] ?? 99) - (order[b.role] ?? 99))
     }
-    return jamRoom.speakers.map((id: string) => ({ id, name: id.slice(0, 8), avatar: null, role: "speaker" }))
-  }, [participants, jamRoom.speakers])
+    return safeSpeakers.map((id: string) => ({ id, name: id.slice(0, 8), avatar: null, role: "speaker" }))
+  }, [participants, safeSpeakers])
 
   const host = stageParticipants.find((p) => p.role === "host") ?? stageParticipants[0] ?? null
   const supporters = stageParticipants.filter((p) => p !== host)
 
   const isHostSpeaking = host
-    ? (jamRoom.speaking.includes(host.id) || (jamRoom.speaking.length > 0 && stageParticipants.indexOf(host) < jamRoom.speaking.length))
+    ? (safeSpeaking.includes(host.id) || (safeSpeaking.length > 0 && stageParticipants.indexOf(host) < safeSpeaking.length))
     : false
 
   const requireAuth = (fn: () => void) => {
@@ -459,7 +464,7 @@ export function RoomLivePage() {
   }
 
   // ── LIVE ROOM ───────────────────────────────────────────────────────────────
-  const totalListeners = jamRoom.listeners.length + (stream.viewerCount || 0)
+  const totalListeners = safeListeners.length + (stream.viewerCount || 0)
 
   // ── DESKTOP: Three-column Clubhouse layout ──────────────────────────────────
   if (isDesktop) {
