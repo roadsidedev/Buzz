@@ -43,53 +43,60 @@ export class DiscoveryService {
   async getLiveNow(
     page: number = 1,
     limit: number = 20,
+    type?: string,
   ): Promise<PaginatedResponse<DiscoveryRoom>> {
     try {
-      logger.info("Fetching live rooms", { page, limit });
+      logger.info("Fetching live rooms", { page, limit, type });
 
       const offset = (page - 1) * limit;
+      // Build separate param lists: main query uses [limit, offset, ?type], count uses [?type]
+      const mainParams: (string | number)[] = [limit, offset];
+      const mainTypeClause = type ? `AND r.type = $${mainParams.push(type)}` : "";
+      const countParams = type ? [type] : [];
+      const countTypeClause = type ? `AND r.type = $1` : "";
 
-      // Get live rooms with viewer count
-      const { rows: rooms } = await this.db.query(
-        `
-        SELECT
-          r.id,
-          r.objective,
-          r.description,
-          r.type,
-          r.status,
-          r.thumbnail_url,
-          r.created_at,
-          r.started_at,
-          c.id as category_id,
-          c.name as category_name,
-          c.color as category_color,
-          c.slug as category_slug,
-          a.id as host_agent_id,
-          MAX(a.name) as host_agent_name,
-          MAX(a.username) as host_agent_username,
-          MAX(a.avatar) as host_agent_avatar,
-          COALESCE(MAX(rv.viewer_count), 0) as viewer_count,
-          COUNT(DISTINCT rp.agent_id) as participant_count,
-          COALESCE(MAX(re.trending_score), 0) as trending_score
-        FROM room r
-        LEFT JOIN category c ON r.category_id = c.id
-        LEFT JOIN agent a ON r.host_agent_id = a.id
-        LEFT JOIN room_viewers rv ON r.id = rv.room_id
-        LEFT JOIN room_engagement re ON r.id = re.room_id
-        LEFT JOIN room_participant rp ON r.id = rp.room_id AND rp.left_at IS NULL
-        WHERE r.status = 'live' AND r.visibility = 'public'
-        GROUP BY r.id, c.id, a.id
-        ORDER BY viewer_count DESC NULLS LAST, r.started_at DESC
-        LIMIT $1 OFFSET $2
-        `,
-        [limit, offset],
-      );
+      const [{ rows: rooms }, countResult] = await Promise.all([
+        this.db.query(
+          `
+          SELECT
+            r.id,
+            r.objective,
+            r.description,
+            r.type,
+            r.status,
+            r.thumbnail_url,
+            r.created_at,
+            r.started_at,
+            c.id as category_id,
+            c.name as category_name,
+            c.color as category_color,
+            c.slug as category_slug,
+            a.id as host_agent_id,
+            a.name as host_agent_name,
+            a.username as host_agent_username,
+            a.avatar as host_agent_avatar,
+            COALESCE(MAX(rv.viewer_count), 0) as viewer_count,
+            COUNT(DISTINCT rp.agent_id) as participant_count,
+            COALESCE(MAX(re.trending_score), 0) as trending_score
+          FROM room r
+          LEFT JOIN category c ON r.category_id = c.id
+          LEFT JOIN agent a ON r.host_agent_id = a.id
+          LEFT JOIN room_viewers rv ON r.id = rv.room_id
+          LEFT JOIN room_engagement re ON r.id = re.room_id
+          LEFT JOIN room_participant rp ON r.id = rp.room_id AND rp.left_at IS NULL
+          WHERE r.status = 'live' AND r.visibility = 'public' ${mainTypeClause}
+          GROUP BY r.id, c.id, a.id
+          ORDER BY viewer_count DESC NULLS LAST, r.started_at DESC
+          LIMIT $1 OFFSET $2
+          `,
+          mainParams,
+        ),
+        this.db.query(
+          `SELECT COUNT(*) as total_count FROM room WHERE status = 'live' AND visibility = 'public' ${countTypeClause}`,
+          countParams,
+        ),
+      ]);
 
-      // Get total count
-      const countResult = await this.db.query(
-        `SELECT COUNT(*) as total_count FROM room WHERE status = 'live' AND visibility = 'public'`,
-      );
       const totalCount = parseInt(countResult.rows[0].total_count, 10);
 
       logger.info("Live rooms fetched", {
@@ -399,7 +406,7 @@ export class DiscoveryService {
   }
 
   /**
-   * Universal Search - across rooms, agents, and podcasts
+   * Universal Search - across rooms and agents
    */
   async globalSearch(
     query: string,
@@ -412,11 +419,11 @@ export class DiscoveryService {
       // 1. Search Rooms
       const roomsPromise = this.db.query(
         `
-        SELECT 
+        SELECT
           r.id, r.objective, r.status, r.thumbnail_url, r.created_at, r.started_at,
           c.id as category_id, c.name as category_name, c.color as category_color, c.slug as category_slug,
-          a.id as host_agent_id, 
-          a.name as host_agent_name, 
+          a.id as host_agent_id,
+          a.name as host_agent_name,
           a.username as host_agent_username,
           a.avatar as host_agent_avatar,
           COALESCE(MAX(rv.viewer_count), 0) as viewer_count,
@@ -429,8 +436,8 @@ export class DiscoveryService {
         LEFT JOIN room_viewers rv ON r.id = rv.room_id
         LEFT JOIN room_engagement re ON r.id = re.room_id
         LEFT JOIN room_participant rp ON r.id = rp.room_id AND rp.left_at IS NULL
-        WHERE 
-          r.objective ILIKE $1 OR 
+        WHERE
+          r.objective ILIKE $1 OR
           r.description ILIKE $1 OR
           a.username ILIKE $1 OR
           a.name ILIKE $1
@@ -444,43 +451,28 @@ export class DiscoveryService {
       // 2. Search Agents
       const agentsPromise = this.db.query(
         `
-        SELECT 
-          id, name, username, avatar, bio, verification_status, reputation_score,
-          (SELECT COUNT(*) FROM agent_follow WHERE following_id = agent.id) as follower_count
-        FROM agent
-        WHERE 
-          username ILIKE $1 OR 
-          name ILIKE $1 OR
-          bio ILIKE $1
-        ORDER BY reputation_score DESC
+        SELECT
+          a.id, a.name, a.username, a.avatar, a.bio, a.verification_status, a.reputation_score,
+          COALESCE(fc.follower_count, 0) as follower_count
+        FROM agent a
+        LEFT JOIN (
+          SELECT following_id, COUNT(*) AS follower_count
+          FROM agent_follow
+          GROUP BY following_id
+        ) fc ON fc.following_id = a.id
+        WHERE
+          a.username ILIKE $1 OR
+          a.name ILIKE $1 OR
+          a.bio ILIKE $1
+        ORDER BY a.reputation_score DESC
         LIMIT $2
       `,
         [`%${sanitizedQuery}%`, limit],
       );
 
-      // 3. Search Podcasts
-      const podcastsPromise = this.db.query(
-        `
-        SELECT 
-          p.id, p.title, p.description, p.cover_image_url, p.category, p.agent_id,
-          a.name as agent_name, a.avatar as agent_avatar,
-          (SELECT COUNT(*) FROM podcast_episode WHERE podcast_id = p.id) as episode_count
-        FROM podcast p
-        JOIN agent a ON p.agent_id = a.id
-        WHERE 
-          p.title ILIKE $1 OR 
-          p.description ILIKE $1 OR
-          p.category ILIKE $1
-        ORDER BY p.created_at DESC
-        LIMIT $2
-      `,
-        [`%${sanitizedQuery}%`, limit],
-      );
-
-      const [roomsResult, agentsResult, podcastsResult] = await Promise.all([
+      const [roomsResult, agentsResult] = await Promise.all([
         roomsPromise,
         agentsPromise,
-        podcastsPromise,
       ]);
 
       return {
@@ -495,22 +487,11 @@ export class DiscoveryService {
           followerCount: parseInt(row.follower_count),
           reputationScore: parseFloat(row.reputation_score),
         })),
-        podcasts: podcastsResult.rows.map((row) => ({
-          id: row.id,
-          title: row.title,
-          description: row.description,
-          coverImageUrl: row.cover_image_url,
-          category: row.category,
-          agentId: row.agent_id,
-          agentName: row.agent_name,
-          agentAvatar: row.agent_avatar,
-          episodeCount: parseInt(row.episode_count),
-        })),
+        podcasts: [],
         query: sanitizedQuery,
         totalResults:
           (roomsResult.rowCount || 0) +
-          (agentsResult.rowCount || 0) +
-          (podcastsResult.rowCount || 0),
+          (agentsResult.rowCount || 0),
       };
     } catch (err) {
       if (err instanceof SQLInjectionError) {

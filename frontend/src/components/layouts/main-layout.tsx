@@ -1,29 +1,22 @@
-import React, { useState, useRef, useEffect } from "react"
+import React, { useState } from "react"
 import { useLocation, useNavigate, Outlet } from "react-router-dom"
 import {
-  Home,
   Mic2,
-  Podcast,
   Tv,
   User,
   Search,
-  SkipBack,
-  SkipForward,
-  Pause,
-  Play as PlayIcon,
   X,
-  Radio,
   Bot,
   UserRound,
   BookOpen,
   ArrowRight,
   Terminal,
   Sparkles,
+  Compass,
 } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import { useAuthStore } from "@/stores/auth-store";
-import { usePlayerStore } from "@/stores/player-store";
 import { Button } from "@/components/ui/button"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
 import { ModeToggle } from "@/components/mode-toggle"
@@ -37,13 +30,9 @@ interface MainLayoutProps {
 export function MainLayout({ children }: MainLayoutProps) {
   const navigate = useNavigate()
   const location = useLocation()
-  const audioRef = useRef<HTMLAudioElement>(null)
 
-  const { playingPodcast, isPlaying, replayTrigger, pendingSeekTime, playbackRate, setPlayingPodcast, setIsPlaying, togglePlay, seekTo, setCurrentTime: setCurrentTimeInStore, clearPendingSeek } = usePlayerStore()
   const [searchQuery, setSearchQuery] = useState("")
   const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false)
-  const [currentTime, setCurrentTime] = useState(0)
-  const [duration, setDuration] = useState(0)
 
   const { authenticated } = useAuthStore()
 
@@ -53,112 +42,36 @@ export function MainLayout({ children }: MainLayoutProps) {
 
   const handleSearch = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && searchQuery.trim()) {
-      navigate(`/search?q=${encodeURIComponent(searchQuery.trim())}`)
+      navigate(`/explore?q=${encodeURIComponent(searchQuery.trim())}`)
       setIsMobileSearchOpen(false)
     }
   }
-
-  // Handle Replay Trigger
-  useEffect(() => {
-    if (audioRef.current && replayTrigger > 0) {
-      audioRef.current.currentTime = 0;
-      audioRef.current.play().catch(err => console.error("Replay playback failed:", err));
-    }
-  }, [replayTrigger]);
-
-  // Handle Playback State Sync
-  useEffect(() => {
-    if (!audioRef.current) return;
-    
-    if (isPlaying) {
-      audioRef.current.play().catch(err => {
-        console.error("Playback failed:", err);
-        setIsPlaying(false);
-      });
-    } else {
-      audioRef.current.pause();
-    }
-  }, [isPlaying, playingPodcast?.id]);
-
-  // Audio Event Listeners
-  useEffect(() => {
-    const audio = audioRef.current;
-    if (!audio) return;
-
-    const handleTimeUpdate = () => {
-      setCurrentTime(audio.currentTime);
-      setCurrentTimeInStore(audio.currentTime);
-    };
-    const handleLoadedMetadata = () => setDuration(audio.duration);
-    const handleEnded = () => setIsPlaying(false);
-
-    audio.addEventListener('timeupdate', handleTimeUpdate);
-    audio.addEventListener('loadedmetadata', handleLoadedMetadata);
-    audio.addEventListener('ended', handleEnded);
-
-    return () => {
-      audio.removeEventListener('timeupdate', handleTimeUpdate);
-      audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
-      audio.removeEventListener('ended', handleEnded);
-    };
-  }, []);
-
-  // Apply seeks triggered by episode page or other consumers
-  useEffect(() => {
-    if (pendingSeekTime !== null && audioRef.current) {
-      audioRef.current.currentTime = pendingSeekTime;
-      clearPendingSeek();
-    }
-  }, [pendingSeekTime]);
-
-  // Apply playback rate changes from episode page
-  useEffect(() => {
-    if (audioRef.current) {
-      audioRef.current.playbackRate = playbackRate;
-    }
-  }, [playbackRate]);
-
-  const formatTime = (seconds: number): string => {
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
 
   const isActive = (path: string) => location.pathname === path || (path !== "/" && location.pathname.startsWith(path))
 
   return (
     <div className="min-h-screen bg-background text-foreground flex overflow-hidden">
-      {/* Hidden Audio Element */}
-      {playingPodcast?.audioUrl && (
-        <audio ref={audioRef} src={playingPodcast.audioUrl} />
-      )}
 
       {/* Desktop Sidebar */}
       <aside className="hidden lg:flex flex-col w-72 border-r bg-muted/30 p-6 shrink-0 z-10">
         <div className="flex items-center gap-3 mb-10 pb-4 border-b">
-          <span className="text-2xl font-bold tracking-tight text-primary cursor-pointer" onClick={() => handleNav("/")}>
+          <span className="text-2xl font-bold tracking-tight text-primary cursor-pointer" onClick={() => handleNav("/rooms")}>
             clawzz
           </span>
         </div>
 
         <nav className="space-y-2 flex-grow">
           <SidebarLink
-            icon={Home}
-            label="Home Feed"
-            active={isActive("/") || isActive("/home") || isActive("/feed")}
-            onClick={() => handleNav("/feed")}
-          />
-          <SidebarLink
             icon={Mic2}
-            label="Audio Rooms"
-            active={isActive("/rooms")}
+            label="Live"
+            active={isActive("/rooms") || isActive("/room")}
             onClick={() => handleNav("/rooms")}
           />
           <SidebarLink
-            icon={Podcast}
-            label="Podcasts"
-            active={isActive("/podcasts")}
-            onClick={() => handleNav("/podcasts")}
+            icon={Compass}
+            label="Explore"
+            active={isActive("/explore")}
+            onClick={() => handleNav("/explore")}
           />
           <SidebarLink
             icon={Tv}
@@ -170,13 +83,11 @@ export function MainLayout({ children }: MainLayoutProps) {
             <SidebarLink
               icon={User}
               label="Profile"
-              active={isActive("/profile")}
+              active={isActive("/profile") || isActive("/agents")}
               onClick={() => handleNav("/profile")}
             />
           </div>
         </nav>
-
-
       </aside>
 
       {/* Main Content Area */}
@@ -197,7 +108,7 @@ export function MainLayout({ children }: MainLayoutProps) {
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
               type="search"
-              placeholder="Search agents, rooms, podcasts..."
+              placeholder="Search agents, rooms..."
               className="w-full pl-9 bg-muted/50 border-transparent focus-visible:bg-background"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -265,7 +176,7 @@ export function MainLayout({ children }: MainLayoutProps) {
                         <ArrowRight size={14} className="text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
                       </div>
                       <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
-                        Register, join rooms, produce podcasts, and earn micropayments
+                        Register, join live rooms, perform, and earn micropayments
                       </p>
                       <div className="flex flex-wrap gap-1 mt-2">
                         {["skill.md", "REST API", "WebSocket", "x402 pay"].map((tag) => (
@@ -306,67 +217,6 @@ export function MainLayout({ children }: MainLayoutProps) {
           {children !== undefined ? children : <Outlet />}
         </div>
 
-        {/* Mini Player */}
-        {playingPodcast && (
-          <div className="fixed bottom-20 lg:bottom-6 left-4 right-4 lg:left-[calc(18rem+2rem)] bg-card border p-4 rounded-xl shadow-lg flex flex-col z-50 animate-in slide-in-from-bottom duration-300 gap-3">
-            <div className="flex items-center w-full">
-              <img src={playingPodcast.cover} className="w-12 h-12 rounded-md object-cover shrink-0" alt={`${playingPodcast.title} cover`} />
-              <div className="ml-4 flex-grow truncate" onClick={() => handleNav(`/podcasts/${playingPodcast.id}`)} style={{ cursor: 'pointer' }}>
-                <h4 className="text-sm font-semibold truncate">{playingPodcast.title}</h4>
-                <p className="text-xs text-muted-foreground truncate">{playingPodcast.author}</p>
-              </div>
-              <div className="flex items-center gap-4 px-4 shrink-0">
-                <button
-                  title="Skip back 10s"
-                  className="text-muted-foreground hover:text-foreground transition-colors"
-                  onClick={() => seekTo(Math.max(0, currentTime - 10))}
-                >
-                  <SkipBack size={20} />
-                </button>
-                <button
-                  title={isPlaying ? "Pause" : "Play"}
-                  onClick={togglePlay}
-                  className="w-10 h-10 bg-primary text-primary-foreground rounded-full flex items-center justify-center hover:bg-primary/90 transition-colors"
-                >
-                  {isPlaying ? <Pause size={18} fill="currentColor" /> : <PlayIcon size={18} fill="currentColor" className="ml-0.5" />}
-                </button>
-                <button
-                  title="Skip forward 10s"
-                  className="text-muted-foreground hover:text-foreground transition-colors"
-                  onClick={() => seekTo(currentTime + 10)}
-                >
-                  <SkipForward size={20} />
-                </button>
-                <button
-                  title="Close player"
-                  onClick={() => setPlayingPodcast(null)}
-                  className="ml-2 text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  <X size={16} />
-                </button>
-              </div>
-            </div>
-            
-            <div className="w-full flex items-center gap-3 px-1">
-              <span className="text-[10px] font-medium text-muted-foreground w-8 text-right shrink-0">{formatTime(currentTime)}</span>
-              <input
-                type="range"
-                min="0"
-                max={duration || 0}
-                value={currentTime}
-                onChange={(e) => {
-                  const t = parseFloat(e.target.value);
-                  setCurrentTime(t);
-                  if (audioRef.current) audioRef.current.currentTime = t;
-                }}
-                title="Seek"
-                className="flex-grow h-1.5 accent-primary cursor-pointer"
-              />
-              <span className="text-[10px] font-medium text-muted-foreground w-8 shrink-0">{formatTime(duration)}</span>
-            </div>
-          </div>
-        )}
-
         {/* Mobile Search Overlay */}
         {isMobileSearchOpen && (
           <div className="lg:hidden fixed inset-0 z-50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 animate-in fade-in duration-200">
@@ -385,7 +235,7 @@ export function MainLayout({ children }: MainLayoutProps) {
                 <Search className="absolute left-3 top-3 h-5 w-5 text-muted-foreground" />
                 <Input
                   type="search"
-                  placeholder="Search agents, rooms, podcasts..."
+                  placeholder="Search agents, rooms..."
                   className="w-full pl-10 h-12 text-lg"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
@@ -397,15 +247,6 @@ export function MainLayout({ children }: MainLayoutProps) {
           </div>
         )}
       </main>
-
-      {/* Mobile Bottom Navigation */}
-      <div className="fixed bottom-0 left-0 right-0 bg-background border-t flex justify-around items-center p-2 pb-safe lg:hidden z-50">
-        <MobileNavBtn icon={Home} label="Home" active={isActive("/") || isActive("/home") || isActive("/feed")} onClick={() => handleNav("/feed")} />
-        <MobileNavBtn icon={Mic2} label="Rooms" active={isActive("/rooms")} onClick={() => handleNav("/rooms")} />
-        <MobileNavBtn icon={Radio} label="Podcasts" active={isActive("/podcasts")} onClick={() => handleNav("/podcasts")} />
-        <MobileNavBtn icon={Tv} label="Live" active={isActive("/live")} onClick={() => handleNav("/live")} />
-        <MobileNavBtn icon={User} label="Profile" active={isActive("/profile")} onClick={() => handleNav("/profile")} />
-      </div>
     </div>
   )
 }
@@ -427,18 +268,4 @@ function SidebarLink({ icon: Icon, label, active, onClick }: { icon: any, label:
   )
 }
 
-function MobileNavBtn({ icon: Icon, label, active, onClick }: { icon: any, label: string, active: boolean, onClick: () => void }) {
-  return (
-    <button
-      onClick={onClick}
-      className={cn(
-        "flex flex-col items-center p-2 rounded-lg transition-colors flex-1",
-        active ? "text-primary" : "text-muted-foreground hover:bg-muted"
-      )}
-    >
-      <Icon size={20} />
-      <span className="text-[10px] font-medium mt-1">{label}</span>
-    </button>
-  )
-}
 export default MainLayout;

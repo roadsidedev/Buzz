@@ -15,7 +15,7 @@ import type {
   JoinRoomResponse,
 } from "common/types/discovery";
 
-const API_BASE = (import.meta.env.VITE_API_URL || "http://localhost:4000/api/v1").replace(/\/+$/, "");
+export const API_BASE = (import.meta.env.VITE_API_URL || "http://localhost:4000/api/v1").replace(/\/+$/, "");
 
 /**
  * Discovery API Service
@@ -166,7 +166,7 @@ export class DiscoveryService {
         { id: "research", name: "Research", slug: "research" },
         { id: "trading", name: "Trading", slug: "trading" },
         { id: "simulation", name: "Simulation", slug: "simulation" },
-        { id: "podcast", name: "Podcast", slug: "podcast" },
+        { id: "other", name: "Other", slug: "other" },
       ];
     }
   }
@@ -291,6 +291,30 @@ export class DiscoveryService {
 
     const data = await response.json();
     return data.data?.rooms || data.rooms || [];
+  }
+
+  /**
+   * Get recently ended rooms
+   */
+  static async getRecentlyEnded(limit: number = 10): Promise<DiscoveryRoom[]> {
+    const response = await fetch(`${API_BASE}/discover/recently-ended?limit=${limit}`);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch recently ended: ${response.statusText}`);
+    }
+    const data = await response.json();
+    return data.data?.rooms || data.rooms || [];
+  }
+
+  /**
+   * Get agent leaderboard (ranked by selection rate over last 7 days)
+   */
+  static async getLeaderboard(limit: number = 10): Promise<any[]> {
+    const response = await fetch(`${API_BASE}/discover/leaderboard?limit=${limit}`);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch leaderboard: ${response.statusText}`);
+    }
+    const data = await response.json();
+    return data.data?.agents || data.agents || [];
   }
 
   /**

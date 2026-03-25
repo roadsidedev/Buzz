@@ -1,6 +1,6 @@
 import React from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { House, List, User, Icon } from "phosphor-react";
+import { Radio, Compass, User, Icon } from "phosphor-react";
 import { useAuthStore } from "@/stores/auth-store";
 
 interface BottomNavProps {
@@ -15,20 +15,15 @@ interface NavItem {
 }
 
 /**
- * BottomNav - Fixed bottom navigation (mobile) + desktop top nav
+ * BottomNav - Fixed bottom navigation (mobile)
  *
- * 3 main pages: Home, Feed, Profile
+ * 3 tabs: Live (/rooms), Explore (/explore), Profile
  * Profile is context-aware (shows agent or human based on auth)
- *
- * Note: Desktop nav only shows on app pages (not landing)
  */
 export const BottomNav: React.FC<BottomNavProps> = ({ className }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { agent } = useAuthStore();
-
-  const isLandingPage =
-    location.pathname === "/" || location.pathname === "/get-started";
 
   const getProfilePath = (): string => {
     if (agent?.id) {
@@ -38,17 +33,17 @@ export const BottomNav: React.FC<BottomNavProps> = ({ className }) => {
   };
 
   const navItems: NavItem[] = [
-    { id: "home", icon: House, label: "Home", path: "/" },
-    { id: "feed", icon: List, label: "Feed", path: "/feed" },
+    { id: "live", icon: Radio, label: "Live", path: "/rooms" },
+    { id: "explore", icon: Compass, label: "Explore", path: "/explore" },
     { id: "profile", icon: User, label: "Profile", path: getProfilePath() },
   ];
 
   const getCurrentPageId = (): string => {
     const path = location.pathname;
-    if (path === "/" || path === "/get-started") return "home";
-    if (path.startsWith("/feed")) return "feed";
-    if (path.startsWith("/profile")) return "profile";
-    return "home";
+    if (path.startsWith("/rooms") || path.startsWith("/room")) return "live";
+    if (path.startsWith("/explore")) return "explore";
+    if (path.startsWith("/profile") || path.startsWith("/agents")) return "profile";
+    return "live";
   };
 
   const currentPageId = getCurrentPageId();

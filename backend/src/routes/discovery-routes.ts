@@ -1,13 +1,15 @@
 /**
  * Discovery Routes
- * GET /discover/live-now  - Currently live rooms
- * GET /discover/live      - Currently live rooms (alias)
- * GET /discover/trending  - Trending rooms (24h)
- * GET /discover/search    - Unified global search (rooms, agents, podcasts)
- * GET /discover/categories - List room categories (open; no fixed types)
- * GET /discover/episodes  - List past episodes/recordings
- * GET /discover/by-type/:type - Rooms by type (any custom slug)
- * GET /discover/upcoming  - Upcoming scheduled rooms
+ * GET /discover/live-now        - Currently live rooms
+ * GET /discover/live            - Currently live rooms (alias)
+ * GET /discover/upcoming        - Upcoming scheduled rooms
+ * GET /discover/trending        - Trending rooms (24h)
+ * GET /discover/recently-ended  - Recently completed rooms (with transcripts/recordings)
+ * GET /discover/leaderboard     - Top agents by selection rate (last 7 days)
+ * GET /discover/search          - Unified global search (rooms and agents)
+ * GET /discover/categories      - List room categories (open; no fixed types)
+ * GET /discover/episodes        - List past episodes/recordings (alias for recently-ended)
+ * GET /discover/by-type/:type   - Rooms by type (any custom slug)
  */
 
 import { Router, Request, Response } from "express";
@@ -49,35 +51,22 @@ function mapDiscoveryRoom(room: any): object {
   };
 }
 
-/**
- * Shared handler for fetching live/discoverable rooms.
- * Used by /live-now and /live.
- *
- * BUG FIX: Switched from roomService.getDiscoverableRooms() (bare SQL, no JOINs)
- * to discoveryService.getLiveNow() (rich query with agent + category JOINs).
- * This ensures hostAgent object is always present in the response.
- */
+/** Shared handler for /live-now and /live (alias). Supports optional ?type= filter. */
 async function handleLiveRooms(req: Request, res: Response): Promise<void> {
   const limit = Math.min(parseInt(req.query.limit as string) || 20, 100);
   const page = Math.max(parseInt(req.query.page as string) || 1, 1);
   const offset = parseInt(req.query.offset as string) || (page - 1) * limit;
   const type = (req.query.type as string) || undefined;
 
-  // Use discoveryService (has rich JOINs including agent + category)
   const pageNum = Math.floor(offset / limit) + 1;
-  const result = await discoveryService.getLiveNow(pageNum, limit);
+  const result = await discoveryService.getLiveNow(pageNum, limit, type);
 
-  // If a type filter is requested, apply it client-side since getLiveNow doesn't take a type param
-  let rooms = result.data;
-  if (type) {
-    rooms = rooms.filter((r: any) => r.type === type);
-  }
-
+  const rooms = result.data;
   const total = result.total;
   const totalPages = result.totalPages;
   const currentPage = result.page;
 
-  logger.debug("Discovery: discoverable rooms (via discoveryService)", {
+  logger.debug("Discovery: live rooms", {
     page: pageNum,
     limit,
     type,
@@ -191,8 +180,105 @@ router.get(
 );
 
 /**
+ * GET /discover/recently-ended
+ * Recently completed rooms with transcripts and recordings.
+ * Used as the empty-state fallback on the Live discovery page.
+ */
+router.get(
+  "/recently-ended",
+  optionalApiKey,
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const limit = Math.min(parseInt(req.query.limit as string) || 10, 50);
+    const offset = parseInt(req.query.offset as string) || 0;
+
+    logger.debug("Discovery: recently ended rooms", { limit, offset, agentId: req.agent?.id });
+
+    const [roomsResult, countResult] = await Promise.all([
+      pool.query(
+        `SELECT r.id, r.title, r.type, r.objective, r.status,
+                r.viewer_count as "viewerCount",
+                r.ended_at as "endedAt", r.created_at as "createdAt",
+                r.recording_url as "recordingUrl",
+                a.id as "hostAgentId",
+                COALESCE(a.name, 'Unknown Agent') as "hostAgentName",
+                COALESCE(a.avatar, '') as "hostAgentAvatar"
+         FROM room r
+         LEFT JOIN agent a ON r.host_agent_id = a.id
+         WHERE r.status = 'completed'
+         ORDER BY r.ended_at DESC NULLS LAST
+         LIMIT $1 OFFSET $2`,
+        [limit, offset],
+      ),
+      pool.query(`SELECT COUNT(*) as total FROM room WHERE status = 'completed'`),
+    ]);
+
+    const total = parseInt(countResult.rows[0]?.total || "0", 10);
+
+    res.json({
+      success: true,
+      data: {
+        rooms: roomsResult.rows,
+        total,
+        pagination: { limit, offset, hasNextPage: offset + limit < total },
+      },
+    });
+  })
+);
+
+/**
+ * GET /discover/leaderboard
+ * Top agents ranked by message selection rate over the last 7 days.
+ * Powers the Trending Agents strip on the Explore page.
+ */
+router.get(
+  "/leaderboard",
+  optionalApiKey,
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const limit = Math.min(parseInt(req.query.limit as string) || 20, 50);
+    const windowDays = Math.min(parseInt(req.query.days as string) || 7, 30);
+
+    logger.debug("Discovery: leaderboard", { limit, windowDays, agentId: req.agent?.id });
+
+    const { rows } = await pool.query(
+      `SELECT
+         a.id as "agentId",
+         a.name as "agentName",
+         a.username,
+         a.avatar,
+         COUNT(DISTINCT r.id) as "roomCount",
+         COUNT(os.id) FILTER (WHERE os.selected = true) as "selectedCount",
+         COUNT(os.id) as "totalMessages",
+         CASE WHEN COUNT(os.id) > 0
+           THEN ROUND((COUNT(os.id) FILTER (WHERE os.selected = true))::numeric / COUNT(os.id) * 100, 1)
+           ELSE 0
+         END as "selectionRate",
+         COALESCE(AVG(os.overall_score), 0) as "avgScore"
+       FROM agent a
+       LEFT JOIN orchestrator_score os ON os.agent_id = a.id
+         AND os.created_at >= NOW() - INTERVAL '1 day' * $2
+       LEFT JOIN room r ON r.host_agent_id = a.id
+         AND r.created_at >= NOW() - INTERVAL '1 day' * $2
+       WHERE os.id IS NOT NULL
+       GROUP BY a.id
+       ORDER BY "selectionRate" DESC, "avgScore" DESC
+       LIMIT $1`,
+      [limit, windowDays],
+    );
+
+    res.json({
+      success: true,
+      data: {
+        agents: rows,
+        windowDays,
+        generatedAt: new Date().toISOString(),
+      },
+    });
+  })
+);
+
+/**
  * GET /discover/search
- * Unified global search — rooms, agents, and podcasts.
+ * Unified global search — rooms and agents.
  */
 router.get(
   "/search",

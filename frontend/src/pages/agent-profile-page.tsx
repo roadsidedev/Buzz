@@ -14,6 +14,7 @@ import { RetroWindow } from "@/components/retro/RetroWindow";
 import { BrutalistButton } from "@/components/retro/BrutalistButton";
 import { TipModal } from "@/components/retro/TipModal";
 import { useSocialStore } from "@/stores/social-store";
+import { API_BASE } from "@/services/discovery";
 import {
   User,
   ChartLine,
@@ -33,6 +34,8 @@ interface AgentStats {
   followerCount: number;
   roomCount: number;
   totalEarnings: string;
+  avgScore?: number;
+  selectionRate?: number;
 }
 
 export const AgentProfilePage: React.FC = () => {
@@ -41,18 +44,24 @@ export const AgentProfilePage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [agent, setAgent] = useState<any>(null);
   const [stats, setStats] = useState<AgentStats>({ followerCount: 0, roomCount: 0, totalEarnings: "0.00" });
+  const [liveRoom, setLiveRoom] = useState<any>(null);
+  const [upcomingRoom, setUpcomingRoom] = useState<any>(null);
   const [showTipModal, setShowTipModal] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { toggleFollow, isFollowing } = useSocialStore();
   const following = isFollowing(id || "");
 
+  const apiBase = API_BASE;
+
   useEffect(() => {
     const fetchAgent = async () => {
       if (!id) { setLoading(false); return; }
       try {
-        const [agentRes, statsRes] = await Promise.all([
-          fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:4000/api/v1'}/agents/${id}`),
-          fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:4000/api/v1'}/agents/${id}/stats`),
+        const [agentRes, statsRes, liveRes, upcomingRes] = await Promise.all([
+          fetch(`${apiBase}/agents/${id}`),
+          fetch(`${apiBase}/agents/${id}/stats`),
+          fetch(`${apiBase}/discover/live-now?limit=50`),
+          fetch(`${apiBase}/discover/upcoming?limit=20`),
         ]);
 
         if (agentRes.ok) {
@@ -69,7 +78,28 @@ export const AgentProfilePage: React.FC = () => {
             followerCount: s.followerCount || 0,
             roomCount: s.roomCount || 0,
             totalEarnings: s.totalEarnings || "0.00",
+            avgScore: s.avgScore,
+            selectionRate: s.selectionRate,
           });
+        }
+
+        if (liveRes.ok) {
+          const liveData = await liveRes.json();
+          const rooms: any[] = liveData.data?.rooms || liveData.rooms || [];
+          const found = rooms.find((r: any) =>
+            r.participants?.some((p: any) => p.agentId === id || p.id === id)
+          );
+          if (found) setLiveRoom(found);
+        }
+
+        if (upcomingRes.ok) {
+          const upData = await upcomingRes.json();
+          const upcoming: any[] = upData.data?.rooms || upData.rooms || [];
+          const found = upcoming.find((r: any) =>
+            r.participants?.some((p: any) => p.agentId === id || p.id === id) ||
+            r.agentId === id
+          );
+          if (found) setUpcomingRoom(found);
         }
       } catch {
         setError("Failed to load agent profile.");
@@ -129,6 +159,39 @@ export const AgentProfilePage: React.FC = () => {
       </header>
 
       <main className="max-w-6xl mx-auto px-4 py-8">
+        {/* Live Now Banner */}
+        {liveRoom && (
+          <div
+            className="mb-6 bg-accent-crimson border-4 border-mac-charcoal p-4 flex items-center justify-between cursor-pointer hover:opacity-90 transition-opacity"
+            onClick={() => navigate(`/room/${liveRoom.id}`)}
+          >
+            <div className="flex items-center gap-3">
+              <span className="w-3 h-3 rounded-full bg-mac-white animate-pulse shrink-0" />
+              <span className="font-bold text-mac-white uppercase tracking-widest text-sm">LIVE NOW</span>
+              <span className="text-mac-white font-mono text-sm truncate max-w-xs">
+                {liveRoom.objective || liveRoom.title || "Active Room"}
+              </span>
+            </div>
+            <span className="text-mac-white font-bold uppercase text-xs shrink-0">Join →</span>
+          </div>
+        )}
+
+        {/* Upcoming Room Banner */}
+        {upcomingRoom && !liveRoom && (
+          <div
+            className="mb-6 bg-mac-charcoal border-4 border-mac-charcoal p-4 flex items-center justify-between cursor-pointer hover:opacity-90 transition-opacity"
+            onClick={() => navigate(`/room/${upcomingRoom.id}`)}
+          >
+            <div className="flex items-center gap-3">
+              <span className="font-bold text-accent-yellow uppercase tracking-widest text-sm">STARTING SOON</span>
+              <span className="text-mac-white font-mono text-sm truncate max-w-xs">
+                {upcomingRoom.objective || upcomingRoom.title || "Upcoming Room"}
+              </span>
+            </div>
+            <span className="text-mac-white font-bold uppercase text-xs shrink-0">View →</span>
+          </div>
+        )}
+
         {/* Profile Header */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
           {/* Agent Avatar & Info */}
@@ -251,12 +314,24 @@ export const AgentProfilePage: React.FC = () => {
                     weight="bold"
                     className="text-accent-teal"
                   />
-                  <span className="font-bold text-mac-white">Status</span>
+                  <span className="font-bold text-mac-white">Selection Rate</span>
                 </div>
                 <span className="font-mono font-bold text-accent-yellow">
-                  {agent?.claimStatus || "Active"}
+                  {stats.selectionRate !== undefined ? `${stats.selectionRate}%` : (agent?.claimStatus || "—")}
                 </span>
               </div>
+
+              {stats.avgScore !== undefined && (
+                <div className="flex items-center justify-between p-3 bg-mac-charcoal">
+                  <div className="flex items-center gap-2">
+                    <Star size={20} weight="bold" className="text-accent-yellow" />
+                    <span className="font-bold text-mac-white">Avg Score</span>
+                  </div>
+                  <span className="font-mono font-bold text-mac-white">
+                    {Number(stats.avgScore).toFixed(0)}
+                  </span>
+                </div>
+              )}
             </div>
           </RetroWindow>
         </div>

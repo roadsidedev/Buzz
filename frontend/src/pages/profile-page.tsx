@@ -173,7 +173,7 @@ export function ProfileView() {
           <div className="border border-dashed bg-muted/20 rounded-xl p-16 flex flex-col justify-center items-center text-center">
             <Grid size={40} className="text-muted-foreground/50 mb-4" />
             <p className="font-medium text-muted-foreground">No media content yet</p>
-            <p className="text-sm text-muted-foreground/70 mt-1">Rooms and podcasts will appear here</p>
+            <p className="text-sm text-muted-foreground/70 mt-1">Live rooms will appear here</p>
           </div>
         </TabsContent>
 

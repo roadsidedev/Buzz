@@ -272,31 +272,41 @@ async def version() -> dict:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Podcast / content-generation routes
+# Content-generation routes
 # ─────────────────────────────────────────────────────────────────────────────
 
-
-class VoicePreferences(BaseModel):
-    primary_voice_id: Optional[str] = None
-    secondary_voice_id: Optional[str] = None
-
-
-class GeneratePodcastRequest(BaseModel):
-    podcast_id: str
-    episode_id: str
-    title: str
-    source_urls: List[str] = []
-    voice_preferences: Optional[VoicePreferences] = None
-    format: Literal["monologue", "dialogue"] = "monologue"
-
-
-class GeneratePodcastResponse(BaseModel):
-    episode_id: str
-    status: str
-    script: str
-    estimated_duration_seconds: int
-    estimated_cost_usdc: float
-    estimated_time_seconds: int
+# DEPRECATED — podcast generation extracted to standalone product.
+# These models and routes are preserved for reference only.
+#
+# class VoicePreferences(BaseModel):
+#     primary_voice_id: Optional[str] = None
+#     secondary_voice_id: Optional[str] = None
+#
+# class GeneratePodcastRequest(BaseModel):
+#     podcast_id: str
+#     episode_id: str
+#     title: str
+#     source_urls: List[str] = []
+#     voice_preferences: Optional[VoicePreferences] = None
+#     format: Literal["monologue", "dialogue"] = "monologue"
+#
+# class GeneratePodcastResponse(BaseModel):
+#     episode_id: str
+#     status: str
+#     script: str
+#     estimated_duration_seconds: int
+#     estimated_cost_usdc: float
+#     estimated_time_seconds: int
+#
+# @router.post("/podcasts/generate", response_model=GeneratePodcastResponse)
+# async def generate_podcast_episode(request: GeneratePodcastRequest) -> GeneratePodcastResponse:
+#     """DEPRECATED — podcast generation extracted to standalone product."""
+#     raise HTTPException(status_code=410, detail="Podcast generation has moved to a standalone product.")
+#
+# @router.get("/podcasts/{episode_id}/status")
+# async def get_podcast_episode_status(episode_id: str) -> dict:
+#     """DEPRECATED — podcast generation extracted to standalone product."""
+#     raise HTTPException(status_code=410, detail="Podcast generation has moved to a standalone product.")
 
 
 class SummaryRequest(BaseModel):
@@ -307,65 +317,13 @@ class SummaryResponse(BaseModel):
     summary: str
 
 
-@router.post("/podcasts/generate", response_model=GeneratePodcastResponse)
-async def generate_podcast_episode(request: GeneratePodcastRequest) -> GeneratePodcastResponse:
-    """
-    Generate a podcast episode script via LLM.
-
-    The orchestrator drafts a structured, engaging podcast script based on the
-    episode title and optional source URLs.  The caller (backend) is responsible
-    for synthesising audio (TTS) and uploading it to storage.
-    """
-    try:
-        service = get_orchestration_service()
-        if request.format == "dialogue":
-            result = await service.generate_podcast_dialogue(
-                podcast_id=request.podcast_id,
-                episode_id=request.episode_id,
-                title=request.title,
-                source_urls=request.source_urls,
-            )
-        else:
-            result = await service.generate_podcast_script(
-                podcast_id=request.podcast_id,
-                episode_id=request.episode_id,
-                title=request.title,
-                source_urls=request.source_urls,
-            )
-        return GeneratePodcastResponse(**result)
-    except Exception as e:
-        logger.error("Podcast generation failed", extra={"error": str(e), "episode_id": request.episode_id})
-        raise HTTPException(status_code=500, detail=f"Podcast generation failed: {str(e)}")
-
-
-@router.get("/podcasts/{episode_id}/status")
-async def get_podcast_episode_status(episode_id: str) -> dict:
-    """
-    Get the generation status of a podcast episode.
-
-    Returns the cached script/status from Redis if the episode was recently
-    generated, or 404 if no record exists.
-    """
-    try:
-        service = get_orchestration_service()
-        status = await service.get_podcast_episode_status(episode_id)
-        if status is None:
-            raise HTTPException(status_code=404, detail=f"Episode {episode_id} not found")
-        return status
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error("Failed to get episode status", extra={"error": str(e), "episode_id": episode_id})
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.post("/podcasts/summary", response_model=SummaryResponse)
+@router.post("/transcript/summary", response_model=SummaryResponse)
 async def generate_summary(request: SummaryRequest) -> SummaryResponse:
     """
-    Generate a concise summary of a transcript using the LLM.
+    Generate a concise summary of a room transcript using the LLM.
 
     Accepts up to 5 000 characters of transcript and returns a 3-5 sentence
-    summary suitable for episode descriptions and social sharing.
+    summary suitable for room completion cards and social sharing.
     """
     if not request.transcript or not request.transcript.strip():
         raise HTTPException(status_code=400, detail="transcript is required")

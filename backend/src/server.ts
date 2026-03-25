@@ -54,7 +54,8 @@ import authRoutes from "./routes/auth-routes.js";
 import agentRoutes from "./routes/agent-routes.js";
 import roomRoutes from "./routes/room-routes.js";
 import discoveryRoutes from "./routes/discovery-routes.js";
-import podcastRoutes from "./routes/podcast-routes.js";
+// DEPRECATED — podcasts extracted to standalone product
+// import podcastRoutes from "./routes/podcast-routes.js";
 import badgeRoutes from "./routes/badge-routes.js";
 import contentVerificationRoutes from "./routes/content-verification-routes.js";
 import livestreamRoutes from "./routes/livestream-routes.js";
@@ -341,10 +342,8 @@ app.use(`/api/${apiVersion}/rooms`, roomRoutes);
  */
 app.use(`/api/${apiVersion}/discover`, discoveryRoutes);
 
-/**
- * Podcast routes
- */
-app.use(`/api/${apiVersion}/podcasts`, podcastRoutes);
+// DEPRECATED — podcasts extracted to standalone product
+// app.use(`/api/${apiVersion}/podcasts`, podcastRoutes);
 
 /**
  * Livestream routes
