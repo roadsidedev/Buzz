@@ -56,25 +56,32 @@ export function MainLayout({ children }: MainLayoutProps) {
       {/* Main Content Area */}
       <main className="flex-grow flex flex-col overflow-y-auto pb-24 lg:pb-0 relative bg-background">
         {/* Header (Sticky) */}
-        <header className="sticky top-0 z-40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b p-4 lg:px-6 flex items-center gap-4">
-          {/* LEFT: CLAWZZ */}
-          <span className="hidden lg:block text-xl font-bold tracking-widest text-primary cursor-pointer shrink-0" onClick={() => handleNav("/rooms")}>
-            CLAWZZ
-          </span>
+        <header className="sticky top-0 z-40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b px-4 lg:px-6 h-16 flex items-center lg:grid lg:grid-cols-3 gap-4">
+          {/* LEFT: CLAWZZ (desktop) | Search button (mobile) */}
+          <div className="flex items-center">
+            <span className="hidden lg:block text-xl font-bold tracking-widest text-primary cursor-pointer" onClick={() => handleNav("/rooms")}>
+              CLAWZZ
+            </span>
+            <button
+              type="button"
+              title="Search"
+              className="lg:hidden shrink-0 p-2 hover:bg-muted rounded-lg transition-colors"
+              onClick={() => setIsMobileSearchOpen(true)}
+            >
+              <Search size={20} />
+            </button>
+          </div>
 
-          {/* MOBILE: Search button */}
-          <button
-            type="button"
-            title="Search"
-            className="lg:hidden shrink-0 p-2 hover:bg-muted rounded-lg transition-colors"
-            onClick={() => setIsMobileSearchOpen(true)}
-          >
-            <Search size={20} />
-          </button>
+          {/* CENTER: Nav tabs (desktop) */}
+          <div className="hidden lg:flex items-center justify-center gap-1">
+            <TopNavLink icon={Home}    label="Home"    active={isActive("/rooms") || isActive("/room")} onClick={() => handleNav("/rooms")} />
+            <TopNavLink icon={Compass} label="Explore" active={isActive("/explore")}                    onClick={() => handleNav("/explore")} />
+            <TopNavLink icon={User}    label="Profile" active={isActive("/profile") || isActive("/agents")} onClick={() => handleNav("/profile")} />
+          </div>
 
-          {/* CENTER: Search bar (desktop) */}
-          <div className="hidden lg:flex flex-1 justify-center">
-            <div className="relative w-72">
+          {/* RIGHT: Search + actions (desktop) */}
+          <div className="flex items-center gap-3 ml-auto lg:ml-0 lg:justify-end">
+            <div className="relative hidden lg:block w-52">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
                 type="search"
@@ -85,16 +92,6 @@ export function MainLayout({ children }: MainLayoutProps) {
                 onKeyDown={handleSearch}
               />
             </div>
-          </div>
-
-          {/* RIGHT: Nav tabs + actions (desktop) */}
-          <div className="hidden lg:flex items-center gap-1 shrink-0">
-            <TopNavLink icon={Home}    label="Home"    active={isActive("/rooms") || isActive("/room")} onClick={() => handleNav("/rooms")} />
-            <TopNavLink icon={Compass} label="Explore" active={isActive("/explore")}                    onClick={() => handleNav("/explore")} />
-            <TopNavLink icon={User}    label="Profile" active={isActive("/profile") || isActive("/agents")} onClick={() => handleNav("/profile")} />
-          </div>
-
-          <div className="flex items-center gap-4 shrink-0 ml-auto lg:ml-0">
             <NotificationBell />
             <ModeToggle />
             <DropdownMenu>
