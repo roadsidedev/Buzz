@@ -52,44 +52,22 @@ export function MainLayout({ children }: MainLayoutProps) {
   const isActive = (path: string) => location.pathname === path || (path !== "/" && location.pathname.startsWith(path))
 
   return (
-    <div className="min-h-screen bg-background text-foreground flex overflow-hidden">
-
-      {/* Desktop Sidebar */}
-      <aside className="hidden lg:flex flex-col w-72 border-r bg-muted/30 p-6 shrink-0 z-10">
-        <div className="flex items-center gap-3 mb-10 pb-4 border-b">
-          <span className="text-2xl font-bold tracking-tight text-primary cursor-pointer" onClick={() => handleNav("/rooms")}>
-            clawzz
-          </span>
-        </div>
-
-        <nav className="space-y-2 flex-grow">
-          <SidebarLink
-            icon={Mic2}
-            label="Live"
-            active={isActive("/rooms") || isActive("/room")}
-            onClick={() => handleNav("/rooms")}
-          />
-          <SidebarLink
-            icon={Compass}
-            label="Explore"
-            active={isActive("/explore")}
-            onClick={() => handleNav("/explore")}
-          />
-          <div className="pt-6 mt-6 border-t space-y-2">
-            <SidebarLink
-              icon={User}
-              label="Profile"
-              active={isActive("/profile") || isActive("/agents")}
-              onClick={() => handleNav("/profile")}
-            />
-          </div>
-        </nav>
-      </aside>
+    <div className="h-screen bg-background text-foreground flex flex-col overflow-hidden">
 
       {/* Main Content Area */}
-      <main className="flex-grow flex flex-col h-screen overflow-y-auto pb-24 lg:pb-0 relative bg-background">
+      <main className="flex-grow flex flex-col overflow-y-auto pb-24 lg:pb-0 relative bg-background">
         {/* Header (Sticky) */}
-        <header className="sticky top-0 z-40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b p-4 lg:px-8 flex items-center justify-between gap-4">
+        <header className="sticky top-0 z-40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b p-4 lg:px-6 flex items-center gap-4">
+          {/* Desktop: Logo + Nav tabs */}
+          <div className="hidden lg:flex items-center gap-1 mr-2 shrink-0">
+            <span className="text-xl font-bold tracking-tight text-primary cursor-pointer mr-4" onClick={() => handleNav("/rooms")}>
+              clawzz
+            </span>
+            <TopNavLink icon={Mic2}    label="Live"    active={isActive("/rooms") || isActive("/room")} onClick={() => handleNav("/rooms")} />
+            <TopNavLink icon={Compass} label="Explore" active={isActive("/explore")}                    onClick={() => handleNav("/explore")} />
+            <TopNavLink icon={User}    label="Profile" active={isActive("/profile") || isActive("/agents")} onClick={() => handleNav("/profile")} />
+          </div>
+
           {/* Mobile Search Button (Left) */}
           <button
             title="Search"
@@ -100,7 +78,7 @@ export function MainLayout({ children }: MainLayoutProps) {
           </button>
 
           {/* Desktop Search */}
-          <div className="relative w-full max-md hidden sm:block">
+          <div className="relative flex-1 max-w-sm hidden sm:block">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
               type="search"
@@ -275,18 +253,18 @@ function MobileNavLink({ icon: Icon, label, active, onClick }: { icon: any, labe
   )
 }
 
-function SidebarLink({ icon: Icon, label, active, onClick }: { icon: any, label: string, active: boolean, onClick: () => void }) {
+function TopNavLink({ icon: Icon, label, active, onClick }: { icon: any, label: string, active: boolean, onClick: () => void }) {
   return (
     <button
       onClick={onClick}
       className={cn(
-        "flex items-center gap-3 w-full p-3 rounded-lg transition-colors text-sm font-medium",
+        "flex items-center gap-2 px-3 py-2 rounded-lg transition-colors text-sm font-medium",
         active
           ? "bg-primary text-primary-foreground"
           : "text-muted-foreground hover:bg-muted hover:text-foreground"
       )}
     >
-      <Icon size={20} />
+      <Icon size={16} />
       <span>{label}</span>
     </button>
   )
