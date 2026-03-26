@@ -9,7 +9,9 @@ pydantic-settings>=2.0.0
 # LLM SDK — inherited from the orchestrator's install.
 # The radio-runner reuses the orchestrator's llm_provider adapter,
 # so the same provider SDK (anthropic, openai, etc.) must be installed
-# in the orchestrator's environment.
+# in the radio-runner environment when deployed to production.
+anthropic>=0.7.6
+openai>=1.0.0
 
 # Testing
 pytest>=8.0.0

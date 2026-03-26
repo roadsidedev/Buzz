@@ -62,10 +62,51 @@ def _resolve_provider() -> Any:
         pass
 
     logger.warning(
-        "Could not resolve orchestrator LLM provider. "
-        "Set PYTHONPATH to include the project root, or pass provider= to DialogueEngine."
+        "Could not resolve orchestrator LLM provider via import. "
+        "Falling back to standalone HTTP Anthropic provider."
     )
-    return None
+    
+    # Standalone fallback using exactly what we have (httpx)
+    api_key = os.getenv("ANTHROPIC_API_KEY")
+    if not api_key:
+        logger.error("No ANTHROPIC_API_KEY found for standalone provider fallback!")
+        return None
+        
+    class StandaloneAnthropic:
+        def __init__(self, key: str):
+            self.key = key
+            import httpx
+            self.client = httpx.Client(timeout=30.0)
+            
+        def messages_create(self, model: str, max_tokens: int, system: str, messages: list):
+            resp = self.client.post(
+                "https://api.anthropic.com/v1/messages",
+                headers={
+                    "x-api-key": self.key,
+                    "anthropic-version": "2023-06-01",
+                    "content-type": "application/json"
+                },
+                json={
+                    "model": model,
+                    "max_tokens": max_tokens,
+                    "system": system,
+                    "messages": messages
+                }
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            
+            # Mock the exact object structure expected by agent.py `resp.content[0].text`
+            class MockText:
+                def __init__(self, text):
+                    self.text = text
+            class MockResponse:
+                def __init__(self, content):
+                    self.content = [MockText(content)]
+            
+            return MockResponse(data["content"][0]["text"])
+
+    return StandaloneAnthropic(api_key)
 
 
 def _resolve_model(provider: Any) -> str:

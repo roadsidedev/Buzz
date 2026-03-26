@@ -203,6 +203,6 @@ class RadioAgent:
         """Save covered topics to disk."""
         try:
             with open(self.memory_file, "w", encoding="utf-8") as f:
-                json.dump({"covered_topics": self.covered_topics}, f, indent=2)
+                json.dump({"covered_topics": list(self.covered_topics)}, f, indent=2)
         except Exception as e:
             logger.error("Failed to save memory for %s: %s", self.name, e)
