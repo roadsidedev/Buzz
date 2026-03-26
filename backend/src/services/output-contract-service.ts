@@ -222,15 +222,23 @@ export class OutputContractService {
         : 0,
     };
 
-    // 4. CALL ORCHESTRATOR
+    // 4. GET COMPLETION LEVEL FROM ORCHESTRATOR ROOM STATE IF POSSIBLE
     let result;
     try {
-      result = await orchestratorClient.validateOutputContract(request);
+      const roomState = await orchestratorClient.getRoomState(roomId);
+      result = {
+        completionPercentage: roomState.contract_satisfaction * 100 || 0,
+        minimumMet: roomState.contract_satisfaction >= 0.5,
+        standardMet: roomState.contract_satisfaction >= 1.0,
+        exceptionalMet: roomState.contract_satisfaction >= 1.5,
+      };
     } catch (err) {
-      logger.error("Output contract validation failed", {
-        roomId,
-        error: err instanceof Error ? err.message : String(err),
-      });
+      if (err instanceof Error && !err.message.includes("404")) {
+        logger.error("Output contract validation failed to fetch state", {
+          roomId,
+          error: err.message,
+        });
+      }
 
       // Fallback: basic validation
       return this._basicValidation(room, messages);
@@ -302,7 +310,8 @@ export class OutputContractService {
     const played = messages.filter((m) => m.status === "played");
 
     // Calculate metrics
-    const turnsMet = room.turnCount >= contract.minimumTurns;
+    const safeTurnCount = room.turnCount || 0;
+    const turnsMet = safeTurnCount >= contract.minimumTurns;
     const audioSeconds = played.length * 30; // Estimate 30s per message
     const audioMet = audioSeconds >= contract.minimumAudioSeconds;
 
@@ -313,12 +322,13 @@ export class OutputContractService {
 
     const completionPercentage = Math.min(
       100,
-      Math.round(
-        ((room.turnCount / contract.minimumTurns) * 50 +
-          (audioSeconds / contract.minimumAudioSeconds) * 30 +
-          (uniqueAgents / contract.minimumParticipants) * 20) /
-          100 *
-          100,
+      Math.max(
+        0,
+        Math.round(
+          ((safeTurnCount / contract.minimumTurns) * 50 +
+            (audioSeconds / contract.minimumAudioSeconds) * 30 +
+            (uniqueAgents / contract.minimumParticipants) * 20),
+        ),
       ),
     );
 
@@ -331,7 +341,7 @@ export class OutputContractService {
       completionLevel: minimumMet ? "minimum" : "minimum",
       suggestedAction: minimumMet ? "close" : "continue",
       failedRequirements: [
-        !turnsMet ? `Need ${contract.minimumTurns} turns (have ${room.turnCount})` : "",
+        !turnsMet ? `Need ${contract.minimumTurns} turns (have ${safeTurnCount})` : "",
         !audioMet
           ? `Need ${contract.minimumAudioSeconds}s audio (have ~${audioSeconds}s)`
           : "",
