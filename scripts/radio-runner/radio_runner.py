@@ -161,14 +161,14 @@ class RadioRunner:
         # 1. Register HOST agent (Alex)
         logger.info("Registering HOST agent (Alex)...")
         self._host = self._bridge.register_agent(
-            name=f"Alex — RadioHost",
+            name=f"Alex — RadioHost ({suffix})",
             username=f"radio_alex_{suffix}",
         )
 
         # 2. Register CO-HOST agent (Mira)
         logger.info("Registering CO-HOST agent (Mira)...")
         self._cohost = self._bridge.register_agent(
-            name=f"Mira — RadioCohost",
+            name=f"Mira — RadioCohost ({suffix})",
             username=f"radio_mira_{suffix}",
         )
 
