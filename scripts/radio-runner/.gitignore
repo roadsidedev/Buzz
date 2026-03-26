@@ -1,0 +1,13 @@
+# Runtime state — not for version control
+memory_*.json
+.radio_agents.json
+narration_queue/
+
+# Environment
+.env
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/

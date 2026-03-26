@@ -10,14 +10,19 @@ radio runner's main loop.
 Used by: radio_runner.py
 """
 
+import hashlib
+import hmac
+import json
 import logging
+import os
 import threading
 from dataclasses import dataclass, field
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from queue import Empty, PriorityQueue
-import json
 
 logger = logging.getLogger(__name__)
+
+WEBHOOK_SECRET: str = os.environ.get("WEBHOOK_SECRET", "")
 
 
 @dataclass(order=True)
@@ -57,7 +62,7 @@ class WebhookServer(threading.Thread):
     Used for injecting breaking news while the runner blocks on LLM calls.
     """
 
-    def __init__(self, port: int, event_queue: EventQueue) -> None:
+    def __init__(self, port: int = 8765, event_queue: EventQueue = None) -> None:
         super().__init__(daemon=True)
         self.port = port
         self.event_queue = event_queue
@@ -80,9 +85,20 @@ class WebhookServer(threading.Thread):
 
     @staticmethod
     def _make_handler(queue: EventQueue) -> type:
+        secret = WEBHOOK_SECRET
+
         class WebhookHandler(BaseHTTPRequestHandler):
             def do_POST(self):
                 if self.path == "/events/breaking-news":
+                    # HMAC secret check (enforced only when WEBHOOK_SECRET is set)
+                    if secret:
+                        provided = self.headers.get("X-Webhook-Secret", "")
+                        if not hmac.compare_digest(provided, secret):
+                            self.send_response(401)
+                            self.end_headers()
+                            self.wfile.write(b'{"error":"unauthorized"}')
+                            return
+
                     content_length = int(self.headers.get("Content-Length", 0))
                     body = self.rfile.read(content_length).decode("utf-8")
                     try:

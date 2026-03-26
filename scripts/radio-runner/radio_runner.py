@@ -28,7 +28,8 @@ import signal
 import sys
 import time
 import uuid
-from typing import Optional
+from collections import deque
+from typing import Callable, Optional
 
 from dotenv import load_dotenv
 
@@ -89,7 +90,7 @@ class RadioRunner:
         self._max_turns = max_turns
         self._running = False
         self._turn_count = 0
-        self._history: list[DialogueTurn] = []
+        self._history: deque[DialogueTurn] = deque(maxlen=10)
 
         # ── Initialize modules ───────────────────────────────────────────────
         self._poller = NewsPoller()
@@ -123,6 +124,7 @@ class RadioRunner:
 
         # News cache — poll every N seconds, not every turn
         self._cached_headlines: list = []
+        self._commit_headlines: Callable[[], None] = lambda: None
         self._last_news_poll: float = 0.0
 
     # ── Lifecycle ────────────────────────────────────────────────────────────
@@ -147,29 +149,32 @@ class RadioRunner:
 
     def _setup(self) -> None:
         """Register agents, create initial room, start watchdog."""
-        suffix = uuid.uuid4().hex[:6]
+        # Stable agent usernames — suffix only used in display name to distinguish
+        # deployments.  Credentials are persisted across restarts so the same
+        # agent rows are reused (avoids orphan accumulation and free-tier exhaustion).
+        agent_suffix = os.environ.get("RADIO_AGENT_SUFFIX", "01")
 
         logger.info("=" * 60)
         logger.info("  ClawZz Radio Runner — Starting up")
         logger.info(f"  Backend      : {BACKEND_URL}")
         logger.info(f"  Orchestrator : {ORCHESTRATOR_URL}")
         logger.info(f"  Turn interval: {self._turn_interval}s")
-        logger.info(f"  Break every  : {self._scheduler._break_interval} turns")
+        logger.info(f"  Break every  : {self._scheduler.break_interval} turns")
         logger.info(f"  Max turns    : {self._max_turns or 'unlimited'}")
         logger.info("=" * 60)
 
-        # 1. Register HOST agent (Alex)
+        # 1. Register HOST agent (Alex) — reuses cached credentials if available
         logger.info("Registering HOST agent (Alex)...")
-        self._host = self._bridge.register_agent(
-            name=f"Alex — RadioHost ({suffix})",
-            username=f"radio_alex_{suffix}",
+        self._host = self._bridge.register_or_reuse_agent(
+            name=f"Alex — RadioHost ({agent_suffix})",
+            username=f"radio_alex_{agent_suffix}",
         )
 
-        # 2. Register CO-HOST agent (Mira)
+        # 2. Register CO-HOST agent (Mira) — reuses cached credentials if available
         logger.info("Registering CO-HOST agent (Mira)...")
-        self._cohost = self._bridge.register_agent(
-            name=f"Mira — RadioCohost ({suffix})",
-            username=f"radio_mira_{suffix}",
+        self._cohost = self._bridge.register_or_reuse_agent(
+            name=f"Mira — RadioCohost ({agent_suffix})",
+            username=f"radio_mira_{agent_suffix}",
         )
 
         # 3. Create initial room
@@ -207,6 +212,12 @@ class RadioRunner:
         """Core turn loop: poll news, generate dialogue, score, repeat."""
         while self._running:
             try:
+                # Check if room keeper permanently failed
+                if self._keeper.failed:
+                    logger.critical("Room keeper permanently failed — halting radio show.")
+                    self._running = False
+                    break
+
                 # Check if room keeper relocated us
                 current_room = self._keeper.room_id
                 if current_room and current_room != self._room_id:
@@ -244,6 +255,9 @@ class RadioRunner:
                 self._turn_count += 1
                 self._history.append(turn)
                 self._scheduler.record_turn()
+                # Mark headlines as seen only after a successful turn
+                self._commit_headlines()
+                self._commit_headlines = lambda: None  # prevent double-commit
 
                 logger.info(
                     f"  Turn {self._turn_count} result: "
@@ -301,7 +315,9 @@ class RadioRunner:
         now = time.monotonic()
         if now - self._last_news_poll >= NEWS_POLL_INTERVAL or not self._cached_headlines:
             try:
-                self._cached_headlines = self._poller.get_latest(n=5)
+                headlines, commit = self._poller.get_latest(n=5)
+                self._cached_headlines = headlines
+                self._commit_headlines = commit
                 self._last_news_poll = now
                 if self._cached_headlines:
                     logger.info(
@@ -316,10 +332,12 @@ class RadioRunner:
     # ── Callbacks & Signals ──────────────────────────────────────────────────
 
     def _handle_room_change(self, old_room_id: str, new_room_id: str) -> None:
-        """Callback from RoomKeeper when a room respawn occurs."""
-        logger.info(
-            f"Room respawned: {old_room_id[:8]} → {new_room_id[:8]}",
-        )
+        """Callback from RoomKeeper when a room respawn occurs (or permanently fails)."""
+        if not new_room_id:
+            logger.critical("RoomKeeper exhausted all respawn attempts — stopping show.")
+            self._running = False
+            return
+        logger.info(f"Room respawned: {old_room_id[:8]} → {new_room_id[:8]}")
         # History carries over — we continue the conversation seamlessly
 
     def _handle_shutdown(self, signum, frame) -> None:
@@ -336,10 +354,14 @@ class RadioRunner:
     # ── Teardown ─────────────────────────────────────────────────────────────
 
     def _teardown(self) -> None:
-        """Clean shutdown: stop keeper, close connections."""
+        """Clean shutdown: stop keeper, flush agent memory, close connections."""
         logger.info("Radio runner shutting down...")
         self._webhook_server.stop()
         self._keeper.stop()
+
+        # Flush agent long-term memory to disk on clean shutdown
+        self._engine.alex.flush_memory()
+        self._engine.mira.flush_memory()
 
         # Close the room gracefully (if we still have a host)
         if self._room_id and self._host:

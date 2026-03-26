@@ -154,6 +154,11 @@ class MusicScheduler:
         }
 
     @property
+    def break_interval(self) -> int:
+        """Number of turns between music breaks."""
+        return self._break_interval
+
+    @property
     def turn_count(self) -> int:
         """Current turn count."""
         return self._turn_count

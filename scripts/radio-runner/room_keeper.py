@@ -80,6 +80,7 @@ class RoomKeeper:
         self._thread: Optional[threading.Thread] = None
         self._stop_event = threading.Event()
         self._respawn_count: int = 0
+        self._failed: bool = False
         self._lock = threading.Lock()
 
     # ── Public API ───────────────────────────────────────────────────────────
@@ -93,7 +94,13 @@ class RoomKeeper:
     @property
     def respawn_count(self) -> int:
         """Total number of respawn operations performed."""
-        return self._respawn_count
+        with self._lock:
+            return self._respawn_count
+
+    @property
+    def failed(self) -> bool:
+        """True if all respawn attempts were exhausted and the show cannot continue."""
+        return self._failed
 
     def start(
         self,
@@ -232,7 +239,7 @@ class RoomKeeper:
                 # Update internal state
                 with self._lock:
                     self._room_id = new_room_id
-                self._respawn_count += 1
+                    self._respawn_count += 1
 
                 # Notify callback
                 if self._on_room_changed:
@@ -258,6 +265,18 @@ class RoomKeeper:
                 )
                 if attempt < self._max_attempts:
                     time.sleep(2.0 * attempt)  # linear backoff between retries
+
+        # All attempts exhausted — mark as permanently failed and notify main loop
+        self._failed = True
+        logger.critical(
+            "RoomKeeper permanently failed — all respawn attempts exhausted",
+            extra={"old_room_id": old_room_id[:8], "attempts": self._max_attempts},
+        )
+        if self._on_room_changed:
+            try:
+                self._on_room_changed(old_room_id, "")
+            except Exception as cb_exc:
+                logger.warning("on_room_changed failure callback failed", extra={"error": str(cb_exc)})
 
         return RespawnResult(
             old_room_id=old_room_id,

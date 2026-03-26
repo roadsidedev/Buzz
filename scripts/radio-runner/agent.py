@@ -24,6 +24,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+RADIO_MEMORY_DIR: str = os.environ.get("RADIO_MEMORY_DIR", "")
+
 logger = logging.getLogger(__name__)
 
 
@@ -65,10 +67,13 @@ class RadioAgent:
 
         # Memory buffers
         self.short_term_memory: deque[AgentMemoryItem] = deque(maxlen=max_memory_turns)
-        
+
         # Long-term memory (covered topics)
-        self.memory_file = Path(__file__).parent / f"memory_{name.lower()}.json"
-        self.covered_topics: List[str] = self._load_long_term_memory()
+        memory_dir = Path(RADIO_MEMORY_DIR) if RADIO_MEMORY_DIR else Path(__file__).parent
+        self.memory_file = memory_dir / f"memory_{name.lower()}.json"
+        self.covered_topics: deque[str] = deque(
+            self._load_long_term_memory(), maxlen=20
+        )
 
         # Load Core Identity
         self.skills_dir = Path(__file__).parent / "skills"
@@ -87,11 +92,11 @@ class RadioAgent:
     def perceive_topic(self, topic: str) -> None:
         """Record that a topic has been covered to long-term memory."""
         if topic and topic not in self.covered_topics:
-            self.covered_topics.append(topic)
-            # Keep only the last 20 topics to prevent prompt bloat
-            if len(self.covered_topics) > 20:
-                self.covered_topics.pop(0)
-            self._save_long_term_memory()
+            self.covered_topics.append(topic)  # deque auto-evicts oldest at maxlen=20
+
+    def flush_memory(self) -> None:
+        """Persist long-term memory to disk. Call on shutdown / SIGTERM."""
+        self._save_long_term_memory()
 
     def perceive_event(self, event_text: str) -> None:
         """Add an external event (like USER_JOINED) to memory."""
@@ -127,20 +132,16 @@ class RadioAgent:
         
         messages = self._build_chat_messages(prompt_intent)
 
-        try:
-            resp = self.provider.messages_create(
-                model=self.model,
-                max_tokens=150,
-                system=system_instruction,
-                messages=messages,
-            )
-            text = resp.content[0].text.strip()
-            # Agent remembers its own thought/action
-            self.perceive_dialogue(self.name, text)
-            return text
-        except Exception as exc:
-            logger.error("Agent '%s' generation failed: %s", self.name, str(exc))
-            return "[generation error] Apologies, processing error."
+        resp = self.provider.messages_create(
+            model=self.model,
+            max_tokens=150,
+            system=system_instruction,
+            messages=messages,
+        )
+        text = resp.content[0].text.strip()
+        # Agent remembers its own thought/action
+        self.perceive_dialogue(self.name, text)
+        return text
 
     def _build_chat_messages(self, current_intent: str) -> List[Dict[str, str]]:
         """Format the memory buffer into provider-compatible message shapes."""

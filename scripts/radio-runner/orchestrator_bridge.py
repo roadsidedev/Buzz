@@ -11,13 +11,21 @@ Depends on: httpx
 Used by: radio_runner.py, room_keeper.py
 """
 
+import json
 import logging
+import os
 import time
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
+from pathlib import Path
 from typing import Optional
 
 import httpx
+
+AGENT_CREDENTIALS_FILE: str = os.environ.get(
+    "RADIO_AGENTS_FILE",
+    str(Path(__file__).parent / ".radio_agents.json"),
+)
 
 logger = logging.getLogger(__name__)
 
@@ -78,9 +86,57 @@ class OrchestratorBridge:
         self._backend.close()
         self._orchestrator.close()
 
+    # ── Agent Credential Persistence ─────────────────────────────────────────
+
+    def register_or_reuse_agent(self, name: str, username: str) -> "RegisteredAgent":
+        """
+        Return a cached agent if credentials exist and the backend confirms the
+        agent is still valid.  Falls back to registering a fresh agent.
+
+        Credentials are stored in RADIO_AGENTS_FILE (.radio_agents.json by default)
+        so restarting the runner doesn't accumulate orphaned agent rows.
+        """
+        creds = self._load_agent_credentials()
+        cached = creds.get(username)
+        if cached:
+            try:
+                # Verify the agent still exists on the backend
+                resp = self._backend.get(
+                    f"/api/v1/agents/{cached['id']}",
+                    headers=self._auth_headers(cached["api_key"]),
+                )
+                if resp.status_code < 300:
+                    logger.info("Reusing cached agent credentials for '%s'", username)
+                    return RegisteredAgent(**cached)
+            except Exception:
+                pass
+            logger.info("Cached credentials for '%s' are stale — re-registering", username)
+
+        agent = self.register_agent(name, username)
+        creds[username] = asdict(agent)
+        self._save_agent_credentials(creds)
+        return agent
+
+    def _load_agent_credentials(self) -> dict:
+        try:
+            path = Path(AGENT_CREDENTIALS_FILE)
+            if path.exists():
+                return json.loads(path.read_text(encoding="utf-8"))
+        except Exception as exc:
+            logger.warning("Could not load agent credentials: %s", exc)
+        return {}
+
+    def _save_agent_credentials(self, creds: dict) -> None:
+        try:
+            Path(AGENT_CREDENTIALS_FILE).write_text(
+                json.dumps(creds, indent=2), encoding="utf-8"
+            )
+        except Exception as exc:
+            logger.warning("Could not save agent credentials: %s", exc)
+
     # ── Agent Registration ───────────────────────────────────────────────────
 
-    def register_agent(self, name: str, username: str) -> RegisteredAgent:
+    def register_agent(self, name: str, username: str) -> "RegisteredAgent":
         """
         Register a new agent with the backend.
 

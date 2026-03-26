@@ -18,7 +18,7 @@ import time
 from collections import deque
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Callable, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +30,7 @@ NEWSAPI_URL: str = "https://newsapi.org/v2/top-headlines"
 # Default RSS sources — override via env var RSS_FEEDS (comma-separated URLs)
 DEFAULT_RSS_FEEDS: list[str] = [
     "https://feeds.bbci.co.uk/news/world/rss.xml",
-    "https://feeds.reuters.com/reuters/topNews",
+    "https://feeds.npr.org/1001/rss.xml",          # Reuters shut down public feeds in 2020
     "https://hnrss.org/frontpage?count=10",
     "https://rss.nytimes.com/services/xml/rss/nyt/Technology.xml",
 ]
@@ -94,26 +94,33 @@ class NewsPoller:
 
     # ── Public API ───────────────────────────────────────────────────────────
 
-    def get_latest(self, n: int = 5) -> list[Headline]:
+    def get_latest(self, n: int = 5) -> Tuple[list, Callable[[], None]]:
         """
-        Return up to `n` fresh, unseen headlines.
+        Return up to `n` fresh, unseen headlines and a commit callback.
 
-        Polls sources synchronously (blocking). Call from the main turn loop
-        every 3-5 minutes.
+        Headlines are NOT marked seen until you call commit().  Call commit()
+        only after the turn is successfully submitted so a failed turn doesn't
+        permanently consume headlines.
+
+        Usage:
+            headlines, commit = poller.get_latest(n=5)
+            # ... use headlines in the turn ...
+            # on success:
+            commit()
         """
         self._poll_all()
         fresh = [h for h in self._buffer if h._hash not in self._seen]
         selected = fresh[:n]
 
-        # Mark as seen
-        for h in selected:
-            self._seen.append(h._hash)
+        def commit() -> None:
+            for h in selected:
+                self._seen.append(h._hash)
 
         logger.info(
             "Headlines selected",
             extra={"count": len(selected), "buffer_size": len(self._buffer)},
         )
-        return selected
+        return selected, commit
 
     # ── Internals ────────────────────────────────────────────────────────────
 

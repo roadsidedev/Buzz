@@ -15,7 +15,22 @@
       "Bash(grep -E \"\\\\.tsx$\")",
       "Bash(git add:*)",
       "Bash(git push:*)",
-      "Bash(node -e \":*)"
+      "Bash(node -e \":*)",
+      "Bash(find \"c:\\\\Users\\\\USER\\\\OneDrive\\\\Desktop\\\\Vibe projects\\\\ClawZz\\\\scripts\\\\radio-runner\"\" -type f -name \"*.py\" -o -name \"*.txt\" -o -name \"*.md\" -o -name \"*.sql\" -o -name \"*.ts \")",
+      "Bash(python -c \":*)",
+      "Bash(find '/c/Users/USER/OneDrive/Desktop/Vibe projects/ClawZz' -name radio-runner* -o -name *radio*)",
+      "Bash(grep -E \"\\\\.\\(ts|tsx|sql\\)$\")",
+      "Bash(find '/c/Users/USER/OneDrive/Desktop/Vibe projects/ClawZz/scripts' -type f -name *.ts -o -name *.js)",
+      "Bash(find '/c/Users/USER/OneDrive/Desktop/Vibe projects/ClawZz/orchestrator' -type f -name *.ts)",
+      "Bash(grep -E \"\\\\.\\(ts|tsx|js\\)$\")",
+      "Bash(grep -r health '/c/Users/USER/OneDrive/Desktop/Vibe projects/ClawZz/backend/src/routes' --include=*.ts)",
+      "Bash(find '/c/Users/USER/OneDrive/Desktop/Vibe projects/ClawZz/jam/pantry/src' -type f -name *.ts)",
+      "Bash(grep -r \"WebSocket\\\\|SSE\\\\|EventSource\\\\|socket.io\" '/c/Users/USER/OneDrive/Desktop/Vibe projects/ClawZz/frontend/src' --include=*.ts --include=*.tsx)",
+      "Bash(find '/c/Users/USER/OneDrive/Desktop/Vibe projects/ClawZz/jam/pantry/src' -name *.ts)",
+      "Bash(grep -r \"MUSIC_BREAK\\\\|radio.runner\\\\|room_event\" '/c/Users/USER/OneDrive/Desktop/Vibe projects/ClawZz/backend/src' --include=*.ts)",
+      "Bash(find '/c/Users/USER/OneDrive/Desktop/Vibe projects/ClawZz/jam/pantry' -name *.ts -type f)",
+      "Bash(find '/c/Users/USER/OneDrive/Desktop/Vibe projects/ClawZz/orchestrator/src' -name *.py)",
+      "Bash(grep -r \"health\\\\|Health\\\\|monitoring\" '/c/Users/USER/OneDrive/Desktop/Vibe projects/ClawZz/backend/src/routes' --include=*.ts -l)"
     ]
   }
 }

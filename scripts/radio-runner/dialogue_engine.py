@@ -37,41 +37,46 @@ def _resolve_provider() -> Any:
     """Resolve the LLM provider using the same adapter as the orchestrator."""
     try:
         from orchestrator.src.services.llm_provider import get_provider
-        provider = get_provider()
-        return provider
+        return get_provider()
     except (ImportError, ModuleNotFoundError):
         pass
 
+    # Fallback: add project root to path (set PYTHONPATH in the environment instead
+    # of relying on this — it won't hold in Docker or deployed environments)
     script_dir = os.path.dirname(os.path.abspath(__file__))
     project_root = os.path.abspath(os.path.join(script_dir, "..", ".."))
     if project_root not in sys.path:
+        logger.debug("sys.path fallback: adding %s (prefer setting PYTHONPATH)", project_root)
         sys.path.insert(0, project_root)
 
     try:
         from orchestrator.src.services.llm_provider import get_provider
-        provider = get_provider()
-        return provider
+        return get_provider()
     except (ImportError, ModuleNotFoundError):
         pass
 
     try:
         from src.services.llm_provider import get_provider
-        provider = get_provider()
-        return provider
+        return get_provider()
     except (ImportError, ModuleNotFoundError):
         pass
 
-    logger.warning("Could not resolve orchestrator LLM provider.")
+    logger.warning(
+        "Could not resolve orchestrator LLM provider. "
+        "Set PYTHONPATH to include the project root, or pass provider= to DialogueEngine."
+    )
     return None
 
+
 def _resolve_model(provider: Any) -> str:
-    """Pick the model name."""
+    """Pick the model name for dialogue generation."""
     if DIALOGUE_MODEL:
         return DIALOGUE_MODEL
     try:
         from orchestrator.src.config.settings import settings as orch_settings
-        return orch_settings.MODERATION_MODEL
-    except (ImportError, ModuleNotFoundError):
+        # Use SCORING_MODEL (capable) not MODERATION_MODEL (cheap content filter)
+        return orch_settings.SCORING_MODEL
+    except (ImportError, ModuleNotFoundError, AttributeError):
         pass
     return "claude-haiku-4-5-20251001"
 
@@ -84,8 +89,8 @@ class DialogueEngine:
     Manages Alex (Host) and Mira (CoHost) through stateful memory buffering.
     """
 
-    def __init__(self, api_key: str = "", model: str = "") -> None:
-        self._provider = _resolve_provider()
+    def __init__(self, api_key: str = "", model: str = "", provider: Any = None) -> None:
+        self._provider = provider or _resolve_provider()
         self._model = model or _resolve_model(self._provider)
 
         # Initialize the stateful agents
