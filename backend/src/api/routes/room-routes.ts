@@ -13,11 +13,12 @@
 
 import { Router, Request, Response } from "express";
 import type { RoomMessage } from "@common/types/index";
-import { RoomStatus } from "@common/types/index";
+import { RoomStatus, MessageStatus } from "@common/types/index";
 import { roomRepository, messageRepository } from "../../repositories/index.js";
 import { turnManagementService } from "../../services/turn-management-service.js";
 import { messageService } from "../../services/message-service.js";
 import { outputContractService } from "../../services/output-contract-service.js";
+import { requireApiKey } from "../../middleware/api-key-auth.js";
 import { ValidationError, NotFoundError } from "../../utils/errors.js";
 import { logger } from "../../utils/logger.js";
 
@@ -434,6 +435,88 @@ router.post(
     }
   },
 );
+
+// ===================================================================
+// TRIGGER TTS ENDPOINT (For Orchestrator / Radio Runner)
+// ===================================================================
+
+/**
+ * POST /api/rooms/:id/tts
+ *
+ * Trigger TTS synthesis and streaming for a selected message.
+ *
+ * Auth: Required (API Key)
+ * Body: { messageId: string, text: string, agentId?: string }
+ *
+ * Returns: { durationMs: number }
+ */
+router.post("/api/rooms/:id/tts", requireApiKey, async (req: Request, res: Response) => {
+  try {
+    const roomId = req.params.id;
+    const { messageId, text, agentId } = req.body as {
+      messageId: string;
+      text: string;
+      agentId?: string;
+    };
+
+    if (!messageId || !text) {
+      return res.status(400).json({ error: "messageId and text required" });
+    }
+
+    const room = await roomRepository.getById(roomId);
+    if (!room || !room.jamRoomId) {
+      return res.status(404).json({ error: "Room or jamRoomId not found" });
+    }
+
+    const { getTTSService } = await import("../../services/tts-service.js");
+    const tts = getTTSService();
+
+    if (!tts.isEnabled()) {
+      return res.status(200).json({ durationMs: 0 });
+    }
+
+    // Attempt to select different voices for different agents.
+    // In production we'd look up the agent's assigned voiceId from DB.
+    let voiceId = undefined;
+    if (agentId && agentId.includes("mira")) {
+      voiceId = process.env.ELEVENLABS_VOICE_B;
+    }
+
+    const { durationMs, audioBuffer } = await tts.synthesizeAndStream(
+      room.jamRoomId,
+      text,
+      messageId,
+      voiceId,
+    );
+
+    // Persist audio URL and played timestamp to the message record
+    try {
+      const { getAudioStorageService } = await import("../../services/audio-storage-service.js");
+      const audioUrl = await getAudioStorageService().upload(audioBuffer, messageId);
+      await messageRepository.updateStatus(messageId, MessageStatus.PLAYED, { playedAt: new Date(), audioUrl: audioUrl || undefined });
+      
+      const { getIO } = await import("../../server.js");
+      getIO().to(`room:${room.id}`).emit("turn:completed", {
+        roomId: room.id,
+        turnNumber: (room.turnCount || 0) + 1,
+        messageId,
+        agentId,
+        text,
+        score: 1.0, // Mocked for radio runner flow
+        durationMs,
+        audioUrl: audioUrl ?? null,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (e) {
+      logger.error("Failed to post-process TTS audio", { error: e });
+    }
+
+    return res.status(200).json({ success: true, durationMs });
+  } catch (err) {
+    logger.error("TTS endpoint failed", { error: err instanceof Error ? err.message : String(err) });
+    return res.status(500).json({ error: "TTS failed" });
+  }
+});
 
 // ===================================================================
 // EXPORTS

@@ -252,6 +252,27 @@ class RadioRunner:
                     cohost_text=turn.cohost_text,
                 )
 
+                # 4. Handle results & pacing
+                if result.selected_message_id:
+                    winner_text = turn.host_text if result.selected_agent_id == self._host.id else turn.cohost_text
+                    
+                    logger.info("Triggering audio synthesis...")
+                    duration_ms = self._bridge.play_audio(
+                        room_id=self._room_id,
+                        message_id=result.selected_message_id,
+                        text=winner_text,
+                        agent_id=result.selected_agent_id,
+                        api_key=self._host.api_key
+                    )
+                    
+                    # Sleep dynamically based on speech duration + 1.5s natural pause
+                    sleep_time = max(1.5, (duration_ms / 1000.0) + 1.5)
+                    logger.info(f"Sleeping {sleep_time:.2f}s for audio playback + padding...")
+                    time.sleep(sleep_time)
+                else:
+                    logger.warning("No message selected, turning over quickly")
+                    time.sleep(self._turn_interval)
+
                 self._turn_count += 1
                 self._history.append(turn)
                 self._scheduler.record_turn()

@@ -318,6 +318,24 @@ class OrchestratorBridge:
         time.sleep(0.3)
         return self.process_turn(room_id)
 
+    def play_audio(self, room_id: str, message_id: str, text: str, agent_id: str, api_key: str) -> int:
+        """
+        Trigger backend TTS to synthesize the audio and play it into the room.
+        Returns the duration of the audio in milliseconds.
+        """
+        resp = self._backend.post(
+            f"/api/v1/rooms/{room_id}/tts",
+            json={
+                "messageId": message_id,
+                "text": text,
+                "agentId": agent_id,
+            },
+            headers=self._auth_headers(api_key),
+        )
+        self._assert_ok(resp, "play_audio")
+        data = resp.json()
+        return data.get("durationMs", 0)
+
     # ── Room Events (for music breaks, etc.) ─────────────────────────────────
 
     def emit_room_event(
