@@ -159,7 +159,7 @@ class OrchestratorBridge:
         self._assert_ok(resp, "register_agent")
         data = resp.json()
         agent = data["agent"]
-        logger.info("Agent registered", extra={"id": agent["id"][:8], "name": name})
+        logger.info("Agent registered", extra={"agent_id_short": agent["id"][:8], "agent_name": name})
         return RegisteredAgent(
             id=agent["id"],
             api_key=agent["api_key"],

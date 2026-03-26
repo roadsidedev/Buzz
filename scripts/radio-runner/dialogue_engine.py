@@ -43,16 +43,22 @@ def _resolve_provider() -> Any:
 
     # Fallback search for orchestrator
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    project_root = os.path.abspath(os.path.join(script_dir, "..", ".."))
+    # Try current dir (Docker/Railway flatten contents)
+    project_root = script_dir
+    # Try one level up (local dev)
+    parent_dir = os.path.abspath(os.path.join(script_dir, ".."))
+    # Try two levels up (standard layout)
+    grandparent_dir = os.path.abspath(os.path.join(script_dir, "..", ".."))
     
-    # Try project root
-    if project_root not in sys.path:
-        sys.path.insert(0, project_root)
-    
-    # Try adding orchestrator dir itself to path to allow 'from src...'
-    orchestrator_dir = os.path.join(project_root, "orchestrator")
-    if os.path.exists(orchestrator_dir) and orchestrator_dir not in sys.path:
-        sys.path.insert(0, orchestrator_dir)
+    potential_roots = [project_root, parent_dir, grandparent_dir]
+    for root in potential_roots:
+        if root not in sys.path:
+            sys.path.insert(0, root)
+        
+        # Try adding orchestrator dir itself to path to allow 'from src...'
+        orch_dir = os.path.join(root, "orchestrator")
+        if os.path.exists(orch_dir) and orch_dir not in sys.path:
+            sys.path.insert(0, orch_dir)
 
     try:
         # Try both package-prefixed and standalone imports
@@ -150,12 +156,25 @@ def _resolve_model(provider: Any) -> str:
     """Pick the model name for dialogue generation."""
     if DIALOGUE_MODEL:
         return DIALOGUE_MODEL
+        
+    # Check for NVIDIA key to provide better default
+    if os.getenv("NVIDIA_API_KEY"):
+        return "meta/llama-3.3-70b-instruct"
+        
     try:
         from orchestrator.src.config.settings import settings as orch_settings
         # Use SCORING_MODEL (capable) not MODERATION_MODEL (cheap content filter)
         return orch_settings.SCORING_MODEL
     except (ImportError, ModuleNotFoundError, AttributeError):
         pass
+    
+    # Check for src.config.settings if standalone
+    try:
+        from src.config.settings import settings as orch_settings
+        return orch_settings.SCORING_MODEL
+    except (ImportError, ModuleNotFoundError, AttributeError):
+        pass
+
     return "claude-haiku-4-5-20251001"
 
 
