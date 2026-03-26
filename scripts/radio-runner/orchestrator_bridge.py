@@ -22,10 +22,12 @@ from typing import Optional
 
 import httpx
 
+# ── Constants ────────────────────────────────────────────────────────────
 AGENT_CREDENTIALS_FILE: str = os.environ.get(
     "RADIO_AGENTS_FILE",
     str(Path(__file__).parent / ".radio_agents.json"),
 )
+SYSTEM_SECRET: Optional[str] = os.environ.get("RADIO_SYSTEM_SECRET")
 
 logger = logging.getLogger(__name__)
 
@@ -88,14 +90,41 @@ class OrchestratorBridge:
 
     # ── Agent Credential Persistence ─────────────────────────────────────────
 
-    def register_or_reuse_agent(self, name: str, username: str) -> "RegisteredAgent":
+    def register_or_reuse_agent(
+        self, 
+        name: str, 
+        username: str, 
+        pre_auth_key: Optional[str] = None
+    ) -> "RegisteredAgent":
         """
         Return a cached agent if credentials exist and the backend confirms the
         agent is still valid.  Falls back to registering a fresh agent.
 
-        Credentials are stored in RADIO_AGENTS_FILE (.radio_agents.json by default)
-        so restarting the runner doesn't accumulate orphaned agent rows.
+        If pre_auth_key is provided, it takes priority and registration is skipped.
         """
+        # 1. Check for pre-authorized key
+        if pre_auth_key:
+            logger.info("Using pre-authorized API key for '%s'", username)
+            try:
+                resp = self._backend.get(
+                    "/api/v1/auth/me",
+                    headers=self._auth_headers(pre_auth_key),
+                )
+                self._assert_ok(resp, "auth_me")
+                agent_data = resp.json().get("data")
+                if not agent_data:
+                    raise RuntimeError("Invalid response from /auth/me")
+                
+                return RegisteredAgent(
+                    id=agent_data["id"],
+                    api_key=pre_auth_key,
+                    name=agent_data["name"],
+                )
+            except Exception as exc:
+                logger.error("Failed to validate pre-authorized key for '%s': %s", username, exc)
+                raise
+
+        # 2. Check cache
         creds = self._load_agent_credentials()
         cached = creds.get(username)
         if cached:
@@ -112,6 +141,7 @@ class OrchestratorBridge:
                 pass
             logger.info("Cached credentials for '%s' are stale — re-registering", username)
 
+        # 3. Fresh registration
         agent = self.register_agent(name, username)
         creds[username] = asdict(agent)
         self._save_agent_credentials(creds)
@@ -139,21 +169,18 @@ class OrchestratorBridge:
     def register_agent(self, name: str, username: str) -> "RegisteredAgent":
         """
         Register a new agent with the backend.
-
-        Args:
-            name: Display name (e.g. "Alex — RadioHost")
-            username: Unique username (e.g. "radio_alex_abc123")
-
-        Returns:
-            RegisteredAgent with id and api_key
         """
+        payload = {
+            "name": name,
+            "username": username,
+            "description": "Radio runner agent (Alex/Mira)",
+        }
+        if SYSTEM_SECRET:
+            payload["system_secret"] = SYSTEM_SECRET
+
         resp = self._backend.post(
             "/api/v1/agents/register",
-            json={
-                "name": name,
-                "username": username,
-                "description": "Radio runner agent (Alex/Mira)",
-            },
+            json=payload,
             headers={"Content-Type": "application/json"},
         )
         self._assert_ok(resp, "register_agent")
@@ -379,10 +406,13 @@ class OrchestratorBridge:
 
     @staticmethod
     def _auth_headers(api_key: str) -> dict[str, str]:
-        return {
+        headers = {
             "Content-Type": "application/json",
             "Authorization": f"Bearer {api_key}",
         }
+        if SYSTEM_SECRET:
+            headers["X-Clawzz-System-Secret"] = SYSTEM_SECRET
+        return headers
 
     @staticmethod
     def _assert_ok(resp: httpx.Response, context: str) -> None:

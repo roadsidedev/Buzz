@@ -24,6 +24,7 @@ export interface RegisterAgentInput {
   name: string;
   username: string;
   description?: string;
+  system_secret?: string; // Optional secret to authorize platform-bot role
 }
 
 export interface RegisterAgentResult {
@@ -167,6 +168,9 @@ export class ClawzzAuthService {
     const now = new Date();
 
     // Insert agent record
+    const systemSecret = process.env.CLAWZZ_SYSTEM_SECRET;
+    const isAuthorizedBot = systemSecret && input.system_secret === systemSecret;
+
     await this.db.query(
       `INSERT INTO agent (
         id, username, name, description, api_key, claim_token,
@@ -181,9 +185,9 @@ export class ClawzzAuthService {
         description || null,
         apiKey,
         claimToken,
-        "pending_claim",
-        "unverified",
-        "agent",
+        isAuthorizedBot ? "claimed" : "pending_claim",
+        isAuthorizedBot ? "verified" : "unverified",
+        isAuthorizedBot ? "bot" : "agent",
         verificationCode,
         now,
         now,

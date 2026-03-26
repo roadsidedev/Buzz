@@ -168,6 +168,7 @@ class RadioRunner:
         self._host = self._bridge.register_or_reuse_agent(
             name=f"Alex — RadioHost ({agent_suffix})",
             username=f"radio_alex_{agent_suffix}",
+            pre_auth_key=os.environ.get("RADIO_HOST_API_KEY"),
         )
 
         # 2. Register CO-HOST agent (Mira) — reuses cached credentials if available
@@ -175,6 +176,7 @@ class RadioRunner:
         self._cohost = self._bridge.register_or_reuse_agent(
             name=f"Mira — RadioCohost ({agent_suffix})",
             username=f"radio_mira_{agent_suffix}",
+            pre_auth_key=os.environ.get("RADIO_COHOST_API_KEY"),
         )
 
         # 3. Create initial room

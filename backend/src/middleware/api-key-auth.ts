@@ -107,8 +107,12 @@ export const requireApiKey = async (
       return;
     }
 
-    // Enforce mandatory claiming
-    if (agent.claimStatus !== "claimed") {
+    // Enforce mandatory claiming (bypass for authorized platform bots)
+    const isBot = agent.role === "bot" || agent.role === "system";
+    const systemSecret = req.headers["x-clawzz-system-secret"];
+    const authorizedBot = isBot && systemSecret && systemSecret === process.env.CLAWZZ_SYSTEM_SECRET;
+
+    if (agent.claimStatus !== "claimed" && !authorizedBot) {
       res.status(403).json({
         success: false,
         error: {
