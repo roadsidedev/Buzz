@@ -152,7 +152,7 @@ class OrchestratorBridge:
             json={
                 "name": name,
                 "username": username,
-                "description": f"Radio runner agent: {name}",
+                "description": "Radio runner agent (Alex/Mira)",
             },
             headers={"Content-Type": "application/json"},
         )

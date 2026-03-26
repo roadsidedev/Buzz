@@ -121,7 +121,10 @@ def get_provider(name: str | None = None, api_key: str | None = None) -> LLMProv
         raise ImportError("No LLM provider configured via env or settings")
 
     # Try to import a provider-specific adapter dynamically
-    module_name = f"src.services.providers.{provider}_provider"
+    # Handle both standalone and package-prefixed imports
+    package_prefix = __name__.rsplit(".src.", 1)[0] + "." if ".src." in __name__ else ""
+    module_name = f"{package_prefix}src.services.providers.{provider}_provider"
+    
     try:
         mod = importlib.import_module(module_name)
         # Attempt common class names

@@ -30,7 +30,7 @@ class Settings(BaseSettings):
 
     # LLM Provider configuration (provider-agnostic)
     # Supported providers: "anthropic", "openai", "nvidia", "kimi", "gemini", "openrouter", "none"
-    LLM_PROVIDER: str = "anthropic"
+    LLM_PROVIDER: str = ""
     LLM_API_KEY: str = ""
     # Optional: explicit API URL for providers that expose HTTP endpoints
     LLM_API_URL: str = ""
@@ -79,7 +79,7 @@ class Settings(BaseSettings):
         """Pydantic config."""
 
         env_file = ".env"
-        case_sensitive = True
+        case_sensitive = False
 
 
 settings = Settings()

@@ -41,22 +41,26 @@ def _resolve_provider() -> Any:
     except (ImportError, ModuleNotFoundError):
         pass
 
-    # Fallback: add project root to path (set PYTHONPATH in the environment instead
-    # of relying on this — it won't hold in Docker or deployed environments)
+    # Fallback search for orchestrator
     script_dir = os.path.dirname(os.path.abspath(__file__))
     project_root = os.path.abspath(os.path.join(script_dir, "..", ".."))
+    
+    # Try project root
     if project_root not in sys.path:
-        logger.debug("sys.path fallback: adding %s (prefer setting PYTHONPATH)", project_root)
         sys.path.insert(0, project_root)
+    
+    # Try adding orchestrator dir itself to path to allow 'from src...'
+    orchestrator_dir = os.path.join(project_root, "orchestrator")
+    if os.path.exists(orchestrator_dir) and orchestrator_dir not in sys.path:
+        sys.path.insert(0, orchestrator_dir)
 
     try:
-        from orchestrator.src.services.llm_provider import get_provider
-        return get_provider()
-    except (ImportError, ModuleNotFoundError):
-        pass
-
-    try:
-        from src.services.llm_provider import get_provider
+        # Try both package-prefixed and standalone imports
+        try:
+            from orchestrator.src.services.llm_provider import get_provider
+        except (ImportError, ModuleNotFoundError):
+            from src.services.llm_provider import get_provider
+            
         return get_provider()
     except (ImportError, ModuleNotFoundError):
         pass
@@ -67,9 +71,42 @@ def _resolve_provider() -> Any:
     )
     
     # Standalone fallback using exactly what we have (httpx)
-    api_key = os.getenv("ANTHROPIC_API_KEY")
-    if not api_key:
-        logger.error("No ANTHROPIC_API_KEY found for standalone provider fallback!")
+    # Check for NVIDIA NIM first as it's the primary for this deployment
+    nvidia_key = os.getenv("NVIDIA_API_KEY")
+    anthropic_key = os.getenv("ANTHROPIC_API_KEY")
+    
+    if nvidia_key:
+        logger.info("Using standalone NVIDIA NIM fallback")
+        class StandaloneNvidia:
+            def __init__(self, key: str):
+                self.key = key
+                import httpx
+                self.client = httpx.Client(timeout=60.0)
+            def messages_create(self, model: str, max_tokens: int, system: str, messages: list):
+                # Map Anthropic-style call to NVIDIA (OpenAI-compatible) endpoint
+                # Note: This is a placeholder for the basic structure.
+                # In practice, get_provider() from orchestrator should handle this better.
+                logger.debug("Standalone NVIDIA NIM call")
+                resp = self.client.post(
+                    "https://integrate.api.nvidia.com/v1/chat/completions",
+                    headers={"Authorization": f"Bearer {self.key}", "Content-Type": "application/json"},
+                    json={
+                        "model": model or "meta/llama-3.1-405b-instruct",
+                        "messages": [{"role": "system", "content": system}] + messages,
+                        "max_tokens": max_tokens,
+                        "temperature": 0.7,
+                    }
+                )
+                resp.raise_for_status()
+                data = resp.json()
+                from collections import namedtuple
+                TextObj = namedtuple("TextObj", ["text"])
+                ContentObj = namedtuple("ContentObj", ["content"])
+                return ContentObj(content=[TextObj(text=data["choices"][0]["message"]["content"])])
+        return StandaloneNvidia(nvidia_key)
+
+    if not anthropic_key:
+        logger.error("No LLM API keys found for standalone provider fallback!")
         return None
         
     class StandaloneAnthropic:

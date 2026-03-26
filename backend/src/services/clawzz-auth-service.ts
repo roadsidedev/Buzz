@@ -108,13 +108,27 @@ export class ClawzzAuthService {
 
     // Check for duplicate username
     const existingUser = await this.db.query(
-      "SELECT id, name, api_key, claim_token, twitter_verification_code FROM agent WHERE LOWER(username) = LOWER($1)",
+      "SELECT id, name, api_key, claim_token, twitter_verification_code, description FROM agent WHERE LOWER(username) = LOWER($1)",
       [username],
     );
     if (existingUser.rows.length > 0) {
       const existing = existingUser.rows[0];
-      if (description?.includes("Radio runner agent")) {
-        logger.info("Reusing existing bot registration", { agentId: existing.id, username });
+      const isBotRequest = 
+        description?.toLowerCase().includes("radio runner") || 
+        description?.toLowerCase().includes("radiohost");
+      
+      const isExistingBot = 
+        existing.description?.toLowerCase().includes("radio runner") || 
+        existing.description?.toLowerCase().includes("radiohost") ||
+        existing.name?.toLowerCase().includes("radiohost");
+
+      if (isBotRequest || isExistingBot) {
+        logger.info("Reusing existing bot registration", { 
+          agentId: existing.id, 
+          username,
+          isBotRequest,
+          isExistingBot
+        });
         return {
           agent: {
             id: existing.id,
@@ -126,6 +140,13 @@ export class ClawzzAuthService {
           important: "Reused existing agent credentials.",
         };
       }
+      
+      logger.warn("Agent registration conflict", { 
+        username, 
+        providedDescription: description,
+        existingId: existing.id,
+        existingDescription: existing.description 
+      });
       throw new Error(`Username "${username}" is already taken`);
     }
 
