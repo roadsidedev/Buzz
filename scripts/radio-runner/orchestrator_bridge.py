@@ -198,6 +198,7 @@ class OrchestratorBridge:
     def create_room(
         self,
         host: RegisteredAgent,
+        title: str = "ClawZz Radio Live",
         room_type: str = "debate",
         objective: str = "Live news discussion",
         spawn_fee: int = 250,
@@ -212,6 +213,7 @@ class OrchestratorBridge:
             "/api/v1/rooms",
             json={
                 "type": room_type,
+                "title": title,
                 "objective": objective,
                 "spawnFee": spawn_fee,
                 "recordingEnabled": True,

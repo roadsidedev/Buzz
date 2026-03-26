@@ -74,6 +74,7 @@ class RoomKeeper:
         self._room_id: str = ""
         self._host_agent = None
         self._cohost_agent = None
+        self._title: str = "ClawZz Radio Live"
         self._room_type: str = "debate"
         self._objective: str = "Live news discussion"
 
@@ -107,6 +108,7 @@ class RoomKeeper:
         room_id: str,
         host_agent,
         cohost_agent,
+        title: str = "ClawZz Radio Live",
         room_type: str = "debate",
         objective: str = "Live news discussion",
     ) -> None:
@@ -117,6 +119,7 @@ class RoomKeeper:
             room_id: Initial room to monitor
             host_agent: RegisteredAgent for room creation
             cohost_agent: RegisteredAgent to join the new room
+            title: Room title for respawning
             room_type: Room type for respawning
             objective: Room objective for respawning
         """
@@ -124,6 +127,7 @@ class RoomKeeper:
             self._room_id = room_id
         self._host_agent = host_agent
         self._cohost_agent = cohost_agent
+        self._title = title
         self._room_type = room_type
         self._objective = objective
 
@@ -228,6 +232,7 @@ class RoomKeeper:
                 # Create new room
                 new_room_id = self._bridge.create_room(
                     host=self._host_agent,
+                    title=self._title,
                     room_type=self._room_type,
                     objective=self._objective,
                 )

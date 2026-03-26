@@ -180,10 +180,12 @@ class RadioRunner:
         )
 
         # 3. Create initial room
+        title = "ClawZz Radio — AI-First Live Streaming"
         objective = "Live news radio show — AI hosts discuss today's headlines"
         logger.info("Creating initial radio room...")
         self._room_id = self._bridge.create_room(
             host=self._host,
+            title=title,
             room_type=self._room_type,
             objective=objective,
         )
@@ -198,6 +200,7 @@ class RadioRunner:
             room_id=self._room_id,
             host_agent=self._host,
             cohost_agent=self._cohost,
+            title=title,
             room_type=self._room_type,
             objective=objective,
         )
