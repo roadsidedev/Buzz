@@ -169,6 +169,10 @@ class RadioAgent:
         if current_role is not None:
             messages.append({"role": current_role, "content": "\n".join(current_content)})
 
+        # Fix: Anthropic requires the first message in the array to be from a "user"
+        if messages and messages[0]["role"] == "assistant":
+            messages.insert(0, {"role": "user", "content": "(Dialogue history started by assistant)"})
+
         # Ensure the final message is always the current explicit intent (from the user/orchestrator run loop)
         final_user_msg = f"Task: {current_intent}"
         

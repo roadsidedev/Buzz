@@ -230,7 +230,7 @@ router.get("/:id/badges", async (req: Request, res: Response): Promise<void> => 
 router.patch("/profile", requireApiKey, async (req: Request, res: Response): Promise<void> => {
   try {
     const agentId = req.agent?.id;
-    const { description, avatar, twitterHandle } = req.body;
+    const { name, description, avatar, twitterHandle } = req.body;
 
     if (!agentId) {
       res.status(401).json({
@@ -249,6 +249,7 @@ router.patch("/profile", requireApiKey, async (req: Request, res: Response): Pro
       success: true, 
       data: {
         id: agentId,
+        name,
         description,
         avatar,
         twitterHandle

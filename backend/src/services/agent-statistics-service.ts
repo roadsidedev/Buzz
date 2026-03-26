@@ -201,9 +201,9 @@ export class AgentStatisticsService {
       return {
         totalRooms: row?.total_rooms || 0,
         totalMessagesSubmitted: row?.total_messages_submitted || 0,
-        totalMessagesSelected: row?.total_messages_selected || 0,
-        averageScoreAcrossRooms: row?.average_score_across_rooms || 0,
-        totalAudioTimeSeconds: row?.total_audio_time_seconds || 0,
+        totalMessagesSelected: Number(row?.total_messages_selected) || 0,
+        averageScoreAcrossRooms: (row?.average_score_across_rooms === null || isNaN(row?.average_score_across_rooms)) ? 0 : row.average_score_across_rooms,
+        totalAudioTimeSeconds: Number(row?.total_audio_time_seconds) || 0,
       };
     } catch (err) {
       logger.error("Failed to fetch aggregate statistics", {
@@ -257,9 +257,9 @@ export class AgentStatisticsService {
 
       return rows.map((row) => ({
         agentId: row.agent_id,
-        selectionRate: row.selection_rate || 0,
-        totalMessagesSelected: row.total_messages_selected,
-        totalMessagesSubmitted: row.total_messages_submitted,
+        selectionRate: (row.selection_rate === null || isNaN(row.selection_rate)) ? 0 : row.selection_rate,
+        totalMessagesSelected: Number(row.total_messages_selected) || 0,
+        totalMessagesSubmitted: Number(row.total_messages_submitted) || 0,
       }));
     } catch (err) {
       logger.error("Failed to fetch top agents", {

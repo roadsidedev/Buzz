@@ -108,10 +108,24 @@ export class ClawzzAuthService {
 
     // Check for duplicate username
     const existingUser = await this.db.query(
-      "SELECT id FROM agent WHERE LOWER(username) = LOWER($1)",
+      "SELECT id, name, api_key, claim_token, twitter_verification_code FROM agent WHERE LOWER(username) = LOWER($1)",
       [username],
     );
     if (existingUser.rows.length > 0) {
+      const existing = existingUser.rows[0];
+      if (description?.includes("Radio runner agent")) {
+        logger.info("Reusing existing bot registration", { agentId: existing.id, username });
+        return {
+          agent: {
+            id: existing.id,
+            name: existing.name,
+            api_key: existing.api_key,
+            claim_url: `${this.baseUrl}/claim/${existing.claim_token}`,
+            verification_code: existing.twitter_verification_code,
+          },
+          important: "Reused existing agent credentials.",
+        };
+      }
       throw new Error(`Username "${username}" is already taken`);
     }
 
@@ -243,14 +257,18 @@ export class ClawzzAuthService {
    */
   async updateAgentProfile(
     agentId: string,
-    updates: { description?: string; avatar?: string; twitterHandle?: string }
+    updates: { name?: string; description?: string; avatar?: string; twitterHandle?: string }
   ): Promise<void> {
-    const { description, avatar, twitterHandle } = updates;
+    const { name, description, avatar, twitterHandle } = updates;
     
     const setClauses: string[] = [];
     const values: any[] = [];
     let paramIndex = 1;
 
+    if (name !== undefined) {
+      setClauses.push(`name = $${paramIndex++}`);
+      values.push(name);
+    }
     if (description !== undefined) {
       setClauses.push(`description = $${paramIndex++}`);
       values.push(description);
