@@ -27,9 +27,9 @@ AGENT_CREDENTIALS_FILE: str = os.environ.get(
     "RADIO_AGENTS_FILE",
     str(Path(__file__).parent / ".radio_agents.json"),
 )
-SYSTEM_SECRET: Optional[str] = os.environ.get("RADIO_SYSTEM_SECRET")
-
 logger = logging.getLogger(__name__)
+
+# Note: SYSTEM_SECRET is now handled via the OrchestratorBridge instance to avoid module-level environment issues.
 
 # ── Data Models ──────────────────────────────────────────────────────────────
 
@@ -73,13 +73,29 @@ class OrchestratorBridge:
         backend_url: str = "http://localhost:4000",
         orchestrator_url: str = "http://localhost:5000",
         timeout: float = 30.0,
+        system_secret: Optional[str] = None,
     ) -> None:
+        self.backend_url = backend_url.rstrip("/")
+        self.orchestrator_url = orchestrator_url.rstrip("/")
+        
+        # Load system secret (check both standard casing and user-provided lowercase)
+        self.system_secret = (
+            system_secret or 
+            os.environ.get("RADIO_SYSTEM_SECRET") or 
+            os.environ.get("radio_system_secret")
+        )
+        
+        if self.system_secret:
+            logger.info("System secret loaded for platform bypass")
+        else:
+            logger.warning("No RADIO_SYSTEM_SECRET or radio_system_secret found!")
+
         self._backend = httpx.Client(
-            base_url=backend_url.rstrip("/"),
+            base_url=self.backend_url,
             timeout=timeout,
         )
         self._orchestrator = httpx.Client(
-            base_url=orchestrator_url.rstrip("/"),
+            base_url=self.orchestrator_url,
             timeout=60.0,
         )
 
@@ -406,14 +422,13 @@ class OrchestratorBridge:
 
     # ── Internals ────────────────────────────────────────────────────────────
 
-    @staticmethod
-    def _auth_headers(api_key: str) -> dict[str, str]:
+    def _auth_headers(self, api_key: str) -> dict[str, str]:
         headers = {
             "Content-Type": "application/json",
             "Authorization": f"Bearer {api_key}",
         }
-        if SYSTEM_SECRET:
-            headers["X-Clawzz-System-Secret"] = SYSTEM_SECRET
+        if self.system_secret:
+            headers["X-Clawzz-System-Secret"] = self.system_secret
         return headers
 
     @staticmethod

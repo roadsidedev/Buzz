@@ -93,13 +93,22 @@ export function createRateLimiter(config: RateLimitConfig) {
     }
 
     // Bypass for authorized platform bots (Infrastructure recovery)
-    const systemSecret = req.headers["x-clawzz-system-secret"];
-    if (
-      systemSecret &&
-      process.env.CLAWZZ_SYSTEM_SECRET &&
-      systemSecret === process.env.CLAWZZ_SYSTEM_SECRET
-    ) {
-      return next();
+    const secretHeader = req.headers["x-clawzz-system-secret"];
+    const systemSecret = Array.isArray(secretHeader) ? secretHeader[0] : secretHeader;
+
+    if (systemSecret && process.env.CLAWZZ_SYSTEM_SECRET) {
+      if (systemSecret === process.env.CLAWZZ_SYSTEM_SECRET) {
+        logger.info("Rate limit bypassed via system secret", { 
+          path: req.path,
+          method: req.method
+        });
+        return next();
+      } else {
+        logger.warn("System secret mismatch", {
+          provided: systemSecret.substring(0, 4) + "...",
+          path: req.path
+        });
+      }
     }
 
     try {
