@@ -191,8 +191,8 @@ class OrchestratorBridge:
             "username": username,
             "description": "Radio runner agent (Alex/Mira)",
         }
-        if SYSTEM_SECRET:
-            payload["system_secret"] = SYSTEM_SECRET
+        if self.system_secret:
+            payload["system_secret"] = self.system_secret
 
         resp = self._backend.post(
             "/api/v1/agents/register",
