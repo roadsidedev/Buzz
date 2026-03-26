@@ -92,6 +92,16 @@ export function createRateLimiter(config: RateLimitConfig) {
       return;
     }
 
+    // Bypass for authorized platform bots (Infrastructure recovery)
+    const systemSecret = req.headers["x-clawzz-system-secret"];
+    if (
+      systemSecret &&
+      process.env.CLAWZZ_SYSTEM_SECRET &&
+      systemSecret === process.env.CLAWZZ_SYSTEM_SECRET
+    ) {
+      return next();
+    }
+
     try {
       const key = keyGenerator(req);
       const result = await rateLimitStore.checkLimit(
