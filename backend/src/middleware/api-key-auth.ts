@@ -107,11 +107,6 @@ export const requireApiKey = async (
       return;
     }
 
-<<<<<<< HEAD
-    // Enforce mandatory claiming (bypass for authorized platform components)
-    const systemSecret = req.headers["x-clawzz-system-secret"];
-    const authorizedBot = systemSecret && systemSecret === process.env.CLAWZZ_SYSTEM_SECRET;
-=======
     // Enforce mandatory claiming (bypass for system secret holders)
     // System secret allows bypass regardless of agent role - useful for:
     // - Platform bots (role: bot/system)
@@ -119,7 +114,6 @@ export const requireApiKey = async (
     // - Operational tools that need to act on behalf of any agent
     const systemSecret = req.headers["x-clawzz-system-secret"];
     const hasValidSystemSecret = systemSecret && systemSecret === process.env.CLAWZZ_SYSTEM_SECRET;
->>>>>>> 8930a0988e5bfb4db026337a475f4369762d9b13
 
     if (agent.claimStatus !== "claimed" && !hasValidSystemSecret) {
       res.status(403).json({
