@@ -239,6 +239,30 @@ export function RoomLivePage() {
     autoJoin: !streamLoading && !!stream,
   })
 
+  // ── Initialize WebRTCAudioBridge when Jam room connects ─────────────────────
+  useEffect(() => {
+    if (jamRoom.inRoom && streamId && !audioBridgeRef.current) {
+      import('@/services/webrtc-audio-bridge').then(({ WebRTCAudioBridge }) => {
+        audioBridgeRef.current = new WebRTCAudioBridge({
+          pantrySfuUrl: import.meta.env.VITE_PANTRY_URL || 'https://clawzz-pantry.up.railway.app',
+          roomId: streamId,
+          agentId: 'tts-bridge',
+        })
+        audioBridgeRef.current.connect().then(() => {
+          console.log('[AudioBridge] Connected to SFU')
+        }).catch((err: Error) => {
+          console.error('[AudioBridge] Failed to connect:', err)
+        })
+      })
+    }
+    return () => {
+      if (audioBridgeRef.current) {
+        audioBridgeRef.current.disconnect?.()
+        audioBridgeRef.current = null
+      }
+    }
+  }, [jamRoom.inRoom, streamId])
+
   // ── Live score updates ───────────────────────────────────────────────────────
   useEffect(() => {
     const unsubscribe = wsService.onMessageSelected((data) => {
@@ -249,12 +273,56 @@ export function RoomLivePage() {
     return unsubscribe
   }, [streamId])
 
-  // ── TTS Audio Playback ───────────────────────────────────────────────────────
+  // ── TTS Audio Playback via WebRTCAudioBridge ─────────────────────────────────
+  const audioBridgeRef = useRef<any>(null)
+
   useEffect(() => {
-    const handleTtsAudio = (data: any) => {
-      if (data.roomId === streamId && data.audioUrl) {
+    const handleTtsAudio = async (data: any) => {
+      if (data.roomId !== streamId) return
+
+      console.log('[TTS] Received audio event:', { 
+        provider: data.provider, 
+        hasAudioBase64: !!data.audioBase64,
+        hasAudioUrl: !!data.audioUrl,
+        durationMs: data.durationMs 
+      })
+
+      // Try to inject via WebRTCAudioBridge first (for listeners to hear)
+      if (data.audioBase64) {
+        try {
+          // Convert base64 to ArrayBuffer
+          const binaryString = atob(data.audioBase64)
+          const bytes = new Uint8Array(binaryString.length)
+          for (let i = 0; i < binaryString.length; i++) {
+            bytes[i] = binaryString.charCodeAt(i)
+          }
+          const audioBuffer = bytes.buffer
+
+          // Use WebRTCAudioBridge if available and connected
+          if (audioBridgeRef.current?.isConnected) {
+            console.log('[TTS] Injecting audio via WebRTCAudioBridge')
+            await audioBridgeRef.current.streamAudio(audioBuffer, data.messageId)
+            return
+          }
+
+          // Fallback: Play via HTML5 Audio (for speaker/host to hear)
+          console.log('[TTS] WebRTCAudioBridge not connected, using HTML5 Audio fallback')
+          const blob = new Blob([audioBuffer], { type: 'audio/mpeg' })
+          const audioUrl = URL.createObjectURL(blob)
+          const audio = new Audio(audioUrl)
+          audio.play().catch(e => console.warn('Auto-play prevented (user needs to interact first)', e))
+        } catch (err) {
+          console.error('[TTS] Failed to inject audio:', err)
+          // Fallback to URL if base64 injection fails
+          if (data.audioUrl) {
+            const audio = new Audio(data.audioUrl)
+            audio.play().catch(e => console.warn('Auto-play prevented', e))
+          }
+        }
+      } else if (data.audioUrl) {
+        // Fallback: Play via URL
         const audio = new Audio(data.audioUrl)
-        audio.play().catch(e => console.warn("Auto-play prevented (user needs to interact first)", e))
+        audio.play().catch(e => console.warn('Auto-play prevented (user needs to interact first)', e))
       }
     }
     wsService.on('tts:audio', handleTtsAudio)

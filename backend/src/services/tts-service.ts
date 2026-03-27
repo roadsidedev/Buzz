@@ -2,25 +2,28 @@
 /**
  * Text-to-Speech Service
  *
- * Integrates with ElevenLabs API for high-quality voice synthesis.
- * Uses the WebRTC Bot Service to inject audio streams directly into Jam rooms.
+ * Integrates with ElevenLabs API and Google Cloud TTS for voice synthesis.
+ * Supports fallback: tries ElevenLabs first, falls back to Google TTS on failure.
  *
  * Features:
- * - Voice synthesis via ElevenLabs API
- * - Audio streaming to Jam rooms via Headless WebRTC Bot
- * - Real-time conversational performance
+ * - Voice synthesis via ElevenLabs API (primary)
+ * - Voice synthesis via Google Cloud TTS (fallback)
+ * - Automatic provider detection and fallback
+ * - Voice mapping: Alex (male), Mira (female)
  *
  * Env vars:
- *   ELEVENLABS_API_KEY   - ElevenLabs API key (required)
- *   ELEVENLABS_VOICE_A   - Voice ID for Alex
- *   ELEVENLABS_VOICE_B   - Voice ID for Mira
+ *   ELEVENLABS_API_KEY   - ElevenLabs API key
+ *   ELEVENLABS_VOICE_A   - Voice ID for Alex (male)
+ *   ELEVENLABS_VOICE_B   - Voice ID for Mira (female)
+ *   GOOGLE_TTS_API_KEY   - Google Cloud TTS API key (fallback)
+ *   GOOGLE_TTS_VOICE     - Voice for male (Alex)
+ *   GOOGLE_TTS_VOICE_B   - Voice for female (Mira)
  */
 
 import { ElevenLabsClient } from "elevenlabs";
 import { logger } from "../utils/logger.js";
 import { ValidationError, ServiceUnavailableError } from "../utils/errors.js";
 import { getJamService } from "./jam-service.js";
-import { TTS_CONFIG } from "../config/media-config.js";
 
 // Buffer concatenation helper for ElevenLabs stream
 async function streamToBuffer(stream: AsyncIterable<Buffer>): Promise<Buffer> {
@@ -31,91 +34,264 @@ async function streamToBuffer(stream: AsyncIterable<Buffer>): Promise<Buffer> {
   return Buffer.concat(chunks);
 }
 
+export type VoiceGender = "male" | "female";
+
+export interface TTSProvider {
+  name: string;
+  synthesize(text: string, voiceId?: string): Promise<{ audioBuffer: Buffer; durationMs: number }>;
+}
+
 export class TTSService {
   private elevenlabs: ElevenLabsClient | null = null;
-  private defaultVoiceA: string;
-  private defaultVoiceB: string;
+  private googleTtsApiKey: string = "";
+  
+  // Voice mappings
+  private elevenLabsVoiceMale: string;
+  private elevenLabsVoiceFemale: string;
+  private googleVoiceMale: string;
+  private googleVoiceFemale: string;
+  private googleLanguage: string;
 
   constructor() {
-    const apiKey = process.env.ELEVENLABS_API_KEY || "";
-    this.defaultVoiceA = process.env.ELEVENLABS_VOICE_A || "pNInz6obpgDQGcFmaJcg"; // Adam
-    this.defaultVoiceB = process.env.ELEVENLABS_VOICE_B || "EXAVITQu4vr4xnSDxMaL"; // Rachel
+    // ElevenLabs configuration
+    const elevenLabsKey = process.env.ELEVENLABS_API_KEY || "";
+    this.elevenLabsVoiceMale = process.env.ELEVENLABS_VOICE_A || "pNInz6obpgDQGcFmaJcg"; // Adam (male)
+    this.elevenLabsVoiceFemale = process.env.ELEVENLABS_VOICE_B || "EXAVITQu4vr4xnSDxMaL"; // Rachel (female)
 
-    if (apiKey) {
-      this.elevenlabs = new ElevenLabsClient({ apiKey });
-      logger.info("ElevenLabs TTS Service initialized");
+    if (elevenLabsKey) {
+      this.elevenlabs = new ElevenLabsClient({ apiKey: elevenLabsKey });
+      logger.info("ElevenLabs TTS Service initialized", { 
+        voiceMale: this.elevenLabsVoiceMale, 
+        voiceFemale: this.elevenLabsVoiceFemale 
+      });
     } else {
       logger.warn("ElevenLabs TTS Service disabled: ELEVENLABS_API_KEY not found");
+    }
+
+    // Google TTS configuration (fallback)
+    this.googleTtsApiKey = process.env.GOOGLE_TTS_API_KEY || "";
+    this.googleVoiceMale = process.env.GOOGLE_TTS_VOICE || "en-US-Neural2-D"; // Male voice
+    this.googleVoiceFemale = process.env.GOOGLE_TTS_VOICE_B || "en-US-Neural2-F"; // Female voice
+    this.googleLanguage = process.env.GOOGLE_TTS_LANGUAGE || "en-US";
+
+    if (this.googleTtsApiKey) {
+      logger.info("Google TTS fallback configured", {
+        voiceMale: this.googleVoiceMale,
+        voiceFemale: this.googleVoiceFemale,
+      });
+    } else {
+      logger.warn("Google TTS fallback disabled: GOOGLE_TTS_API_KEY not found");
     }
   }
 
   isEnabled(): boolean {
-    return TTS_CONFIG.enabled && this.elevenlabs !== null;
+    return this.elevenlabs !== null || this.googleTtsApiKey !== "";
   }
 
   /**
-   * Synthesize text to speech
+   * Get voice ID for a given gender
    */
-  async synthesize(request: { text: string; voiceId?: string }): Promise<{ audioBuffer: Buffer; durationMs: number; format: string }> {
-    if (!this.elevenlabs) throw new ServiceUnavailableError("ElevenLabs TTS not configured");
-    if (!request.text) throw new ValidationError("Text is required");
+  getVoiceForGender(gender: VoiceGender, provider: "elevenlabs" | "google"): string {
+    if (provider === "elevenlabs") {
+      return gender === "male" ? this.elevenLabsVoiceMale : this.elevenLabsVoiceFemale;
+    }
+    return gender === "male" ? this.googleVoiceMale : this.googleVoiceFemale;
+  }
 
-    const voiceId = request.voiceId || this.defaultVoiceA;
+  /**
+   * Detect if we should use male or female voice based on agent name
+   */
+  detectGender(agentName: string): VoiceGender {
+    const name = (agentName || "").toLowerCase();
+    // Mira is female, Alex is male by default
+    if (name.includes("mira") || name.includes("female")) {
+      return "female";
+    }
+    return "male";
+  }
+
+  /**
+   * Synthesize text to speech using ElevenLabs (primary)
+   */
+  async synthesizeWithElevenLabs(
+    text: string,
+    voiceId?: string
+  ): Promise<{ audioBuffer: Buffer; durationMs: number }> {
+    if (!this.elevenlabs) {
+      throw new ServiceUnavailableError("ElevenLabs TTS not configured");
+    }
+    if (!text) {
+      throw new ValidationError("Text is required");
+    }
+
+    const voice = voiceId || this.elevenLabsVoiceMale;
 
     try {
-      const audioStream = await this.elevenlabs.textToSpeech.convert(voiceId, {
-        text: request.text,
-        model_id: "eleven_turbo_v2", // Fast latency conversational model
+      const audioStream = await this.elevenlabs.textToSpeech.convert(voice, {
+        text,
+        model_id: "eleven_turbo_v2",
         output_format: "mp3_44100_128",
       });
 
       const audioBuffer = await streamToBuffer(audioStream);
-      
-      // Rough duration estimate if actual duration not provided
-      const wordCount = request.text.split(/\s+/).length;
-      const wpm = 150;
-      const durationMs = Math.round((wordCount / wpm) * 60 * 1000);
+      const wordCount = text.split(/\s+/).length;
+      const durationMs = Math.round((wordCount / 150) * 60 * 1000);
 
-      return { audioBuffer, durationMs, format: "mp3" };
+      logger.debug("ElevenLabs synthesis successful", {
+        voiceId: voice,
+        textLength: text.length,
+        audioSize: audioBuffer.length,
+      });
+
+      return { audioBuffer, durationMs };
     } catch (err) {
-      logger.error("ElevenLabs TTS synthesis failed", { error: err instanceof Error ? err.message : String(err) });
-      throw err;
+      const errorMsg = err instanceof Error ? err.message : String(err);
+      logger.error("ElevenLabs TTS synthesis failed", { error: errorMsg });
+      throw new Error(`ElevenLabs failed: ${errorMsg}`);
     }
   }
 
   /**
-   * Synthesize and immediately stream to Jam audio room
-   * Uses direct Jam API to inject audio into the room
+   * Synthesize text to speech using Google Cloud TTS (fallback)
+   */
+  async synthesizeWithGoogle(
+    text: string,
+    voiceName?: string
+  ): Promise<{ audioBuffer: Buffer; durationMs: number }> {
+    if (!this.googleTtsApiKey) {
+      throw new ServiceUnavailableError("Google TTS not configured");
+    }
+    if (!text) {
+      throw new ValidationError("Text is required");
+    }
+
+    const voice = voiceName || this.googleVoiceMale;
+
+    try {
+      const response = await fetch(
+        `https://texttospeech.googleapis.com/v1/text:synthesize?key=${this.googleTtsApiKey}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            input: { text },
+            voice: { languageCode: this.googleLanguage, name: voice },
+            audioConfig: { audioEncoding: "MP3" },
+          }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error?.message || `Google TTS HTTP ${response.status}`);
+      }
+
+      if (!data.audioContent) {
+        throw new Error("No audio content returned from Google TTS");
+      }
+
+      const audioBuffer = Buffer.from(data.audioContent, "base64");
+      const wordCount = text.split(/\s+/).length;
+      const durationMs = Math.round((wordCount / 150) * 60 * 1000);
+
+      logger.debug("Google TTS synthesis successful", {
+        voiceName: voice,
+        textLength: text.length,
+        audioSize: audioBuffer.length,
+      });
+
+      return { audioBuffer, durationMs };
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : String(err);
+      logger.error("Google TTS synthesis failed", { error: errorMsg });
+      throw new Error(`Google TTS failed: ${errorMsg}`);
+    }
+  }
+
+  /**
+   * Synthesize text - tries ElevenLabs first, falls back to Google TTS
+   */
+  async synthesize(request: { text: string; voiceId?: string; agentName?: string }): Promise<{ audioBuffer: Buffer; durationMs: number; format: string; provider: string }> {
+    const { text, voiceId, agentName } = request;
+    
+    if (!text) {
+      throw new ValidationError("Text is required");
+    }
+
+    // Detect gender based on agent name
+    const gender = this.detectGender(agentName || "");
+    const usedGender = gender;
+
+    // Try ElevenLabs first
+    if (this.elevenlabs) {
+      try {
+        const voice = voiceId || this.getVoiceForGender(usedGender, "elevenlabs");
+        const result = await this.synthesizeWithElevenLabs(text, voice);
+        return { ...result, format: "mp3", provider: "elevenlabs" };
+      } catch (err) {
+        logger.warn("ElevenLabs synthesis failed, attempting Google TTS fallback", {
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
+
+    // Fallback to Google TTS
+    if (this.googleTtsApiKey) {
+      try {
+        const voice = this.getVoiceForGender(usedGender, "google");
+        const result = await this.synthesizeWithGoogle(text, voice);
+        return { ...result, format: "mp3", provider: "google" };
+      } catch (err) {
+        logger.error("Google TTS fallback also failed", {
+          error: err instanceof Error ? err.message : String(err),
+        });
+        throw new ServiceUnavailableError("All TTS providers failed");
+      }
+    }
+
+    throw new ServiceUnavailableError("No TTS provider available");
+  }
+
+  /**
+   * Synthesize and stream to Jam audio room
+   * This method generates audio and returns it - actual streaming is handled by the caller via WebSocket
    */
   async synthesizeAndStream(
     jamRoomId: string,
     text: string,
     messageId: string,
     voiceId?: string,
-  ): Promise<{ audioBuffer: Buffer; durationMs: number }> {
-    const { audioBuffer } = await this.synthesize({ text, voiceId });
+    agentName?: string
+  ): Promise<{ audioBuffer: Buffer; durationMs: number; provider: string }> {
+    // Generate audio with fallback
+    const result = await this.synthesize({ text, voiceId, agentName });
 
-    // Stream audio directly to Jam via the Jam service API
+    // Try to stream to Jam (non-blocking - won't fail the whole operation)
     const jamService = getJamService();
     if (jamService) {
-      jamService.streamAudio(jamRoomId, audioBuffer, messageId).catch(e => {
-        logger.error("Error streaming audio to Jam", { jamRoomId, messageId, error: e });
+      jamService.streamAudio(jamRoomId, result.audioBuffer, messageId).catch(e => {
+        logger.error("Error streaming audio to Jam REST API", { jamRoomId, messageId, error: e });
       });
     } else {
-      logger.warn("Jam service not available, audio will not be streamed to room", { jamRoomId });
+      logger.debug("Jam service not available, audio will be sent via WebSocket", { jamRoomId });
     }
 
-    const wordCount = text.split(/\s+/).length;
-    let durationMs = Math.round((wordCount / 150) * 60 * 1000);
-    
-    return { audioBuffer, durationMs };
+    return {
+      audioBuffer: result.audioBuffer,
+      durationMs: result.durationMs,
+      provider: result.provider,
+    };
   }
 
   /**
    * Health check
    */
-  async healthCheck(): Promise<boolean> {
-    return this.elevenlabs !== null;
+  async healthCheck(): Promise<{ elevenlabs: boolean; google: boolean }> {
+    return {
+      elevenlabs: this.elevenlabs !== null,
+      google: this.googleTtsApiKey !== "",
+    };
   }
 }
 

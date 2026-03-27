@@ -955,29 +955,36 @@ router.post(
     // Get Jam room ID for streaming audio to the room
     const jamRoomId = room.jamRoomId || roomId;
 
+    let ttsProvider = "none";
+    let audioBase64: string | null = null;
+
     if (tts.isEnabled()) {
       try {
-        // Use synthesizeAndStream to both generate audio AND stream it to Jam
-        // This pipes the audio through BotService to the WebRTC room
-        const { audioBuffer, durationMs: ttsMs } = await tts.synthesizeAndStream(
+        // Use synthesizeAndStream to generate audio (with fallback between providers)
+        // Pass agentName for voice gender detection (Alex=male, Mira=female)
+        const { audioBuffer, durationMs: ttsMs, provider } = await tts.synthesizeAndStream(
           jamRoomId,
           text,
           messageId,
           voiceId,
+          agentName,
         );
         durationMs = ttsMs;
+        ttsProvider = provider;
+        audioBase64 = audioBuffer.toString("base64");
 
         // Also upload to S3/R2 for replay/archival
         const { getAudioStorageService } = await import("../services/audio-storage-service.js");
         audioUrl = await getAudioStorageService().upload(audioBuffer, messageId);
 
-        logger.info("TTS synthesis and streaming complete", {
+        logger.info("TTS synthesis complete", {
           roomId,
           jamRoomId,
           messageId,
           durationMs,
           agentName: agentName ?? agentId,
           voiceId: voiceId ?? "default",
+          provider: ttsProvider,
           hasAudioUrl: !!audioUrl,
         });
       } catch (ttsErr) {
@@ -994,7 +1001,7 @@ router.post(
     }
 
     // 3. Emit tts:audio event so the frontend live room plays the audio
-    // The frontend listens on `room:{id}` for this event and plays the URL
+    // The frontend listens on `room:{id}` for this event and injects via WebRTCAudioBridge
     try {
       const { getIO } = await import("../server.js");
       getIO().to(`room:${roomId}`).emit("tts:audio", {
@@ -1004,7 +1011,9 @@ router.post(
         agentName: agentName ?? null,
         text,
         audioUrl,
+        audioBase64,
         durationMs,
+        provider: ttsProvider,
         timestamp: new Date().toISOString(),
       });
     } catch (socketErr) {
