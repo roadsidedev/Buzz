@@ -17,6 +17,7 @@ import { toSolanaWalletConnectors } from "@privy-io/react-auth/solana";
 import "./styles/globals.css";
 import { AppRouter } from "@/router";
 import { ThemeProvider } from "@/components/theme-provider";
+import { useAuthStore } from "@/stores/auth-store";
 import { logger } from "@/utils/logger";
 
 /**
