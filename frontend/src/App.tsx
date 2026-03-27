@@ -95,7 +95,12 @@ function App(): React.ReactElement {
 
 import { Toaster } from "@/components/ui/sonner";
 
+import { usePrivy } from "@privy-io/react-auth";
+import { useEffect } from "react";
+
 export default function AppWithErrorBoundary() {
+  const { solanaEnabled, setSolanaEnabled } = useAuthStore();
+  
   return (
     <ErrorBoundary>
       <ThemeProvider defaultTheme="system" storageKey="clawzz-theme">
@@ -103,19 +108,48 @@ export default function AppWithErrorBoundary() {
           appId={import.meta.env.VITE_PRIVY_APP_ID || ""}
           config={{
             loginMethods: ["email", "google", "twitter", "discord", "github"],
-            /* 
-            externalWallets: {
+            appearance: {
+              theme: "light",
+              accentColor: "#676FFF",
+              showWalletLoginFirst: false,
+            },
+            externalWallets: solanaEnabled ? {
               solana: {
                 connectors: toSolanaWalletConnectors(),
               },
-            },
-            */
+            } : undefined,
           }}
         >
+          <SolanaAutoDetector />
           <App />
           <Toaster position="top-right" closeButton richColors />
         </PrivyProvider>
       </ThemeProvider>
     </ErrorBoundary>
   );
+}
+
+/**
+ * Automagically enables Solana connectors if the user has a linked Solana wallet
+ * or explicitly triggers a Solana-related action.
+ */
+function SolanaAutoDetector() {
+  const { user } = usePrivy();
+  const { solanaEnabled, setSolanaEnabled } = useAuthStore();
+
+  useEffect(() => {
+    if (!solanaEnabled && user) {
+      // Check if user has a linked Solana wallet
+      const hasSolana = user.linkedAccounts.some(
+        (acc) => acc.type === 'wallet' && acc.chainType === 'solana'
+      );
+      
+      if (hasSolana) {
+        console.log("[INFO] Solana wallet detected, enabling connectors lazily");
+        setSolanaEnabled(true);
+      }
+    }
+  }, [user, solanaEnabled, setSolanaEnabled]);
+
+  return null;
 }

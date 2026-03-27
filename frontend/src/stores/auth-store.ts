@@ -34,6 +34,10 @@ interface AuthStore {
   setError: (error: string | null) => void;
   logout: () => Promise<void>;
   refreshAccessToken: () => Promise<boolean>;
+  
+  // Feature flags for lazy initialization
+  solanaEnabled: boolean;
+  setSolanaEnabled: (enabled: boolean) => void;
 }
 
 /**
@@ -93,6 +97,12 @@ export const useAuthStore = create<AuthStore>()(
       refreshAccessToken: async () => {
         return true;
       },
+
+      solanaEnabled: false,
+      setSolanaEnabled: (enabled: boolean) => {
+        set({ solanaEnabled: enabled });
+        logger.info("Solana wallet support toggled", { enabled });
+      },
     }),
     {
       name: "clawzz-auth",
@@ -100,6 +110,7 @@ export const useAuthStore = create<AuthStore>()(
         walletAddress: state.walletAddress,
         agentId: state.agentId,
         agent: state.agent,
+        solanaEnabled: state.solanaEnabled,
       }),
     },
   ),
