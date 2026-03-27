@@ -41,6 +41,27 @@ const ROLE_LABEL: Record<string, string> = {
   spectator: "Listener",
 }
 
+// ── Audio Utilities ───────────────────────────────────────────────────────────
+
+const playBeep = (freq: number, type: OscillatorType, duration: number, vol: number) => {
+  try {
+    const ctx = new (window.AudioContext || (window as any).webkitAudioContext)()
+    const osc = ctx.createOscillator()
+    const gain = ctx.createGain()
+    osc.type = type
+    osc.frequency.setValueAtTime(freq, ctx.currentTime)
+    gain.gain.setValueAtTime(vol, ctx.currentTime)
+    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + duration)
+    osc.connect(gain)
+    gain.connect(ctx.destination)
+    osc.start()
+    osc.stop(ctx.currentTime + duration)
+  } catch (e) {
+    console.warn("Audio Context not supported or allowed", e)
+  }
+}
+
+
 // ── ScoreBar ──────────────────────────────────────────────────────────────────
 
 function ScoreBar({ score }: { score?: number }) {
@@ -216,6 +237,18 @@ export function RoomLivePage() {
     return unsubscribe
   }, [streamId])
 
+  // ── TTS Audio Playback ───────────────────────────────────────────────────────
+  useEffect(() => {
+    const handleTtsAudio = (data: any) => {
+      if (data.roomId === streamId && data.audioUrl) {
+        const audio = new Audio(data.audioUrl)
+        audio.play().catch(e => console.warn("Auto-play prevented (user needs to interact first)", e))
+      }
+    }
+    wsService.on('tts:audio', handleTtsAudio)
+    return () => wsService.off('tts:audio', handleTtsAudio)
+  }, [streamId])
+
   // ── Fetch room ──────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!streamId) { setStreamLoading(false); return }
@@ -266,6 +299,17 @@ export function RoomLivePage() {
   const safeSpeakers: string[] = Array.isArray(jamRoom.speakers) ? jamRoom.speakers : []
   const safeListeners: string[] = Array.isArray(jamRoom.listeners) ? jamRoom.listeners : []
   const safeSpeaking: string[] = Array.isArray(jamRoom.speaking) ? jamRoom.speaking : []
+
+  // ── Sound Cues ──────────────────────────────────────────────────────────────
+  const prevListenersCount = useRef(0)
+  useEffect(() => {
+    if (safeListeners.length > prevListenersCount.current) {
+      if (prevListenersCount.current > 0) playBeep(600, "sine", 0.1, 0.05) // Enter
+    } else if (safeListeners.length < prevListenersCount.current) {
+      if (prevListenersCount.current > 0) playBeep(400, "sine", 0.1, 0.05) // Exit
+    }
+    prevListenersCount.current = safeListeners.length
+  }, [safeListeners.length])
 
   const stageParticipants = React.useMemo<ParticipantInfo[]>(() => {
     if (participants.length > 0) {
@@ -470,8 +514,7 @@ export function RoomLivePage() {
   if (isDesktop) {
     return (
       <div
-        className="animate-in fade-in duration-500 flex flex-col h-full min-h-screen"
-        style={{ background: "linear-gradient(180deg, #0f0a1e 0%, #0d0d14 100%)" }}
+        className="animate-in fade-in duration-500 flex flex-col h-full min-h-screen bg-background text-foreground"
       >
         {/* ── Desktop Header ── */}
         <div className="flex items-center gap-4 px-6 py-4 border-b border-white/8 shrink-0">
@@ -718,8 +761,7 @@ export function RoomLivePage() {
   // ── MOBILE LAYOUT (original, preserved exactly) ──────────────────────────────
   return (
     <div
-      className="animate-in fade-in duration-500 min-h-screen pb-28"
-      style={{ background: "linear-gradient(180deg, #0f0a1e 0%, #0d0d14 100%)" }}
+      className="animate-in fade-in duration-500 min-h-screen pb-28 bg-background text-foreground"
     >
       {/* ── Header ── */}
       <div className="flex items-center justify-between px-4 pt-4 pb-3">
@@ -800,19 +842,28 @@ export function RoomLivePage() {
       </div>
 
       {/* ── Listeners ── */}
-      <div className="px-5 pt-4 pb-3 border-t border-white/10">
-        <div className="flex items-center gap-3">
-          {jamRoom.listeners.length > 0 && (
-            <div className="flex -space-x-2">
-              {jamRoom.listeners.slice(0, 8).map((listenerId: string) => (
-                <img key={listenerId} src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${listenerId}`} className="w-8 h-8 rounded-full border-2 border-white/10 bg-white/5" alt="Listener" />
-              ))}
-            </div>
-          )}
-          <span className="text-sm font-semibold text-white/50">
-            {totalListeners > 0 ? `${totalListeners > 8 ? `+${totalListeners - 8} ` : ""}listening` : "No listeners yet"}
-          </span>
+      <div className="px-5 pt-4 pb-6 border-t border-border">
+        <div className="flex items-center justify-between mb-4">
+          <span className="font-black text-[11px] uppercase tracking-widest text-muted-foreground">Listeners</span>
+          <span className="text-[10px] font-bold text-muted-foreground/60">{totalListeners}</span>
         </div>
+        
+        {jamRoom.listeners.length === 0 ? (
+          <p className="text-[11px] text-muted-foreground/50 text-center mt-6 mb-4">No listeners yet</p>
+        ) : (
+          <div className="flex flex-wrap gap-4 pb-4">
+            {jamRoom.listeners.map((listenerId: string) => (
+              <div key={listenerId} className="flex flex-col items-center gap-1.5 w-[60px]">
+                <img
+                  src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${listenerId}`}
+                  className="w-12 h-12 rounded-full border border-border bg-muted"
+                  alt="Listener"
+                />
+                <span className="text-[10px] text-foreground/70 font-medium truncate w-full text-center">{listenerId.slice(0, 8)}</span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* ── REC indicator ── */}

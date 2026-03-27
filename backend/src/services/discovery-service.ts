@@ -77,6 +77,7 @@ export class DiscoveryService {
             a.avatar as host_agent_avatar,
             COALESCE(MAX(rv.viewer_count), 0) as viewer_count,
             COUNT(DISTINCT rp.agent_id) as participant_count,
+            ARRAY_AGG(DISTINCT rp.agent_id) FILTER (WHERE rp.agent_id IS NOT NULL) as speaker_ids,
             COALESCE(MAX(re.trending_score), 0) as trending_score
           FROM room r
           LEFT JOIN category c ON r.category_id = c.id
@@ -149,7 +150,8 @@ export class DiscoveryService {
           MAX(a.avatar) as host_agent_avatar,
           COALESCE(MAX(rv.viewer_count), 0) as viewer_count,
           COALESCE(MAX(re.trending_score), 0) as trending_score,
-          COUNT(DISTINCT rp.agent_id) as participant_count
+          COUNT(DISTINCT rp.agent_id) as participant_count,
+          ARRAY_AGG(DISTINCT rp.agent_id) FILTER (WHERE rp.agent_id IS NOT NULL) as speaker_ids
         FROM room r
         LEFT JOIN category c ON r.category_id = c.id
         LEFT JOIN agent a ON r.host_agent_id = a.id
@@ -220,6 +222,7 @@ export class DiscoveryService {
           a.avatar as host_agent_avatar,
           COALESCE(rv.viewer_count, 0) as viewer_count,
           COUNT(DISTINCT rp.agent_id) as participant_count,
+          ARRAY_AGG(DISTINCT rp.agent_id) FILTER (WHERE rp.agent_id IS NOT NULL) as speaker_ids,
           COALESCE(re.trending_score, 0) as trending_score
         FROM room r
         LEFT JOIN category c ON r.category_id = c.id
@@ -320,6 +323,7 @@ export class DiscoveryService {
           a.avatar as host_agent_avatar,
           COALESCE(rv.viewer_count, 0) as viewer_count,
           COUNT(DISTINCT rp.agent_id) as participant_count,
+          ARRAY_AGG(DISTINCT rp.agent_id) FILTER (WHERE rp.agent_id IS NOT NULL) as speaker_ids,
           COALESCE(re.trending_score, 0) as trending_score
         FROM room r
         LEFT JOIN category c ON r.category_id = c.id
@@ -648,6 +652,9 @@ export class DiscoveryService {
         username: row.host_agent_username,
         avatar: row.host_agent_avatar,
       },
+      speakers: row.speaker_ids && row.speaker_ids.length > 0 
+        ? Array.from(new Set([row.host_agent_id, ...row.speaker_ids]))
+        : [row.host_agent_id],
       viewerCount: parseInt(row.viewer_count || "0", 10),
       participantCount: parseInt(row.participant_count || "0", 10),
       trendingScore: parseFloat(row.trending_score || "0"),
