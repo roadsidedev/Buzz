@@ -78,26 +78,41 @@ async def lifespan(app: FastAPI):
         sys.exit(1)
 
     # 2. INITIALIZE ORCHESTRATION SERVICE
-    logger.info("Initializing orchestration service...")
+    logger.info("Initializing orchestration service...", {"redis_url": settings.REDIS_URL})
     try:
         # Inject provider into ScoringEngine by creating OrchestrationService
         # and setting it in routes so request handlers pick it up.
         from .services.scoring_engine import ScoringEngine
         from .services.orchestration_service import OrchestrationService
 
+        logger.info("Creating OrchestrationService instance...")
         scoring_engine = ScoringEngine()
         orchestration_service = OrchestrationService()
+        
         # If the scoring engine was able to initialize a provider client,
         # attach it to the orchestration service's scoring_engine.
         orchestration_service.scoring_engine = scoring_engine
 
-        # Register singleton for routes
+        # Register singleton for routes BEFORE initialization
+        logger.info("Setting orchestration service singleton...")
         set_orchestration_service(orchestration_service)
-
+        
+        # Now initialize (connects to Redis)
+        logger.info("Calling orchestration_service.initialize()...")
         await orchestration_service.initialize()
-        logger.info("Orchestration service initialized successfully")
+        
+        # Verify initialization
+        if orchestration_service.room_state_manager is None:
+            logger.error("Initialization completed but room_state_manager is still None!")
+            raise RuntimeError("room_state_manager not initialized")
+            
+        logger.info("Orchestration service initialized successfully", {
+            "room_state_manager_ready": True
+        })
     except Exception as e:
+        import traceback
         logger.error(f"Failed to initialize orchestration service: {e}")
+        logger.error(f"Traceback: {traceback.format_exc()}")
         sys.exit(1)
 
     # 3. INITIALIZE API GATEWAY CLIENT

@@ -42,8 +42,19 @@ class OrchestrationService:
 
     async def initialize(self) -> None:
         """Initialize Redis-backed room state manager (call on startup)."""
-        self.room_state_manager = await get_room_state_manager()
-        logger.info("OrchestrationService initialized with Redis state manager")
+        logger.info("Starting OrchestrationService.initialize()...")
+        try:
+            self.room_state_manager = await get_room_state_manager()
+            logger.info("get_room_state_manager() returned", {
+                "room_state_manager": self.room_state_manager,
+                "connected": self.room_state_manager.connected if self.room_state_manager else "N/A"
+            })
+            logger.info("OrchestrationService initialized with Redis state manager")
+        except Exception as e:
+            logger.error(f"Failed to initialize room_state_manager: {e}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
+            raise
 
     # Room Lifecycle
 

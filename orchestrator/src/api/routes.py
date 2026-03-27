@@ -27,8 +27,14 @@ def set_orchestration_service(service: OrchestrationService) -> None:
 def get_orchestration_service() -> OrchestrationService:
     """Get the orchestration service singleton."""
     global _orchestration_service
+    logger.info(f"get_orchestration_service called, _orchestration_service is: {_orchestration_service}")
     if _orchestration_service is None:
-        _orchestration_service = OrchestrationService()
+        logger.error("OrchestrationService singleton is None!")
+        raise RuntimeError(
+            "OrchestrationService not initialized. "
+            "Ensure the orchestrator started successfully and the lifespan handler ran."
+        )
+    logger.info(f"Returning orchestration service with room_state_manager: {_orchestration_service.room_state_manager}")
     return _orchestration_service
 
 
@@ -152,7 +158,9 @@ async def get_room_state(room_id: str) -> dict:
         Room state snapshot
     """
     try:
+        logger.info(f"get_room_state called for room {room_id}")
         service = get_orchestration_service()
+        logger.info(f"Got orchestration service: {service}, room_state_manager: {service.room_state_manager}")
         room_state = await service.get_room_state(room_id)
         return {
             "status": "success",
