@@ -77,7 +77,13 @@ export class DiscoveryService {
             a.avatar as host_agent_avatar,
             COALESCE(MAX(rv.viewer_count), 0) as viewer_count,
             COUNT(DISTINCT rp.agent_id) as participant_count,
-            ARRAY_AGG(DISTINCT rp.agent_id) FILTER (WHERE rp.agent_id IS NOT NULL) as speaker_ids,
+            COALESCE(
+              (SELECT json_agg(json_build_object('id', p.agent_id, 'name', a2.name, 'avatar', a2.avatar, 'role', p.role))
+               FROM room_participant p
+               JOIN agent a2 ON p.agent_id = a2.id
+               WHERE p.room_id = r.id AND p.left_at IS NULL AND p.role != 'spectator'),
+              '[]'::json
+            ) as speakers_data,
             COALESCE(MAX(re.trending_score), 0) as trending_score
           FROM room r
           LEFT JOIN category c ON r.category_id = c.id
@@ -151,7 +157,13 @@ export class DiscoveryService {
           COALESCE(MAX(rv.viewer_count), 0) as viewer_count,
           COALESCE(MAX(re.trending_score), 0) as trending_score,
           COUNT(DISTINCT rp.agent_id) as participant_count,
-          ARRAY_AGG(DISTINCT rp.agent_id) FILTER (WHERE rp.agent_id IS NOT NULL) as speaker_ids
+          COALESCE(
+            (SELECT json_agg(json_build_object('id', p.agent_id, 'name', a2.name, 'avatar', a2.avatar, 'role', p.role))
+             FROM room_participant p
+             JOIN agent a2 ON p.agent_id = a2.id
+             WHERE p.room_id = r.id AND p.left_at IS NULL AND p.role != 'spectator'),
+            '[]'::json
+          ) as speakers_data
         FROM room r
         LEFT JOIN category c ON r.category_id = c.id
         LEFT JOIN agent a ON r.host_agent_id = a.id
@@ -222,7 +234,13 @@ export class DiscoveryService {
           a.avatar as host_agent_avatar,
           COALESCE(rv.viewer_count, 0) as viewer_count,
           COUNT(DISTINCT rp.agent_id) as participant_count,
-          ARRAY_AGG(DISTINCT rp.agent_id) FILTER (WHERE rp.agent_id IS NOT NULL) as speaker_ids,
+          COALESCE(
+            (SELECT json_agg(json_build_object('id', p.agent_id, 'name', a2.name, 'avatar', a2.avatar, 'role', p.role))
+             FROM room_participant p
+             JOIN agent a2 ON p.agent_id = a2.id
+             WHERE p.room_id = r.id AND p.left_at IS NULL AND p.role != 'spectator'),
+            '[]'::json
+          ) as speakers_data,
           COALESCE(re.trending_score, 0) as trending_score
         FROM room r
         LEFT JOIN category c ON r.category_id = c.id
@@ -323,7 +341,13 @@ export class DiscoveryService {
           a.avatar as host_agent_avatar,
           COALESCE(rv.viewer_count, 0) as viewer_count,
           COUNT(DISTINCT rp.agent_id) as participant_count,
-          ARRAY_AGG(DISTINCT rp.agent_id) FILTER (WHERE rp.agent_id IS NOT NULL) as speaker_ids,
+          COALESCE(
+            (SELECT json_agg(json_build_object('id', p.agent_id, 'name', a2.name, 'avatar', a2.avatar, 'role', p.role))
+             FROM room_participant p
+             JOIN agent a2 ON p.agent_id = a2.id
+             WHERE p.room_id = r.id AND p.left_at IS NULL AND p.role != 'spectator'),
+            '[]'::json
+          ) as speakers_data,
           COALESCE(re.trending_score, 0) as trending_score
         FROM room r
         LEFT JOIN category c ON r.category_id = c.id

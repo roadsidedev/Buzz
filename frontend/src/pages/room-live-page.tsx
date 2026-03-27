@@ -152,33 +152,45 @@ function SpeakerTile({
   participant,
   isSpeaking,
   score,
-  compact,
+  compact = false,
 }: {
   participant: ParticipantInfo
   isSpeaking: boolean
   score?: number
   compact?: boolean
 }) {
-  const sz = compact ? "w-14 h-14 border-2" : "w-[68px] h-[68px] border-2"
+  const sizeClass = compact ? "w-16 h-16" : "w-[84px] h-[84px]"
+  const innerClass = compact ? "w-[56px] h-[56px]" : "w-[76px] h-[76px]"
+
   return (
-    <div className={cn("flex flex-col items-center gap-1.5", compact && "gap-1")}>
-      <div className={cn(`${sz} rounded-full border-background transition-all duration-300 overflow-hidden bg-muted`, isSpeaking && "ring-2 ring-primary ring-offset-2 ring-offset-background shadow-lg shadow-primary/20")}>
-        <img
-          src={participant.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${participant.id}`}
-          className="w-full h-full object-cover"
-          alt={participant.name}
-        />
+    <div className="flex flex-col items-center gap-2">
+      <div className={cn("relative rounded-full flex items-center justify-center transition-all duration-300", sizeClass, isSpeaking ? "bg-violet-500/20" : "")}>
+        {/* Ring */}
+        {isSpeaking && (
+          <div className="absolute inset-0 rounded-full border-2 border-violet-400 animate-pulse" />
+        )}
+        
+        {/* Avatar */}
+        <div className={cn("rounded-full overflow-hidden border-2 bg-muted relative z-10", innerClass, isSpeaking ? "border-violet-400" : "border-background")}>
+          <img
+            src={participant.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${participant.id}`}
+            className="w-full h-full object-cover"
+            alt={participant.name}
+          />
+        </div>
+        
+        {/* Badges */}
+        <div className="absolute -bottom-1 -right-1 z-20 w-6 h-6 rounded-full bg-violet-500 border-2 border-background flex items-center justify-center shadow-sm">
+          {isSpeaking ? <Waveform size="sm" /> : <MicOff size={10} className="text-white" strokeWidth={2} />}
+        </div>
       </div>
-      <div className="h-4 flex items-center justify-center">
-        {isSpeaking ? <Waveform size="sm" /> : <MicOff size={10} className="text-muted-foreground/40" strokeWidth={1.5} />}
-      </div>
-      <p className={cn("font-semibold text-white/80 text-center leading-tight truncate", compact ? "text-[10px] w-14" : "text-[11px] w-16")}>
+      <ScoreBar score={score} />
+      <p className={cn("font-semibold text-foreground text-center leading-tight truncate", compact ? "text-[10px] w-14" : "text-[11px] w-16")}>
         {participant.name}
       </p>
-      <p className={cn("text-[10px] font-medium", participant.role === "co_host" ? "text-violet-400" : "text-white/40")}>
+      <p className={cn("text-[10px] font-medium uppercase tracking-wider", participant.role === "co_host" || participant.role === "host" ? "text-violet-500 font-bold" : "text-muted-foreground")}>
         {ROLE_LABEL[participant.role] || "Speaker"}
       </p>
-      {!compact && <ScoreBar score={score} />}
     </div>
   )
 }
@@ -323,6 +335,13 @@ export function RoomLivePage() {
 
   const host = stageParticipants.find((p) => p.role === "host") ?? stageParticipants[0] ?? null
   const supporters = stageParticipants.filter((p) => p !== host)
+
+  const listenerProfiles = React.useMemo(() => {
+    return safeListeners.map(id => {
+      const p = participants.find(part => part.id === id);
+      return p || { id, name: id.slice(0, 8), avatar: null, role: "listener" };
+    });
+  }, [safeListeners, participants]);
 
   const isHostSpeaking = host
     ? (safeSpeaking.includes(host.id) || (safeSpeaking.length > 0 && stageParticipants.indexOf(host) < safeSpeaking.length))
@@ -580,32 +599,47 @@ export function RoomLivePage() {
                 <p className="text-xs uppercase tracking-widest">No speakers yet</p>
               </div>
             ) : (
-              <div className="relative z-10">
-                {/* Host — center, large */}
-                {host && (
-                  <div className="flex justify-center mb-12">
-                    <HostTile
-                      participant={host}
-                      isSpeaking={isHostSpeaking}
-                      score={agentScores[host.id]}
-                      large
+              <div className="relative z-10 w-full max-w-4xl mx-auto mt-8 flex-grow">
+                <div className="flex justify-center flex-wrap gap-x-12 gap-y-16">
+                  {stageParticipants.map((p, idx) => (
+                    <SpeakerTile
+                      key={p.id}
+                      participant={p}
+                      isSpeaking={
+                        safeSpeaking.includes(p.id) ||
+                        (safeSpeaking.length > 0 && idx < safeSpeaking.length)
+                      }
+                      score={agentScores[p.id]}
                     />
-                  </div>
-                )}
+                </div>
+              </div>
+            )}
 
-                {/* Supporting speakers */}
-                {supporters.length > 0 && (
-                  <div className="flex justify-center gap-10 flex-wrap">
-                    {supporters.map((p, idx) => (
-                      <SpeakerTile
-                        key={p.id}
-                        participant={p}
-                        isSpeaking={jamRoom.speaking.includes(p.id) || (jamRoom.speaking.length > 0 && idx + 1 < jamRoom.speaking.length)}
-                        score={agentScores[p.id]}
-                      />
-                    ))}
-                  </div>
-                )}
+            {/* ── Listeners Grid (Desktop) ── */}
+            {listenerProfiles.length > 0 && (
+              <div className="mt-12 w-full max-w-4xl">
+                <div className="flex items-center justify-between mb-4 px-2">
+                  <span className="font-black text-[11px] uppercase tracking-[0.2em] text-muted-foreground/60">Listeners</span>
+                  <span className="text-[10px] font-bold text-muted-foreground/40">{listenerProfiles.length}</span>
+                </div>
+                <div className="flex flex-wrap gap-x-8 gap-y-6 justify-start px-2">
+                  {listenerProfiles.map((p) => (
+                    <div key={p.id} className="flex flex-col items-center gap-2 group cursor-pointer">
+                      <div className="relative">
+                        <div className="w-14 h-14 rounded-[22px] overflow-hidden bg-muted border border-border/50 group-hover:border-primary/30 transition-all duration-300">
+                          <img
+                            src={p.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${p.id}`}
+                            className="w-full h-full object-cover"
+                            alt={p.name}
+                          />
+                        </div>
+                      </div>
+                      <span className="text-[10px] font-medium text-foreground/50 truncate w-14 text-center group-hover:text-foreground/80 transition-colors">
+                        {p.name.split(' ')[0]}
+                      </span>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
 
@@ -689,33 +723,28 @@ export function RoomLivePage() {
 
           {/* ── RIGHT: Persistent Chat ── */}
           <div
-            className="w-[280px] shrink-0 border-l border-white/8 flex flex-col overflow-hidden"
-            style={{ background: "rgba(15,10,30,0.85)" }}
+            className="w-[280px] shrink-0 border-l border-border flex flex-col overflow-hidden bg-card"
           >
-            {/* Chat header */}
-            <div className="px-4 py-3 border-b border-white/8 shrink-0 flex items-center gap-2">
-              <MessageSquare size={14} className="text-white/30" />
-              <span className="font-black text-[11px] uppercase tracking-widest text-white/30">Live Chat</span>
+            {/* Header */}
+            <div className="px-5 py-4 border-b border-border flex items-center gap-2 shrink-0">
+              <MessageSquare size={16} className="text-muted-foreground" />
+              <span className="font-semibold text-sm text-foreground/80 tracking-wide uppercase">Live Chat</span>
             </div>
 
             {/* Messages */}
-            <div className="flex-grow overflow-y-auto p-3 space-y-2.5 scrollbar-hide">
+            <div className="flex-grow overflow-y-auto p-5 space-y-4">
               {chat.length === 0 ? (
-                <p className="text-center text-white/20 text-xs font-medium pt-8">Be the first to say something!</p>
-              ) : chat.map((c, i) => (
-                <div
-                  key={i}
-                  className={cn(
-                    "animate-in slide-in-from-bottom-2 duration-200 p-2 rounded-lg",
-                    c.isPriority ? "bg-primary/10 border-l-2 border-primary" : "hover:bg-white/5 transition-colors",
-                  )}
-                >
-                  <span className={cn("font-semibold text-xs mr-1.5", c.user === "You" ? "text-violet-400" : "text-white/70")}>
-                    {c.user}:
-                  </span>
-                  <span className="text-white/45 text-xs leading-snug">{c.msg}</span>
-                </div>
-              ))}
+                <p className="text-center text-muted-foreground text-xs mt-10">Be the first to say something!</p>
+              ) : (
+                chat.map((c, i) => (
+                  <div key={i} className="text-[13px] leading-relaxed">
+                    <span className={cn("font-bold mr-2", c.user === "You" ? "text-violet-500" : "text-foreground/70")}>
+                      {c.user}:
+                    </span>
+                    <span className="text-foreground/80">{c.msg}</span>
+                  </div>
+                ))
+              )}
               <div ref={chatEndRef} />
             </div>
 
@@ -841,25 +870,27 @@ export function RoomLivePage() {
         )}
       </div>
 
-      {/* ── Listeners ── */}
+      {/* ── Listeners (Mobile) ── */}
       <div className="px-5 pt-4 pb-6 border-t border-border">
         <div className="flex items-center justify-between mb-4">
           <span className="font-black text-[11px] uppercase tracking-widest text-muted-foreground">Listeners</span>
-          <span className="text-[10px] font-bold text-muted-foreground/60">{totalListeners}</span>
+          <span className="text-[10px] font-bold text-muted-foreground/60">{listenerProfiles.length}</span>
         </div>
         
-        {jamRoom.listeners.length === 0 ? (
+        {listenerProfiles.length === 0 ? (
           <p className="text-[11px] text-muted-foreground/50 text-center mt-6 mb-4">No listeners yet</p>
         ) : (
           <div className="flex flex-wrap gap-4 pb-4">
-            {jamRoom.listeners.map((listenerId: string) => (
-              <div key={listenerId} className="flex flex-col items-center gap-1.5 w-[60px]">
+            {listenerProfiles.map((p) => (
+              <div key={p.id} className="flex flex-col items-center gap-1.5 w-[60px]">
                 <img
-                  src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${listenerId}`}
-                  className="w-12 h-12 rounded-full border border-border bg-muted"
-                  alt="Listener"
+                  src={p.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${p.id}`}
+                  className="w-12 h-12 rounded-full border border-border bg-muted shadow-sm"
+                  alt={p.name}
                 />
-                <span className="text-[10px] text-foreground/70 font-medium truncate w-full text-center">{listenerId.slice(0, 8)}</span>
+                <span className="text-[10px] text-foreground/70 font-medium truncate w-full text-center">
+                  {p.name.split(' ')[0]}
+                </span>
               </div>
             ))}
           </div>

@@ -34,7 +34,9 @@ function capitalizeType(type: string): string {
 
 // ─── Speaker avatar grid (Clubhouse-style right column) ───────────────────────
 
-const SpeakerGrid = ({ speakers, size = "md" }: { speakers: string[]; size?: "sm" | "md" }) => {
+type SpeakerInfo = { id?: string; name?: string; avatar?: string; } | string
+
+const SpeakerGrid = ({ speakers, size = "md" }: { speakers: SpeakerInfo[]; size?: "sm" | "md" }) => {
   const avatarSize = size === "sm" ? "w-9 h-9" : "w-11 h-11"
   const visible = speakers.slice(0, 4)
   const overflow = speakers.length - 4
@@ -42,11 +44,21 @@ const SpeakerGrid = ({ speakers, size = "md" }: { speakers: string[]; size?: "sm
   return (
     <div className="flex flex-col items-end gap-1.5 shrink-0">
       <div className="grid grid-cols-2 gap-1.5">
-        {visible.map((s, i) => (
-          <div key={i} className={`${avatarSize} rounded-full bg-muted overflow-hidden border border-border`}>
-            <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${s}`} alt="speaker" className="w-full h-full object-cover" />
-          </div>
-        ))}
+        {visible.map((s, i) => {
+          const name = typeof s === 'string' ? s : (s.name || s.id || 'speaker')
+          const avatar = typeof s === 'string' ? null : s.avatar
+          const id = typeof s === 'string' ? s : s.id
+
+          return (
+            <div key={i} className={`${avatarSize} rounded-full bg-muted overflow-hidden border border-border`}>
+              <img 
+                src={avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${id || name}`} 
+                alt={name} 
+                className="w-full h-full object-cover" 
+              />
+            </div>
+          )
+        })}
         {/* Fill empty slots so the grid always looks balanced */}
         {visible.length === 1 && <div className={`${avatarSize} rounded-full bg-muted/50 border border-border`} />}
       </div>
@@ -71,8 +83,14 @@ const RoomCard = ({
   const title = room.title || room.objective || "Untitled Space"
   const tag = capitalizeType(room.category?.name || room.type)
   const listeners = room.viewerCount || room.viewer_count || 0
-  const hostName = room.hostAgent?.name || room.hostAgentName || room.host_agent_name || "Agent"
-  const speakers = room.speakers || [hostName]
+  
+  const hostInfo = {
+    id: room.hostAgent?.id || room.host_agent_id,
+    name: room.hostAgent?.name || room.hostAgentName || room.host_agent_name || "Agent",
+    avatar: room.hostAgent?.avatar || room.host_agent_avatar
+  }
+  const speakers = room.speakers || [hostInfo]
+  const speakerNames = speakers.map((s: any) => typeof s === 'string' ? s : (s.name || s.id || 'speaker'))
 
   return (
     <div
@@ -104,7 +122,7 @@ const RoomCard = ({
 
           {/* Speaker names */}
           <p className="text-muted-foreground text-[11px] truncate">
-            {speakers.slice(0, 3).join(", ")}{speakers.length > 3 ? ` +${speakers.length - 3}` : ""}
+            {speakerNames.slice(0, 3).join(", ")}{speakerNames.length > 3 ? ` +${speakerNames.length - 3}` : ""}
           </p>
         </div>
 
@@ -138,8 +156,14 @@ const HeroCard = ({
   const title = room.title || room.objective || "Untitled Space"
   const tag = capitalizeType(room.category?.name || room.type)
   const listeners = room.viewerCount || room.viewer_count || 0
-  const hostName = room.hostAgent?.name || room.hostAgentName || room.host_agent_name || "Agent"
-  const speakers = room.speakers || [hostName]
+  
+  const hostInfo = {
+    id: room.hostAgent?.id || room.host_agent_id,
+    name: room.hostAgent?.name || room.hostAgentName || room.host_agent_name || "Agent",
+    avatar: room.hostAgent?.avatar || room.host_agent_avatar
+  }
+  const speakers = room.speakers || [hostInfo]
+  const speakerNames = speakers.map((s: any) => typeof s === 'string' ? s : (s.name || s.id || 'speaker'))
   const isVideo = room.format === "video" || room.stream_capabilities?.includes("video")
 
   return (
@@ -169,7 +193,7 @@ const HeroCard = ({
           </h2>
 
           <p className="text-muted-foreground text-[12px] truncate">
-            {speakers.slice(0, 2).join(", ")}{speakers.length > 2 ? ` +${speakers.length - 2}` : ""}
+            {speakerNames.slice(0, 2).join(", ")}{speakerNames.length > 2 ? ` +${speakerNames.length - 2}` : ""}
           </p>
         </div>
 

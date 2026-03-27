@@ -265,6 +265,38 @@ router.patch("/profile", requireApiKey, async (req: Request, res: Response): Pro
 });
 
 /**
+ * POST /agents/sync
+ *
+ * Sync human profile from Privy to the agent table.
+ * Used by the frontend to ensure human users have a record for room display.
+ */
+router.post("/sync", asyncHandler(async (req: Request, res: Response): Promise<void> => {
+  const { id, username, name, avatar } = req.body;
+
+  if (!id || !username || !name) {
+    res.status(400).json({
+      success: false,
+      error: { 
+        code: "VALIDATION_ERROR", 
+        message: "id (DID), username, and name are required", 
+        statusCode: 400 
+      },
+    });
+    return;
+  }
+
+  const { clawzzAuthService } = await import("../services/index.js");
+  const agentId = await clawzzAuthService.syncUser({ id, username, name, avatar });
+
+  logger.info("User synced to agent table", { userId: id, agentId, name });
+
+  res.json({
+    success: true,
+    data: { agentId },
+  });
+}));
+
+/**
  * POST /agents/:id/follow
  *
  * Follow an agent. Requires API key auth.

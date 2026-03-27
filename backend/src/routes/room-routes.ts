@@ -472,10 +472,25 @@ router.post(
  */
 router.post(
   "/:id/join",
-  requireApiKey,
+  optionalApiKey,
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const { id } = req.params;
-    const agent = req.agent!;
+    const { userId, role = "speaker" } = req.body;
+
+    // Resolve participant identity: either from API key OR from body (human)
+    const agentId = req.agent?.agentId || userId;
+
+    if (!agentId) {
+      res.status(401).json({
+        success: false,
+        error: {
+          code: "UNAUTHORIZED",
+          message: "API key or userId is required",
+          statusCode: 401,
+        },
+      });
+      return;
+    }
 
     const room = await roomService.getRoomById(id);
 
@@ -492,41 +507,39 @@ router.post(
     }
 
     // If room is pending (Jam was unavailable at creation), attempt to
-    // initialize audio now.  initializeJamRoom() is idempotent — if Jam
-    // is already set up it returns immediately.
+    // initialize audio now.
     if (room.status === "pending" && !room.jamRoomId) {
       try {
         await roomService.initializeJamRoom(id);
-        logger.info("Jam auto-initialized on agent join", {
+        logger.info("Jam auto-initialized on join", {
           roomId: id,
-          agentId: agent.agentId,
+          agentId,
         });
       } catch (err) {
-        // Jam still unavailable — let the agent join anyway.
-        // The room stays pending; audio can be retried later.
         logger.warn("Auto Jam init on join failed — room stays pending", {
           roomId: id,
-          agentId: agent.agentId,
+          agentId,
           error: err instanceof Error ? err.message : String(err),
         });
       }
     }
 
-    // Add agent as participant
-    await roomService.addParticipant(id, agent.agentId);
+    // Add agent/user as participant
+    await roomService.addParticipant(id, agentId, role);
 
-    logger.info("Agent joined room", {
+    logger.info("Participant joined room", {
       roomId: id,
-      agentId: agent.agentId,
+      agentId,
+      role,
     });
 
     // Start room in orchestrator if it's not already started
-    // (Orchestrator handles idempotency)
     try {
       await orchestratorClient.startRoom(id);
     } catch (err) {
       logger.warn("Failed to start room in orchestrator", {
         roomId: id,
+        agentId,
         error: err instanceof Error ? err.message : String(err),
       });
     }
@@ -535,6 +548,7 @@ router.post(
       success: true,
       data: {
         message: "Joined room successfully",
+        agentId,
       },
     });
   })

@@ -39,6 +39,27 @@ const ROLE_LABEL: Record<string, string> = {
   spectator: "Listener",
 }
 
+// ── Audio Utilities ───────────────────────────────────────────────────────────
+
+const playBeep = (freq: number, type: OscillatorType, duration: number, vol: number) => {
+  try {
+    const ctx = new (window.AudioContext || (window as any).webkitAudioContext)()
+    const osc = ctx.createOscillator()
+    const gain = ctx.createGain()
+    osc.type = type
+    osc.frequency.setValueAtTime(freq, ctx.currentTime)
+    gain.gain.setValueAtTime(vol, ctx.currentTime)
+    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + duration)
+    osc.connect(gain)
+    gain.connect(ctx.destination)
+    osc.start()
+    osc.stop(ctx.currentTime + duration)
+  } catch (e) {
+    console.warn("Audio Context not supported or allowed", e)
+  }
+}
+
+
 // ── ScoreBar ──────────────────────────────────────────────────────────────────
 
 function ScoreBar({ score }: { score?: number }) {
@@ -93,8 +114,8 @@ function SpeakerCell({
       <div className="relative">
         <div
           className={cn(
-            `${avatarSize} rounded-full border-2 border-white/10 overflow-hidden bg-white/5 transition-all duration-300`,
-            isSpeaking && "ring-2 ring-violet-400 ring-offset-2 ring-offset-[#1c1c1e]",
+            `${avatarSize} rounded-full border-2 border-border overflow-hidden bg-muted transition-all duration-300`,
+            isSpeaking && "ring-2 ring-violet-400 ring-offset-2 ring-offset-background",
           )}
         >
           <img
@@ -105,26 +126,26 @@ function SpeakerCell({
         </div>
         {!isSmall && (
           <>
-            <div className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-blue-500 border-2 border-[#1c1c1e] flex items-center justify-center">
+            <div className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-blue-500 border-2 border-background flex items-center justify-center">
               <Plus size={10} className="text-white" strokeWidth={3} />
             </div>
-            <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-[#2c2c2e] border border-white/10 flex items-center justify-center">
+            <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-muted border border-border flex items-center justify-center">
               {isSpeaking
                 ? <Waveform size="sm" />
-                : <MicOff size={9} className="text-white/30" strokeWidth={1.5} />}
+                : <MicOff size={9} className="text-muted-foreground/50" strokeWidth={1.5} />}
             </div>
           </>
         )}
       </div>
       {!isSmall && <ScoreBar score={score} />}
       <p className={cn(
-        "text-white/80 text-center truncate font-medium",
+        "text-foreground/90 text-center truncate font-semibold",
         isSmall ? "text-[10px] w-11" : "text-[11px] w-[72px]",
       )}>
         {participant.name}
       </p>
       {!isSmall && (
-        <p className="text-[9px] text-violet-400 uppercase font-bold tracking-wide">
+        <p className="text-[9px] text-violet-500 font-bold uppercase tracking-wide">
           {ROLE_LABEL[participant.role] || "Speaker"}
         </p>
       )}
@@ -185,6 +206,19 @@ export function RoomDock() {
     return unsub
   }, [activeRoomId])
 
+  // TTS Audio Playback
+  useEffect(() => {
+    if (!activeRoomId) return
+    const handleTtsAudio = (data: any) => {
+      if (data.roomId === activeRoomId && data.audioUrl) {
+        const audio = new Audio(data.audioUrl)
+        audio.play().catch(e => console.warn("Auto-play prevented", e))
+      }
+    }
+    const unsub = wsService.on('tts:audio', handleTtsAudio)
+    return () => wsService.off('tts:audio', handleTtsAudio)
+  }, [activeRoomId])
+
   // Fetch room
   useEffect(() => {
     if (!activeRoomId) return
@@ -225,6 +259,17 @@ export function RoomDock() {
   const safeSpeakers: string[] = Array.isArray(jamRoom.speakers) ? jamRoom.speakers : []
   const safeListeners: string[] = Array.isArray(jamRoom.listeners) ? jamRoom.listeners : []
   const safeSpeaking: string[] = Array.isArray(jamRoom.speaking) ? jamRoom.speaking : []
+
+  // Sound Cues
+  const prevListenersCount = useRef(0)
+  useEffect(() => {
+    if (safeListeners.length > prevListenersCount.current) {
+      if (prevListenersCount.current > 0) playBeep(600, "sine", 0.1, 0.05) // Enter
+    } else if (safeListeners.length < prevListenersCount.current) {
+      if (prevListenersCount.current > 0) playBeep(400, "sine", 0.1, 0.05) // Exit
+    }
+    prevListenersCount.current = safeListeners.length
+  }, [safeListeners.length])
 
   const stageParticipants = useMemo<ParticipantInfo[]>(() => {
     if (participants.length > 0) {
@@ -318,17 +363,16 @@ export function RoomDock() {
   if (!isExpanded) {
     return (
       <div
-        className="fixed bottom-[60px] inset-x-0 z-40 h-16 flex items-center gap-3 px-4 border-t border-white/10 cursor-pointer"
-        style={{ background: "rgba(28,28,30,0.97)", backdropFilter: "blur(12px)" }}
+        className="fixed bottom-[60px] inset-x-0 z-40 h-16 flex items-center gap-3 px-4 border-t border-border cursor-pointer bg-background/95 backdrop-blur-md"
         onClick={() => setExpanded(true)}
       >
-        <span className="w-2 h-2 rounded-full bg-red-400 animate-pulse shrink-0" />
+        <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse shrink-0" />
         <div className="flex-grow min-w-0">
-          <p className="text-white/90 font-semibold text-sm truncate">
+          <p className="text-foreground font-semibold text-sm truncate">
             {streamLoading ? "Loading…" : (stream?.title || "Audio Room")}
           </p>
           {totalListeners > 0 && (
-            <p className="text-white/40 text-[11px]">{totalListeners} listening</p>
+            <p className="text-muted-foreground text-[11px]">{totalListeners} listening</p>
           )}
         </div>
         <button
@@ -359,12 +403,11 @@ export function RoomDock() {
   return (
     <>
       <div
-        className="fixed inset-0 z-40 flex flex-col animate-in slide-in-from-bottom duration-300"
-        style={{ background: "#1c1c1e" }}
+        className="fixed inset-0 z-40 flex flex-col animate-in slide-in-from-bottom duration-300 bg-background text-foreground"
       >
         {/* Drag handle */}
         <div className="flex justify-center pt-3 pb-1 shrink-0">
-          <div className="w-10 h-1 rounded-full bg-white/20" />
+          <div className="w-10 h-1 rounded-full bg-muted-foreground/30" />
         </div>
 
         {/* Header */}
@@ -372,16 +415,16 @@ export function RoomDock() {
           <button
             type="button"
             onClick={() => setExpanded(false)}
-            className="p-1.5 text-white/50 hover:text-white/80 transition-colors"
+            className="p-1.5 text-muted-foreground hover:text-foreground transition-colors"
             aria-label="Collapse"
           >
             <ChevronDown size={22} />
           </button>
           <div className="flex-grow min-w-0">
-            <p className="text-white/40 text-[11px] uppercase font-bold tracking-widest truncate">
+            <p className="text-muted-foreground text-[11px] uppercase font-bold tracking-widest truncate">
               {stream?.category || "Live"}
             </p>
-            <p className="text-white font-bold text-base leading-tight truncate">
+            <p className="text-foreground font-bold text-base leading-tight truncate">
               {stream?.title || "Loading…"}
             </p>
           </div>
@@ -423,16 +466,16 @@ export function RoomDock() {
 
           {/* On Stage */}
           <div className="mb-8">
-            <p className="text-white/30 text-[11px] uppercase tracking-widest font-bold mb-4">
+            <p className="text-muted-foreground text-[11px] uppercase tracking-widest font-bold mb-4">
               On Stage
             </p>
             {jamRoom.isLoading ? (
               <div className="flex items-center gap-3 py-8">
-                <div className="w-6 h-6 border-2 border-violet-500/30 border-t-violet-400 rounded-full animate-spin" />
-                <p className="text-xs text-white/40 uppercase tracking-widest">Connecting…</p>
+                <div className="w-6 h-6 border-2 border-violet-500/30 border-t-violet-500 rounded-full animate-spin" />
+                <p className="text-xs text-muted-foreground uppercase tracking-widest">Connecting…</p>
               </div>
             ) : stageParticipants.length === 0 ? (
-              <div className="flex flex-col items-center gap-3 py-10 text-white/20">
+              <div className="flex flex-col items-center gap-3 py-10 text-muted-foreground/50">
                 <Headphones size={36} />
                 <p className="text-xs uppercase tracking-widest">No speakers yet</p>
               </div>
@@ -486,8 +529,7 @@ export function RoomDock() {
 
         {/* Bottom action bar */}
         <div
-          className="shrink-0 px-4 py-3 border-t border-white/10 flex items-center gap-3"
-          style={{ background: "rgba(18,18,20,0.95)" }}
+          className="shrink-0 px-4 py-3 border-t border-border flex items-center gap-3 bg-muted/30"
         >
           {/* Mic pill */}
           <button
@@ -496,10 +538,10 @@ export function RoomDock() {
             className={cn(
               "flex items-center gap-2 px-5 h-11 rounded-full border-2 font-bold text-sm transition-all",
               !jamRoom.inRoom
-                ? "border-white/10 text-white/20 cursor-default"
+                ? "border-border text-muted-foreground cursor-default"
                 : jamRoom.isMuted
-                  ? "border-white/20 bg-white/5 text-white/50"
-                  : "border-violet-500 bg-violet-600/20 text-violet-300",
+                  ? "border-border bg-muted text-muted-foreground"
+                  : "border-violet-500 bg-violet-600/20 text-violet-500",
             )}
           >
             {jamRoom.isMuted || !jamRoom.inRoom ? <MicOff size={18} /> : <Mic size={18} />}
@@ -514,7 +556,7 @@ export function RoomDock() {
           <button
             type="button"
             onClick={() => setShowChat(true)}
-            className="relative w-11 h-11 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-white/50 hover:text-white/80 transition-colors"
+            className="relative w-11 h-11 rounded-full bg-muted border border-border flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
             aria-label="Chat"
           >
             <MessageSquare size={20} />
@@ -529,7 +571,7 @@ export function RoomDock() {
           <button
             type="button"
             onClick={() => requireAuth(() => setShowTipModal(true))}
-            className="w-11 h-11 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-white/50 hover:text-green-400 transition-colors"
+            className="w-11 h-11 rounded-full bg-muted border border-border flex items-center justify-center text-muted-foreground hover:text-green-500 transition-colors"
             aria-label="Tip"
           >
             <DollarSign size={20} />
@@ -540,37 +582,36 @@ export function RoomDock() {
       {/* Chat sheet */}
       {showChat && (
         <>
-          <div className="fixed inset-0 z-[45] bg-black/40" onClick={() => setShowChat(false)} />
+          <div className="fixed inset-0 z-[45] bg-black/40 backdrop-blur-sm" onClick={() => setShowChat(false)} />
           <div
-            className="fixed inset-x-0 bottom-0 z-[46] flex flex-col h-[55vh] animate-in slide-in-from-bottom duration-300 rounded-t-2xl overflow-hidden border-t border-white/10"
-            style={{ background: "rgba(15,10,30,0.98)", backdropFilter: "blur(12px)" }}
+            className="fixed inset-x-0 bottom-0 z-[46] flex flex-col h-[55vh] animate-in slide-in-from-bottom duration-300 rounded-t-2xl overflow-hidden border-t border-border bg-background/95 backdrop-blur-xl"
             role="dialog"
             aria-label="Live Chat"
           >
-            <div className="flex justify-center pt-3 pb-1 bg-white/5 shrink-0">
-              <div className="w-10 h-1.5 rounded-full bg-white/20" />
+            <div className="flex justify-center pt-3 pb-1 shrink-0">
+              <div className="w-10 h-1.5 rounded-full bg-muted-foreground/30" />
             </div>
-            <div className="px-4 py-3 border-b border-white/10 bg-white/5 shrink-0 flex items-center justify-between">
-              <span className="font-semibold text-sm text-white/80 flex items-center gap-2">
-                <MessageSquare size={15} className="text-white/40" /> Live Chat
+            <div className="px-4 py-3 border-b border-border shrink-0 flex items-center justify-between">
+              <span className="font-semibold text-sm text-foreground flex items-center gap-2">
+                <MessageSquare size={15} className="text-muted-foreground" /> Live Chat
               </span>
-              <button type="button" onClick={() => setShowChat(false)} className="text-white/40 hover:text-white/70 transition-colors">
+              <button type="button" onClick={() => setShowChat(false)} className="text-muted-foreground hover:text-foreground transition-colors">
                 <ChevronDown size={18} />
               </button>
             </div>
             <div className="flex-grow p-4 overflow-y-auto space-y-3 text-sm">
               {chat.length === 0 ? (
-                <p className="text-center text-white/40 font-medium pt-8">Be the first to say something!</p>
+                <p className="text-center text-muted-foreground font-medium pt-8">Be the first to say something!</p>
               ) : chat.map((c, i) => (
-                <div key={i} className="p-2.5 rounded-lg hover:bg-white/5 transition-colors">
-                  <span className={cn("font-semibold mr-2", c.user === "You" ? "text-violet-400" : "text-white/80")}>
+                <div key={i} className="p-2.5 rounded-lg hover:bg-muted/50 transition-colors">
+                  <span className={cn("font-semibold mr-2", c.user === "You" ? "text-violet-500" : "text-foreground")}>
                     {c.user}:
                   </span>
-                  <span className="text-white/50 leading-snug">{c.msg}</span>
+                  <span className="text-foreground/80 leading-snug">{c.msg}</span>
                 </div>
               ))}
             </div>
-            <div className="p-3 border-t border-white/10 bg-black/20 shrink-0">
+            <div className="p-3 border-t border-border bg-muted/20 shrink-0">
               <form onSubmit={sendMsg} className="flex gap-2">
                 <Input
                   value={message}

@@ -127,13 +127,26 @@ export const usePrivyAuth = () => {
         fetchInteractions();
         fetchBalance();
 
+        // Sync profile to backend for room display
+        const profile = extractProfile(user);
+        apiClient.post("/agents/sync", {
+          id: user.id,
+          username: profile.username,
+          name: profile.displayName,
+          avatar: profile.avatarUrl,
+        }).then(res => {
+          if (res.data?.success) {
+            setAgentId(res.data.data.agentId);
+          }
+        }).catch(err => logger.error("Profile sync failed", { err }));
+
         logger.info("Privy user synced", {
           userId: user.id,
           walletAddress: address,
         });
       }
     }
-  }, [ready, user, authenticated, fetchInteractions, fetchBalance]);
+  }, [ready, user, authenticated, fetchInteractions, fetchBalance, setAgentId, setAgent, setAuthenticated, setWalletAddress]);
 
   const handleLogout = async () => {
     try {

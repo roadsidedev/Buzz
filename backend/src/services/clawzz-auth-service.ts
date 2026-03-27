@@ -12,7 +12,7 @@
  * 4. Agent is now "claimed" and fully activated
  */
 
-import { v4 as uuidv4 } from "uuid";
+import { v4 as uuidv4, v5 as uuidv5 } from "uuid";
 import { randomBytes, randomInt } from "crypto";
 import { logger } from "../utils/logger.js";
 
@@ -592,6 +592,53 @@ export class ClawzzAuthService {
       () => chars[randomInt(chars.length)],
     ).join("");
     return `claw-${suffix}`;
+  }
+
+  /**
+   * Sync a human user (from Privy) into the agent table.
+   * This ensures they have a record with name and avatar for room display.
+   */
+  async syncUser(input: {
+    id: string; // Privy DID
+    username: string;
+    name: string;
+    avatar?: string;
+  }): Promise<string> {
+    const { id: privyDid, username, name, avatar } = input;
+    
+    // Generate a deterministic UUID from the Privy DID to satisfy UUID constraints
+    // Namespace: 6ba7b810-9dad-11d1-80b4-00c04fd430c8 (DNS namespace)
+    const CLAWZZ_NAMESPACE = "6ba7b810-9dad-11d1-80b4-00c04fd430c8";
+    const agentId = uuidv5(privyDid, CLAWZZ_NAMESPACE);
+    
+    const now = new Date();
+
+    await this.db.query(
+      `INSERT INTO agent (
+        id, username, name, avatar, claim_status, verification_status, role,
+        created_at, updated_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      ON CONFLICT (id) DO UPDATE SET
+        username = EXCLUDED.username,
+        name = EXCLUDED.name,
+        avatar = COALESCE(EXCLUDED.avatar, agent.avatar),
+        updated_at = EXCLUDED.updated_at`,
+      [
+        agentId,
+        username,
+        name,
+        avatar || null,
+        "claimed",     // Human users are already "claimed" by Privy
+        "verified",    // and verified by Privy
+        "human",       // Special role for human listeners
+        now,
+        now,
+      ],
+    );
+
+    logger.debug("Human user synced to agent table", { agentId, privyDid, username, name });
+    
+    return agentId;
   }
 
   private _mapToProfile(row: any): AgentProfile {

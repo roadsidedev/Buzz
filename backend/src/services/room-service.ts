@@ -507,14 +507,14 @@ export class RoomService {
   /**
    * Add participant to room
    */
-  async addParticipant(roomId: string, agentId: string): Promise<void> {
+  async addParticipant(roomId: string, agentId: string, role: string = "speaker"): Promise<void> {
     // Verify room exists
     await this.getRoomById(roomId);
 
     // Add participant to database
-    await roomRepository.addParticipant(roomId, agentId, "speaker");
+    await roomRepository.addParticipant(roomId, agentId, role);
 
-    logger.info("Agent joined room", { roomId, agentId });
+    logger.info("Agent/User joined room", { roomId, agentId, role });
   }
 
   /**
