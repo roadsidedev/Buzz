@@ -876,4 +876,126 @@ router.get(
   })
 );
 
+/**
+ * POST /rooms/:id/tts
+ * Synthesize a selected message as speech and stream it to the live room.
+ *
+ * Called by the radio-runner after the orchestrator selects a winning message.
+ * Flow:
+ *   1. Synthesize audio via ElevenLabs (or no-op if TTS disabled)
+ *   2. Upload MP3 to S3/R2 (AudioStorageService)
+ *   3. Emit `tts:audio` Socket.IO event to `room:{id}` so the frontend plays it
+ *   4. Return { success, durationMs } to caller
+ *
+ * Voice selection: send `agentName` in the request body.
+ *   - Contains "mira" (case-insensitive) → ELEVENLABS_VOICE_B
+ *   - Otherwise → ELEVENLABS_VOICE_A (Alex / default)
+ *
+ * Auth: Bearer API key + X-Clawzz-System-Secret
+ */
+router.post(
+  "/:id/tts",
+  requireApiKey,
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const { id: roomId } = req.params;
+    const {
+      messageId,
+      text,
+      agentId,
+      agentName,
+    } = req.body as {
+      messageId?: string;
+      text?: string;
+      agentId?: string;
+      agentName?: string;
+    };
+
+    if (!messageId || !text) {
+      res.status(400).json({
+        success: false,
+        error: {
+          code: "MISSING_FIELDS",
+          message: "messageId and text are required",
+          statusCode: 400,
+        },
+      });
+      return;
+    }
+
+    // Verify the room exists
+    const room = await roomService.getRoomById(roomId);
+
+    // Resolve voice: use agentName (not the UUID agentId) for matching
+    const isMira = (agentName ?? "").toLowerCase().includes("mira");
+    const voiceId = isMira
+      ? process.env.ELEVENLABS_VOICE_B
+      : process.env.ELEVENLABS_VOICE_A;
+
+    // Lazy-load TTS service to avoid circular deps
+    const { getTTSService } = await import("../services/tts-service.js");
+    const tts = getTTSService();
+
+    let durationMs = 0;
+    let audioUrl: string | null = null;
+
+    if (tts.isEnabled()) {
+      try {
+        // 1. Synthesize audio
+        const { audioBuffer, durationMs: ttsMs } = await tts.synthesize({
+          text,
+          voiceId,
+        });
+        durationMs = ttsMs;
+
+        // 2. Upload to S3/R2 (non-blocking failure — audio still plays via URL if available)
+        const { getAudioStorageService } = await import("../services/audio-storage-service.js");
+        audioUrl = await getAudioStorageService().upload(audioBuffer, messageId);
+
+        logger.info("TTS synthesis complete", {
+          roomId,
+          messageId,
+          durationMs,
+          agentName: agentName ?? agentId,
+          voiceId: voiceId ?? "default",
+          hasAudioUrl: !!audioUrl,
+        });
+      } catch (ttsErr) {
+        logger.error("TTS synthesis failed", {
+          roomId,
+          messageId,
+          error: ttsErr instanceof Error ? ttsErr.message : String(ttsErr),
+        });
+        // Continue — emit the event with null audioUrl so the room UI can show transcript
+      }
+    } else {
+      logger.info("TTS disabled — skipping synthesis", { roomId });
+    }
+
+    // 3. Emit tts:audio event so the frontend live room plays the audio
+    // The frontend listens on `room:{id}` for this event and plays the URL
+    try {
+      const { getIO } = await import("../server.js");
+      getIO().to(`room:${roomId}`).emit("tts:audio", {
+        roomId,
+        messageId,
+        agentId: agentId ?? null,
+        agentName: agentName ?? null,
+        text,
+        audioUrl,
+        durationMs,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (socketErr) {
+      // Non-fatal: log and continue
+      logger.warn("Failed to emit tts:audio Socket.IO event", {
+        roomId,
+        error: socketErr instanceof Error ? socketErr.message : String(socketErr),
+      });
+    }
+
+    res.json({ success: true, durationMs });
+  })
+);
+
 export default router;
+

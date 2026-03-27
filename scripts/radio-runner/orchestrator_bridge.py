@@ -218,9 +218,25 @@ class OrchestratorBridge:
         room_type: str = "debate",
         objective: str = "Live news discussion",
         spawn_fee: int = 250,
+        join_as_host: bool = True,
     ) -> str:
         """
-        Create a new room via the backend API.
+        Create a new room via the backend API and optionally join the host as
+        a participant immediately.
+
+        The host agent creates the room (sets hostAgentId) but is NOT
+        automatically added to the room_participant table by the backend.
+        Calling join_room() here ensures the host appears in the participant
+        list alongside the co-host so the frontend shows them as "live".
+
+        Args:
+            host: The host agent who creates and owns the room
+            title: Display title for the room
+            room_type: Room type (e.g. "debate")
+            objective: Room objective text
+            spawn_fee: Spawn fee in cents (default 250 = $2.50)
+            join_as_host: If True (default), auto-join the host as participant
+                          after creation. Set False only for testing.
 
         Returns:
             Room ID (UUID string)
@@ -241,6 +257,21 @@ class OrchestratorBridge:
         room_id = data["data"]["room"]["id"]
         status = data["data"]["room"]["status"]
         logger.info("Room created", extra={"room_id": room_id[:8], "status": status})
+
+        # Auto-join the host as a participant so they appear in the participant
+        # list. The backend only sets hostAgentId during creation; it does NOT
+        # automatically insert a room_participant row for the host.
+        if join_as_host:
+            try:
+                self.join_room(room_id, host)
+                logger.info("Host joined room as participant", extra={"room_id": room_id[:8], "host": host.name})
+            except Exception as exc:
+                # Non-fatal: the room is still created. Log and continue.
+                logger.warning(
+                    "Host self-join failed — host may not appear as participant",
+                    extra={"room_id": room_id[:8], "error": str(exc)},
+                )
+
         return room_id
 
     def join_room(self, room_id: str, agent: RegisteredAgent) -> None:
@@ -363,10 +394,24 @@ class OrchestratorBridge:
         time.sleep(0.3)
         return self.process_turn(room_id)
 
-    def play_audio(self, room_id: str, message_id: str, text: str, agent_id: str, api_key: str) -> int:
+    def play_audio(
+        self,
+        room_id: str,
+        message_id: str,
+        text: str,
+        agent_id: str,
+        api_key: str,
+        agent_name: str = "",
+    ) -> int:
         """
-        Trigger backend TTS to synthesize the audio and play it into the room.
-        Returns the duration of the audio in milliseconds.
+        Trigger backend TTS to synthesize the audio and emit it to the live room.
+
+        The backend uses `agentName` (not `agentId`) for voice selection:
+          - name contains "mira" (case-insensitive) → ELEVENLABS_VOICE_B
+          - otherwise → ELEVENLABS_VOICE_A (Alex / default)
+
+        Returns:
+            Estimated speech duration in milliseconds (0 if TTS disabled)
         """
         resp = self._backend.post(
             f"/api/v1/rooms/{room_id}/tts",
@@ -374,6 +419,7 @@ class OrchestratorBridge:
                 "messageId": message_id,
                 "text": text,
                 "agentId": agent_id,
+                "agentName": agent_name,
             },
             headers=self._auth_headers(api_key),
         )

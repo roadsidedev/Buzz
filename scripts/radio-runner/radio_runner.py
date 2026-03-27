@@ -260,6 +260,7 @@ class RadioRunner:
                 # 4. Handle results & pacing
                 if result.selected_message_id:
                     winner_text = turn.host_text if result.selected_agent_id == self._host.id else turn.cohost_text
+                    winner_name = self._host.name if result.selected_agent_id == self._host.id else self._cohost.name
                     
                     logger.info("Triggering audio synthesis...")
                     duration_ms = self._bridge.play_audio(
@@ -267,7 +268,8 @@ class RadioRunner:
                         message_id=result.selected_message_id,
                         text=winner_text,
                         agent_id=result.selected_agent_id,
-                        api_key=self._host.api_key
+                        api_key=self._host.api_key,
+                        agent_name=winner_name
                     )
                     
                     # Sleep dynamically based on speech duration + 1.5s natural pause
