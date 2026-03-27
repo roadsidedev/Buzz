@@ -952,21 +952,28 @@ router.post(
     let durationMs = 0;
     let audioUrl: string | null = null;
 
+    // Get Jam room ID for streaming audio to the room
+    const jamRoomId = room.jamRoomId || roomId;
+
     if (tts.isEnabled()) {
       try {
-        // 1. Synthesize audio
-        const { audioBuffer, durationMs: ttsMs } = await tts.synthesize({
+        // Use synthesizeAndStream to both generate audio AND stream it to Jam
+        // This pipes the audio through BotService to the WebRTC room
+        const { audioBuffer, durationMs: ttsMs } = await tts.synthesizeAndStream(
+          jamRoomId,
           text,
+          messageId,
           voiceId,
-        });
+        );
         durationMs = ttsMs;
 
-        // 2. Upload to S3/R2 (non-blocking failure — audio still plays via URL if available)
+        // Also upload to S3/R2 for replay/archival
         const { getAudioStorageService } = await import("../services/audio-storage-service.js");
         audioUrl = await getAudioStorageService().upload(audioBuffer, messageId);
 
-        logger.info("TTS synthesis complete", {
+        logger.info("TTS synthesis and streaming complete", {
           roomId,
+          jamRoomId,
           messageId,
           durationMs,
           agentName: agentName ?? agentId,
@@ -974,8 +981,9 @@ router.post(
           hasAudioUrl: !!audioUrl,
         });
       } catch (ttsErr) {
-        logger.error("TTS synthesis failed", {
+        logger.error("TTS synthesis/streaming failed", {
           roomId,
+          jamRoomId,
           messageId,
           error: ttsErr instanceof Error ? ttsErr.message : String(ttsErr),
         });

@@ -19,7 +19,7 @@
 import { ElevenLabsClient } from "elevenlabs";
 import { logger } from "../utils/logger.js";
 import { ValidationError, ServiceUnavailableError } from "../utils/errors.js";
-import { getBotService } from "./bot-service.js";
+import { getJamService } from "./jam-service.js";
 import { TTS_CONFIG } from "../config/media-config.js";
 
 // Buffer concatenation helper for ElevenLabs stream
@@ -84,7 +84,8 @@ export class TTSService {
   }
 
   /**
-   * Synthesize and immediately pipe into the Headless WebRTC Bot for the given room
+   * Synthesize and immediately stream to Jam audio room
+   * Uses direct Jam API to inject audio into the room
    */
   async synthesizeAndStream(
     jamRoomId: string,
@@ -94,16 +95,18 @@ export class TTSService {
   ): Promise<{ audioBuffer: Buffer; durationMs: number }> {
     const { audioBuffer } = await this.synthesize({ text, voiceId });
 
-    const botService = getBotService();
-    // Play the audio via the bot without blocking the current return
-    botService.streamAudioBuffer(jamRoomId, audioBuffer).catch(e => {
-        logger.error("Error playing audio stream via bot", { jamRoomId, error: e });
-    });
+    // Stream audio directly to Jam via the Jam service API
+    const jamService = getJamService();
+    if (jamService) {
+      jamService.streamAudio(jamRoomId, audioBuffer, messageId).catch(e => {
+        logger.error("Error streaming audio to Jam", { jamRoomId, messageId, error: e });
+      });
+    } else {
+      logger.warn("Jam service not available, audio will not be streamed to room", { jamRoomId });
+    }
 
     const wordCount = text.split(/\s+/).length;
     let durationMs = Math.round((wordCount / 150) * 60 * 1000);
-    // Real duration might be longer, but we return estimate for quick API response
-    // The bot service handles actual playing sequence sequentially.
     
     return { audioBuffer, durationMs };
   }

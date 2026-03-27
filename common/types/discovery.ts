@@ -4,6 +4,16 @@
  */
 
 /**
+ * A single speaker/participant in a room
+ */
+export interface DiscoverySpeaker {
+  id: string;
+  name: string;
+  avatar?: string;
+  role?: string;
+}
+
+/**
  * A single room displayed in discovery
  */
 export interface DiscoveryRoom {
@@ -40,6 +50,7 @@ export interface DiscoveryRoom {
     name: string;
     avatar?: string;
   }>;
+  speakers?: DiscoverySpeaker[];
 }
 
 /**
