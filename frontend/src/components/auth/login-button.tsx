@@ -129,7 +129,7 @@ export const usePrivyAuth = () => {
 
         // Sync profile to backend for room display
         const profile = extractProfile(user);
-        apiClient.post("/agents/sync", {
+        apiClient.post<{ success: boolean; data: { agentId: string } }>("/agents/sync", {
           id: user.id,
           username: profile.username,
           name: profile.displayName,
