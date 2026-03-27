@@ -103,7 +103,7 @@ import { useSocialStore } from "@/stores/social-store";
 import { useWalletStore } from "@/stores/wallet-store";
 
 export const usePrivyAuth = () => {
-  const { user, ready, logout: privyLogout } = usePrivy();
+  const { user, ready, logout: privyLogout, getAccessToken } = usePrivy();
   const {
     setAuthenticated,
     setWalletAddress,
@@ -124,7 +124,7 @@ export const usePrivyAuth = () => {
         if (address && !authenticated) {
           // 1. Get Access Token first to avoid 401s on subsequent calls
           try {
-            const token = await user.getAccessToken();
+            const token = await getAccessToken();
             if (token) {
               apiClient.setToken(token);
               logger.debug("API token synced from Privy");
