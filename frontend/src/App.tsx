@@ -103,11 +103,13 @@ export default function AppWithErrorBoundary() {
           appId={import.meta.env.VITE_PRIVY_APP_ID || ""}
           config={{
             loginMethods: ["email", "google", "twitter", "discord", "github"],
+            /* 
             externalWallets: {
               solana: {
                 connectors: toSolanaWalletConnectors(),
               },
             },
+            */
           }}
         >
           <App />

@@ -117,35 +117,56 @@ export const usePrivyAuth = () => {
 
   // Sync Privy user with auth store
   React.useEffect(() => {
-    if (ready && user) {
-      const address = user.wallet?.address;
+    const syncUser = async () => {
+      if (ready && user) {
+        const address = user.wallet?.address;
 
-      if (address && !authenticated) {
-        setWalletAddress(address);
-        setAgent(extractProfile(user) as any);
-        setAuthenticated(true);
-        fetchInteractions();
-        fetchBalance();
-
-        // Sync profile to backend for room display
-        const profile = extractProfile(user);
-        apiClient.post<{ success: boolean; data: { agentId: string } }>("/agents/sync", {
-          id: user.id,
-          username: profile.username,
-          name: profile.displayName,
-          avatar: profile.avatarUrl,
-        }).then(res => {
-          if (res.data?.success) {
-            setAgentId(res.data.data.agentId);
+        if (address && !authenticated) {
+          // 1. Get Access Token first to avoid 401s on subsequent calls
+          try {
+            const token = await user.getAccessToken();
+            if (token) {
+              apiClient.setToken(token);
+              logger.debug("API token synced from Privy");
+            }
+          } catch (tokenErr) {
+            logger.error("Failed to get Privy access token", { tokenErr });
           }
-        }).catch(err => logger.error("Profile sync failed", { err }));
 
-        logger.info("Privy user synced", {
-          userId: user.id,
-          walletAddress: address,
-        });
+          // 2. Set local auth state
+          setWalletAddress(address);
+          setAgent(extractProfile(user) as any);
+          setAuthenticated(true);
+
+          // 3. Trigger protected data fetches now that token is set
+          fetchInteractions();
+          fetchBalance();
+
+          // 4. Sync profile to backend for room display
+          const profile = extractProfile(user);
+          apiClient.post<{ success: boolean; data: { agentId: string } }>("/agents/sync", {
+            id: user.id,
+            username: profile.username,
+            name: profile.displayName,
+            avatar: profile.avatarUrl,
+          }).then(res => {
+            if (res.data?.success) {
+              setAgentId(res.data.data.agentId);
+            }
+          }).catch(err => {
+            // Only log as error if it's not a 401 (which we shouldn't get now)
+            logger.error("Profile sync failed", { err });
+          });
+
+          logger.info("Privy user synced", {
+            userId: user.id,
+            walletAddress: address,
+          });
+        }
       }
-    }
+    };
+
+    syncUser();
   }, [ready, user, authenticated, fetchInteractions, fetchBalance, setAgentId, setAgent, setAuthenticated, setWalletAddress]);
 
   const handleLogout = async () => {

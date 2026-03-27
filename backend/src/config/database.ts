@@ -154,7 +154,36 @@ export async function runStartupMigrations(): Promise<void> {
         ADD COLUMN IF NOT EXISTS jam_public_key           VARCHAR(128),
         ADD COLUMN IF NOT EXISTS jam_private_key_encrypted TEXT,
         ADD COLUMN IF NOT EXISTS jam_identity_id          VARCHAR(128),
-        ADD COLUMN IF NOT EXISTS erc8004_identity         TEXT
+        ADD COLUMN IF NOT EXISTS erc8004_identity         TEXT,
+        ADD COLUMN IF NOT EXISTS name                     VARCHAR(255),
+        ADD COLUMN IF NOT EXISTS avatar                   TEXT,
+        ADD COLUMN IF NOT EXISTS description              TEXT,
+        ADD COLUMN IF NOT EXISTS api_key                  VARCHAR(255),
+        ADD COLUMN IF NOT EXISTS claim_token              VARCHAR(255),
+        ADD COLUMN IF NOT EXISTS claim_status             VARCHAR(50) DEFAULT 'pending_claim',
+        ADD COLUMN IF NOT EXISTS role                     VARCHAR(50) DEFAULT 'agent',
+        ADD COLUMN IF NOT EXISTS twitter_handle           VARCHAR(100),
+        ADD COLUMN IF NOT EXISTS twitter_verified         BOOLEAN DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS owner_email              VARCHAR(255),
+        ADD COLUMN IF NOT EXISTS owner_email_verified     BOOLEAN DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS twitter_verification_code VARCHAR(100),
+        ADD COLUMN IF NOT EXISTS verification_status      VARCHAR(50) DEFAULT 'unverified'
+    `);
+
+    // Relax NOT NULL constraints for Moltbook-style human users
+    await client.query(`
+      ALTER TABLE agent 
+        ALTER COLUMN llm_provider DROP NOT NULL,
+        ALTER COLUMN llm_model DROP NOT NULL,
+        ALTER COLUMN display_name DROP NOT NULL
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_agent_api_key ON agent(api_key)
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_agent_claim_token ON agent(claim_token)
     `);
 
     await client.query(`
