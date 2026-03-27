@@ -35,9 +35,9 @@ def validate_environment() -> None:
     # LLM provider validation: allow `none` for degraded mode, otherwise require a key
     provider = (settings.LLM_PROVIDER or "").lower()
     if provider and provider != "none":
-        if not (settings.LLM_API_KEY or settings.ANTHROPIC_API_KEY):
+        if not settings.LLM_API_KEY:
             missing.append(
-                "  • LLM_API_KEY or ANTHROPIC_API_KEY: API key for selected LLM provider"
+                "  • LLM_API_KEY: API key for selected LLM provider"
             )
 
     if missing:
