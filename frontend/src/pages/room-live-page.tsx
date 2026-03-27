@@ -611,6 +611,7 @@ export function RoomLivePage() {
                       }
                       score={agentScores[p.id]}
                     />
+                  ))}
                 </div>
               </div>
             )}
