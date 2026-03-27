@@ -32,9 +32,9 @@ def validate_environment() -> None:
     if not settings.REDIS_URL:
         missing.append("  • REDIS_URL: Redis connection for room state")
 
-    # LLM provider validation: allow `none` for degraded mode, otherwise require a key
+    # LLM provider validation: allow `none` or empty for degraded mode, otherwise require a key
     provider = (settings.LLM_PROVIDER or "").lower()
-    if provider and provider != "none":
+    if provider not in ("", "none"):
         if not settings.LLM_API_KEY:
             missing.append(
                 "  • LLM_API_KEY: API key for selected LLM provider"
