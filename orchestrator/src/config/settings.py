@@ -1,6 +1,7 @@
 """Configuration management for Orchestrator Service."""
 
 import os
+from pydantic import model_validator
 from pydantic_settings import BaseSettings
 from typing import Literal
 
@@ -74,6 +75,22 @@ class Settings(BaseSettings):
     SCORING_WEIGHT_COHERENCE: float = 0.20
     SCORING_WEIGHT_ACTIONABILITY: float = 0.15
     SCORING_WEIGHT_ENGAGEMENT: float = 0.05
+
+    @model_validator(mode='after')
+    def resolve_llm_api_key(self) -> 'Settings':
+        """Resolve LLM_API_KEY from provider-specific env vars if not set directly."""
+        if not self.LLM_API_KEY:
+            provider = (self.LLM_PROVIDER or "").lower()
+            if provider == "nvidia":
+                self.LLM_API_KEY = os.getenv("NVIDIA_API_KEY", "")
+            elif provider == "anthropic":
+                self.LLM_API_KEY = (
+                    os.getenv("ANTHROPIC_API_KEY", "")
+                    or os.getenv("CLAUDE_API_KEY", "")
+                )
+            elif provider == "openai":
+                self.LLM_API_KEY = os.getenv("OPENAI_API_KEY", "")
+        return self
 
     class Config:
         """Pydantic config."""
