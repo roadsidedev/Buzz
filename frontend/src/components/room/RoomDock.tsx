@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react"
 import {
   ChevronDown, Mic, MicOff, MessageSquare, Share2, DollarSign,
-  PhoneOff, Copy, Plus, Headphones,
+  PhoneOff, Copy, Plus, Headphones, Volume2, VolumeX,
 } from "lucide-react"
 import axios from "axios"
 import { cn } from "@/lib/utils"
@@ -178,6 +178,7 @@ export function RoomDock() {
   const chunksRef = useRef<BlobPart[]>([])
   const recordingStreamRef = useRef<MediaStream | null>(null)
   const recordingStartRef = useRef<Date | null>(null)
+  const audioRef = useRef<HTMLAudioElement | null>(null)
 
   const jamRoom = useJamRoom({
     roomId: activeRoomId || "",
@@ -206,18 +207,55 @@ export function RoomDock() {
     return unsub
   }, [activeRoomId])
 
-  // TTS Audio Playback
+  // Subscribe to socket room for TTS audio events
+  useEffect(() => {
+    if (!activeRoomId || !stream) return
+    wsService.joinRoom(activeRoomId)
+    return () => wsService.leaveRoom(activeRoomId)
+  }, [activeRoomId, stream])
+
+  // Unlock persistent audio element on first user interaction (satisfies autoplay policy)
+  useEffect(() => {
+    const unlock = () => {
+      if (audioRef.current) {
+        audioRef.current.play().then(() => audioRef.current?.pause()).catch(() => {})
+      }
+    }
+    document.addEventListener("click", unlock, { once: true })
+    document.addEventListener("touchstart", unlock, { once: true })
+    return () => {
+      document.removeEventListener("click", unlock)
+      document.removeEventListener("touchstart", unlock)
+    }
+  }, [])
+
+  // TTS Audio Playback — use persistent audio element + audioBase64 for autoplay compliance
   useEffect(() => {
     if (!activeRoomId) return
     const handleTtsAudio = (data: any) => {
-      if (data.roomId === activeRoomId && data.audioUrl) {
-        const audio = new Audio(data.audioUrl)
-        audio.play().catch(e => console.warn("Auto-play prevented", e))
+      if (data.roomId !== activeRoomId) return
+      if (!audioRef.current) return
+      if (data.audioBase64) {
+        try {
+          const bytes = Uint8Array.from(atob(data.audioBase64), (c) => c.charCodeAt(0))
+          const blob = new Blob([bytes.buffer], { type: "audio/mpeg" })
+          const blobUrl = URL.createObjectURL(blob)
+          audioRef.current.src = blobUrl
+          audioRef.current.onended = () => URL.revokeObjectURL(blobUrl)
+        } catch {
+          if (data.audioUrl) audioRef.current.src = data.audioUrl
+        }
+      } else if (data.audioUrl) {
+        audioRef.current.src = data.audioUrl
+      } else {
+        return
       }
+      audioRef.current.muted = jamRoom.isSoundMuted
+      audioRef.current.play().catch((e) => console.warn("[RoomDock] Audio play blocked:", e))
     }
-    const unsub = wsService.on('tts:audio', handleTtsAudio)
-    return () => wsService.off('tts:audio', handleTtsAudio)
-  }, [activeRoomId])
+    wsService.on("tts:audio", handleTtsAudio)
+    return () => wsService.off("tts:audio", handleTtsAudio)
+  }, [activeRoomId, jamRoom.isSoundMuted])
 
   // Fetch room
   useEffect(() => {
@@ -402,6 +440,9 @@ export function RoomDock() {
   // ── Expanded full sheet ───────────────────────────────────────────────────────
   return (
     <>
+      {/* Hidden persistent audio element — reused for all TTS playback */}
+      <audio ref={audioRef} preload="none" style={{ display: "none" }} />
+
       <div
         className="fixed inset-0 z-40 flex flex-col animate-in slide-in-from-bottom duration-300 bg-background text-foreground"
       >
@@ -531,22 +572,23 @@ export function RoomDock() {
         <div
           className="shrink-0 px-4 py-3 border-t border-border flex items-center gap-3 bg-muted/30"
         >
-          {/* Mic pill */}
+          {/* Speaker / audio-output mute pill */}
           <button
             type="button"
-            onClick={jamRoom.inRoom ? jamRoom.toggleMute : undefined}
+            onClick={jamRoom.inRoom ? jamRoom.toggleSoundMute : undefined}
             className={cn(
-              "flex items-center gap-2 px-5 h-11 rounded-full border-2 font-bold text-sm transition-all",
+              "flex items-center gap-2 px-5 h-11 rounded-full border-2 font-bold text-sm transition-all duration-200",
               !jamRoom.inRoom
                 ? "border-border text-muted-foreground cursor-default"
-                : jamRoom.isMuted
-                  ? "border-border bg-muted text-muted-foreground"
+                : jamRoom.isSoundMuted
+                  ? "border-amber-500 bg-amber-500/15 text-amber-400 animate-pulse"
                   : "border-violet-500 bg-violet-600/20 text-violet-500",
             )}
+            aria-label={jamRoom.isSoundMuted ? "Unmute audio" : "Mute audio"}
           >
-            {jamRoom.isMuted || !jamRoom.inRoom ? <MicOff size={18} /> : <Mic size={18} />}
+            {!jamRoom.inRoom || jamRoom.isSoundMuted ? <VolumeX size={18} /> : <Volume2 size={18} />}
             <span className="text-[13px]">
-              {!jamRoom.inRoom ? "Connecting…" : jamRoom.isMuted ? "Unmute" : "Muted"}
+              {!jamRoom.inRoom ? "Connecting…" : jamRoom.isSoundMuted ? "Tap to hear" : "Live"}
             </span>
           </button>
 

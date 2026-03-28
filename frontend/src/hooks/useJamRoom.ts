@@ -6,7 +6,7 @@
  */
 
 import { useEffect, useState, useCallback, useRef } from "react";
-import { createJam, on as jamOn } from "jam-core";
+import { createJam } from "jam-core";
 
 export interface JamState {
   inRoom: boolean;
@@ -193,13 +193,13 @@ export function useJamRoom(options: UseJamRoomOptions): UseJamRoomReturn {
     }
   }, [autoJoin, inRoom, isLoading, error, connect]);
 
-  // Force re-render on state changes using jam-core's minimal-state `on` subscription
+  // Force re-render on state changes using the documented jam-core api.onState API.
+  // api.onState(undefined, listener) subscribes to ALL state changes and returns an unsubscribe fn.
   const [, forceUpdate] = useState({});
   useEffect(() => {
     if (jamRef.current) {
-      const [jamState] = jamRef.current;
-      // jamOn(state, listener) subscribes to any state change — returns an unsubscribe fn
-      const unsubscribe = jamOn(jamState, () => forceUpdate({}));
+      const [, jamApi] = jamRef.current;
+      const unsubscribe = (jamApi as any).onState?.(undefined, () => forceUpdate({}));
       return typeof unsubscribe === "function" ? unsubscribe : undefined;
     }
   }, []);
