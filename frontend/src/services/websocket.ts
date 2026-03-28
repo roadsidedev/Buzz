@@ -24,6 +24,8 @@ export class WebSocketService {
   private maxReconnectAttempts: number = 5;
   private reconnectDelay: number = 1000;
   private listeners: Map<string, Set<EventCallback<any>>> = new Map();
+  // Rooms to (re-)join once the socket connects
+  private pendingRooms: Set<string> = new Set();
 
   constructor(wsUrl?: string) {
     this.wsUrl = wsUrl || import.meta.env.VITE_WS_URL || "ws://localhost:4000";
@@ -50,12 +52,36 @@ export class WebSocketService {
           this.isConnected = true;
           this.reconnectAttempts = 0;
           console.log("[WebSocket] Connected");
+
+          // Re-register any event listeners that were set up before the socket existed
+          this.listeners.forEach((_, event) => {
+            if (this.socket && !this.socket.hasListeners(event)) {
+              this.socket.on(event, (data: unknown) => {
+                this.emit(event, data);
+              });
+            }
+          });
+
+          // Flush any rooms that tried to join before connection was ready
+          this.pendingRooms.forEach((roomId) => {
+            this.socket!.emit("room:join", { roomId });
+          });
+          this.pendingRooms.clear();
+
           resolve();
         });
 
         this.socket.on("disconnect", () => {
           this.isConnected = false;
           console.log("[WebSocket] Disconnected");
+        });
+
+        // On automatic reconnect, re-join all active rooms
+        this.socket.io.on("reconnect", () => {
+          this.pendingRooms.forEach((roomId) => {
+            this.socket?.emit("room:join", { roomId });
+          });
+          this.pendingRooms.clear();
         });
 
         this.socket.on("connect_error", (error: Error) => {
@@ -94,18 +120,22 @@ export class WebSocketService {
   }
 
   /**
-   * Register event listener
+   * Register event listener.
+   * If the socket doesn't exist yet (connect() not called), the socket.io
+   * listener is registered lazily on the next connect() call via the
+   * connect handler above.
    */
   public on<T = unknown>(event: string, callback: EventCallback<T>): void {
     if (!this.listeners.has(event)) {
       this.listeners.set(event, new Set());
 
       // Register socket listener only once per event type
-      if (this.socket) {
+      if (this.socket && !this.socket.hasListeners(event)) {
         this.socket.on(event, (data: T) => {
           this.emit(event, data);
         });
       }
+      // If socket is null the connect() handler will register it on first connection
     }
 
     this.listeners.get(event)?.add(callback);
@@ -164,16 +194,23 @@ export class WebSocketService {
   }
 
   /**
-   * Join a room for real-time updates
+   * Join a room for real-time updates.
+   * If the socket is not yet connected, the join is queued and sent once connected.
    */
   public joinRoom(roomId: string, agentId?: string): void {
-    this.send("room:join", { roomId, agentId });
+    if (!this.isConnectedStatus()) {
+      // Queue for when the socket connects/reconnects
+      this.pendingRooms.add(roomId);
+      return;
+    }
+    this.socket?.emit("room:join", { roomId, agentId });
   }
 
   /**
    * Leave a room
    */
   public leaveRoom(roomId: string): void {
+    this.pendingRooms.delete(roomId);
     this.send("room:leave", { roomId });
   }
 

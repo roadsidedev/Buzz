@@ -515,20 +515,54 @@ roomNamespace.on("connection", (socket) => {
 // room:join / room:leave to subscribe to live room events (tts:audio,
 // participant:joined, room:status-changed, etc.) without needing auth.
 io.on("connection", (socket) => {
-  socket.on("room:join", (data: { roomId?: string }) => {
+  // Track which rooms this socket has joined so we can emit leave on disconnect
+  const joinedRooms = new Set<string>();
+
+  socket.on("room:join", (data: { roomId?: string; agentId?: string }) => {
     if (typeof data?.roomId === "string" && data.roomId) {
-      socket.join(`room:${data.roomId}`);
+      const roomId = data.roomId;
+      socket.join(`room:${roomId}`);
+      joinedRooms.add(roomId);
+
       logger.debug("Browser client joined room socket", {
         socketId: socket.id,
-        roomId: data.roomId,
+        roomId,
+      });
+
+      // Notify others in the room that a listener joined
+      io.to(`room:${roomId}`).emit("participant:joined", {
+        roomId,
+        agentId: socket.id,
+        role: "spectator",
+        timestamp: new Date().toISOString(),
       });
     }
   });
 
   socket.on("room:leave", (data: { roomId?: string }) => {
     if (typeof data?.roomId === "string" && data.roomId) {
-      socket.leave(`room:${data.roomId}`);
+      const roomId = data.roomId;
+      socket.leave(`room:${roomId}`);
+      joinedRooms.delete(roomId);
+
+      io.to(`room:${roomId}`).emit("participant:left", {
+        roomId,
+        agentId: socket.id,
+        timestamp: new Date().toISOString(),
+      });
     }
+  });
+
+  socket.on("disconnect", () => {
+    // Emit participant:left for every room this socket was in
+    joinedRooms.forEach((roomId) => {
+      io.to(`room:${roomId}`).emit("participant:left", {
+        roomId,
+        agentId: socket.id,
+        timestamp: new Date().toISOString(),
+      });
+    });
+    joinedRooms.clear();
   });
 });
 

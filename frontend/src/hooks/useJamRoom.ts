@@ -6,7 +6,7 @@
  */
 
 import { useEffect, useState, useCallback, useRef } from "react";
-import { createJam } from "jam-core";
+import { createJam, on as jamOn } from "jam-core";
 
 export interface JamState {
   inRoom: boolean;
@@ -60,12 +60,14 @@ export interface UseJamRoomReturn {
   speakers: string[];
   listeners: string[];
   speaking: string[];
-  isMuted: boolean;
+  isMuted: boolean;       // mic muted
+  isSoundMuted: boolean;  // audio output muted
   isSpeaking: boolean;
   myId: string | null;
   connect: () => Promise<void>;
   disconnect: () => void;
-  toggleMute: () => void;
+  toggleMute: () => void;       // mic toggle
+  toggleSoundMute: () => void;  // audio output toggle
   sendReaction: (emoji: string) => void;
   error: string | null;
   isLoading: boolean;
@@ -125,7 +127,8 @@ export function useJamRoom(options: UseJamRoomOptions): UseJamRoomReturn {
   const speakers = Array.isArray((state as any).speakers) ? (state as any).speakers : [];
   const listeners = Array.isArray((state as any).listeners) ? (state as any).listeners : [];
   const speaking = Array.isArray((state as any).speaking) ? (state as any).speaking : [];
-  const isMuted = (state as any).muted || false;
+  const isMuted = (state as any).micMuted || false;         // mic mute
+  const isSoundMuted = (state as any).soundMuted ?? true;  // audio output mute (default true in jam)
   const myId = (state as any).myId || null;
   const isSpeaking = myId !== null && speaking.includes(myId);
 
@@ -141,6 +144,8 @@ export function useJamRoom(options: UseJamRoomOptions): UseJamRoomReturn {
 
     try {
       const [, jamApi] = jamRef.current;
+      // Unmute audio output so listeners can hear the room immediately
+      await (jamApi as any).setProps({ soundMuted: false });
       await (jamApi as any).enterRoom(roomId);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to connect");
@@ -157,11 +162,19 @@ export function useJamRoom(options: UseJamRoomOptions): UseJamRoomReturn {
     }
   }, []);
 
-  // Toggle mute
+  // Toggle mic mute
   const toggleMute = useCallback(() => {
     if (jamRef.current) {
       const [jamState, jamApi] = jamRef.current;
-      (jamApi as any).mute(!(jamState as any).muted);
+      (jamApi as any).setProps({ micMuted: !(jamState as any).micMuted });
+    }
+  }, []);
+
+  // Toggle audio output (speaker/headphone) mute
+  const toggleSoundMute = useCallback(() => {
+    if (jamRef.current) {
+      const [jamState, jamApi] = jamRef.current;
+      (jamApi as any).setProps({ soundMuted: !(jamState as any).soundMuted });
     }
   }, []);
 
@@ -180,13 +193,14 @@ export function useJamRoom(options: UseJamRoomOptions): UseJamRoomReturn {
     }
   }, [autoJoin, inRoom, isLoading, error, connect]);
 
-  // Force re-render on state changes
+  // Force re-render on state changes using jam-core's minimal-state `on` subscription
   const [, forceUpdate] = useState({});
   useEffect(() => {
     if (jamRef.current) {
       const [jamState] = jamRef.current;
-      const unsubscribe = (jamState as any).on?.(() => forceUpdate({}));
-      return unsubscribe;
+      // jamOn(state, listener) subscribes to any state change — returns an unsubscribe fn
+      const unsubscribe = jamOn(jamState, () => forceUpdate({}));
+      return typeof unsubscribe === "function" ? unsubscribe : undefined;
     }
   }, []);
 
@@ -198,11 +212,13 @@ export function useJamRoom(options: UseJamRoomOptions): UseJamRoomReturn {
     listeners,
     speaking,
     isMuted,
+    isSoundMuted,
     isSpeaking,
     myId,
     connect,
     disconnect,
     toggleMute,
+    toggleSoundMute,
     sendReaction,
     error,
     isLoading,
