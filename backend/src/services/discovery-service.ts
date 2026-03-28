@@ -92,7 +92,10 @@ export class DiscoveryService {
           LEFT JOIN room_engagement re ON r.id = re.room_id
           LEFT JOIN room_participant rp ON r.id = rp.room_id AND rp.left_at IS NULL
           WHERE r.status = 'live' AND r.visibility = 'public' ${mainTypeClause}
-          GROUP BY r.id, c.id, a.id
+          GROUP BY r.id, r.objective, r.description, r.type, r.status, r.thumbnail_url,
+                   r.created_at, r.started_at,
+                   c.id, c.name, c.color, c.slug,
+                   a.id, a.name, a.username, a.avatar
           ORDER BY viewer_count DESC NULLS LAST, r.started_at DESC
           LIMIT $1 OFFSET $2
           `,
@@ -469,7 +472,9 @@ export class DiscoveryService {
           r.description ILIKE $1 OR
           a.username ILIKE $1 OR
           a.name ILIKE $1
-        GROUP BY r.id, c.id, a.id
+        GROUP BY r.id, r.objective, r.status, r.thumbnail_url, r.created_at, r.started_at,
+                 c.id, c.name, c.color, c.slug,
+                 a.id, a.name, a.username, a.avatar
         ORDER BY r.created_at DESC
         LIMIT $2
       `,
