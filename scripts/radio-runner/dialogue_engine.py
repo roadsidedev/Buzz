@@ -212,15 +212,35 @@ class DialogueEngine:
             topic = "BREAKING NEWS"
             payload_str = str(events[0].payload)
             intent = f"Interrupt the show. BREAKING NEWS Alert: {payload_str}"
-            
+
             # Hot-swap skills
             self.alex.load_skill("skill_breaking_news.md")
             self.mira.load_skill("skill_breaking_news.md")
-            
+
             # Inject event into both memories
             self.alex.perceive_event("SYSTEM ALERT: " + intent)
             self.mira.perceive_event("SYSTEM ALERT: " + intent)
-            
+
+        elif events and events[0].event_type == "POST_MUSIC_BREAK":
+            # Build the next-topic context so re-entry can tease forward naturally
+            if headlines:
+                top = headlines[0]
+                topic = top.title[:80]
+                next_topic_intent = (
+                    f"React to this headline:\nTITLE: {top.title}\n"
+                    f"SOURCE: {top.source}\nSUMMARY: {top.summary or '(none)'}"
+                )
+            else:
+                topic = "general_trends"
+                next_topic_intent = "Banter about broader tech/society trends."
+
+            intent = (
+                f"You're returning from a music break. Welcome listeners back naturally, "
+                f"then transition into: {next_topic_intent}"
+            )
+            self.alex.load_skill("skill_post_music_break.md")
+            self.mira.load_skill("skill_post_music_break.md")
+
         elif headlines:
             top = headlines[0]
             topic = top.title[:80]
@@ -234,9 +254,9 @@ class DialogueEngine:
             self.mira.load_skill("skill_news_banter.md")
         else:
             topic = "slow_news"
-            intent = "It's a slow news hour. Banter about broader tech/society trends."
-            self.alex.load_skill("skill_news_banter.md")
-            self.mira.load_skill("skill_news_banter.md")
+            intent = "It's a slow news hour. Banter about broader tech/society trends and bold predictions."
+            self.alex.load_skill("skill_slow_news.md")
+            self.mira.load_skill("skill_slow_news.md")
 
         # 1. Alex THINKS and ACTS
         logger.debug("Generating Host turn...")

@@ -514,6 +514,19 @@ export class RoomService {
     // Add participant to database
     await roomRepository.addParticipant(roomId, agentId, role);
 
+    // Broadcast to all live-room subscribers so the listener panel updates in real-time
+    try {
+      const { getIO } = await import("../server.js");
+      getIO().to(`room:${roomId}`).emit("participant:joined", {
+        roomId,
+        agentId,
+        role,
+        timestamp: new Date().toISOString(),
+      });
+    } catch {
+      // Non-fatal: socket emission failure must not roll back the DB join
+    }
+
     logger.info("Agent/User joined room", { roomId, agentId, role });
   }
 
@@ -534,6 +547,18 @@ export class RoomService {
     // Remove participant from database
     await roomRepository.removeParticipant(roomId, agentId);
 
+    // Broadcast departure so listener panels update immediately
+    try {
+      const { getIO } = await import("../server.js");
+      getIO().to(`room:${roomId}`).emit("participant:left", {
+        roomId,
+        agentId,
+        timestamp: new Date().toISOString(),
+      });
+    } catch {
+      // Non-fatal
+    }
+
     logger.info("Agent left room", { roomId, agentId });
   }
 
@@ -546,6 +571,18 @@ export class RoomService {
 
     // Update database
     await roomRepository.updateStatus(roomId, status);
+
+    // Push status change to all live-room subscribers so the UI badge updates in real-time
+    try {
+      const { getIO } = await import("../server.js");
+      getIO().to(`room:${roomId}`).emit("room:status-changed", {
+        roomId,
+        status,
+        timestamp: new Date().toISOString(),
+      });
+    } catch {
+      // Non-fatal
+    }
 
     if (status === "live") {
       try {

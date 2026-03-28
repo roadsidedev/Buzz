@@ -58,7 +58,7 @@ export function emitMessageSubmitted(
 ): void {
   const event = "message:submitted";
 
-  io.to(roomId).emit(event, {
+  io.to(`room:${roomId}`).emit(event, {
     messageId: message.id,
     agentId: message.agentId,
     text: message.text,
@@ -82,7 +82,7 @@ export function emitTurnSelected(
   roomId: string,
   event: TurnSelectedEvent,
 ): void {
-  io.to(roomId).emit("turn:selected", {
+  io.to(`room:${roomId}`).emit("turn:selected", {
     roomId: event.roomId,
     turnNumber: event.turnNumber,
     selectedMessageId: event.messageId,
@@ -109,7 +109,7 @@ export function emitRoomCompletion(
   roomId: string,
   event: RoomCompletionEvent,
 ): void {
-  io.to(roomId).emit("room:completion", {
+  io.to(`room:${roomId}`).emit("room:completion", {
     roomId: event.roomId,
     completionPercentage: event.completionPercentage,
     completionLevel: event.completionLevel,
@@ -134,7 +134,7 @@ export function emitRoomCompleted(
   roomId: string,
   event: RoomCompletedEvent,
 ): void {
-  io.to(roomId).emit("room:completed", {
+  io.to(`room:${roomId}`).emit("room:completed", {
     roomId: event.roomId,
     completionLevel: event.completionLevel,
     totalTurns: event.totalTurns,
@@ -164,7 +164,7 @@ export function emitTurnStatusUpdate(
     nextTurnAt: Date;
   },
 ): void {
-  io.to(roomId).emit("turn:status", {
+  io.to(`room:${roomId}`).emit("turn:status", {
     roomId,
     currentTurn: data.currentTurn,
     candidateCount: data.candidateCount,
@@ -189,7 +189,7 @@ export function emitOrchestratorError(
   roomId: string,
   error: string,
 ): void {
-  io.to(roomId).emit("orchestrator:error", {
+  io.to(`room:${roomId}`).emit("orchestrator:error", {
     roomId,
     error,
     timestamp: new Date(),
@@ -218,7 +218,7 @@ export function emitAgentStatsUpdate(
     averageScore: number;
   },
 ): void {
-  io.to(roomId).emit("agent:stats", {
+  io.to(`room:${roomId}`).emit("agent:stats", {
     roomId,
     agentId: data.agentId,
     submitted: data.submitted,
@@ -258,7 +258,7 @@ export function registerOrchestratorHandlers(
   }
 
   // Join room-specific channel
-  socket.join(roomId);
+  socket.join(`room:${roomId}`);
 
   logger.info("Socket subscribed to orchestration events", {
     socketId: socket.id,
@@ -294,7 +294,7 @@ export function broadcastToRoom(
   eventName: string,
   data: unknown,
 ): void {
-  io.to(roomId).emit(eventName, {
+  io.to(`room:${roomId}`).emit(eventName, {
     ...data,
     roomId,
     timestamp: new Date(),
@@ -320,7 +320,7 @@ export function notifyAgent(
 ): void {
   // TODO: Implement agent-specific routing via socket.io adapter
   // For now, broadcast to room and filter on client
-  io.to(roomId).emit(`agent:${eventName}`, {
+  io.to(`room:${roomId}`).emit(`agent:${eventName}`, {
     ...data,
     agentId,
     roomId,

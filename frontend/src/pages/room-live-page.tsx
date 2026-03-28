@@ -305,24 +305,27 @@ export function RoomLivePage() {
             return
           }
 
-          // Fallback: Play via HTML5 Audio (for speaker/host to hear)
+          // Fallback: use persistent audio element (respects the autoplay unlock gesture)
           console.log('[TTS] WebRTCAudioBridge not connected, using HTML5 Audio fallback')
           const blob = new Blob([audioBuffer], { type: 'audio/mpeg' })
-          const audioUrl = URL.createObjectURL(blob)
-          const audio = new Audio(audioUrl)
-          audio.play().catch(e => console.warn('Auto-play prevented (user needs to interact first)', e))
+          const blobUrl = URL.createObjectURL(blob)
+          if (audioPlayerRef.current) {
+            audioPlayerRef.current.src = blobUrl
+            audioPlayerRef.current.onended = () => URL.revokeObjectURL(blobUrl)
+            audioPlayerRef.current.play().catch(e => console.warn('[TTS] Audio play blocked (needs user interaction):', e))
+          }
         } catch (err) {
           console.error('[TTS] Failed to inject audio:', err)
-          // Fallback to URL if base64 injection fails
-          if (data.audioUrl) {
-            const audio = new Audio(data.audioUrl)
-            audio.play().catch(e => console.warn('Auto-play prevented', e))
+          if (data.audioUrl && audioPlayerRef.current) {
+            audioPlayerRef.current.src = data.audioUrl
+            audioPlayerRef.current.play().catch(e => console.warn('[TTS] Audio play blocked:', e))
           }
         }
       } else if (data.audioUrl) {
-        // Fallback: Play via URL
-        const audio = new Audio(data.audioUrl)
-        audio.play().catch(e => console.warn('Auto-play prevented (user needs to interact first)', e))
+        if (audioPlayerRef.current) {
+          audioPlayerRef.current.src = data.audioUrl
+          audioPlayerRef.current.play().catch(e => console.warn('[TTS] Audio play blocked (needs user interaction):', e))
+        }
       }
     }
     wsService.on('tts:audio', handleTtsAudio)
@@ -368,6 +371,53 @@ export function RoomLivePage() {
       .then((res) => setParticipants(res.data?.data?.participants || []))
       .catch(() => {})
   }, [streamId, stream, apiUrl])
+
+  // ── Join socket room for live events (tts:audio, participant changes, status) ─
+  useEffect(() => {
+    if (!streamId || !stream) return
+    wsService.joinRoom(streamId)
+    return () => wsService.leaveRoom(streamId)
+  }, [streamId, stream])
+
+  // ── Real-time participant lifecycle ─────────────────────────────────────────
+  useEffect(() => {
+    const unsubJoined = wsService.onParticipantJoined((data) => {
+      if (data.roomId !== streamId) return
+      setParticipants((prev) => {
+        if (prev.some((p) => p.id === data.agentId)) return prev
+        return [...prev, { id: data.agentId, name: data.agentId.slice(0, 8), avatar: null, role: data.role }]
+      })
+      playBeep(600, "sine", 0.1, 0.05)
+    })
+    const unsubLeft = wsService.onParticipantLeft((data) => {
+      if (data.roomId !== streamId) return
+      setParticipants((prev) => prev.filter((p) => p.id !== data.agentId))
+    })
+    return () => { unsubJoined(); unsubLeft() }
+  }, [streamId])
+
+  // ── Real-time room status updates ───────────────────────────────────────────
+  useEffect(() => {
+    return wsService.onRoomStatusChanged((data) => {
+      if (data.roomId !== streamId) return
+      setStream((prev: any) => prev ? { ...prev, status: data.status } : prev)
+    })
+  }, [streamId])
+
+  // ── Unlock audio context on first user interaction ──────────────────────────
+  useEffect(() => {
+    const unlock = () => {
+      if (audioPlayerRef.current) {
+        audioPlayerRef.current.play().then(() => audioPlayerRef.current?.pause()).catch(() => {})
+      }
+    }
+    document.addEventListener("click", unlock, { once: true })
+    document.addEventListener("touchstart", unlock, { once: true })
+    return () => {
+      document.removeEventListener("click", unlock)
+      document.removeEventListener("touchstart", unlock)
+    }
+  }, [])
 
   // Scroll chat to bottom
   useEffect(() => {
@@ -603,6 +653,8 @@ export function RoomLivePage() {
       <div
         className="animate-in fade-in duration-500 flex flex-col h-full min-h-screen bg-background text-foreground"
       >
+        {/* Hidden persistent audio element — reused for all TTS playback to satisfy browser autoplay policy */}
+        <audio ref={audioPlayerRef} preload="none" style={{ display: "none" }} />
         {/* ── Desktop Header ── */}
         <div className="flex items-center gap-4 px-6 py-4 border-b border-white/8 shrink-0">
           <button
@@ -616,10 +668,18 @@ export function RoomLivePage() {
 
           <div className="flex-grow min-w-0">
             <div className="flex items-center gap-2.5 flex-wrap">
-              <span className="flex items-center gap-1.5 bg-red-500/15 text-red-400 text-[11px] font-black uppercase tracking-widest px-2.5 py-0.5 rounded-full">
-                <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse" />
-                Live
-              </span>
+              {stream.status === "live" && (
+                <span className="flex items-center gap-1.5 bg-red-500/15 text-red-400 text-[11px] font-black uppercase tracking-widest px-2.5 py-0.5 rounded-full">
+                  <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse" />
+                  Live
+                </span>
+              )}
+              {stream.status === "pending" && (
+                <span className="flex items-center gap-1.5 bg-yellow-500/15 text-yellow-400 text-[11px] font-black uppercase tracking-widest px-2.5 py-0.5 rounded-full">
+                  <span className="w-1.5 h-1.5 rounded-full bg-yellow-400 animate-pulse" />
+                  Starting…
+                </span>
+              )}
               <Badge variant="secondary" className="capitalize text-xs font-semibold bg-white/8 text-white/60 border-0">
                 {stream.category}
               </Badge>
@@ -774,17 +834,17 @@ export function RoomLivePage() {
               <span className="text-[10px] font-bold text-white/20">{totalListeners}</span>
             </div>
             <div className="flex-grow overflow-y-auto p-3 space-y-2 scrollbar-hide">
-              {jamRoom.listeners.length === 0 && (
+              {listenerProfiles.length === 0 && (
                 <p className="text-[11px] text-white/20 text-center mt-6">No listeners yet</p>
               )}
-              {jamRoom.listeners.map((listenerId: string) => (
-                <div key={listenerId} className="flex items-center gap-2">
+              {listenerProfiles.map((p) => (
+                <div key={p.id} className="flex items-center gap-2">
                   <img
-                    src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${listenerId}`}
+                    src={p.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${p.id}`}
                     className="w-7 h-7 rounded-full border border-white/10 bg-white/5"
                     alt="Listener"
                   />
-                  <span className="text-xs text-white/40 font-medium truncate">{listenerId.slice(0, 8)}</span>
+                  <span className="text-xs text-white/40 font-medium truncate">{p.name.split(' ')[0]}</span>
                 </div>
               ))}
             </div>
@@ -856,11 +916,13 @@ export function RoomLivePage() {
     )
   }
 
-  // ── MOBILE LAYOUT (original, preserved exactly) ──────────────────────────────
+  // ── MOBILE LAYOUT ─────────────────────────────────────────────────────────────
   return (
     <div
       className="animate-in fade-in duration-500 min-h-screen pb-28 bg-background text-foreground"
     >
+      {/* Hidden persistent audio element — shared TTS player */}
+      <audio ref={audioPlayerRef} preload="none" style={{ display: "none" }} />
       {/* ── Header ── */}
       <div className="flex items-center justify-between px-4 pt-4 pb-3">
         <button
@@ -873,10 +935,18 @@ export function RoomLivePage() {
         </button>
 
         <div className="flex items-center gap-2">
-          <span className="flex items-center gap-1.5 bg-red-500/15 text-red-400 text-[11px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full">
-            <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse" />
-            Live
-          </span>
+          {stream.status === "live" && (
+            <span className="flex items-center gap-1.5 bg-red-500/15 text-red-400 text-[11px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full">
+              <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse" />
+              Live
+            </span>
+          )}
+          {stream.status === "pending" && (
+            <span className="flex items-center gap-1.5 bg-yellow-500/15 text-yellow-400 text-[11px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full">
+              <span className="w-1.5 h-1.5 rounded-full bg-yellow-400 animate-pulse" />
+              Starting…
+            </span>
+          )}
           {totalListeners > 0 && (
             <span className="text-sm font-bold text-white/50">
               {totalListeners.toLocaleString()}
