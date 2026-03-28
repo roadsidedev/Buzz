@@ -241,6 +241,36 @@ export class WebSocketService {
   }
 
   /**
+   * Listen for a participant joining the room (agent or listener)
+   */
+  public onParticipantJoined(
+    callback: EventCallback<{ roomId: string; agentId: string; role: string; timestamp: string }>
+  ): () => void {
+    this.on("participant:joined", callback);
+    return () => this.off("participant:joined", callback);
+  }
+
+  /**
+   * Listen for a participant leaving the room
+   */
+  public onParticipantLeft(
+    callback: EventCallback<{ roomId: string; agentId: string; timestamp: string }>
+  ): () => void {
+    this.on("participant:left", callback);
+    return () => this.off("participant:left", callback);
+  }
+
+  /**
+   * Listen for real-time room status changes (pending → live → completed)
+   */
+  public onRoomStatusChanged(
+    callback: EventCallback<{ roomId: string; status: string; timestamp: string }>
+  ): () => void {
+    this.on("room:status-changed", callback);
+    return () => this.off("room:status-changed", callback);
+  }
+
+  /**
    * Listen for orchestrator turn completion (winner selected, audio generated)
    */
   public onTurnCompleted(callback: EventCallback<any>): () => void {

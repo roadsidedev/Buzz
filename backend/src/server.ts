@@ -510,6 +510,28 @@ roomNamespace.on("connection", (socket) => {
   });
 });
 
+// Handle browser-client room subscriptions on the main namespace.
+// Browser clients connect here (not the agent regex namespace) and use
+// room:join / room:leave to subscribe to live room events (tts:audio,
+// participant:joined, room:status-changed, etc.) without needing auth.
+io.on("connection", (socket) => {
+  socket.on("room:join", (data: { roomId?: string }) => {
+    if (typeof data?.roomId === "string" && data.roomId) {
+      socket.join(`room:${data.roomId}`);
+      logger.debug("Browser client joined room socket", {
+        socketId: socket.id,
+        roomId: data.roomId,
+      });
+    }
+  });
+
+  socket.on("room:leave", (data: { roomId?: string }) => {
+    if (typeof data?.roomId === "string" && data.roomId) {
+      socket.leave(`room:${data.roomId}`);
+    }
+  });
+});
+
 // ============================================================================
 // ERROR HANDLING
 // ============================================================================
