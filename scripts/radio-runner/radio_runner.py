@@ -336,6 +336,13 @@ class RadioRunner:
         self._interruptible_sleep(music_break.duration_seconds)
         self._scheduler.end_break()
 
+        # Signal the next dialogue turn to use the post-music-break re-entry skill
+        self._event_queue.push(
+            "POST_MUSIC_BREAK",
+            priority=5,
+            payload={"break_number": music_break.break_number},
+        )
+
     # ── News Polling ─────────────────────────────────────────────────────────
 
     def _refresh_headlines(self) -> None:
