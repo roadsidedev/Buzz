@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom"
 import {
   MessageSquare, Share2, DollarSign,
   Copy, ChevronDown, Mic, MicOff, Headphones, ArrowLeft, PhoneOff, Send, Users,
+  Volume2, VolumeX,
 } from "lucide-react"
 import axios from "axios"
 import { Button } from "@/components/ui/button"
@@ -238,6 +239,13 @@ export function RoomLivePage() {
     pantryUrl: import.meta.env.VITE_PANTRY_URL,
     autoJoin: !streamLoading && !!stream,
   })
+
+  // Sync the HTML5 audio element's muted state with Jam's soundMuted
+  useEffect(() => {
+    if (audioPlayerRef.current) {
+      audioPlayerRef.current.muted = jamRoom.isSoundMuted
+    }
+  }, [jamRoom.isSoundMuted])
 
   // ── Initialize WebRTCAudioBridge when Jam room connects ─────────────────────
   useEffect(() => {
@@ -716,6 +724,19 @@ export function RoomLivePage() {
               style={{ background: "radial-gradient(ellipse at 50% 0%, rgba(108,92,231,0.22) 0%, transparent 65%)" }}
             />
 
+            {/* ── Unmute banner — shown when connected but audio is muted ── */}
+            {jamRoom.inRoom && jamRoom.isSoundMuted && (
+              <button
+                type="button"
+                onClick={jamRoom.toggleSoundMute}
+                className="relative z-20 flex items-center gap-3 w-full max-w-xs mx-auto mb-6 px-5 py-3 rounded-2xl bg-amber-500/15 border border-amber-500/30 text-amber-300 hover:bg-amber-500/25 transition-all duration-200 group"
+              >
+                <VolumeX size={18} className="shrink-0" />
+                <span className="text-sm font-bold">Tap to hear the room</span>
+                <Volume2 size={16} className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity" />
+              </button>
+            )}
+
             {jamRoom.isLoading ? (
               <div className="flex flex-col items-center gap-3 py-16">
                 <div className="w-8 h-8 border-4 border-violet-500/30 border-t-violet-400 rounded-full animate-spin" />
@@ -784,21 +805,39 @@ export function RoomLivePage() {
                 <span className="text-xs font-bold uppercase tracking-wide">Leave</span>
               </button>
 
-              {/* Mic — primary CTA */}
+              {/* Speaker / audio-output mute — primary CTA for listeners */}
               <button
                 type="button"
-                onClick={jamRoom.inRoom ? jamRoom.toggleMute : undefined}
+                onClick={jamRoom.inRoom ? jamRoom.toggleSoundMute : undefined}
                 className={cn(
                   "w-16 h-16 rounded-full border-2 flex items-center justify-center transition-all duration-200 shadow-lg",
                   !jamRoom.inRoom
                     ? "border-white/10 text-white/20 cursor-default"
-                    : jamRoom.isMuted
-                      ? "border-white/20 bg-white/5 text-white/40"
+                    : jamRoom.isSoundMuted
+                      ? "border-amber-500 bg-amber-500/20 text-amber-400 shadow-amber-500/20 animate-pulse"
                       : "border-violet-500 bg-violet-600 text-white shadow-violet-500/40",
                 )}
-                aria-label={jamRoom.isMuted ? "Unmute" : "Mute"}
+                aria-label={jamRoom.isSoundMuted ? "Unmute audio" : "Mute audio"}
+                title={jamRoom.isSoundMuted ? "Tap to hear the room" : "Mute room audio"}
               >
-                {jamRoom.isMuted || !jamRoom.inRoom ? <MicOff size={24} /> : <Mic size={24} />}
+                {jamRoom.isSoundMuted ? <VolumeX size={24} /> : <Volume2 size={24} />}
+              </button>
+
+              {/* Mic — secondary CTA */}
+              <button
+                type="button"
+                onClick={jamRoom.inRoom ? jamRoom.toggleMute : undefined}
+                className={cn(
+                  "w-12 h-12 rounded-full border-2 flex items-center justify-center transition-all duration-200",
+                  !jamRoom.inRoom
+                    ? "border-white/10 text-white/20 cursor-default"
+                    : jamRoom.isMuted
+                      ? "border-white/20 bg-white/5 text-white/40"
+                      : "border-white/30 bg-white/5 text-white/60",
+                )}
+                aria-label={jamRoom.isMuted ? "Unmute mic" : "Mute mic"}
+              >
+                {jamRoom.isMuted || !jamRoom.inRoom ? <MicOff size={18} /> : <Mic size={18} />}
               </button>
 
               <button
@@ -969,6 +1008,19 @@ export function RoomLivePage() {
         </Badge>
       </div>
 
+      {/* ── Unmute banner (mobile) ── */}
+      {jamRoom.inRoom && jamRoom.isSoundMuted && (
+        <button
+          type="button"
+          onClick={jamRoom.toggleSoundMute}
+          className="mx-5 mb-4 flex items-center gap-3 w-full px-4 py-3 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-300 hover:bg-amber-500/25 transition-all duration-200"
+        >
+          <VolumeX size={16} className="shrink-0" />
+          <span className="text-sm font-bold">Tap to hear the room</span>
+          <Volume2 size={14} className="ml-auto opacity-60" />
+        </button>
+      )}
+
       {/* ── Stage ── */}
       <div className="relative px-5 pt-8 pb-6">
         <div
@@ -1073,16 +1125,21 @@ export function RoomLivePage() {
             <DollarSign size={22} />
             <span className="text-[9px] font-bold uppercase tracking-wide">Tip</span>
           </button>
+          {/* Speaker mute — primary CTA on mobile */}
           <button
             type="button"
-            onClick={jamRoom.inRoom ? jamRoom.toggleMute : undefined}
+            onClick={jamRoom.inRoom ? jamRoom.toggleSoundMute : undefined}
             className={cn(
               "w-16 h-16 rounded-full border-2 flex items-center justify-center transition-all duration-200 shadow-lg",
-              !jamRoom.inRoom ? "border-white/10 text-white/20 cursor-default" : jamRoom.isMuted ? "border-white/20 bg-white/5 text-white/40" : "border-violet-500 bg-violet-600 text-white shadow-violet-500/40",
+              !jamRoom.inRoom
+                ? "border-white/10 text-white/20 cursor-default"
+                : jamRoom.isSoundMuted
+                  ? "border-amber-500 bg-amber-500/20 text-amber-400 shadow-amber-500/20 animate-pulse"
+                  : "border-violet-500 bg-violet-600 text-white shadow-violet-500/40",
             )}
-            aria-label={jamRoom.isMuted ? "Unmute" : "Mute"}
+            aria-label={jamRoom.isSoundMuted ? "Unmute audio" : "Mute audio"}
           >
-            {jamRoom.isMuted || !jamRoom.inRoom ? <MicOff size={24} /> : <Mic size={24} />}
+            {jamRoom.isSoundMuted ? <VolumeX size={24} /> : <Volume2 size={24} />}
           </button>
           <button type="button" onClick={() => setShowChat(true)} className="relative flex flex-col items-center gap-0.5 text-white/50 hover:text-white/80 transition-colors" aria-label="Chat">
             <MessageSquare size={22} />
