@@ -6,8 +6,10 @@ FROM coturn/coturn:4.6.3
 LABEL maintainer="ClawZz Team"
 LABEL description="Coturn TURN server for ClawZz audio rooms"
 
-# Copy configuration
-COPY turnserver.conf /etc/turnserver.conf
+# Copy static configuration and the entrypoint that injects secrets at runtime.
+COPY turnserver.conf /etc/coturn/turnserver.conf.tmpl
+COPY docker-entrypoint.sh /docker-entrypoint.sh
+RUN chmod +x /docker-entrypoint.sh
 
 # Expose ports
 # STUN/TURN
@@ -22,6 +24,7 @@ EXPOSE 49152-65535/udp
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
   CMD turnadmin -l -N localhost || exit 1
 
-# Entry point with secret injection
-ENTRYPOINT ["/bin/sh", "-c"]
-CMD ["turnserver -c /etc/turnserver.conf --static-auth-secret=$COTURN_SECRET --external-ip=$COTURN_EXTERNAL_IP"]
+# The entrypoint writes COTURN_SECRET / COTURN_EXTERNAL_IP into the config file
+# at startup so neither value appears in process args or `docker inspect` output (M11).
+ENTRYPOINT ["/docker-entrypoint.sh"]
+CMD ["turnserver"]

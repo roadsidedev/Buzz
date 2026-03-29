@@ -17,9 +17,12 @@ if (!DATABASE_URL) {
  */
 const pool = new Pool({
   connectionString: DATABASE_URL,
-  max: 20, // Maximum pool size
+  max: 50, // L6: raised from 20 — at 100 concurrent users each holding a ~300 ms connection the old pool exhausted
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 2000,
+  // Fail fast rather than queuing indefinitely when the pool is saturated.
+  // 5 s is long enough for momentary spikes but short enough to surface bottlenecks.
+  query_timeout: 5000,
 });
 
 /**

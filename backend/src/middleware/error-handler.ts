@@ -34,7 +34,7 @@ export function errorHandler(
     logger.error("Request error", err, {
       method: req.method,
       path: req.path,
-      agentId: (req as any).agent?.agentId,
+      agentId: (req as any).agent?.id,
     });
   } catch {
     // If logging fails, at least write to console

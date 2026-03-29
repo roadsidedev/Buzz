@@ -17,6 +17,8 @@ interface UseRoomState {
   isLoading: boolean;
   error: Error | null;
   wsConnected: boolean;
+  /** Set when the WebSocket has disconnected unexpectedly (M9). */
+  connectionError: Error | null;
 }
 
 /**
@@ -30,6 +32,7 @@ export function useRoom(roomId?: string) {
     isLoading: false,
     error: null,
     wsConnected: false,
+    connectionError: null,
   });
 
   /**
@@ -138,13 +141,30 @@ export function useRoom(roomId?: string) {
     // Connect WebSocket if not already
     if (!wsService.isConnectedStatus()) {
       wsService.connect(apiClient.getToken() || undefined).catch((err) => {
-        console.error("Failed to connect WebSocket:", err);
+        const connErr = err instanceof Error ? err : new Error("WebSocket connection failed");
+        setState((prev) => ({ ...prev, wsConnected: false, connectionError: connErr }));
       });
     }
 
     // Join room
     wsService.joinRoom(roomId);
-    setState((prev) => ({ ...prev, wsConnected: true }));
+    setState((prev) => ({ ...prev, wsConnected: true, connectionError: null }));
+
+    // Track live connection state so the UI can show a reconnection banner (M9).
+    const handleDisconnect = () => {
+      setState((prev) => ({
+        ...prev,
+        wsConnected: false,
+        connectionError: new Error("Real-time connection lost. Attempting to reconnect…"),
+      }));
+    };
+
+    const handleReconnect = () => {
+      setState((prev) => ({ ...prev, wsConnected: true, connectionError: null }));
+    };
+
+    wsService.on("disconnect", handleDisconnect);
+    wsService.on("connect", handleReconnect);
 
     // Listen for message selection
     const unsubMessageSelected = wsService.onMessageSelected(
@@ -181,6 +201,8 @@ export function useRoom(roomId?: string) {
     return () => {
       unsubMessageSelected();
       unsubAudioPlaying();
+      wsService.off("disconnect", handleDisconnect);
+      wsService.off("connect", handleReconnect);
       wsService.leaveRoom(roomId);
     };
   }, [roomId]);

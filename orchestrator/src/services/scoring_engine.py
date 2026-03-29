@@ -73,7 +73,7 @@ class ScoringEngine:
         # Layer 1: Sanitize user input to prevent prompt injection
         message_sanitization = sanitize_prompt(message.text)
         if not message_sanitization.is_safe:
-            logger.warn(
+            logger.warning(
                 "Message contains safety violations",
                 extra={
                     "message_id": message.id,
@@ -87,7 +87,7 @@ class ScoringEngine:
         prompt_sanitization = sanitize_prompt(prompt)
         
         if not prompt_sanitization.is_safe:
-            logger.warn(
+            logger.warning(
                 "Scoring prompt contains safety violations",
                 extra={"violations": prompt_sanitization.violations},
             )
@@ -272,12 +272,19 @@ Respond ONLY with valid JSON."""
                 if self.client is None:
                     raise RuntimeError("LLM provider not configured")
 
-                # Use provider's `messages_create` to allow multiple SDKs
+                # Use provider's `messages_create` to allow multiple SDKs.
+                # H7: Always include a system prompt to enforce JSON-only output;
+                # without it some models return freeform text that fails JSON parsing.
                 response = await asyncio.wait_for(
                     asyncio.to_thread(
                         self.client.messages_create,
                         model=self.scoring_model,
                         max_tokens=1024,
+                        system=(
+                            "You are a precise message scoring engine. "
+                            "You MUST respond ONLY with valid JSON matching the specified schema. "
+                            "Do not include any preamble, explanation, or markdown — just the JSON object."
+                        ),
                         messages=[{"role": "user", "content": prompt}],
                     ),
                     timeout=SCORING_TIMEOUT,
@@ -289,7 +296,7 @@ Respond ONLY with valid JSON."""
 
             except asyncio.TimeoutError:
                 last_error = "timeout"
-                logger.warn(
+                logger.warning(
                     "Scoring timeout",
                     extra={
                         "message_id": message_id,
@@ -305,7 +312,7 @@ Respond ONLY with valid JSON."""
 
             except json.JSONDecodeError as e:
                 last_error = "json_parse_error"
-                logger.warn(
+                logger.warning(
                     "Scoring response parse error",
                     extra={
                         "message_id": message_id,
@@ -384,23 +391,53 @@ Respond ONLY with valid JSON."""
 
         data = json.loads(json_str)  # Raises JSONDecodeError on invalid JSON
 
+        # M5: Use .get() with safe defaults for all score fields so that a
+        # partially-formed LLM response does not raise an unhandled KeyError.
+        # Missing numeric fields fall back to FALLBACK_SCORE; missing text fields
+        # fall back to sensible empty values. Log whenever fields are absent so
+        # the LLM prompt or provider can be investigated.
+        _missing: list[str] = []
+
+        def _score(key: str) -> float:
+            val = data.get(key)
+            if val is None:
+                _missing.append(key)
+                return float(FALLBACK_SCORE)
+            try:
+                return max(0.0, min(100.0, float(val)))
+            except (TypeError, ValueError):
+                _missing.append(key)
+                return float(FALLBACK_SCORE)
+
+        relevance = _score("relevance_score")
+        novelty = _score("novelty_score")
+        coherence = _score("coherence_score")
+        actionability = _score("actionability_score")
+        engagement = _score("engagement_score")
+
+        if _missing:
+            logger.warning(
+                "Scoring response missing expected fields — fallback values used",
+                extra={"missing_fields": _missing},
+            )
+
         # Compute weighted overall score
         overall = (
-            data["relevance_score"] * settings.SCORING_WEIGHT_RELEVANCE
-            + data["novelty_score"] * settings.SCORING_WEIGHT_NOVELTY
-            + data["coherence_score"] * settings.SCORING_WEIGHT_COHERENCE
-            + data["actionability_score"] * settings.SCORING_WEIGHT_ACTIONABILITY
-            + data["engagement_score"] * settings.SCORING_WEIGHT_ENGAGEMENT
+            relevance * settings.SCORING_WEIGHT_RELEVANCE
+            + novelty * settings.SCORING_WEIGHT_NOVELTY
+            + coherence * settings.SCORING_WEIGHT_COHERENCE
+            + actionability * settings.SCORING_WEIGHT_ACTIONABILITY
+            + engagement * settings.SCORING_WEIGHT_ENGAGEMENT
         )
 
         return {
-            "relevance_score": data["relevance_score"],
-            "novelty_score": data["novelty_score"],
-            "coherence_score": data["coherence_score"],
-            "actionability_score": data["actionability_score"],
-            "engagement_score": data["engagement_score"],
+            "relevance_score": relevance,
+            "novelty_score": novelty,
+            "coherence_score": coherence,
+            "actionability_score": actionability,
+            "engagement_score": engagement,
             "overall_score": overall,
-            "reasoning": data["reasoning"],
+            "reasoning": data.get("reasoning", "No reasoning provided"),
             "strengths": data.get("strengths", []),
             "weaknesses": data.get("weaknesses", []),
         }

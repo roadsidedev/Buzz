@@ -3,6 +3,7 @@
  * Data access layer for agent queries
  */
 
+import crypto from "crypto";
 import type { VerifiedAgent } from "@common/types/index";
 import { query, queryOne } from "../config/database.js";
 import { logger } from "../utils/logger.js";
@@ -10,6 +11,30 @@ import {
   encryptDatabaseField,
   decryptDatabaseField,
 } from "../config/database-encryption-config.js";
+
+/**
+ * Compute a deterministic HMAC-SHA256 blind index for an Ethereum address.
+ *
+ * GCM encryption is non-deterministic (random IVs) so encrypted values cannot
+ * be searched with a WHERE clause. A blind index — an HMAC keyed with a stable
+ * secret — is deterministic and safe to store alongside the ciphertext.
+ *
+ * BLIND_INDEX_SECRET must be set in the environment; it is separate from
+ * ENCRYPTION_SECRET so that a compromise of one does not affect the other.
+ */
+function blindIndexAddress(address: string): string {
+  const secret = process.env.BLIND_INDEX_SECRET || process.env.ENCRYPTION_SECRET || "";
+  if (!secret) {
+    throw new Error(
+      "BLIND_INDEX_SECRET (or ENCRYPTION_SECRET) is required for address lookup. " +
+      "Set a stable random value in the environment.",
+    );
+  }
+  return crypto
+    .createHmac("sha256", secret)
+    .update(address.toLowerCase())
+    .digest("hex");
+}
 
 interface AgentRow {
   id: string;
@@ -44,9 +69,14 @@ export class AgentRepository {
       agent.erc8004_address,
     );
 
+    // Compute a deterministic blind index for address lookups (H5).
+    // The column hashed_address must exist; if not yet migrated the INSERT will
+    // fail loudly rather than silently skipping the index.
+    const hashedAddress = blindIndexAddress(agent.erc8004_address);
+
     const text = `
-      INSERT INTO agent (id, name, avatar, erc8004_address, verification_status, created_at, updated_at)
-      VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
+      INSERT INTO agent (id, name, avatar, erc8004_address, hashed_address, verification_status, created_at, updated_at)
+      VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
       RETURNING id, name, avatar, erc8004_address, verified_at, created_at, updated_at
     `;
 
@@ -55,6 +85,7 @@ export class AgentRepository {
       agent.name,
       agent.avatar,
       encryptedAddress,
+      hashedAddress,
       "verified",
     ]);
 
@@ -88,40 +119,33 @@ export class AgentRepository {
   }
 
   /**
-   * Get agent by Ethereum address
-   * Note: Encrypted fields cannot be searched directly without blind indexing.
-   * For MVP, we fetch and decrypt or use a hashed version for lookup.
-   * Since erc8004_address is unique, we search for the encrypted value.
+   * Get agent by Ethereum address using a blind-index lookup (O(log n)).
+   *
+   * GCM encryption is non-deterministic so the encrypted `erc8004_address`
+   * column cannot be searched directly.  We store an HMAC-SHA256 blind index
+   * (`hashed_address`) that is deterministic and indexed in the database,
+   * allowing an exact-match WHERE clause instead of a full-table scan.
    */
   async getByAddress(erc8004Address: string): Promise<VerifiedAgent | null> {
-    // To find an encrypted field, we must encrypt the search term with the same IV (not possible with random IV)
-    // or use a deterministic hash (blind index).
-    // For now, we search by the encrypted value (only works if encryption is deterministic, which GCM is not).
-    // CORRECT APPROACH: Use a blind index (hash) for lookups.
-
-    // Fallback: If we can't search, we might need a separate hashed_address column.
-    // For this fix, we'll try to find it by decrypting all or using the encrypted string if it matches.
-    // However, GCM is non-deterministic. Let's check if we have a hashed_address column.
+    const hashedAddress = blindIndexAddress(erc8004Address);
 
     const text = `
       SELECT id, name, avatar, erc8004_address, verified_at, created_at, updated_at
       FROM agent
+      WHERE hashed_address = $1
+      LIMIT 1
     `;
 
-    const rows = await query<AgentRow>(text);
+    const row = await queryOne<AgentRow>(text, [hashedAddress]);
 
-    for (const row of rows) {
-      const decrypted = decryptDatabaseField(
-        "agent",
-        "erc8004_address",
-        row.erc8004_address,
-      );
-      if (decrypted === erc8004Address) {
-        return this.mapRowToAgent(row);
-      }
+    if (!row) {
+      logger.debug("Agent not found by address", {
+        addressPrefix: erc8004Address.slice(0, 10) + "...",
+      });
+      return null;
     }
 
-    return null;
+    return this.mapRowToAgent(row);
   }
 
   /**

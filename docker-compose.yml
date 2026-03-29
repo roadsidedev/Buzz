@@ -27,7 +27,8 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - clawzz-network
+      # Frontend only needs to reach the API gateway — not the DB or Redis (M13).
+      - frontend-net
 
   # ============================================
   # API GATEWAY (Node.js Express)
@@ -75,7 +76,9 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - clawzz-network
+      # Backend bridges the public-facing layer and the internal data layer (M13).
+      - frontend-net   # reachable by the frontend container
+      - backend-net    # reaches postgres, redis, orchestrator, pantry
 
   # ============================================
   # ORCHESTRATOR (Python FastAPI)
@@ -114,7 +117,8 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - clawzz-network
+      # Orchestrator is internal-only; not reachable from frontend-net (M13).
+      - backend-net
 
   # ============================================
   # JAM STACK - SELF HOSTED AUDIO ROOMS
@@ -142,7 +146,9 @@ services:
       timeout: 10s
       retries: 3
     networks:
-      - clawzz-network
+      # Pantry needs redis (backend-net) and must be reachable by backend (M13).
+      - backend-net
+      - audio-net
 
   # Pantry-SFU - Mediasoup SFU for Large Rooms
   pantry-sfu:
@@ -164,7 +170,7 @@ services:
       - pantry
       - redis
     networks:
-      - clawzz-network
+      - audio-net
     profiles:
       - sfu
 
@@ -184,7 +190,8 @@ services:
       - "5349:5349/tcp"
       - "49152-65535:49152-65535/udp"
     networks:
-      - clawzz-network
+      # COTURN only needs the audio network; no DB/Redis access (M13).
+      - audio-net
     restart: unless-stopped
 
   # ============================================
@@ -200,7 +207,7 @@ services:
       - "1935:1935"   # RTMP ingest
       - "8080:80"     # HTTP stats page
     networks:
-      - clawzz-network
+      - audio-net
     restart: unless-stopped
     profiles:
       - video
@@ -223,7 +230,7 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - clawzz-network
+      - backend-net
     profiles:
       - legacy-jam
 
@@ -248,7 +255,8 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - clawzz-network
+      # Postgres is accessible only to backend services, not the frontend (M13).
+      - backend-net
 
   # ============================================
   # REDIS (Shared Cache & Event Bus)
@@ -267,12 +275,23 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - clawzz-network
+      # Redis is accessible only to backend services, not the frontend (M13).
+      - backend-net
 
 volumes:
   postgres_data:
   redis_data:
 
+# ── Network topology (M13) ─────────────────────────────────────────────────
+# frontend-net: browser-tier — frontend ↔ backend only; no DB/Redis exposure.
+# backend-net:  data-tier    — backend, orchestrator, pantry, postgres, redis.
+#               The frontend container is explicitly absent from this network.
+# audio-net:    audio-tier   — coturn, pantry, pantry-sfu, nginx-rtmp.
+#               No database access from TURN infrastructure.
 networks:
-  clawzz-network:
+  frontend-net:
+    driver: bridge
+  backend-net:
+    driver: bridge
+  audio-net:
     driver: bridge

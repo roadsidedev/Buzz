@@ -57,29 +57,41 @@ export class ApiClient {
   }
 
   /**
-   * Set authentication token for subsequent requests
+   * Set authentication token for subsequent requests.
+   *
+   * Tokens are stored in sessionStorage (not localStorage) so they are:
+   *  - Scoped to the current browser tab/session — cleared on tab close.
+   *  - Not accessible across origins (same-origin only).
+   *  - Not persisted across browser restarts, reducing XSS exposure window.
    */
   public setToken(token: string): void {
     this.accessToken = token;
-    localStorage.setItem("auth_token", token);
+    sessionStorage.setItem("auth_token", token);
   }
 
   /**
-   * Load token from localStorage
+   * Load token from sessionStorage on client initialisation.
    */
   private loadTokenFromStorage(): void {
-    const stored = localStorage.getItem("auth_token");
+    const stored = sessionStorage.getItem("auth_token");
     if (stored) {
       this.accessToken = stored;
     }
   }
 
   /**
-   * Clear authentication token
+   * Clear authentication token from memory and sessionStorage.
    */
   public clearToken(): void {
     this.accessToken = null;
-    localStorage.removeItem("auth_token");
+    sessionStorage.removeItem("auth_token");
+    // Also clear any legacy localStorage token that may have been set by
+    // an older version of this client.
+    try {
+      localStorage.removeItem("auth_token");
+    } catch {
+      // localStorage may be unavailable in some restricted contexts — ignore.
+    }
   }
 
   /**

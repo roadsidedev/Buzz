@@ -103,14 +103,39 @@ function sanitizeString(input: string): string {
   );
 }
 
+// Maximum rate-limit window across all event types — used as the TTL for
+// stale socket entries so the GC sweep can reclaim them without evicting
+// entries that are still within an active window.
+const MAX_WINDOW_MS = Math.max(...Object.values(RATE_LIMITS).map((r) => r.windowMs));
+
 /**
- * Rate limiter for WebSocket events
+ * Rate limiter for WebSocket events (M1 — memory-leak fix).
+ *
+ * The previous implementation kept socket entries in `sockets` forever;
+ * disconnected sockets accumulated unboundedly because `cleanup()` was not
+ * always called on abnormal disconnects.
+ *
+ * Fix: a periodic GC sweep (every MAX_WINDOW_MS) removes sockets whose most
+ * recently active rate-limit window has expired, capping memory usage to
+ * O(active_sockets × event_types) rather than O(all_ever_connected).
  */
 class WebSocketRateLimiter {
   private sockets = new Map<
     string,
     Map<string, { count: number; resetAt: number }>
   >();
+
+  // Track the latest resetAt across all events per socket so the GC can
+  // determine whether any window is still active without iterating all events.
+  private socketLastActive = new Map<string, number>();
+
+  private gcTimer: ReturnType<typeof setInterval>;
+
+  constructor() {
+    // Run GC every full window; .unref() prevents the timer from keeping the
+    // Node.js process alive during graceful shutdown.
+    this.gcTimer = setInterval(() => this._gc(), MAX_WINDOW_MS).unref();
+  }
 
   /**
    * Check if event is rate limited
@@ -127,7 +152,9 @@ class WebSocketRateLimiter {
     const now = Date.now();
 
     if (!socketLimits.has(event)) {
-      socketLimits.set(event, { count: 1, resetAt: now + config.windowMs });
+      const resetAt = now + config.windowMs;
+      socketLimits.set(event, { count: 1, resetAt });
+      this.socketLastActive.set(socketId, Math.max(this.socketLastActive.get(socketId) ?? 0, resetAt));
       return false;
     }
 
@@ -137,23 +164,51 @@ class WebSocketRateLimiter {
     if (now > limit.resetAt) {
       limit.count = 1;
       limit.resetAt = now + config.windowMs;
-      return false;
-    }
-
-    // Check limit
-    if (limit.count >= config.max) {
+    } else if (limit.count >= config.max) {
       return true;
+    } else {
+      limit.count++;
     }
 
-    limit.count++;
+    this.socketLastActive.set(socketId, Math.max(this.socketLastActive.get(socketId) ?? 0, limit.resetAt));
     return false;
   }
 
   /**
-   * Clean up socket data
+   * Eagerly release all state for a disconnected socket.
+   * Called on a clean Socket.IO disconnect event.
    */
   cleanup(socketId: string): void {
     this.sockets.delete(socketId);
+    this.socketLastActive.delete(socketId);
+  }
+
+  /**
+   * Periodic GC: evict entries whose last active window has fully expired.
+   * This provides a safety net for sockets that disconnect without emitting
+   * a clean disconnect event (network drops, process kills, etc.).
+   */
+  private _gc(): void {
+    const now = Date.now();
+    let evicted = 0;
+    for (const [socketId, lastActive] of this.socketLastActive) {
+      if (now > lastActive) {
+        this.sockets.delete(socketId);
+        this.socketLastActive.delete(socketId);
+        evicted++;
+      }
+    }
+    if (evicted > 0) {
+      // Avoid importing logger here to keep this file self-contained;
+      // use console.debug which is stripped in production log levels.
+      // eslint-disable-next-line no-console
+      console.debug(`[WebSocketRateLimiter] GC evicted ${evicted} stale socket(s); remaining: ${this.sockets.size}`);
+    }
+  }
+
+  /** Stop the background GC timer (used in tests). */
+  destroy(): void {
+    clearInterval(this.gcTimer);
   }
 }
 

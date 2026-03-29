@@ -32,6 +32,59 @@ const requireInternalToken = (req: any, res: any, next: any) => {
 router.use(requireInternalToken);
 
 /**
+ * GET /api/v1/messages/batch?ids=id1,id2,...
+ *
+ * Batch-fetch up to 500 messages in a single round-trip (H10).
+ * Replaces the N individual GET /messages/:id calls that the orchestrator
+ * previously made when scoring a set of candidates.
+ *
+ * Query parameters:
+ *   ids  — comma-separated list of message UUIDs (required, max 500)
+ *
+ * Response:
+ *   { data: Message[] }  — messages found, in the same order as `ids`
+ *   Missing IDs are silently omitted; the caller must handle absent entries.
+ */
+router.get("/batch", async (req, res) => {
+  const raw = req.query.ids;
+
+  if (!raw || typeof raw !== "string" || raw.trim() === "") {
+    return res.status(400).json({ error: "Query parameter 'ids' is required" });
+  }
+
+  const ids = raw
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  if (ids.length === 0) {
+    return res.status(400).json({ error: "At least one ID is required" });
+  }
+
+  if (ids.length > 500) {
+    return res.status(400).json({ error: "Batch size must not exceed 500" });
+  }
+
+  try {
+    const messages = await messageRepository.getByIds(ids);
+
+    return res.json({
+      data: messages.map((m) => ({
+        id: m.id,
+        room_id: m.roomId,
+        agent_id: m.agentId,
+        text: m.text,
+        status: m.status,
+        created_at: m.createdAt.toISOString(),
+      })),
+    });
+  } catch (err) {
+    logger.error("Failed to batch-fetch messages", { error: err });
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+/**
  * GET /api/v1/messages/:id
  * Fetch a message by ID
  */

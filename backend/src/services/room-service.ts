@@ -44,6 +44,25 @@ interface CreateRoomInput extends CreateRoomRequest {
 let factoryInitialized = false;
 
 /**
+ * Retrieve the encryption secret and hard-fail if it is missing or empty.
+ *
+ * Using an empty string as an encryption key is equivalent to no encryption.
+ * A missing secret in production is a misconfiguration that must surface
+ * loudly rather than silently producing unprotected data.
+ */
+function getEncryptionSecret(): string {
+  const secret = process.env.ENCRYPTION_SECRET;
+  if (!secret || secret.trim().length === 0) {
+    const msg =
+      "ENCRYPTION_SECRET environment variable is required but is not set or is empty. " +
+      "Set a strong random value (e.g. `openssl rand -base64 32`) before starting the service.";
+    logger.error(msg);
+    throw new Error(msg);
+  }
+  return secret;
+}
+
+/**
  * Ensure Jam service factory is initialized
  */
 function ensureFactoryInitialized(): void {
@@ -193,14 +212,16 @@ export class RoomService {
       ensureFactoryInitialized();
 
       const factory = getJamServiceFactory();
-      const jamService = factory?.getService() as JamServiceV2;
-
+      if (!factory) {
+        throw new Error("Jam service factory not configured");
+      }
+      const jamService = factory.getService() as JamServiceV2 | null;
       if (!jamService) {
-        throw new Error("Jam service not configured");
+        throw new Error("Jam service not available — factory returned null");
       }
 
       // Always use V2 (SSR auth with agent keypair)
-      const encryptionSecret = process.env.ENCRYPTION_SECRET || "";
+      const encryptionSecret = getEncryptionSecret();
 
       // Get agent keypair (from ERC-8004 identity or stored)
       const keyPair = await getAgentKeypair({
@@ -633,12 +654,12 @@ export class RoomService {
       ensureFactoryInitialized();
 
       const factory = getJamServiceFactory();
-      const jamService = factory?.getService() as JamServiceV2;
+      const jamService = factory?.getService() as JamServiceV2 | null;
 
       if (jamService) {
         const hostAgent = await agentRepository.getById(room.hostAgentId);
         if (hostAgent) {
-          const encryptionSecret = process.env.ENCRYPTION_SECRET || "";
+          const encryptionSecret = getEncryptionSecret();
           const keyPair = await getAgentKeypair({
             agentId: room.hostAgentId,
             erc8004Identity: hostAgent.erc8004_identity,

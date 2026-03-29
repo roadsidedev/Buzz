@@ -257,6 +257,38 @@ export class MessageRepository {
   }
 
   /**
+   * Fetch multiple messages by ID in a single query (H10 — batch endpoint).
+   *
+   * Uses a parameterised `WHERE id = ANY($1)` rather than N individual SELECTs.
+   * Results are returned in the same order as `ids`; missing IDs are silently
+   * omitted (caller is responsible for checking).
+   *
+   * @param ids - Array of message UUIDs (max 500 enforced here)
+   * @returns Messages found, preserving input order
+   */
+  async getByIds(ids: string[]): Promise<RoomMessage[]> {
+    if (ids.length === 0) return [];
+
+    // Hard-cap to prevent oversized queries; callers should chunk if needed.
+    const cappedIds = ids.slice(0, 500);
+
+    const text = `
+      SELECT id, room_id, agent_id, text, status, score, audio_url,
+             selected_at, played_at, created_at, updated_at
+      FROM message
+      WHERE id = ANY($1::uuid[])
+    `;
+
+    const rows = await query<MessageRow>(text, [cappedIds]);
+
+    // Restore caller-supplied ordering
+    const rowMap = new Map(rows.map((r) => [r.id, r]));
+    return cappedIds
+      .filter((id) => rowMap.has(id))
+      .map((id) => this._mapRowToMessage(rowMap.get(id)!));
+  }
+
+  /**
    * Count messages by status in room
    *
    * @param roomId - Room ID

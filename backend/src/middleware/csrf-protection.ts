@@ -230,11 +230,28 @@ export function validateCSRFToken() {
       return;
     }
 
-    // Skip CSRF for API routes — external agents use Bearer token auth, not cookies
-    // CSRF protection is only relevant for browser-based (cookie-authenticated) requests
+    // Skip CSRF for API routes ONLY when the request is authenticated exclusively
+    // via Bearer token (Authorization header).  If a session cookie is also
+    // present the request may have originated from a browser context and is
+    // therefore CSRF-vulnerable regardless of the path prefix (M4).
     if (req.path.startsWith("/api/")) {
-      next();
-      return;
+      const hasBearerToken = typeof req.headers.authorization === "string" &&
+        req.headers.authorization.startsWith("Bearer ");
+      const hasSessionCookie = !!(req.cookies && req.cookies[CSRF_COOKIE_NAME]);
+
+      // Pure bearer-only request — no cookie present — safe to skip CSRF.
+      if (hasBearerToken && !hasSessionCookie) {
+        next();
+        return;
+      }
+
+      // Cookie-carrying request on an /api/ path: fall through to CSRF
+      // validation below so browser-initiated mutations are protected.
+      if (!hasSessionCookie) {
+        // No auth at all — let downstream auth middleware handle the 401.
+        next();
+        return;
+      }
     }
 
     // Extract CSRF token from header

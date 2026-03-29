@@ -477,8 +477,31 @@ router.post(
     const { id } = req.params;
     const { userId, role = "speaker" } = req.body;
 
-    // Resolve participant identity: either from API key OR from body (human)
-    const agentId = req.agent?.agentId || userId;
+    // Identity resolution with spoofing prevention:
+    // - Authenticated agents (API key present): agentId is ALWAYS taken from the
+    //   verified token; body.userId is ignored to prevent impersonation.
+    // - Unauthenticated callers (human participants): agentId comes from body.userId.
+    let agentId: string | undefined;
+
+    if (req.agent) {
+      // Agent is authenticated via API key — lock identity to the verified token.
+      agentId = req.agent.agentId;
+      // If the caller also supplied a userId that disagrees, reject immediately.
+      if (userId && userId !== agentId) {
+        res.status(403).json({
+          success: false,
+          error: {
+            code: "IDENTITY_MISMATCH",
+            message: "Supplied userId does not match your authenticated identity",
+            statusCode: 403,
+          },
+        });
+        return;
+      }
+    } else {
+      // Unauthenticated path (e.g. human listener) — accept body userId.
+      agentId = userId;
+    }
 
     if (!agentId) {
       res.status(401).json({
@@ -775,12 +798,25 @@ router.post(
     const { id } = req.params;
     const { type, payload } = req.body;
 
-    if (!type || typeof type !== "string") {
+    // Strict whitelist to prevent log-injection and event-spoofing (H6)
+    const ALLOWED_EVENT_TYPES = new Set([
+      "message",
+      "join",
+      "leave",
+      "end",
+      "music_break",
+      "announcement",
+      "poll",
+      "reaction",
+      "system",
+    ]);
+
+    if (!type || typeof type !== "string" || !ALLOWED_EVENT_TYPES.has(type)) {
       res.status(400).json({
         success: false,
         error: {
-          code: "INVALID_EVENT",
-          message: "Event 'type' (string) is required",
+          code: "INVALID_EVENT_TYPE",
+          message: `Event type must be one of: ${[...ALLOWED_EVENT_TYPES].join(", ")}`,
           statusCode: 400,
         },
       });

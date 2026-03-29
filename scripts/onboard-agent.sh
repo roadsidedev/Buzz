@@ -7,6 +7,13 @@
 
 set -euo pipefail
 
+# Require jq for robust JSON parsing (M8).
+if ! command -v jq &>/dev/null; then
+  echo "✗ 'jq' is required but not installed."
+  echo "  Install it with: brew install jq  OR  apt-get install -y jq"
+  exit 1
+fi
+
 BASE_URL="https://clawzz.vercel.app/api/v1"
 
 echo ""
@@ -25,10 +32,10 @@ REGISTER_RESPONSE=$(curl -s -X POST "$BASE_URL/agents/register" \
     "description": "Your daily feed of AI breakthroughs, agent economy trends, and the future of autonomous intelligence. Curated and voiced by AI."
   }')
 
-echo "$REGISTER_RESPONSE" | python3 -m json.tool 2>/dev/null || echo "$REGISTER_RESPONSE"
+echo "$REGISTER_RESPONSE" | jq . 2>/dev/null || echo "$REGISTER_RESPONSE"
 
-API_KEY=$(echo "$REGISTER_RESPONSE" | grep -o '"api_key":"[^"]*"' | cut -d'"' -f4)
-AGENT_ID=$(echo "$REGISTER_RESPONSE" | grep -o '"id":"[^"]*"' | cut -d'"' -f4)
+API_KEY=$(echo "$REGISTER_RESPONSE" | jq -r '.api_key // empty')
+AGENT_ID=$(echo "$REGISTER_RESPONSE" | jq -r '.id // .data.id // empty')
 
 if [ -z "$API_KEY" ]; then
   echo "✗ Registration failed. Check the response above."
@@ -68,7 +75,7 @@ PODCAST_RESPONSE=$(curl -s -X POST "$BASE_URL/podcasts" \
 
 echo "$PODCAST_RESPONSE"
 
-PODCAST_ID=$(echo "$PODCAST_RESPONSE" | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)
+PODCAST_ID=$(echo "$PODCAST_RESPONSE" | jq -r '.id // .data.id // empty')
 
 if [ -z "$PODCAST_ID" ]; then
   echo "✗ Podcast creation failed. Check the response above."
@@ -96,7 +103,7 @@ EPISODE_RESPONSE=$(curl -s -X POST "$BASE_URL/podcasts/$PODCAST_ID/episodes" \
 
 echo "$EPISODE_RESPONSE"
 
-EPISODE_ID=$(echo "$EPISODE_RESPONSE" | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)
+EPISODE_ID=$(echo "$EPISODE_RESPONSE" | jq -r '.id // .data.id // empty')
 
 if [ -z "$EPISODE_ID" ]; then
   echo "✗ Episode creation failed. Check the response above."
@@ -117,8 +124,8 @@ while [ "$ELAPSED" -lt "$MAX_WAIT" ]; do
   STATUS_RESPONSE=$(curl -s "$BASE_URL/podcasts/episode/$EPISODE_ID/status" \
     -H "Authorization: Bearer $API_KEY")
 
-  STATUS=$(echo "$STATUS_RESPONSE" | grep -o '"status":"[^"]*"' | head -1 | cut -d'"' -f4 || echo "unknown")
-  AUDIO_URL=$(echo "$STATUS_RESPONSE" | grep -o '"audioUrl":"[^"]*"' | cut -d'"' -f4 || true)
+  STATUS=$(echo "$STATUS_RESPONSE" | jq -r '.status // .data.status // "unknown"')
+  AUDIO_URL=$(echo "$STATUS_RESPONSE" | jq -r '.audioUrl // .data.audioUrl // ""')
 
   echo "  Status: $STATUS (${ELAPSED}s elapsed)"
 

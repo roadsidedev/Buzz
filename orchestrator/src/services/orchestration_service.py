@@ -1,8 +1,10 @@
 """Core orchestration engine coordinating all systems."""
 
 import logging
+import re
 from datetime import datetime
 from typing import Optional
+from urllib.parse import urlparse
 
 from ..clients.api_gateway_client import get_api_gateway_client
 from ..config.settings import settings
@@ -213,13 +215,15 @@ class OrchestrationService:
         Execute a complete turn: score, select, broadcast.
 
         Strategy:
-        1. Get pending messages from queue
-        2. Score each against context
-        3. Apply moderation
-        4. Select winner
-        5. Emit turn event
-        6. Check contract completion
-        7. Return turn metadata
+        1. Acquire a distributed Redis lock to prevent concurrent turn processing
+           for the same room (race-condition protection).
+        2. Get pending messages from queue
+        3. Score each against context
+        4. Apply moderation
+        5. Select winner
+        6. Emit turn event
+        7. Check contract completion
+        8. Return turn metadata
 
         Args:
             room_id: Room UUID
@@ -230,6 +234,33 @@ class OrchestrationService:
         if not self.room_state_manager:
             raise RuntimeError("OrchestrationService not initialized")
 
+        # ── Distributed lock (H4) ────────────────────────────────────────────
+        # Prevent concurrent process_turn calls on the same room from corrupting
+        # room state (lost writes, duplicate turns, incorrect contract tracking).
+        lock_key = f"turn_lock:{room_id}"
+        lock_value = str(id(self))  # unique enough per-process identifier
+        lock_ttl_seconds = 30  # generous TTL in case the process dies mid-turn
+
+        redis = self.room_state_manager.redis
+        acquired = await redis.set(lock_key, lock_value, nx=True, ex=lock_ttl_seconds)
+        if not acquired:
+            logger.warning(
+                "Turn already in progress for room — skipping duplicate request",
+                extra={"room_id": room_id},
+            )
+            return {"status": "turn_in_progress", "room_id": room_id}
+
+        try:
+            return await self._process_turn_locked(room_id)
+        finally:
+            # Release lock only if we still own it (prevent releasing a lock
+            # refreshed by another process after our TTL expired).
+            current = await redis.get(lock_key)
+            if current and current.decode() == lock_value:
+                await redis.delete(lock_key)
+
+    async def _process_turn_locked(self, room_id: str) -> dict:
+        """Internal turn processing — must only be called while holding the turn lock."""
         room_state = await self.room_state_manager.get_room(room_id)
         if not room_state:
             raise ValueError(f"Room {room_id} not found")
@@ -370,14 +401,18 @@ class OrchestrationService:
         Returns a dict compatible with GeneratePodcastResponse.
         Falls back to a structured placeholder when LLM is unavailable.
         """
+        safe_title = self._sanitize_llm_input(title, max_length=200)
+
+        # Only include URLs that pass SSRF policy (C6/H1)
+        safe_source_urls = [u for u in (source_urls or [])[:5] if self._is_safe_url(u)]
         sources_text = ""
-        if source_urls:
-            sources_text = "\n".join(f"- {u}" for u in source_urls[:5])
+        if safe_source_urls:
+            sources_text = "\n".join(f"- {u}" for u in safe_source_urls)
             sources_text = f"\n\nReference sources:\n{sources_text}"
 
         prompt = (
             f"You are an expert podcast scriptwriter. Write a compelling, engaging podcast "
-            f"script for an episode titled: \"{title}\".{sources_text}\n\n"
+            f"script for an episode titled: \"{safe_title}\".{sources_text}\n\n"
             "Requirements:\n"
             "- Natural conversational tone\n"
             "- Clear introduction, body, and conclusion\n"
@@ -391,7 +426,7 @@ class OrchestrationService:
             user_content=prompt,
             max_tokens=1200,
             fallback=(
-                f"Welcome to this episode: {title}. "
+                f"Welcome to this episode: {safe_title}. "
                 "Today we explore this fascinating topic in depth. "
                 "Stay tuned for more insights from the ClawZz AI network."
             ),
@@ -427,6 +462,85 @@ class OrchestrationService:
             "estimated_time_seconds": 5,
         }
 
+    # ── Internal helpers ─────────────────────────────────────────────────────
+
+    @staticmethod
+    def _sanitize_llm_input(text: str, max_length: int = 1000) -> str:
+        """
+        Strip prompt-injection patterns from user-supplied text before it is
+        interpolated into LLM prompts.
+
+        Removes: instruction-override markers, role-switch attempts, special
+        XML-like tags, and truncates to `max_length` characters.
+        """
+        if not text:
+            return ""
+        # Truncate first to bound cost
+        sanitized = text[:max_length]
+        # Remove common injection phrases
+        injection_patterns = [
+            r"(?i)ignore\s+(all\s+)?previous\s+instructions",
+            r"(?i)forget\s+(everything|all|prior)",
+            r"(?i)you\s+are\s+now\s+(a|an|the)\s+",
+            r"(?i)(system|assistant|human|user)\s*:\s*",
+            r"<\|?(im_start|im_end|endoftext)\|?>",
+            r"\[\[(SYSTEM|INST|\/INST)\]\]",
+        ]
+        for pattern in injection_patterns:
+            sanitized = re.sub(pattern, " ", sanitized)
+        # Collapse excessive whitespace introduced by replacements
+        sanitized = re.sub(r"\s{3,}", "  ", sanitized).strip()
+        return sanitized
+
+    @staticmethod
+    def _is_safe_url(url: str) -> bool:
+        """
+        SSRF protection: reject URLs that point at private/loopback networks or
+        use non-HTTP(S) schemes.
+
+        Blocked:
+        - Non-http/https schemes (file://, ftp://, gopher://, etc.)
+        - Loopback addresses (127.x.x.x, ::1, localhost)
+        - RFC-1918 private ranges (10.x, 172.16-31.x, 192.168.x)
+        - Link-local (169.254.x.x)
+        - Internal metadata endpoints (169.254.169.254 — AWS/GCP IMDS)
+        """
+        try:
+            parsed = urlparse(url)
+        except Exception:
+            return False
+
+        if parsed.scheme not in ("http", "https"):
+            return False
+
+        hostname = parsed.hostname or ""
+        if not hostname:
+            return False
+
+        # Block loopback and common internal hostnames
+        blocked_hostnames = {"localhost", "metadata.google.internal"}
+        if hostname.lower() in blocked_hostnames:
+            return False
+
+        # Block by IP range
+        import ipaddress
+        try:
+            addr = ipaddress.ip_address(hostname)
+            if (
+                addr.is_loopback
+                or addr.is_private
+                or addr.is_link_local
+                or addr.is_multicast
+                or addr.is_reserved
+                or addr.is_unspecified
+            ):
+                return False
+        except ValueError:
+            # Not an IP address — hostname-based; allow it
+            pass
+
+        return True
+
     async def generate_podcast_dialogue(
         self,
         podcast_id: str,
@@ -444,17 +558,33 @@ class OrchestrationService:
         Returns a dict compatible with GeneratePodcastResponse.
         """
         import json
-        import re
 
-        # Fetch and extract text from source URLs (best-effort)
+        # Sanitize user-supplied title before LLM interpolation (H1)
+        safe_title = self._sanitize_llm_input(title, max_length=200)
+
+        # Fetch and extract text from source URLs (best-effort, SSRF-safe)
         source_content = ""
         if source_urls:
             try:
                 import httpx
-                async with httpx.AsyncClient(timeout=10) as client:
+                async with httpx.AsyncClient(
+                    timeout=10,
+                    follow_redirects=False,  # Never follow redirects — prevents redirect-based SSRF
+                    max_redirects=0,
+                ) as client:
                     for url in source_urls[:3]:  # Cap at 3 sources
+                        # Block private/internal URLs before making the request (C6)
+                        if not self._is_safe_url(url):
+                            logger.warning(
+                                "Source URL blocked by SSRF policy",
+                                extra={"url": url, "episode_id": episode_id},
+                            )
+                            continue
                         try:
-                            resp = await client.get(url, follow_redirects=True)
+                            resp = await client.get(
+                                url,
+                                headers={"Accept": "text/html,text/plain"},
+                            )
                             if resp.status_code == 200:
                                 # Strip HTML tags with a simple regex
                                 text = re.sub(r"<[^>]+>", " ", resp.text)
@@ -477,7 +607,7 @@ class OrchestrationService:
         )
 
         user_prompt = (
-            f'Write a podcast dialogue between two hosts about: "{title}".{sources_block}\n\n'
+            f'Write a podcast dialogue between two hosts about: "{safe_title}".{sources_block}\n\n'
             "HOST_A is a curious, thoughtful learner who asks questions and builds understanding.\n"
             "HOST_B is a knowledgeable expert who explains with concrete examples.\n\n"
             "Rules:\n"
@@ -490,7 +620,7 @@ class OrchestrationService:
         )
 
         fallback_script = (
-            f"[HOST_A]: Welcome back everyone. Today we're exploring: {title}.\n"
+            f"[HOST_A]: Welcome back everyone. Today we're exploring: {safe_title}.\n"
             f"[HOST_B]: That's right. It's a fascinating topic and we have a lot to cover.\n"
             f"[HOST_A]: Let's dive in. What should our listeners know first?\n"
             f"[HOST_B]: The most important thing to understand is that this area is evolving rapidly. "

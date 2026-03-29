@@ -1,29 +1,53 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # scripts/setup-env.sh
 # Run from project root: ./scripts/setup-env.sh
+#
+# M15: Added `set -euo pipefail` so any failure (openssl, cp, chmod) aborts
+# the script immediately rather than silently producing a broken .env file.
+# The output file is created with mode 600 (owner read/write only) before
+# secrets are written so a world-readable window never exists.
 
-set -e
+set -euo pipefail
 
 echo "Setting up ClawZz environment..."
 
 # Check if .env exists
 if [ -f ".env" ]; then
-  echo "⚠️  .env already exists. Back up and remove to regenerate."
+  echo "ERROR: .env already exists. Back up and remove it to regenerate." >&2
+  exit 1
+fi
+
+if [ ! -f ".env.example" ]; then
+  echo "ERROR: .env.example not found. Run from the project root directory." >&2
   exit 1
 fi
 
 # Copy example file
 cp .env.example .env
 
-# Generate secrets and append to .env
-echo "" >> .env
-echo "# Generated secrets" >> .env
-echo "JWT_SECRET=\"$(openssl rand -base64 48)\"" >> .env
-echo "ENCRYPTION_SECRET=\"$(openssl rand -base64 32)\"" >> .env
-echo "COTURN_SECRET=\"$(openssl rand -hex 32)\"" >> .env
+# Restrict permissions BEFORE writing any secrets so no world-readable
+# window exists on multi-user systems (M15).
+chmod 600 .env
+
+# Generate and append secrets.
+# Each openssl invocation is on its own line so a failure on any one of them
+# aborts the whole script (set -e) without corrupting the partial file.
+JWT_SECRET=$(openssl rand -base64 48)
+ENCRYPTION_SECRET=$(openssl rand -base64 32)
+BLIND_INDEX_SECRET=$(openssl rand -base64 32)
+COTURN_SECRET=$(openssl rand -hex 32)
+
+cat >> .env <<EOF
+
+# Generated secrets — do NOT commit this file
+JWT_SECRET="${JWT_SECRET}"
+ENCRYPTION_SECRET="${ENCRYPTION_SECRET}"
+BLIND_INDEX_SECRET="${BLIND_INDEX_SECRET}"
+COTURN_SECRET="${COTURN_SECRET}"
+EOF
 
 echo ""
-echo "✅ .env file created with generated secrets"
+echo "✅ .env file created with generated secrets (mode 600)"
 echo ""
 echo "Required actions:"
 echo "1. Set your DATABASE_URL"

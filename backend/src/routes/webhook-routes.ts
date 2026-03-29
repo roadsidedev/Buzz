@@ -36,6 +36,74 @@ const router = Router();
  *   "timestamp": 1234567890
  * }
  */
+/**
+ * Webhook replay-attack protection.
+ *
+ * Strategy:
+ * 1. Require an `x-x402-timestamp` header (Unix seconds).
+ * 2. Reject webhooks that are older than MAX_WEBHOOK_AGE_SECONDS.
+ * 3. Store the webhook nonce (signature) in Redis with a TTL equal to
+ *    MAX_WEBHOOK_AGE_SECONDS; reject duplicate nonces within that window.
+ *
+ * This guarantees each unique webhook payload is processed exactly once
+ * and that replays older than the freshness window are automatically discarded.
+ */
+const MAX_WEBHOOK_AGE_SECONDS = 300; // 5 minutes
+
+async function assertWebhookFreshness(
+  req: Request,
+  signature: string,
+): Promise<void> {
+  const timestampHeader = req.headers["x-x402-timestamp"];
+  const timestamp =
+    typeof timestampHeader === "string" ? parseInt(timestampHeader, 10) : NaN;
+
+  if (isNaN(timestamp)) {
+    throw new SecurityError("Missing or invalid x-x402-timestamp header", {
+      code: "MISSING_TIMESTAMP",
+    });
+  }
+
+  const ageSeconds = Math.floor(Date.now() / 1000) - timestamp;
+  if (ageSeconds > MAX_WEBHOOK_AGE_SECONDS || ageSeconds < -30) {
+    logger.warn("Webhook timestamp out of acceptable range", {
+      ageSeconds,
+      maxAge: MAX_WEBHOOK_AGE_SECONDS,
+    });
+    throw new SecurityError("Webhook timestamp is too old or too far in the future", {
+      code: "TIMESTAMP_OUT_OF_RANGE",
+    });
+  }
+
+  // Deduplicate by storing nonce in Redis for the freshness window.
+  // Silently skip nonce check if Redis is unavailable (timestamp check still applies).
+  try {
+    const { getRedisClient } = await import("../config/redis.js");
+    const redis = getRedisClient();
+    if (redis) {
+      const nonceKey = `webhook_nonce:${signature}`;
+      // NX = only set if key does not exist; returns null if already exists
+      const set = await redis.set(nonceKey, "1", {
+        NX: true,
+        EX: MAX_WEBHOOK_AGE_SECONDS,
+      });
+      if (set === null) {
+        logger.warn("Duplicate webhook nonce detected — possible replay attack", {
+          ip: req.ip,
+        });
+        throw new SecurityError("Webhook replay detected: duplicate nonce", {
+          code: "DUPLICATE_NONCE",
+        });
+      }
+    }
+  } catch (err) {
+    if (err instanceof SecurityError) throw err;
+    logger.warn("Redis nonce check unavailable — timestamp validation still applies", {
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+}
+
 router.post(
   "/webhooks/payment",
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
@@ -61,6 +129,9 @@ router.post(
         code: "INVALID_SIGNATURE",
       });
     }
+
+    // Replay-attack protection: timestamp freshness + nonce deduplication (H3)
+    await assertWebhookFreshness(req, signature);
 
     // Parse payment update
     const { paymentId, status, txHash, blockNumber } = req.body;

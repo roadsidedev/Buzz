@@ -12,6 +12,7 @@
  */
 
 import { Request, Response, NextFunction } from "express";
+import crypto from "crypto";
 import { RateLimitError } from "../utils/errors.js";
 import { logger } from "../utils/logger.js";
 import {
@@ -66,6 +67,40 @@ export async function initializeRateLimitStore(): Promise<void> {
 }
 
 /**
+ * Emergency in-memory rate limiter — active ONLY when Redis is unavailable.
+ * Caps each IP to EMERGENCY_MAX_REQUESTS per EMERGENCY_WINDOW_MS.
+ * Entries auto-expire; map is bounded by TTL cleanup.
+ */
+const EMERGENCY_MAX_REQUESTS = 50;
+const EMERGENCY_WINDOW_MS = 60_000;
+const emergencyStore = new Map<string, { count: number; resetAt: number }>();
+
+function applyEmergencyRateLimit(key: string): boolean {
+  const now = Date.now();
+  const entry = emergencyStore.get(key);
+
+  if (!entry || now > entry.resetAt) {
+    emergencyStore.set(key, { count: 1, resetAt: now + EMERGENCY_WINDOW_MS });
+    return true;
+  }
+
+  if (entry.count >= EMERGENCY_MAX_REQUESTS) {
+    return false;
+  }
+
+  entry.count++;
+  return true;
+}
+
+// Sweep expired emergency entries every 5 minutes to prevent unbounded growth.
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, entry] of emergencyStore) {
+    if (now > entry.resetAt) emergencyStore.delete(key);
+  }
+}, 5 * 60_000).unref();
+
+/**
  * Create rate limit middleware
  */
 export function createRateLimiter(config: RateLimitConfig) {
@@ -76,7 +111,7 @@ export function createRateLimiter(config: RateLimitConfig) {
     config.keyGenerator ||
     ((req: Request) => {
       // Rate limit by agent ID if authenticated, otherwise by IP
-      const agentId = (req as any).agent?.agentId || (req as any).user?.agentId;
+      const agentId = (req as any).agent?.id || (req as any).user?.agentId;
       if (agentId) return String(agentId);
       return req.ip || "unknown";
     });
@@ -92,22 +127,33 @@ export function createRateLimiter(config: RateLimitConfig) {
       return;
     }
 
-    // Bypass for authorized platform bots (Infrastructure recovery)
-    const secretHeader = req.headers["x-clawzz-system-secret"];
-    const systemSecret = Array.isArray(secretHeader) ? secretHeader[0] : secretHeader;
+    // Internal platform bypass — scoped to /api/internal/* only.
+    // Uses constant-time comparison to prevent timing-based secret extraction.
+    const BYPASS_PATH_PREFIX = "/api/internal/";
+    if (req.path.startsWith(BYPASS_PATH_PREFIX) && process.env.CLAWZZ_SYSTEM_SECRET) {
+      const secretHeader = req.headers["x-clawzz-system-secret"];
+      const providedSecret = Array.isArray(secretHeader) ? secretHeader[0] : secretHeader;
 
-    if (systemSecret && process.env.CLAWZZ_SYSTEM_SECRET) {
-      if (systemSecret === process.env.CLAWZZ_SYSTEM_SECRET) {
-        logger.info("Rate limit bypassed via system secret", { 
-          path: req.path,
-          method: req.method
-        });
-        return next();
-      } else {
-        logger.warn("System secret mismatch", {
-          provided: systemSecret.substring(0, 4) + "...",
-          path: req.path
-        });
+      if (providedSecret) {
+        const expected = Buffer.from(process.env.CLAWZZ_SYSTEM_SECRET, "utf8");
+        const provided = Buffer.from(providedSecret, "utf8");
+
+        // Buffers must be the same byte length for timingSafeEqual
+        const isMatch =
+          expected.length === provided.length &&
+          crypto.timingSafeEqual(expected, provided);
+
+        if (isMatch) {
+          logger.info("Rate limit bypassed via system secret on internal route", {
+            path: req.path,
+            method: req.method,
+          });
+          return next();
+        } else {
+          logger.warn("System secret mismatch on internal route", {
+            path: req.path,
+          });
+        }
       }
     }
 
@@ -153,11 +199,19 @@ export function createRateLimiter(config: RateLimitConfig) {
         return;
       }
 
-      logger.error("Rate limit check error", {
+      logger.error("Rate limit check error — applying conservative in-memory fallback", {
         error: error instanceof Error ? error.message : String(error),
       });
 
-      // Allow request if rate limiting check fails (degrade gracefully)
+      // DO NOT pass all requests through on store failure — that disables rate limiting
+      // entirely during Redis outages and opens the door to DDoS attacks.
+      // Instead, apply a strict in-memory emergency cap of 50 req/min per IP.
+      const emergencyKey = req.ip || "unknown";
+      const emergencyAllowed = applyEmergencyRateLimit(emergencyKey);
+      if (!emergencyAllowed) {
+        next(new RateLimitError("Service temporarily limited — try again shortly.", 60, {}));
+        return;
+      }
       next();
     }
   };

@@ -25,7 +25,9 @@ declare global {
   namespace Express {
     interface Request {
       agent?: {
+        /** Canonical agent identifier. Always prefer this field. */
         id: string;
+        /** @deprecated Use `id` — kept for backwards-compat with room/podcast routes. Will be removed in a future cleanup. */
         agentId: string;
         username: string;
         name: string;

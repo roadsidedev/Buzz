@@ -1,9 +1,10 @@
 """FastAPI routes for orchestrator service."""
 
 import logging
+import os
 from typing import Dict, List, Literal, Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel
 
 from ..models.room import Room
@@ -230,9 +231,47 @@ async def health_check() -> dict:
     return {"status": "healthy", "service": "orchestrator"}
 
 
-@router.get("/debug/llm")
+def _require_debug_access(x_debug_token: Optional[str] = Header(None, alias="X-Debug-Token")) -> None:
+    """
+    Guard for the /debug/* endpoints.
+
+    Rules:
+    - Disabled entirely when ENVIRONMENT == "production" (regardless of token).
+    - Requires a valid X-Debug-Token header matching ORCHESTRATOR_DEBUG_SECRET
+      in all other environments.
+    - Returns 403 Forbidden if either condition is not met.
+    """
+    from ..config.settings import settings
+
+    if settings.ENVIRONMENT == "production":
+        raise HTTPException(
+            status_code=403,
+            detail="Debug endpoints are disabled in production.",
+        )
+
+    debug_secret = os.environ.get("ORCHESTRATOR_DEBUG_SECRET", "")
+    if not debug_secret:
+        raise HTTPException(
+            status_code=503,
+            detail="Debug endpoint unavailable: ORCHESTRATOR_DEBUG_SECRET is not configured.",
+        )
+
+    if not x_debug_token or x_debug_token != debug_secret:
+        logger.warning("Unauthorised /debug endpoint access attempt")
+        raise HTTPException(
+            status_code=403,
+            detail="Invalid or missing X-Debug-Token header.",
+        )
+
+
+@router.get("/debug/llm", dependencies=[Depends(_require_debug_access)])
 async def debug_llm() -> dict:
-    """Diagnose LLM provider configuration and connectivity."""
+    """
+    Diagnose LLM provider configuration and connectivity.
+
+    Restricted to non-production environments and requires a valid
+    X-Debug-Token header matching the ORCHESTRATOR_DEBUG_SECRET env var.
+    """
     from ..config.settings import settings
     from ..services.llm_provider import get_provider, _detect_provider_from_env
 
@@ -249,7 +288,7 @@ async def debug_llm() -> dict:
     try:
         provider = get_provider()
         info["provider_loaded"] = type(provider).__name__
-        # Quick test call
+        # Quick test call — intentionally generic prompt (no user data)
         response = provider.messages_create(
             model=settings.SCORING_MODEL,
             max_tokens=20,
@@ -277,44 +316,6 @@ async def version() -> dict:
         "version": settings.SERVICE_VERSION,
         "environment": settings.ENVIRONMENT,
     }
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Content-generation routes
-# ─────────────────────────────────────────────────────────────────────────────
-
-# DEPRECATED — podcast generation extracted to standalone product.
-# These models and routes are preserved for reference only.
-#
-# class VoicePreferences(BaseModel):
-#     primary_voice_id: Optional[str] = None
-#     secondary_voice_id: Optional[str] = None
-#
-# class GeneratePodcastRequest(BaseModel):
-#     podcast_id: str
-#     episode_id: str
-#     title: str
-#     source_urls: List[str] = []
-#     voice_preferences: Optional[VoicePreferences] = None
-#     format: Literal["monologue", "dialogue"] = "monologue"
-#
-# class GeneratePodcastResponse(BaseModel):
-#     episode_id: str
-#     status: str
-#     script: str
-#     estimated_duration_seconds: int
-#     estimated_cost_usdc: float
-#     estimated_time_seconds: int
-#
-# @router.post("/podcasts/generate", response_model=GeneratePodcastResponse)
-# async def generate_podcast_episode(request: GeneratePodcastRequest) -> GeneratePodcastResponse:
-#     """DEPRECATED — podcast generation extracted to standalone product."""
-#     raise HTTPException(status_code=410, detail="Podcast generation has moved to a standalone product.")
-#
-# @router.get("/podcasts/{episode_id}/status")
-# async def get_podcast_episode_status(episode_id: str) -> dict:
-#     """DEPRECATED — podcast generation extracted to standalone product."""
-#     raise HTTPException(status_code=410, detail="Podcast generation has moved to a standalone product.")
 
 
 class SummaryRequest(BaseModel):

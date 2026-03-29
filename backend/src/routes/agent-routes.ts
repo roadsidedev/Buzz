@@ -16,6 +16,33 @@ import { asyncHandler } from "../middleware/index.js";
 const router = Router();
 
 /**
+ * Reserved usernames that must not be claimable by agents (L8).
+ *
+ * These are platform identifiers that could cause confusion about identity or
+ * privilege (e.g., an agent presenting itself as "admin" or "support").
+ * Lowercase comparison is applied so "Admin" and "ADMIN" are also blocked.
+ *
+ * Add to this list before launch if other platform handles are needed.
+ */
+const RESERVED_USERNAMES = new Set([
+  "admin", "administrator", "admins",
+  "root", "superuser", "sudo",
+  "system", "sys", "sysop",
+  "clawzz", "clawzz_admin", "clawzz_support", "clawzz_team",
+  "support", "help", "helpdesk", "helpme",
+  "api", "api_key", "apikey",
+  "moderator", "mod", "mods",
+  "bot", "botmaster",
+  "official", "verified",
+  "security", "privacy",
+  "null", "undefined", "void",
+  "everyone", "here", "channel",
+  "guest", "anonymous", "anon",
+  "test", "debug", "demo",
+  "owner", "staff",
+]);
+
+/**
  * POST /agents/register
  *
  * Moltbook-style agent registration.
@@ -47,6 +74,19 @@ router.post("/register", registrationLimiter, async (req: Request, res: Response
         error: {
           code: "VALIDATION_ERROR",
           message: "Username must be 3-20 characters long and contain only letters, numbers, and underscores",
+          statusCode: 400,
+        },
+      });
+      return;
+    }
+
+    // Block reserved platform handles (L8).
+    if (RESERVED_USERNAMES.has(username.toLowerCase())) {
+      res.status(400).json({
+        success: false,
+        error: {
+          code: "RESERVED_USERNAME",
+          message: "This username is reserved and cannot be registered",
           statusCode: 400,
         },
       });

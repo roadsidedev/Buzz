@@ -76,24 +76,67 @@ class APIGatewayClient:
 
     async def get_messages_batch(self, message_ids: list[str]) -> list[Message]:
         """
-        Fetch multiple messages from API Gateway (batch).
+        Fetch multiple messages from API Gateway in a single HTTP request (H10).
+
+        Uses GET /api/v1/messages/batch?ids=<csv> which resolves all IDs in one
+        DB query instead of N individual round-trips.  Falls back to sequential
+        per-ID fetches only when the batch endpoint returns a non-2xx status so
+        that the orchestrator continues to work against older backend versions.
 
         Args:
-            message_ids: List of message UUIDs
+            message_ids: List of message UUIDs (max 500 per call)
 
         Returns:
-            List of Message objects (in same order as input)
-
-        Raises:
-            httpx.HTTPError: If API call fails
+            List of Message objects in the same order as message_ids;
+            IDs that were not found are silently omitted.
         """
         if not message_ids:
             return []
 
-        # For MVP, call get_message individually
-        # TODO: Phase 3 will add batch endpoint to Phase 1
-        # GET /api/v1/messages/batch?ids=msg-001,msg-002,msg-003
+        # Attempt the single-round-trip batch endpoint first.
+        try:
+            ids_param = ",".join(message_ids)
+            response = await self.client.get(
+                "/api/v1/messages/batch",
+                params={"ids": ids_param},
+                headers={"Accept": "application/json"},
+            )
 
+            if response.status_code == 200:
+                payload = response.json()
+                items = payload.get("data", [])
+                messages: list[Message] = []
+                for item in items:
+                    try:
+                        messages.append(Message(**item))
+                    except Exception as parse_err:
+                        logger.warning(
+                            "Skipping unparseable message in batch response",
+                            extra={"error": str(parse_err)},
+                        )
+                logger.info(
+                    "Batch message fetch succeeded",
+                    extra={
+                        "requested": len(message_ids),
+                        "returned": len(messages),
+                    },
+                )
+                return messages
+
+            # Batch endpoint returned an error status — fall through to
+            # sequential fallback so we degrade gracefully.
+            logger.warning(
+                "Batch endpoint returned non-200; falling back to sequential fetch",
+                extra={"status_code": response.status_code},
+            )
+
+        except httpx.HTTPError as e:
+            logger.warning(
+                "Batch endpoint unreachable; falling back to sequential fetch",
+                extra={"error": str(e)},
+            )
+
+        # Sequential fallback — preserves compatibility with older backend builds.
         messages = []
         for msg_id in message_ids:
             try:
@@ -105,7 +148,6 @@ class APIGatewayClient:
                     "Skipping failed message fetch",
                     extra={"message_id": msg_id, "error": str(e)},
                 )
-                continue
 
         return messages
 
