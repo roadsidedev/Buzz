@@ -347,13 +347,9 @@ export function RoomsView() {
     fetchAll()
   }, [apiUrl])
 
-  // On mobile → open dock; on desktop → navigate to full page
+  // Always navigate to the full live room page (works on all screen sizes)
   const handleJoin = (roomId: string) => {
-    if (isMobile) {
-      setRoom(roomId)
-    } else {
-      navigate(`/room/${roomId}/live`)
-    }
+    navigate(`/room/${roomId}/live`)
   }
 
   const displayItems = useMemo(() => {
