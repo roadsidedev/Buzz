@@ -13,6 +13,7 @@
     "format": "prettier --write \"src/**/*.ts\""
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.80.0",
     "@circle-fin/developer-controlled-wallets": "^10.1.0",
     "@noble/ed25519": "^3.0.0",
     "@opentelemetry/auto-instrumentations-node": "^0.40.1",

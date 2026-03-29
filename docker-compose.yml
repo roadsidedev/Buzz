@@ -32,6 +32,7 @@ services:
 
   # ============================================
   # API GATEWAY (Node.js Express)
+  # Scoring/orchestration logic now runs in-process — no separate service needed.
   # ============================================
   backend:
     build:
@@ -45,8 +46,17 @@ services:
       - DATABASE_URL=${DATABASE_URL}
       - REDIS_URL=${REDIS_URL:-redis://redis:6379}
       - JWT_SECRET=${JWT_SECRET}
-      - ORCHESTRATOR_URL=${ORCHESTRATOR_URL:-http://orchestrator:5000}
       - GCP_PROJECT_ID=${GCP_PROJECT_ID}
+      # LLM provider for in-process scoring (moved from orchestrator service)
+      - SCORING_LLM_PROVIDER=${SCORING_LLM_PROVIDER:-anthropic}
+      - SCORING_LLM_API_KEY=${ANTHROPIC_API_KEY}
+      - SCORING_LLM_BASE_URL=${SCORING_LLM_BASE_URL:-}
+      - SCORING_MODEL=${SCORING_MODEL:-claude-3-5-sonnet-20241022}
+      - MODERATION_MODEL=${MODERATION_MODEL:-claude-3-5-haiku-20241022}
+      - MAX_CANDIDATES_PER_TURN=${MAX_CANDIDATES_PER_TURN:-10}
+      - MIN_SCORE_THRESHOLD=${MIN_SCORE_THRESHOLD:-50.0}
+      - BANKR_API_KEY=${BANKR_API_KEY:-}
+      - ACTIVE_LLM_GATEWAY=${ACTIVE_LLM_GATEWAY:-primary}
       # Self-hosted Jam configuration
       - PANTRY_URL=http://pantry:3000
       - JAM_SELF_HOSTED_ENABLED=${JAM_SELF_HOSTED_ENABLED:-true}
@@ -64,8 +74,6 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-      orchestrator:
-        condition: service_healthy
       pantry:
         condition: service_healthy
     volumes:
@@ -78,47 +86,7 @@ services:
     networks:
       # Backend bridges the public-facing layer and the internal data layer (M13).
       - frontend-net   # reachable by the frontend container
-      - backend-net    # reaches postgres, redis, orchestrator, pantry
-
-  # ============================================
-  # ORCHESTRATOR (Python FastAPI)
-  # ============================================
-  orchestrator:
-    build:
-      context: .
-      dockerfile: orchestrator/Dockerfile
-    container_name: clawzz-orchestrator
-    ports:
-      - "5000:5000"
-    environment:
-      - ORCHESTRATOR_PORT=${ORCHESTRATOR_PORT:-5000}
-      - ORCHESTRATOR_HOST=${ORCHESTRATOR_HOST:-0.0.0.0}
-      - DATABASE_URL=${DATABASE_URL}
-      - REDIS_URL=${REDIS_URL:-redis://redis:6379}
-      # LLM Provider configuration (required for orchestrator to function)
-      - LLM_PROVIDER=${LLM_PROVIDER:-nvidia}
-      - LLM_API_KEY=${NVIDIA_API_KEY}
-      - LLM_API_URL=${LLM_API_URL:-}
-      # Legacy API keys (optional, for fallback)
-      - CLAUDE_API_KEY=${CLAUDE_API_KEY}
-      - NVIDIA_API_KEY=${NVIDIA_API_KEY}
-      - LOG_LEVEL=${LOG_LEVEL:-debug}
-      - GCP_PROJECT_ID=${GCP_PROJECT_ID}
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    volumes:
-      - ./orchestrator/src:/app/src
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    networks:
-      # Orchestrator is internal-only; not reachable from frontend-net (M13).
-      - backend-net
+      - backend-net    # reaches postgres, redis, pantry
 
   # ============================================
   # JAM STACK - SELF HOSTED AUDIO ROOMS
@@ -284,7 +252,7 @@ volumes:
 
 # ── Network topology (M13) ─────────────────────────────────────────────────
 # frontend-net: browser-tier — frontend ↔ backend only; no DB/Redis exposure.
-# backend-net:  data-tier    — backend, orchestrator, pantry, postgres, redis.
+# backend-net:  data-tier    — backend, pantry, postgres, redis.
 #               The frontend container is explicitly absent from this network.
 # audio-net:    audio-tier   — coturn, pantry, pantry-sfu, nginx-rtmp.
 #               No database access from TURN infrastructure.
