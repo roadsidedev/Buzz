@@ -193,15 +193,12 @@ export function useJamRoom(options: UseJamRoomOptions): UseJamRoomReturn {
     }
   }, [autoJoin, inRoom, isLoading, error, connect]);
 
-  // Force re-render on state changes using the documented jam-core api.onState API.
-  // api.onState(undefined, listener) subscribes to ALL state changes and returns an unsubscribe fn.
-  const [, forceUpdate] = useState({});
+  // Poll jam state every 100 ms to pick up changes from jam-core's minimal-state.
+  // minimal-state mutates the state object in-place; we just need React to re-read it.
+  const [, setTick] = useState(0);
   useEffect(() => {
-    if (jamRef.current) {
-      const [, jamApi] = jamRef.current;
-      const unsubscribe = (jamApi as any).onState?.(undefined, () => forceUpdate({}));
-      return typeof unsubscribe === "function" ? unsubscribe : undefined;
-    }
+    const id = setInterval(() => setTick((t) => t + 1), 100);
+    return () => clearInterval(id);
   }, []);
 
   return {
