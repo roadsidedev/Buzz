@@ -749,7 +749,7 @@ export function RoomLivePage() {
               </div>
             ) : (
               <div className="relative z-10 w-full max-w-4xl mx-auto mt-8 flex-grow">
-                <div className="flex justify-center flex-wrap gap-x-12 gap-y-16">
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8 justify-items-center">
                   {stageParticipants.map((p, idx) => (
                     <SpeakerTile
                       key={p.id}
@@ -772,7 +772,7 @@ export function RoomLivePage() {
                   <span className="font-black text-[11px] uppercase tracking-[0.2em] text-muted-foreground/60">Listeners</span>
                   <span className="text-[10px] font-bold text-muted-foreground/40">{listenerProfiles.length}</span>
                 </div>
-                <div className="flex flex-wrap gap-x-8 gap-y-6 justify-start px-2">
+                <div className="grid grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-x-6 gap-y-4 px-2">
                   {listenerProfiles.map((p) => (
                     <div key={p.id} className="flex flex-col items-center gap-2 group cursor-pointer">
                       <div className="relative">
@@ -812,9 +812,9 @@ export function RoomLivePage() {
                 className={cn(
                   "w-16 h-16 rounded-full border-2 flex items-center justify-center transition-all duration-200 shadow-lg",
                   !jamRoom.inRoom
-                    ? "border-white/10 text-white/20 cursor-default"
+                    ? "border-border text-foreground/25 cursor-default"
                     : jamRoom.isSoundMuted
-                      ? "border-amber-500 bg-amber-500/20 text-amber-400 shadow-amber-500/20 animate-pulse"
+                      ? "border-amber-500 bg-amber-500/20 text-amber-600 dark:text-amber-400 shadow-amber-500/20 animate-pulse"
                       : "border-violet-500 bg-violet-600 text-white shadow-violet-500/40",
                 )}
                 aria-label={jamRoom.isSoundMuted ? "Unmute audio" : "Mute audio"}
@@ -830,10 +830,10 @@ export function RoomLivePage() {
                 className={cn(
                   "w-12 h-12 rounded-full border-2 flex items-center justify-center transition-all duration-200",
                   !jamRoom.inRoom
-                    ? "border-white/10 text-white/20 cursor-default"
+                    ? "border-border text-foreground/25 cursor-default"
                     : jamRoom.isMuted
-                      ? "border-white/20 bg-white/5 text-white/40"
-                      : "border-white/30 bg-white/5 text-white/60",
+                      ? "border-border bg-muted text-foreground/50"
+                      : "border-violet-400/60 bg-violet-500/10 text-violet-600 dark:text-violet-400",
                 )}
                 aria-label={jamRoom.isMuted ? "Unmute mic" : "Mute mic"}
               >
@@ -843,7 +843,7 @@ export function RoomLivePage() {
               <button
                 type="button"
                 onClick={() => requireAuth(() => setShowTipModal(true))}
-                className="flex items-center gap-1.5 text-white/40 hover:text-green-400 transition-colors bg-white/5 hover:bg-green-500/10 px-4 py-2 rounded-full"
+                className="flex items-center gap-1.5 text-muted-foreground hover:text-green-600 dark:hover:text-green-400 transition-colors bg-muted hover:bg-green-500/10 px-4 py-2 rounded-full"
                 aria-label="Tip"
               >
                 <DollarSign size={16} />
@@ -854,36 +854,36 @@ export function RoomLivePage() {
                 <button
                   type="button"
                   onClick={startRecording}
-                  className="flex items-center gap-1.5 text-white/25 hover:text-white/50 transition-colors bg-white/5 hover:bg-white/10 px-4 py-2 rounded-full"
+                  className="flex items-center gap-1.5 text-muted-foreground/50 hover:text-foreground/70 transition-colors bg-muted hover:bg-muted/80 px-4 py-2 rounded-full"
                 >
                   <span className="w-1.5 h-1.5 rounded-full border border-current" />
                   <span className="text-xs uppercase tracking-widest">Start Rec</span>
                 </button>
               )}
               {recordingUploading && (
-                <span className="text-[11px] text-white/30 uppercase tracking-widest">Saving…</span>
+                <span className="text-[11px] text-muted-foreground/60 uppercase tracking-widest">Saving…</span>
               )}
             </div>
           </div>
 
           {/* ── MIDDLE: Listeners ── */}
-          <div className="w-[200px] shrink-0 border-l border-white/8 flex flex-col overflow-hidden">
-            <div className="px-4 py-3 border-b border-white/8 shrink-0 flex items-center justify-between">
-              <span className="font-black text-[11px] uppercase tracking-widest text-white/30">Listeners</span>
-              <span className="text-[10px] font-bold text-white/20">{totalListeners}</span>
+          <div className="w-[200px] shrink-0 border-l border-border flex flex-col overflow-hidden">
+            <div className="px-4 py-3 border-b border-border shrink-0 flex items-center justify-between">
+              <span className="font-black text-[11px] uppercase tracking-widest text-muted-foreground">Listeners</span>
+              <span className="text-[10px] font-bold text-muted-foreground/60">{totalListeners}</span>
             </div>
             <div className="flex-grow overflow-y-auto p-3 space-y-2 scrollbar-hide">
               {listenerProfiles.length === 0 && (
-                <p className="text-[11px] text-white/20 text-center mt-6">No listeners yet</p>
+                <p className="text-[11px] text-muted-foreground/60 text-center mt-6">No listeners yet</p>
               )}
               {listenerProfiles.map((p) => (
                 <div key={p.id} className="flex items-center gap-2">
                   <img
                     src={p.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${p.id}`}
-                    className="w-7 h-7 rounded-full border border-white/10 bg-white/5"
+                    className="w-7 h-7 rounded-full border border-border bg-muted"
                     alt="Listener"
                   />
-                  <span className="text-xs text-white/40 font-medium truncate">{p.name.split(' ')[0]}</span>
+                  <span className="text-xs text-foreground/60 font-medium truncate">{p.name.split(' ')[0]}</span>
                 </div>
               ))}
             </div>
@@ -1002,8 +1002,8 @@ export function RoomLivePage() {
 
       {/* ── Room title + category ── */}
       <div className="px-5 pb-2">
-        <h1 className="text-xl font-bold text-white leading-snug mb-2 line-clamp-2">{streamTitle}</h1>
-        <Badge variant="secondary" className="capitalize text-xs font-semibold bg-white/10 text-white/70 border-0">
+        <h1 className="text-xl font-bold text-foreground leading-snug mb-2 line-clamp-2">{streamTitle}</h1>
+        <Badge variant="secondary" className="capitalize text-xs font-semibold">
           {stream.category}
         </Badge>
       </div>
@@ -1013,7 +1013,7 @@ export function RoomLivePage() {
         <button
           type="button"
           onClick={jamRoom.toggleSoundMute}
-          className="mx-5 mb-4 flex items-center gap-3 w-full px-4 py-3 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-300 hover:bg-amber-500/25 transition-all duration-200"
+          className="mx-5 mb-4 flex items-center gap-3 w-full px-4 py-3 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-600 dark:text-amber-300 hover:bg-amber-500/25 transition-all duration-200"
         >
           <VolumeX size={16} className="shrink-0" />
           <span className="text-sm font-bold">Tap to hear the room</span>
@@ -1031,10 +1031,10 @@ export function RoomLivePage() {
         {jamRoom.isLoading ? (
           <div className="flex flex-col items-center gap-3 py-10">
             <div className="w-8 h-8 border-4 border-violet-500/30 border-t-violet-400 rounded-full animate-spin" />
-            <p className="text-xs text-white/40 animate-pulse tracking-widest uppercase">Connecting…</p>
+            <p className="text-xs text-muted-foreground/60 animate-pulse tracking-widest uppercase">Connecting…</p>
           </div>
         ) : stageParticipants.length === 0 ? (
-          <div className="flex flex-col items-center gap-3 py-10 text-white/20">
+          <div className="flex flex-col items-center gap-3 py-10 text-muted-foreground/40">
             <Headphones size={40} />
             <p className="text-xs uppercase tracking-widest">No speakers yet</p>
           </div>
@@ -1046,7 +1046,7 @@ export function RoomLivePage() {
               </div>
             )}
             {supporters.length > 0 && (
-              <div className="flex justify-center gap-8 flex-wrap">
+              <div className="grid grid-cols-3 gap-6 justify-items-center">
                 {supporters.map((p, idx) => (
                   <SpeakerTile
                     key={p.id}
@@ -1071,7 +1071,7 @@ export function RoomLivePage() {
         {listenerProfiles.length === 0 ? (
           <p className="text-[11px] text-muted-foreground/50 text-center mt-6 mb-4">No listeners yet</p>
         ) : (
-          <div className="flex flex-wrap gap-4 pb-4">
+          <div className="grid grid-cols-4 gap-3 pb-4">
             {listenerProfiles.map((p) => (
               <div key={p.id} className="flex flex-col items-center gap-1.5 w-[60px]">
                 <img
@@ -1097,13 +1097,13 @@ export function RoomLivePage() {
           </span>
         )}
         {recordingUploading && (
-          <span className="text-[11px] text-white/40 uppercase tracking-widest">Saving…</span>
+          <span className="text-[11px] text-muted-foreground/60 uppercase tracking-widest">Saving…</span>
         )}
         {!isRecording && !recordingUploading && stream?.recordingEnabled && jamRoom.inRoom && (
           <button
             type="button"
             onClick={startRecording}
-            className="text-[11px] text-white/30 hover:text-white/50 uppercase tracking-widest transition-colors flex items-center gap-1.5"
+            className="text-[11px] text-muted-foreground/50 hover:text-foreground/70 uppercase tracking-widest transition-colors flex items-center gap-1.5"
           >
             <span className="w-1.5 h-1.5 rounded-full border border-current" />
             Start Rec
@@ -1112,36 +1112,46 @@ export function RoomLivePage() {
       </div>
 
       {/* ── Fixed bottom action bar ── */}
-      <div
-        className="fixed bottom-0 inset-x-0 backdrop-blur-sm border-t border-white/10 z-30"
-        style={{ background: "rgba(13,13,20,0.95)" }}
-      >
-        <div className="max-w-2xl mx-auto px-6 py-3 flex items-center justify-between">
+      <div className="fixed bottom-0 inset-x-0 backdrop-blur-sm border-t border-border z-30 bg-background/95">
+        <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
           <button type="button" onClick={handleLeave} className="flex flex-col items-center gap-0.5 text-red-400 hover:text-red-300 transition-colors" aria-label="Leave">
             <PhoneOff size={20} />
             <span className="text-[9px] font-bold uppercase tracking-wide">Leave</span>
           </button>
-          <button type="button" onClick={() => requireAuth(() => setShowTipModal(true))} className="flex flex-col items-center gap-0.5 text-white/50 hover:text-green-400 transition-colors" aria-label="Tip">
-            <DollarSign size={22} />
-            <span className="text-[9px] font-bold uppercase tracking-wide">Tip</span>
+          {/* Mic mute */}
+          <button
+            type="button"
+            onClick={jamRoom.inRoom ? jamRoom.toggleMute : undefined}
+            className={cn(
+              "flex flex-col items-center gap-0.5 transition-colors",
+              !jamRoom.inRoom
+                ? "text-foreground/25 cursor-default"
+                : jamRoom.isMuted
+                  ? "text-red-400"
+                  : "text-muted-foreground hover:text-foreground/80",
+            )}
+            aria-label={jamRoom.isMuted ? "Unmute mic" : "Mute mic"}
+          >
+            {jamRoom.isMuted ? <MicOff size={20} /> : <Mic size={20} />}
+            <span className="text-[9px] font-bold uppercase tracking-wide">Mic</span>
           </button>
           {/* Speaker mute — primary CTA on mobile */}
           <button
             type="button"
             onClick={jamRoom.inRoom ? jamRoom.toggleSoundMute : undefined}
             className={cn(
-              "w-16 h-16 rounded-full border-2 flex items-center justify-center transition-all duration-200 shadow-lg",
+              "w-14 h-14 rounded-full border-2 flex items-center justify-center transition-all duration-200 shadow-lg",
               !jamRoom.inRoom
-                ? "border-white/10 text-white/20 cursor-default"
+                ? "border-border text-foreground/25 cursor-default"
                 : jamRoom.isSoundMuted
-                  ? "border-amber-500 bg-amber-500/20 text-amber-400 shadow-amber-500/20 animate-pulse"
+                  ? "border-amber-500 bg-amber-500/20 text-amber-600 dark:text-amber-400 shadow-amber-500/20 animate-pulse"
                   : "border-violet-500 bg-violet-600 text-white shadow-violet-500/40",
             )}
             aria-label={jamRoom.isSoundMuted ? "Unmute audio" : "Mute audio"}
           >
-            {jamRoom.isSoundMuted ? <VolumeX size={24} /> : <Volume2 size={24} />}
+            {jamRoom.isSoundMuted ? <VolumeX size={22} /> : <Volume2 size={22} />}
           </button>
-          <button type="button" onClick={() => setShowChat(true)} className="relative flex flex-col items-center gap-0.5 text-white/50 hover:text-white/80 transition-colors" aria-label="Chat">
+          <button type="button" onClick={() => setShowChat(true)} className="relative flex flex-col items-center gap-0.5 text-muted-foreground hover:text-foreground/80 transition-colors" aria-label="Chat">
             <MessageSquare size={22} />
             <span className="text-[9px] font-bold uppercase tracking-wide">Chat</span>
             {chat.length > 0 && (
@@ -1150,9 +1160,9 @@ export function RoomLivePage() {
               </span>
             )}
           </button>
-          <button type="button" onClick={() => setShareWizardOpen(true)} className="flex flex-col items-center gap-0.5 text-white/50 hover:text-white/80 transition-colors" aria-label="Share">
-            <Share2 size={22} />
-            <span className="text-[9px] font-bold uppercase tracking-wide">Share</span>
+          <button type="button" onClick={() => requireAuth(() => setShowTipModal(true))} className="flex flex-col items-center gap-0.5 text-muted-foreground hover:text-green-600 dark:hover:text-green-400 transition-colors" aria-label="Tip">
+            <DollarSign size={22} />
+            <span className="text-[9px] font-bold uppercase tracking-wide">Tip</span>
           </button>
         </div>
       </div>
