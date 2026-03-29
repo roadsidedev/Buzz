@@ -17,23 +17,23 @@ import { getLLMClient } from "./llm-provider.js";
 import type { ScoringMessage, ScoringContext, ScoringResult } from "./types.js";
 import { logger } from "../../utils/logger.js";
 
-// ─── Config (overrideable via env) ────────────────────────────────────────────
+// ─── Config ───────────────────────────────────────────────────────────────────
+// Model names are the only things that should vary between deployments.
+// All tuning constants are encoded here — not in environment variables.
 
 const SCORING_MODEL = process.env.SCORING_MODEL ?? "claude-3-5-sonnet-20241022";
-const SCORING_TIMEOUT_MS = parseInt(process.env.SCORING_TIMEOUT_SECONDS ?? "10", 10) * 1000;
-const SCORING_RETRY_ATTEMPTS = parseInt(process.env.SCORING_RETRY_ATTEMPTS ?? "3", 10);
-const SCORING_RETRY_DELAY_MS = 1000;
+const SCORING_TIMEOUT_MS = 10_000;   // 10 seconds per LLM call
+const SCORING_RETRY_ATTEMPTS = 3;
+const SCORING_RETRY_DELAY_MS = 1_000;
 const FALLBACK_SCORE = 50;
 
-function weights() {
-  return {
-    relevance: parseFloat(process.env.SCORING_WEIGHT_RELEVANCE ?? "0.35"),
-    novelty: parseFloat(process.env.SCORING_WEIGHT_NOVELTY ?? "0.25"),
-    coherence: parseFloat(process.env.SCORING_WEIGHT_COHERENCE ?? "0.20"),
-    actionability: parseFloat(process.env.SCORING_WEIGHT_ACTIONABILITY ?? "0.15"),
-    engagement: parseFloat(process.env.SCORING_WEIGHT_ENGAGEMENT ?? "0.05"),
-  };
-}
+const WEIGHTS = {
+  relevance:     0.35,
+  novelty:       0.25,
+  coherence:     0.20,
+  actionability: 0.15,
+  engagement:    0.05,
+} as const;
 
 // ─── Prompt sanitizer (minimal injection prevention) ─────────────────────────
 
@@ -90,8 +90,7 @@ export class ScoringEngine {
     messages: ScoringMessage[],
     context: ScoringContext,
   ): Promise<ScoringResult[]> {
-    const maxCandidates = parseInt(process.env.MAX_CANDIDATES_PER_TURN ?? "10", 10);
-    const candidates = messages.slice(0, maxCandidates);
+    const candidates = messages.slice(0, 10);
 
     if (candidates.length === 0) return [];
 
@@ -246,7 +245,7 @@ Respond ONLY with valid JSON.`;
 
     const data = JSON.parse(json) as Record<string, unknown>; // throws on invalid JSON → triggers retry
 
-    const w = weights();
+    const w = WEIGHTS;
     const missing: string[] = [];
 
     const score = (key: string): number => {

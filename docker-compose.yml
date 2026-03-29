@@ -47,16 +47,14 @@ services:
       - REDIS_URL=${REDIS_URL:-redis://redis:6379}
       - JWT_SECRET=${JWT_SECRET}
       - GCP_PROJECT_ID=${GCP_PROJECT_ID}
-      # LLM provider for in-process scoring (moved from orchestrator service)
-      - SCORING_LLM_PROVIDER=${SCORING_LLM_PROVIDER:-anthropic}
-      - SCORING_LLM_API_KEY=${ANTHROPIC_API_KEY}
-      - SCORING_LLM_BASE_URL=${SCORING_LLM_BASE_URL:-}
+      # LLM provider for in-process scoring
+      # Set LLM_PROVIDER to: anthropic | openai | nvidia | kimi | openrouter | none
+      - LLM_PROVIDER=${LLM_PROVIDER:-anthropic}
+      - LLM_API_KEY=${LLM_API_KEY}
+      - LLM_BASE_URL=${LLM_BASE_URL:-}
       - SCORING_MODEL=${SCORING_MODEL:-claude-3-5-sonnet-20241022}
       - MODERATION_MODEL=${MODERATION_MODEL:-claude-3-5-haiku-20241022}
-      - MAX_CANDIDATES_PER_TURN=${MAX_CANDIDATES_PER_TURN:-10}
-      - MIN_SCORE_THRESHOLD=${MIN_SCORE_THRESHOLD:-50.0}
       - BANKR_API_KEY=${BANKR_API_KEY:-}
-      - ACTIVE_LLM_GATEWAY=${ACTIVE_LLM_GATEWAY:-primary}
       # Self-hosted Jam configuration
       - PANTRY_URL=http://pantry:3000
       - JAM_SELF_HOSTED_ENABLED=${JAM_SELF_HOSTED_ENABLED:-true}

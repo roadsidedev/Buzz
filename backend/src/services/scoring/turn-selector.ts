@@ -13,7 +13,7 @@
 import type { RoomStateData, ScoringResult, TurnSelection } from "./types.js";
 import { logger } from "../../utils/logger.js";
 
-const MIN_SCORE_THRESHOLD = parseFloat(process.env.MIN_SCORE_THRESHOLD ?? "50.0");
+const MIN_SCORE_THRESHOLD = 50.0;
 
 export class TurnSelector {
   /**

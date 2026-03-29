@@ -3,7 +3,15 @@
  *
  * Provider-agnostic LLM client for message scoring and moderation.
  * Supports Anthropic (primary), OpenAI-compatible providers (OpenAI, NVIDIA NIM,
- * Kimi, OpenRouter), and Bankr gateway fallback — mirroring llm_provider.py.
+ * Kimi, OpenRouter), and Bankr gateway fallback.
+ *
+ * Configuration (3 env vars, all you need):
+ *   LLM_PROVIDER=anthropic|openai|nvidia|kimi|openrouter|none  (default: anthropic)
+ *   LLM_API_KEY=<your provider key>
+ *   LLM_BASE_URL=<base URL for OpenAI-compat providers, optional>
+ *
+ * Optional Bankr fallback:
+ *   BANKR_API_KEY=<bankr key>
  *
  * Usage:
  *   const client = getLLMClient();
@@ -103,14 +111,14 @@ class OpenAICompatClient implements LLMClient {
 
 // ─── Bankr gateway wrapper ────────────────────────────────────────────────────
 
-const BANKR_BASE_URL = "https://llm.bankr.bot";
+const BANKR_DEFAULT_URL = "https://llm.bankr.bot";
 
 class BankrClient implements LLMClient {
   private inner: LLMClient;
   private bankrKey: string;
   private bankrUrl: string;
 
-  constructor(inner: LLMClient, bankrKey: string, bankrUrl: string = BANKR_BASE_URL) {
+  constructor(inner: LLMClient, bankrKey: string, bankrUrl: string = BANKR_DEFAULT_URL) {
     this.inner = inner;
     this.bankrKey = bankrKey;
     this.bankrUrl = bankrUrl;
@@ -123,8 +131,6 @@ class BankrClient implements LLMClient {
       logger.warn("Primary LLM failed, falling back to Bankr gateway", {
         error: primaryErr instanceof Error ? primaryErr.message : String(primaryErr),
       });
-
-      // Bankr exposes an OpenAI-compat endpoint
       const bankr = new OpenAICompatClient(this.bankrUrl, this.bankrKey);
       return bankr.messagesCreate(params);
     }
@@ -136,50 +142,48 @@ class BankrClient implements LLMClient {
 let _client: LLMClient | null = null;
 
 function _buildClient(): LLMClient {
-  const provider = (process.env.SCORING_LLM_PROVIDER ?? "anthropic").toLowerCase();
-  const apiKey = process.env.SCORING_LLM_API_KEY ?? "";
-  const baseUrl = process.env.SCORING_LLM_BASE_URL ?? "";
+  const provider = (process.env.LLM_PROVIDER ?? "anthropic").toLowerCase();
+  const apiKey   = process.env.LLM_API_KEY ?? "";
+  const baseUrl  = process.env.LLM_BASE_URL ?? "";
   const bankrKey = process.env.BANKR_API_KEY ?? "";
-  const bankrUrl = process.env.BANKR_BASE_URL ?? BANKR_BASE_URL;
-  const activeGateway = process.env.ACTIVE_LLM_GATEWAY ?? "primary";
+  const bankrUrl = process.env.BANKR_BASE_URL ?? BANKR_DEFAULT_URL;
 
   let primary: LLMClient;
 
   if (provider === "anthropic") {
+    // Fall back to common Anthropic key names if LLM_API_KEY is not set
     const key = apiKey || process.env.ANTHROPIC_API_KEY || process.env.CLAUDE_API_KEY || "";
     if (!key) {
-      logger.warn("No Anthropic API key found (ANTHROPIC_API_KEY / CLAUDE_API_KEY / SCORING_LLM_API_KEY). Scoring will use fallback scores.");
+      logger.warn("No API key found for Anthropic provider. Set LLM_API_KEY. Scoring will use fallback scores.");
     }
     primary = new AnthropicClient(key);
   } else if (provider === "none") {
-    // Degraded mode — no LLM available
-    logger.warn("SCORING_LLM_PROVIDER=none — all scoring calls will use fallback scores.");
+    logger.warn("LLM_PROVIDER=none — all scoring calls will use fallback scores.");
     primary = {
       async messagesCreate(): Promise<LLMMessage> {
-        throw new Error("LLM provider disabled (SCORING_LLM_PROVIDER=none)");
+        throw new Error("LLM provider disabled (LLM_PROVIDER=none)");
       },
     };
   } else {
-    // OpenAI-compat: openai, nvidia, kimi, openrouter
+    // OpenAI-compat: openai, nvidia, kimi, openrouter, or any custom provider
     const effectiveKey = apiKey ||
-      (provider === "nvidia" ? process.env.NVIDIA_API_KEY ?? "" : "") ||
-      (provider === "openai" ? process.env.OPENAI_API_KEY ?? "" : "");
+      (provider === "nvidia"     ? process.env.NVIDIA_API_KEY  ?? "" : "") ||
+      (provider === "openai"     ? process.env.OPENAI_API_KEY  ?? "" : "");
 
-    const effectiveUrl = baseUrl ||
-      (provider === "nvidia" ? "https://integrate.api.nvidia.com/v1" : "") ||
-      (provider === "kimi" ? "https://api.moonshot.cn/v1" : "") ||
-      (provider === "openrouter" ? "https://openrouter.ai/api/v1" : "") ||
-      "https://api.openai.com/v1";
+    // Default base URLs for known providers; override with LLM_BASE_URL
+    const defaultUrls: Record<string, string> = {
+      openai:     "https://api.openai.com/v1",
+      nvidia:     "https://integrate.api.nvidia.com/v1",
+      kimi:       "https://api.moonshot.cn/v1",
+      openrouter: "https://openrouter.ai/api/v1",
+    };
+    const effectiveUrl = baseUrl || defaultUrls[provider] || "https://api.openai.com/v1";
 
     primary = new OpenAICompatClient(effectiveUrl, effectiveKey);
   }
 
-  // Wrap with Bankr fallback if configured
-  if (bankrKey && activeGateway === "bankr") {
-    return new BankrClient(primary, bankrKey, bankrUrl);
-  }
+  // Wrap with Bankr fallback if a Bankr key is configured
   if (bankrKey) {
-    // bankrKey set but gateway is "primary" — Bankr acts as secondary fallback only
     return new BankrClient(primary, bankrKey, bankrUrl);
   }
 

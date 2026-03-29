@@ -29,7 +29,7 @@ import type {
 } from "./types.js";
 import { logger } from "../../utils/logger.js";
 
-const MAX_CANDIDATES = parseInt(process.env.MAX_CANDIDATES_PER_TURN ?? "10", 10);
+const MAX_CANDIDATES = 10;
 const SCORING_MODEL = process.env.SCORING_MODEL ?? "claude-3-5-sonnet-20241022";
 
 // ─── LocalOrchestratorAdapter ─────────────────────────────────────────────────
