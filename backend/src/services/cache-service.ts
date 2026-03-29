@@ -219,6 +219,15 @@ export class CacheService {
   }
 
   /**
+   * Expose underlying Redis client for modules that need direct Redis access
+   * (e.g. RoomStateStore in the scoring module).
+   * Returns null if Redis is unavailable.
+   */
+  getRedisClient(): RedisClientType | null {
+    return this.client;
+  }
+
+  /**
    * Graceful shutdown
    */
   async shutdown(): Promise<void> {
