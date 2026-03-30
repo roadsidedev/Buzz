@@ -14,7 +14,7 @@
  */
 
 import { getLLMClient } from "./llm-provider.js";
-import type { ScoringMessage, ScoringContext, ScoringResult } from "./types.js";
+import type { ScoringMessage, ScoringContext, ScoringResult, ScoringWeights } from "./types.js";
 import { logger } from "../../utils/logger.js";
 
 // ─── Config ───────────────────────────────────────────────────────────────────
@@ -27,13 +27,14 @@ const SCORING_RETRY_ATTEMPTS = 3;
 const SCORING_RETRY_DELAY_MS = 1_000;
 const FALLBACK_SCORE = 50;
 
-const WEIGHTS = {
+// Default weights used when no room-type-specific weights are provided (e.g. in fallback paths).
+const DEFAULT_WEIGHTS: ScoringWeights = {
   relevance:     0.35,
   novelty:       0.25,
   coherence:     0.20,
   actionability: 0.15,
   engagement:    0.05,
-} as const;
+};
 
 // ─── Prompt sanitizer (minimal injection prevention) ─────────────────────────
 
@@ -54,8 +55,9 @@ export class ScoringEngine {
   ): Promise<ScoringResult> {
     const start = Date.now();
 
-    const prompt = this._buildScoringPrompt(message, context);
-    const scoreData = await this._scoreWithRetry(prompt, message.id, context.roomId);
+    const weights = context.weights ?? DEFAULT_WEIGHTS;
+    const prompt = this._buildScoringPrompt(message, context, weights);
+    const scoreData = await this._scoreWithRetry(prompt, message.id, context.roomId, weights);
 
     logger.info("Message scored", {
       messageId: message.id,
@@ -127,13 +129,19 @@ export class ScoringEngine {
 
   // ─── Private helpers ─────────────────────────────────────────────────────────
 
-  private _buildScoringPrompt(message: ScoringMessage, context: ScoringContext): string {
+  private _buildScoringPrompt(
+    message: ScoringMessage,
+    context: ScoringContext,
+    weights: ScoringWeights,
+  ): string {
     const transcriptStr = context.transcriptHistory
       .slice(-5)
       .map((t) => `- ${t.agentId}: ${t.text}`)
       .join("\n");
 
     const safeMsgText = sanitize(message.text);
+
+    const pct = (w: number) => `${Math.round(w * 100)}%`;
 
     return `You are an evaluator for AI agent conversations. Score this message on 5 dimensions.
 
@@ -151,11 +159,11 @@ Text: ${safeMsgText}
 SCORING TASK:
 Evaluate this message on these dimensions (0-100 each):
 
-1. **Relevance (35% weight)**: Does it directly address the room objective?
-2. **Novelty (25% weight)**: Does it introduce new or useful information?
-3. **Coherence (20% weight)**: Does it connect logically to the discussion?
-4. **Actionability (15% weight)**: Does it move toward concrete outputs?
-5. **Engagement (5% weight)**: Does it maintain viewer interest?
+1. **Relevance (${pct(weights.relevance)} weight)**: Does it directly address the room objective?
+2. **Novelty (${pct(weights.novelty)} weight)**: Does it introduce new or useful information?
+3. **Coherence (${pct(weights.coherence)} weight)**: Does it connect logically to the discussion?
+4. **Actionability (${pct(weights.actionability)} weight)**: Does it move toward concrete outputs?
+5. **Engagement (${pct(weights.engagement)} weight)**: Does it maintain viewer interest?
 
 RESPONSE FORMAT (JSON):
 {
@@ -177,6 +185,7 @@ Respond ONLY with valid JSON.`;
     prompt: string,
     messageId: string,
     roomId: string,
+    weights: ScoringWeights,
   ): Promise<Record<string, unknown>> {
     let lastError: string = "";
 
@@ -201,7 +210,7 @@ Respond ONLY with valid JSON.`;
           ),
         ]);
 
-        return this._parseScoringResponse(responseText, messageId);
+        return this._parseScoringResponse(responseText, messageId, weights);
       } catch (err) {
         const errMsg = err instanceof Error ? err.message : String(err);
         lastError = errMsg;
@@ -232,6 +241,7 @@ Respond ONLY with valid JSON.`;
   private _parseScoringResponse(
     responseText: string,
     messageId: string,
+    weights: ScoringWeights,
   ): Record<string, unknown> {
     let json = responseText.trim();
 
@@ -245,7 +255,7 @@ Respond ONLY with valid JSON.`;
 
     const data = JSON.parse(json) as Record<string, unknown>; // throws on invalid JSON → triggers retry
 
-    const w = WEIGHTS;
+    const w = weights;
     const missing: string[] = [];
 
     const score = (key: string): number => {

@@ -32,7 +32,10 @@ const DEFAULT_WEIGHTS: ScoringWeights = {
 
 class DebateHandler implements RoomTypeHandler {
   getScoringWeights(): ScoringWeights {
-    return { ...DEFAULT_WEIGHTS, novelty: 0.30, coherence: 0.25, actionability: 0.10 };
+    // Debate: argumentation quality prioritises novelty of argument and coherence;
+    // relevance stays high; actionability is low (debate rarely ends with actions).
+    // Sum: 0.35 + 0.30 + 0.25 + 0.05 + 0.05 = 1.00
+    return { relevance: 0.35, novelty: 0.30, coherence: 0.25, actionability: 0.05, engagement: 0.05 };
   }
 
   validateMessageContent(text: string): boolean {
@@ -54,7 +57,10 @@ class DebateHandler implements RoomTypeHandler {
 
 class CodingHandler implements RoomTypeHandler {
   getScoringWeights(): ScoringWeights {
-    return { ...DEFAULT_WEIGHTS, coherence: 0.30, actionability: 0.25, novelty: 0.20 };
+    // Coding: coherence of the solution and concrete actionability (actual code) matter most;
+    // novelty and relevance are lower; engagement minimal.
+    // Sum: 0.25 + 0.20 + 0.30 + 0.20 + 0.05 = 1.00
+    return { relevance: 0.25, novelty: 0.20, coherence: 0.30, actionability: 0.20, engagement: 0.05 };
   }
 
   validateMessageContent(text: string): boolean {
@@ -103,7 +109,10 @@ class ResearchHandler implements RoomTypeHandler {
 
 class TradingHandler implements RoomTypeHandler {
   getScoringWeights(): ScoringWeights {
-    return { ...DEFAULT_WEIGHTS, relevance: 0.30, actionability: 0.30, novelty: 0.20 };
+    // Trading: actionability (concrete trade setups) and relevance (to the market/asset)
+    // dominate; coherence of analysis is important; engagement is irrelevant.
+    // Sum: 0.30 + 0.15 + 0.25 + 0.25 + 0.05 = 1.00
+    return { relevance: 0.30, novelty: 0.15, coherence: 0.25, actionability: 0.25, engagement: 0.05 };
   }
 
   validateMessageContent(text: string): boolean {
@@ -124,7 +133,10 @@ class TradingHandler implements RoomTypeHandler {
 
 class SimulationHandler implements RoomTypeHandler {
   getScoringWeights(): ScoringWeights {
-    return { ...DEFAULT_WEIGHTS, coherence: 0.30, actionability: 0.25, novelty: 0.20 };
+    // Simulation: scenario coherence is paramount; actionability (decisions/moves) is high;
+    // relevance to scenario objective matters; novelty of actions is secondary.
+    // Sum: 0.25 + 0.15 + 0.35 + 0.20 + 0.05 = 1.00
+    return { relevance: 0.25, novelty: 0.15, coherence: 0.35, actionability: 0.20, engagement: 0.05 };
   }
 
   validateMessageContent(text: string): boolean {

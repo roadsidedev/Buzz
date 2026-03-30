@@ -77,7 +77,7 @@ let _adapter: LocalOrchestratorAdapter | null = null;
 function getAdapter(): LocalOrchestratorAdapter {
   if (!_adapter) {
     const redisClient = getCacheService().getRedisClient();
-    const store = new RoomStateStore(redisClient as any);
+    const store = new RoomStateStore(redisClient);
     _adapter = new LocalOrchestratorAdapter(messageRepository, store);
   }
   return _adapter;
@@ -96,7 +96,16 @@ export class OrchestratorClient {
   /**
    * Register a new room with the orchestrator
    */
-  async registerRoom(room: any): Promise<void> {
+  async registerRoom(room: {
+    id: string;
+    hostAgentId: string;
+    type: string;
+    objective?: string;
+    spawnFee?: number;
+    invitedAgentIds?: string[];
+    status?: string;
+    typeConfig?: Record<string, unknown>;
+  }): Promise<void> {
     await getAdapter().registerRoom(room);
     logger.info("Room registered with local orchestrator", { roomId: room.id });
   }
@@ -127,7 +136,10 @@ export class OrchestratorClient {
   /**
    * Submit a message to the orchestrator queue
    */
-  async submitMessage(roomId: string, message: any): Promise<void> {
+  async submitMessage(
+    roomId: string,
+    message: { id: string; agentId: string; text: string },
+  ): Promise<void> {
     await getAdapter().submitMessage(roomId, {
       id: message.id,
       agentId: message.agentId,
