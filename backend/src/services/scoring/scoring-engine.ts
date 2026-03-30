@@ -36,6 +36,20 @@ const DEFAULT_WEIGHTS: ScoringWeights = {
   engagement:    0.05,
 };
 
+// Internal typed representation of what the LLM returns (or the fallback produces).
+interface ScoringData {
+  relevance_score: number;
+  novelty_score: number;
+  coherence_score: number;
+  actionability_score: number;
+  engagement_score: number;
+  overall_score: number;
+  reasoning: string;
+  strengths: string[];
+  weaknesses: string[];
+  fallback_triggered?: boolean;
+}
+
 // ─── Prompt sanitizer (minimal injection prevention) ─────────────────────────
 
 function sanitize(text: string): string {
@@ -186,7 +200,7 @@ Respond ONLY with valid JSON.`;
     messageId: string,
     roomId: string,
     weights: ScoringWeights,
-  ): Promise<Record<string, unknown>> {
+  ): Promise<ScoringData> {
     let lastError: string = "";
 
     for (let attempt = 0; attempt < SCORING_RETRY_ATTEMPTS; attempt++) {
@@ -242,7 +256,7 @@ Respond ONLY with valid JSON.`;
     responseText: string,
     messageId: string,
     weights: ScoringWeights,
-  ): Record<string, unknown> {
+  ): ScoringData {
     let json = responseText.trim();
 
     // Unwrap markdown code blocks: ```json ... ``` or ``` ... ```
@@ -330,7 +344,7 @@ function _sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function _fallbackScoreData(): Record<string, unknown> {
+function _fallbackScoreData(): ScoringData {
   return {
     relevance_score: FALLBACK_SCORE,
     novelty_score: FALLBACK_SCORE,
