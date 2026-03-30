@@ -12,6 +12,7 @@
  *   - Saves ~2 HTTP round-trips per turn cycle (roughly 50–200 ms).
  */
 
+import { MessageStatus } from "@common/types/index.js";
 import type { MessageRepository } from "../../repositories/message-repository.js";
 import type { RoomStateStore } from "./room-state-store.js";
 import { ScoringEngine } from "./scoring-engine.js";
@@ -140,7 +141,7 @@ export class LocalOrchestratorAdapter {
     }
 
     // 2. Fetch candidate messages directly from DB (eliminates HTTP callback)
-    const candidates = await this.messageRepo.getByRoomAndStatus(roomId, "candidate" as any);
+    const candidates = await this.messageRepo.getByRoomAndStatus(roomId, MessageStatus.CANDIDATE);
     const limited = candidates.slice(0, MAX_CANDIDATES);
 
     if (limited.length === 0) {
@@ -177,12 +178,15 @@ export class LocalOrchestratorAdapter {
       scores.map((s, i) => this.moderationAgent.updateScoringForViolations(s, scoringMessages[i])),
     );
 
-    // 6. Update DB: mark all candidates as 'scored' or 'flagged' (no HTTP callback needed)
+    // 6. Update DB: mark all candidates as QUEUED (scored, awaiting turn selection) or
+    //    REJECTED (failed moderation). No HTTP callback needed.
     await Promise.all(
       scores.map((s) =>
-        this.messageRepo.updateStatus(s.messageId, s.isModerated ? ("flagged" as any) : ("scored" as any), {
-          score: s.overallScore,
-        }),
+        this.messageRepo.updateStatus(
+          s.messageId,
+          s.isModerated ? MessageStatus.REJECTED : MessageStatus.QUEUED,
+          { score: s.overallScore },
+        ),
       ),
     );
 
@@ -197,8 +201,8 @@ export class LocalOrchestratorAdapter {
       };
     }
 
-    // 8. Mark winner as 'selected' in DB
-    await this.messageRepo.updateStatus(selection.selectedMessageId, "selected" as any, {
+    // 8. Mark winner as SELECTED in DB
+    await this.messageRepo.updateStatus(selection.selectedMessageId, MessageStatus.SELECTED, {
       score: selection.score,
       selectedAt: selection.timestamp,
     });
@@ -323,13 +327,15 @@ export class LocalOrchestratorAdapter {
     const existing = await this.stateStore.getRoom(roomId);
     if (existing) return existing;
 
-    // Minimal state — will be filled in by registerRoom/startRoom but we need
-    // a safe default so processTurn doesn't crash on first call if Redis was wiped
+    // Minimal state — used when Redis was wiped after room creation.
+    // Status defaults to "pending" (not "live") so that processTurn() correctly
+    // returns an error instead of blindly processing messages for an unknown room.
+    // startRoom() will transition it to "live" if needed.
     const minimal: RoomStateData = {
       roomId,
       hostAgentId: "",
       roomType: "custom",
-      status: "live",
+      status: "pending",
       roomObjective: "",
       typeConfig: {},
       turnCount: 0,

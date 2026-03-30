@@ -14,7 +14,8 @@ import { logger } from "../../utils/logger.js";
 
 const MODERATION_MODEL = process.env.MODERATION_MODEL ?? "claude-3-5-haiku-20241022";
 
-const MODERATION_PROMPT = `You are a content safety evaluator. Analyze the following message for safety violations.
+function buildModerationPrompt(text: string): string {
+  return `You are a content safety evaluator. Analyze the following message for safety violations.
 
 Check for:
 - Hate speech or discrimination
@@ -25,7 +26,7 @@ Check for:
 - Adult/explicit content
 
 Message to evaluate:
-"{message}"
+"${text}"
 
 Respond ONLY with valid JSON:
 {
@@ -34,12 +35,13 @@ Respond ONLY with valid JSON:
   "explanation": "<brief explanation>",
   "confidence": <0.0-1.0>
 }`;
+}
 
 export class ModerationAgent {
   async scanMessage(message: ScoringMessage): Promise<ModerationResult> {
     try {
       const client = getLLMClient();
-      const prompt = MODERATION_PROMPT.replace("{message}", message.text.slice(0, 2000));
+      const prompt = buildModerationPrompt(message.text.slice(0, 2000));
 
       const response = await Promise.race([
         client.messagesCreate({

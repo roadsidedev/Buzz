@@ -127,6 +127,16 @@ export class RoomStateStore {
   // We match that shape exactly to allow zero-downtime migration.
 
   private _serialize(state: RoomStateData): Record<string, unknown> {
+    // Convert transcript entries to snake_case for Python wire compatibility.
+    const snakeTranscript = state.transcript.map((t) => ({
+      turn: t.turn,
+      agent_id: t.agentId,
+      message_id: t.messageId,
+      text: t.text,
+      score: t.score,
+      timestamp: t.timestamp,
+    }));
+
     return {
       room: {
         id: state.roomId,
@@ -141,16 +151,10 @@ export class RoomStateStore {
         completed_at: state.completedAt,
       },
       message_queue: state.messageQueue,
-      turn_history: state.transcript,
+      // turn_history mirrors transcript — both must be snake_case for Python compatibility.
+      turn_history: snakeTranscript,
       last_speaker_id: state.lastSpeakerId,
-      transcript: state.transcript.map((t) => ({
-        turn: t.turn,
-        agent_id: t.agentId,
-        message_id: t.messageId,
-        text: t.text,
-        score: t.score,
-        timestamp: t.timestamp,
-      })),
+      transcript: snakeTranscript,
       contract_satisfaction: state.contractSatisfaction,
     };
   }

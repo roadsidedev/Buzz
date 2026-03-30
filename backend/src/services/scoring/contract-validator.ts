@@ -112,13 +112,21 @@ export class ContractValidator {
       satisfaction = 100;
       level = "exceptional";
     } else if (turns >= contract.standardTurns) {
-      satisfaction = 85 + ((turns - contract.standardTurns) / (contract.exceptionalTurns - contract.standardTurns)) * 15;
+      const range = contract.exceptionalTurns - contract.standardTurns;
+      satisfaction = range > 0
+        ? 85 + ((turns - contract.standardTurns) / range) * 15
+        : 85;
       level = "standard";
     } else if (turns >= contract.minimumTurns) {
-      satisfaction = 60 + ((turns - contract.minimumTurns) / (contract.standardTurns - contract.minimumTurns)) * 25;
+      const range = contract.standardTurns - contract.minimumTurns;
+      satisfaction = range > 0
+        ? 60 + ((turns - contract.minimumTurns) / range) * 25
+        : 60;
       level = "minimum";
     } else {
-      satisfaction = (turns / contract.minimumTurns) * 60;
+      satisfaction = contract.minimumTurns > 0
+        ? (turns / contract.minimumTurns) * 60
+        : 0;
       level = "minimum";
     }
 
