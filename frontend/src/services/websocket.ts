@@ -24,8 +24,9 @@ export class WebSocketService {
   private maxReconnectAttempts: number = 5;
   private reconnectDelay: number = 1000;
   private listeners: Map<string, Set<EventCallback<any>>> = new Map();
-  // Rooms to (re-)join once the socket connects
-  private pendingRooms: Set<string> = new Set();
+  // All rooms currently subscribed to — persists through reconnects so
+  // socket.io auto-reconnect always restores live room event delivery.
+  private joinedRooms: Set<string> = new Set();
 
   constructor(wsUrl?: string) {
     this.wsUrl = wsUrl || import.meta.env.VITE_WS_URL || "ws://localhost:4000";
@@ -62,11 +63,12 @@ export class WebSocketService {
             }
           });
 
-          // Flush any rooms that tried to join before connection was ready
-          this.pendingRooms.forEach((roomId) => {
+          // (Re-)join all tracked rooms — handles both the initial connect and
+          // every subsequent auto-reconnect. joinedRooms is never cleared, so
+          // room subscriptions are fully restored after a network blip.
+          this.joinedRooms.forEach((roomId) => {
             this.socket!.emit("room:join", { roomId });
           });
-          this.pendingRooms.clear();
 
           resolve();
         });
@@ -75,14 +77,8 @@ export class WebSocketService {
           this.isConnected = false;
           console.log("[WebSocket] Disconnected");
         });
-
-        // On automatic reconnect, re-join all active rooms
-        this.socket.io.on("reconnect", () => {
-          this.pendingRooms.forEach((roomId) => {
-            this.socket?.emit("room:join", { roomId });
-          });
-          this.pendingRooms.clear();
-        });
+        // Note: no separate "reconnect" handler needed — socket.on("connect")
+        // fires on every successful connection including auto-reconnects.
 
         this.socket.on("connect_error", (error: Error) => {
           console.error("[WebSocket] Connection error:", error.message);
@@ -195,13 +191,13 @@ export class WebSocketService {
 
   /**
    * Join a room for real-time updates.
-   * If the socket is not yet connected, the join is queued and sent once connected.
+   * Persists across reconnects — if the socket isn't connected yet the join
+   * is sent automatically once the connection is established.
    */
   public joinRoom(roomId: string, agentId?: string): void {
+    this.joinedRooms.add(roomId); // persist for reconnect recovery
     if (!this.isConnectedStatus()) {
-      // Queue for when the socket connects/reconnects
-      this.pendingRooms.add(roomId);
-      return;
+      return; // connect handler will flush joinedRooms on next connect
     }
     this.socket?.emit("room:join", { roomId, agentId });
   }
@@ -210,7 +206,7 @@ export class WebSocketService {
    * Leave a room
    */
   public leaveRoom(roomId: string): void {
-    this.pendingRooms.delete(roomId);
+    this.joinedRooms.delete(roomId); // stop re-joining on reconnect
     this.send("room:leave", { roomId });
   }
 
