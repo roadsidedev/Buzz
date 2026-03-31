@@ -237,6 +237,18 @@ export function RoomLivePage() {
     return () => window.removeEventListener("resize", handler)
   }, [])
 
+  // ── Ensure WebSocket is connected as soon as the room page mounts ──────────
+  // room-live-page does not use use-room/use-episode/use-websocket hooks, so
+  // wsService.connect() would never be called without this.  Without it,
+  // joinRoom() queues to pendingRooms but the flush never fires → no events.
+  useEffect(() => {
+    if (!wsService.isConnectedStatus()) {
+      wsService.connect(apiClient.getToken() || undefined).catch((err) =>
+        console.warn("[Room] WebSocket connect error:", err)
+      )
+    }
+  }, [])
+
   const jamRoom = useJamRoom({
     roomId: streamId,
     pantryUrl: import.meta.env.VITE_PANTRY_URL,
@@ -438,19 +450,7 @@ export function RoomLivePage() {
   // ── Stage participants ──────────────────────────────────────────────────────
   // Safely coerce jam-core arrays — they may arrive as non-arrays before WebRTC init
   const safeSpeakers: string[] = Array.isArray(jamRoom.speakers) ? jamRoom.speakers : []
-  const safeListeners: string[] = Array.isArray(jamRoom.listeners) ? jamRoom.listeners : []
   const safeSpeaking: string[] = Array.isArray(jamRoom.speaking) ? jamRoom.speaking : []
-
-  // ── Sound Cues ──────────────────────────────────────────────────────────────
-  const prevListenersCount = useRef(0)
-  useEffect(() => {
-    if (safeListeners.length > prevListenersCount.current) {
-      if (prevListenersCount.current > 0) playBeep(600, "sine", 0.1, 0.05) // Enter
-    } else if (safeListeners.length < prevListenersCount.current) {
-      if (prevListenersCount.current > 0) playBeep(400, "sine", 0.1, 0.05) // Exit
-    }
-    prevListenersCount.current = safeListeners.length
-  }, [safeListeners.length])
 
   const stageParticipants = React.useMemo<ParticipantInfo[]>(() => {
     if (participants.length > 0) {
@@ -465,18 +465,24 @@ export function RoomLivePage() {
   const host = stageParticipants.find((p) => p.role === "host") ?? stageParticipants[0] ?? null
   const supporters = stageParticipants.filter((p) => p !== host)
 
-  const listenerProfiles = React.useMemo(() => {
-    // Merge Jam WebRTC listeners + WebSocket spectators so humans who join via
-    // socket (role: "spectator") appear in the listener section immediately.
-    const wsSpectatorIds = participants
-      .filter((p) => p.role === "spectator")
-      .map((p) => p.id)
-    const mergedIds = [...new Set([...safeListeners, ...wsSpectatorIds])]
-    return mergedIds.map((id) => {
-      const p = participants.find((part) => part.id === id)
-      return p || { id, name: id.slice(0, 8), avatar: null, role: "listener" }
-    })
-  }, [safeListeners, participants]);
+  // All listener tracking comes exclusively from WebSocket spectator events
+  // (Jam-core does not expose a listeners array in its state tree).
+  const listenerProfiles = React.useMemo(
+    () => participants.filter((p) => p.role === "spectator"),
+    [participants]
+  )
+
+  // ── Sound Cues ──────────────────────────────────────────────────────────────
+  const prevListenersCount = useRef(0)
+  useEffect(() => {
+    const count = listenerProfiles.length
+    if (count > prevListenersCount.current) {
+      if (prevListenersCount.current > 0) playBeep(600, "sine", 0.1, 0.05) // Enter
+    } else if (count < prevListenersCount.current) {
+      if (prevListenersCount.current > 0) playBeep(400, "sine", 0.1, 0.05) // Exit
+    }
+    prevListenersCount.current = count
+  }, [listenerProfiles.length])
 
   const isHostSpeaking = host
     ? (safeSpeaking.includes(host.id) || (safeSpeaking.length > 0 && stageParticipants.indexOf(host) < safeSpeaking.length))
