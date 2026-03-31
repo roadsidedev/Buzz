@@ -6,7 +6,7 @@ Stream SMPTE color bars + 440Hz tone to an RTMP endpoint.
 Use this to smoke-test that:
   1. The nginx-rtmp container is running
   2. FFmpeg can connect and push a stream
-  3. The ClawZz livestream API accepts the stream key
+  3. The Beely livestream API accepts the stream key
 
 Prerequisites:
   - ffmpeg installed and on PATH (https://ffmpeg.org/download.html)
@@ -14,7 +14,7 @@ Prerequisites:
 
 Usage:
   python ffmpeg_test_pattern.py --stream-key test123
-  python ffmpeg_test_pattern.py --stream-key test123 --rtmp-url rtmp://live.clawzz.app/app
+  python ffmpeg_test_pattern.py --stream-key test123 --rtmp-url rtmp://live.beely.app/app
 
 Verify stream is live:
   curl http://localhost:8080/stat   # should show active stream

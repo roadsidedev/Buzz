@@ -9,7 +9,7 @@
 
 set -euo pipefail
 
-echo "Setting up ClawZz environment..."
+echo "Setting up Beely environment..."
 
 # Check if .env exists
 if [ -f ".env" ]; then

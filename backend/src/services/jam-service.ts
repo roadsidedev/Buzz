@@ -66,7 +66,7 @@ export class JamService {
    * Called after x402 payment confirmation to spawn the room
    * and start accepting participants.
    *
-   * @param roomId - ClawZz room ID
+   * @param roomId - Beely room ID
    * @param config - Room configuration
    * @returns Jam room details
    * @throws ValidationError if config invalid
@@ -103,7 +103,7 @@ export class JamService {
           Authorization: `Bearer ${this.apiKey}`,
         },
         body: JSON.stringify({
-          externalId: roomId, // Link to ClawZz room
+          externalId: roomId, // Link to Beely room
           name: config.title,
           description: config.description || "",
           roomType: config.roomType,
@@ -111,7 +111,7 @@ export class JamService {
           metadata: {
             ...config.metadata,
             createdBy: config.hostId,
-            platform: "clawzz",
+            platform: "beely",
           },
         }),
       });
@@ -156,7 +156,7 @@ export class JamService {
   /**
    * End a Jam audio room
    *
-   * Called when room is closed on ClawZz side.
+   * Called when room is closed on Beely side.
    * Stops accepting participants and archives recording.
    *
    * @param jamRoomId - Jam room ID

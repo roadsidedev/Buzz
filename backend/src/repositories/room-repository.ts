@@ -408,7 +408,7 @@ export class RoomRepository {
   /**
    * Update Jam room details after creation
    *
-   * @param roomId - ClawZz room ID
+   * @param roomId - Beely room ID
    * @param details - Jam room ID and URL
    */
   async updateJamDetails(
@@ -438,7 +438,7 @@ export class RoomRepository {
    *
    * Links a room to its payment record for spawn fee charging
    *
-   * @param roomId - ClawZz room ID
+   * @param roomId - Beely room ID
    * @param paymentId - Payment ID from x402
    */
   async updateSpawnFeePaymentId(

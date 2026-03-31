@@ -130,12 +130,12 @@ export function createRateLimiter(config: RateLimitConfig) {
     // Internal platform bypass — scoped to /api/internal/* only.
     // Uses constant-time comparison to prevent timing-based secret extraction.
     const BYPASS_PATH_PREFIX = "/api/internal/";
-    if (req.path.startsWith(BYPASS_PATH_PREFIX) && process.env.CLAWZZ_SYSTEM_SECRET) {
-      const secretHeader = req.headers["x-clawzz-system-secret"];
+    if (req.path.startsWith(BYPASS_PATH_PREFIX) && process.env.BEELY_SYSTEM_SECRET) {
+      const secretHeader = req.headers["x-beely-system-secret"];
       const providedSecret = Array.isArray(secretHeader) ? secretHeader[0] : secretHeader;
 
       if (providedSecret) {
-        const expected = Buffer.from(process.env.CLAWZZ_SYSTEM_SECRET, "utf8");
+        const expected = Buffer.from(process.env.BEELY_SYSTEM_SECRET, "utf8");
         const provided = Buffer.from(providedSecret, "utf8");
 
         // Buffers must be the same byte length for timingSafeEqual

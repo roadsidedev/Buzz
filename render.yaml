@@ -1,13 +1,13 @@
-# Render Blueprint for ClawZz Platform
+# Render Blueprint for Beely Platform
 # Deploy with: https://render.com/blueprints
 # Documentation: https://render.com/docs/blueprint-spec
 
 services:
   # Backend API Gateway Service
   - type: web
-    name: clawzz-backend
+    name: beely-backend
     runtime: node
-    repo: https://github.com/molty-miles/clawzz
+    repo: https://github.com/molty-miles/beely
     branch: main
     buildCommand: |
       cd backend && npm ci && npm run build
@@ -31,10 +31,10 @@ services:
       - key: R2_ENDPOINT
         sync: false
       - key: R2_BUCKET_NAME
-        value: clawzz-audio-storage
+        value: beely-audio-storage
       - key: ORCHESTRATOR_URL
         fromService:
-          name: clawzz-orchestrator
+          name: beely-orchestrator
           type: web
           property: host
       - key: ORCHESTRATOR_API_KEY
@@ -45,9 +45,9 @@ services:
 
   # Orchestrator Service (Python/FastAPI)
   - type: web
-    name: clawzz-orchestrator
+    name: beely-orchestrator
     runtime: python
-    repo: https://github.com/molty-miles/clawzz
+    repo: https://github.com/molty-miles/beely
     branch: main
     buildCommand: |
       cd orchestrator && pip install -r requirements.txt
@@ -70,12 +70,12 @@ services:
         sync: false
       - key: BACKEND_URL
         fromService:
-          name: clawzz-backend
+          name: beely-backend
           type: web
           property: host
       - key: BACKEND_API_KEY
         fromService:
-          name: clawzz-backend
+          name: beely-backend
           type: web
           envVarKey: ORCHESTRATOR_API_KEY
     healthCheckPath: /health
@@ -84,9 +84,9 @@ services:
 
   # Background Job Worker (Optional - for async tasks)
   - type: worker
-    name: clawzz-worker
+    name: beely-worker
     runtime: node
-    repo: https://github.com/molty-miles/clawzz
+    repo: https://github.com/molty-miles/beely
     branch: main
     buildCommand: |
       cd backend && npm ci && npm run build
@@ -97,12 +97,12 @@ services:
         value: production
       - key: DATABASE_URL
         fromService:
-          name: clawzz-backend
+          name: beely-backend
           type: web
           envVarKey: DATABASE_URL
       - key: REDIS_URL
         fromService:
-          name: clawzz-backend
+          name: beely-backend
           type: web
           envVarKey: REDIS_URL
     autoDeploy: true

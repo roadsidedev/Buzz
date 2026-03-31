@@ -2,7 +2,7 @@
  * API Key Authentication Middleware
  *
  * Replaces SIWA receipt middleware. Validates API keys from
- * Authorization: Bearer clawzz_xxx header and attaches agent to request.
+ * Authorization: Bearer beely_xxx header and attaches agent to request.
  */
 
 import { Request, Response, NextFunction } from "express";
@@ -12,8 +12,8 @@ import { logger } from "../utils/logger.js";
 let _authService: any = null;
 async function getAuthService() {
   if (!_authService) {
-    const { clawzzAuthService } = await import("../services/index.js");
-    _authService = clawzzAuthService;
+    const { beelyAuthService } = await import("../services/index.js");
+    _authService = beelyAuthService;
   }
   return _authService;
 }
@@ -114,8 +114,8 @@ export const requireApiKey = async (
     // - Platform bots (role: bot/system)
     // - Legacy agents re-registered with system secret
     // - Operational tools that need to act on behalf of any agent
-    const systemSecret = req.headers["x-clawzz-system-secret"];
-    const hasValidSystemSecret = systemSecret && systemSecret === process.env.CLAWZZ_SYSTEM_SECRET;
+    const systemSecret = req.headers["x-beely-system-secret"];
+    const hasValidSystemSecret = systemSecret && systemSecret === process.env.BEELY_SYSTEM_SECRET;
 
     if (agent.claimStatus !== "claimed" && !hasValidSystemSecret) {
       res.status(403).json({

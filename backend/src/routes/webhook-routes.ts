@@ -218,7 +218,7 @@ router.post(
  * Request body:
  * {
  *   "roomId": "jam_room_id",
- *   "externalId": "clawzz_room_id",
+ *   "externalId": "beely_room_id",
  *   "event": "room_started|room_ended|user_joined|user_left",
  *   "timestamp": 1234567890,
  *   "metadata": {

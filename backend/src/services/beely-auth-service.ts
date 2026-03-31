@@ -1,5 +1,5 @@
 /**
- * ClawZz Auth Service — Moltbook-style API-key authentication
+ * Beely Auth Service — Moltbook-style API-key authentication
  *
  * Replaces SIWA auth. Registration requires only name + description.
  * Agents get an API key immediately. Human owners claim agents via
@@ -76,14 +76,14 @@ export interface ClaimStatusResult {
 // Service
 // ============================================
 
-export class ClawzzAuthService {
+export class BeelyAuthService {
   private db: any;
   private baseUrl: string;
 
   constructor(db: any) {
     this.db = db;
     this.baseUrl =
-      process.env.CLAWZZ_BASE_URL || "https://clawzz.vercel.app";
+      process.env.BEELY_BASE_URL || "https://beely-live.vercel.app";
   }
 
   // ==========================================
@@ -168,7 +168,7 @@ export class ClawzzAuthService {
     const now = new Date();
 
     // Insert agent record
-    const systemSecret = process.env.CLAWZZ_SYSTEM_SECRET;
+    const systemSecret = process.env.BEELY_SYSTEM_SECRET;
     const isAuthorizedBot = systemSecret && input.system_secret === systemSecret;
 
     await this.db.query(
@@ -221,7 +221,7 @@ export class ClawzzAuthService {
    * Look up agent by API key for middleware authentication.
    */
   async getAgentByApiKey(apiKey: string): Promise<AgentProfile | null> {
-    if (!apiKey || !apiKey.startsWith("clawzz_")) {
+    if (!apiKey || !apiKey.startsWith("beely_")) {
       return null;
     }
 
@@ -578,11 +578,11 @@ export class ClawzzAuthService {
   // ==========================================
 
   private _generateApiKey(): string {
-    return `clawzz_${randomBytes(24).toString("hex")}`;
+    return `beely_${randomBytes(24).toString("hex")}`;
   }
 
   private _generateClaimToken(): string {
-    return `clawzz_claim_${randomBytes(16).toString("hex")}`;
+    return `beely_claim_${randomBytes(16).toString("hex")}`;
   }
 
   private _generateVerificationCode(): string {
@@ -608,8 +608,8 @@ export class ClawzzAuthService {
     
     // Generate a deterministic UUID from the Privy DID to satisfy UUID constraints
     // Namespace: 6ba7b810-9dad-11d1-80b4-00c04fd430c8 (DNS namespace)
-    const CLAWZZ_NAMESPACE = "6ba7b810-9dad-11d1-80b4-00c04fd430c8";
-    const agentId = uuidv5(privyDid, CLAWZZ_NAMESPACE);
+    const BEELY_NAMESPACE = "6ba7b810-9dad-11d1-80b4-00c04fd430c8";
+    const agentId = uuidv5(privyDid, BEELY_NAMESPACE);
     
     const now = new Date();
 

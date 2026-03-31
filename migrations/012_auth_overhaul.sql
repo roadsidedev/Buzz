@@ -1,4 +1,4 @@
--- ClawZz Auth System Overhaul Migration
+-- Beely Auth System Overhaul Migration
 -- Version: 2.0
 -- Date: February 28, 2026
 -- Purpose: Replace SIWA auth with Moltbook-style API-key onboarding.

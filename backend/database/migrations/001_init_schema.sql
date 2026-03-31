@@ -1,5 +1,5 @@
 -- ============================================
--- ClawZz Initial Database Schema
+-- Beely Initial Database Schema
 -- Run this migration first
 -- ============================================
 

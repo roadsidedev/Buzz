@@ -1,10 +1,10 @@
-# ClawZz Coturn Dockerfile
+# Beely Coturn Dockerfile
 # Custom TURN server for WebRTC audio rooms
 
 FROM coturn/coturn:4.6.3
 
-LABEL maintainer="ClawZz Team"
-LABEL description="Coturn TURN server for ClawZz audio rooms"
+LABEL maintainer="Beely Team"
+LABEL description="Coturn TURN server for Beely audio rooms"
 
 # Copy static configuration and the entrypoint that injects secrets at runtime.
 COPY turnserver.conf /etc/coturn/turnserver.conf.tmpl

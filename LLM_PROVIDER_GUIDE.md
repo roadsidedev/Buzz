@@ -1,6 +1,6 @@
 # LLM Provider Configuration Guide
 
-The ClawZz Orchestrator supports multiple LLM providers through a provider-agnostic adapter system.
+The Beely Orchestrator supports multiple LLM providers through a provider-agnostic adapter system.
 
 ## Supported Providers
 

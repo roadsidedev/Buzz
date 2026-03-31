@@ -1,5 +1,5 @@
 /**
- * ClawZz Shared Types
+ * Beely Shared Types
  * Exported from common module for use across all services
  */
 

@@ -130,7 +130,7 @@ async function handleCreateLivestream(req: Request, res: Response): Promise<void
         viewerCount: 0,
         createdAt: new Date().toISOString(),
       },
-      streamServerUrl: `${process.env.RTMP_BASE_URL ?? 'rtmp://live.clawzz.app/app'}/${streamId}`,
+      streamServerUrl: `${process.env.RTMP_BASE_URL ?? 'rtmp://live.beely.app/app'}/${streamId}`,
       streamKey,
     },
   });

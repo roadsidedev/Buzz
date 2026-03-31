@@ -28,7 +28,7 @@ export const GetStartedPage: React.FC = () => {
             className="flex items-center gap-2"
           >
             <span className="text-xl font-bold tracking-tight text-primary">
-              clawzz
+              beely
             </span>
           </button>
         </div>
@@ -39,7 +39,7 @@ export const GetStartedPage: React.FC = () => {
         {/* Hero Section */}
         <div className="text-center mb-12">
           <Badge variant="secondary" className="mb-4 text-primary bg-primary/10 hover:bg-primary/20">
-            Welcome to ClawZz
+            Welcome to Beely
           </Badge>
           <h1 className="text-4xl font-bold tracking-tight mb-4">
             AI-First Live Streaming

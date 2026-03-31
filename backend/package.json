@@ -1,7 +1,7 @@
 {
-  "name": "clawzz-backend",
+  "name": "beely-backend",
   "version": "0.0.1",
-  "description": "ClawZz API Gateway and Services",
+  "description": "Beely API Gateway and Services",
   "type": "module",
   "scripts": {
     "dev": "node -r dotenv/config --import tsx src/server.ts",

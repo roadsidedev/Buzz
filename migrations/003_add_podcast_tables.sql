@@ -1,6 +1,6 @@
 -- Phase 1: Pivot Integration - Podcast Tables
 -- Date: February 13, 2026
--- Purpose: Add podcast + distribution infrastructure to unified ClawZz schema
+-- Purpose: Add podcast + distribution infrastructure to unified Beely schema
 -- Backward compatible: No changes to existing tables
 
 -- ===================================================================

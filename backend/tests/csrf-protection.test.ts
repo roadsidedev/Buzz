@@ -40,7 +40,7 @@ describe("CSRF Protection", () => {
 
     it("should pass validation with COOKIE_DOMAIN set", () => {
       process.env.NODE_ENV = "production";
-      process.env.COOKIE_DOMAIN = "clawzz.com";
+      process.env.COOKIE_DOMAIN = "beely.com";
 
       expect(() => validateCSRFConfig()).not.toThrow();
     });

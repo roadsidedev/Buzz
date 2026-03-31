@@ -6,7 +6,7 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    container_name: clawzz-frontend
+    container_name: beely-frontend
     ports:
       - "3000:3000"
     environment:
@@ -38,7 +38,7 @@ services:
     build:
       context: .
       dockerfile: backend/Dockerfile
-    container_name: clawzz-backend
+    container_name: beely-backend
     ports:
       - "4000:4000"
     environment:
@@ -66,7 +66,7 @@ services:
       # Coturn configuration
       - COTURN_SECRET=${COTURN_SECRET}
       - COTURN_EXTERNAL_IP=${COTURN_EXTERNAL_IP:-}
-      - COTURN_REALM=${COTURN_REALM:-clawzz.dev}
+      - COTURN_REALM=${COTURN_REALM:-beely-live.vercel.app}
     depends_on:
       postgres:
         condition: service_healthy
@@ -95,7 +95,7 @@ services:
     build:
       context: ./jam/pantry
       dockerfile: Dockerfile
-    container_name: clawzz-pantry
+    container_name: beely-pantry
     ports:
       - "3003:3000"
     environment:
@@ -121,7 +121,7 @@ services:
     build:
       context: ./jam/pantry-sfu
       dockerfile: Dockerfile
-    container_name: clawzz-sfu
+    container_name: beely-sfu
     environment:
       - JAM_SFU=true
       - JAM_SFU_EXTERNAL_IP=${COTURN_EXTERNAL_IP:-}
@@ -145,11 +145,11 @@ services:
     build:
       context: ./coturn
       dockerfile: Dockerfile
-    container_name: clawzz-coturn
+    container_name: beely-coturn
     environment:
       - COTURN_SECRET=${COTURN_SECRET}
       - COTURN_EXTERNAL_IP=${COTURN_EXTERNAL_IP:-}
-      - COTURN_REALM=${COTURN_REALM:-clawzz.dev}
+      - COTURN_REALM=${COTURN_REALM:-beely-live.vercel.app}
     ports:
       - "3478:3478/udp"
       - "3478:3478/tcp"
@@ -168,7 +168,7 @@ services:
   # ============================================
   nginx-rtmp:
     image: alfg/nginx-rtmp
-    container_name: clawzz-rtmp
+    container_name: beely-rtmp
     ports:
       - "1935:1935"   # RTMP ingest
       - "8080:80"     # HTTP stats page
@@ -183,7 +183,7 @@ services:
   # ============================================
   jam:
     image: ghcr.io/jam-systems/jam:latest
-    container_name: clawzz-jam-legacy
+    container_name: beely-jam-legacy
     ports:
       - "3001:3000"
     environment:
@@ -205,18 +205,18 @@ services:
   # ============================================
   postgres:
     image: postgres:15-alpine
-    container_name: clawzz-postgres
+    container_name: beely-postgres
     ports:
       - "5432:5432"
     environment:
-      - POSTGRES_USER=${POSTGRES_USER:-clawzz}
+      - POSTGRES_USER=${POSTGRES_USER:-beely}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-      - POSTGRES_DB=${POSTGRES_DB:-clawzz}
+      - POSTGRES_DB=${POSTGRES_DB:-beely}
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./migrations:/docker-entrypoint-initdb.d
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U clawzz"]
+      test: ["CMD-SHELL", "pg_isready -U beely"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -229,7 +229,7 @@ services:
   # ============================================
   redis:
     image: redis:7-alpine
-    container_name: clawzz-redis
+    container_name: beely-redis
     ports:
       - "6379:6379"
     command: redis-server --appendonly yes

@@ -1,4 +1,4 @@
-# ClawZz Frontend - Complete Index
+# Beely Frontend - Complete Index
 
 **Phase 3 Complete** | February 15, 2025
 

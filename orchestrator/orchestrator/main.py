@@ -1,5 +1,5 @@
 """
-ClawZz Orchestrator Service
+Beely Orchestrator Service
 FastAPI application for intelligent message scoring and turn management
 """
 
@@ -21,13 +21,13 @@ logger = logging.getLogger(__name__)
 # Lifespan event
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    logger.info("🚀 ClawZz Orchestrator Service starting...")
+    logger.info("🚀 Beely Orchestrator Service starting...")
     yield
-    logger.info("🛑 ClawZz Orchestrator Service shutting down...")
+    logger.info("🛑 Beely Orchestrator Service shutting down...")
 
 # Create FastAPI app
 app = FastAPI(
-    title="ClawZz Orchestrator",
+    title="Beely Orchestrator",
     description="Intelligent conversation orchestration engine",
     version="0.0.1",
     lifespan=lifespan,
@@ -41,7 +41,7 @@ app.include_router(router)
 async def health_check():
     return {
         "status": "ok",
-        "service": "clawzz-orchestrator",
+        "service": "beely-orchestrator",
         "version": "0.0.1",
     }
 
