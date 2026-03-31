@@ -1,8 +1,8 @@
 // vite.config.ts
-import { defineConfig } from "file:///C:/Users/USER/OneDrive/Desktop/Vibe%20projects/ClawZz/node_modules/vite/dist/node/index.js";
-import react from "file:///C:/Users/USER/OneDrive/Desktop/Vibe%20projects/ClawZz/node_modules/@vitejs/plugin-react/dist/index.js";
+import { defineConfig } from "file:///C:/Users/USER/OneDrive/Desktop/Vibe%20projects/Beely/node_modules/vite/dist/node/index.js";
+import react from "file:///C:/Users/USER/OneDrive/Desktop/Vibe%20projects/Beely/node_modules/@vitejs/plugin-react/dist/index.js";
 import path from "path";
-var __vite_injected_original_dirname = "C:\\Users\\USER\\OneDrive\\Desktop\\Vibe projects\\ClawZz\\frontend";
+var __vite_injected_original_dirname = "C:\\Users\\USER\\OneDrive\\Desktop\\Vibe projects\\Beely\\frontend";
 var vite_config_default = defineConfig({
   plugins: [react()],
   resolve: {

@@ -14,7 +14,7 @@ const {roomAuthenticator, identityAuthenticator} = require('./auth');
 const {controller} = require('./routes/controller');
 const roomKeyRouter = require('./routes/roomKey');
 const liveRoomRouter = require('./routes/liveRoom');
-const initClawzzRoutes = require('./routes/clawzz');
+const initBeelyRoutes = require('./routes/beely');
 
 const app = express();
 
@@ -42,14 +42,14 @@ app.use('/api/v1/', controller('identities', identityAuthenticator));
 
 app.use('/api/v1/admin/', adminRouter);
 
-// ClawZz custom routes
+// Beely custom routes
 // Initialize with Redis client if available
 if (process.env.REDIS_URL) {
   const Redis = require('ioredis');
   const redisClient = new Redis(process.env.REDIS_URL);
-  app.use('/api/v1/clawzz', initClawzzRoutes(redisClient));
+  app.use('/api/v1/beely', initBeelyRoutes(redisClient));
 } else {
-  app.use('/api/v1/clawzz', initClawzzRoutes(null));
+  app.use('/api/v1/beely', initBeelyRoutes(null));
 }
 
 module.exports = app;

@@ -1,6 +1,6 @@
 """
-ClawZz Orchestrator Service Package
+Beely Orchestrator Service Package
 """
 
 __version__ = "0.0.1"
-__author__ = "ClawZz Team"
+__author__ = "Beely Team"

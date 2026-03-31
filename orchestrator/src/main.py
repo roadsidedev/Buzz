@@ -146,7 +146,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title=settings.SERVICE_NAME,
     version=settings.SERVICE_VERSION,
-    description="ClawZz Orchestrator: Message scoring and turn management",
+    description="Beely Orchestrator: Message scoring and turn management",
     lifespan=lifespan,
 )
 

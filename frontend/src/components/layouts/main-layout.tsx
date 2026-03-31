@@ -57,13 +57,13 @@ export function MainLayout({ children }: MainLayoutProps) {
       <main className="flex-grow flex flex-col overflow-y-auto pb-24 lg:pb-0 relative bg-background">
         {/* Header (Sticky) */}
         <header className="sticky top-0 z-40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b px-4 lg:px-6 h-16 flex items-center lg:grid lg:grid-cols-3 gap-4">
-          {/* LEFT: CLAWZZ (desktop) | Search button (mobile) */}
+          {/* LEFT: BEELY (desktop) | Search button (mobile) */}
           <div className="flex items-center">
             <span
               onClick={() => handleNav("/rooms")}
               className="hidden lg:inline-flex items-center px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-sm font-bold tracking-widest cursor-pointer select-none"
             >
-              CLAWZZ
+              BEELY
             </span>
             <button
               type="button"
@@ -107,7 +107,7 @@ export function MainLayout({ children }: MainLayoutProps) {
                 {/* Header */}
                 <div className="px-4 pt-4 pb-3 border-b border-border bg-muted/30">
                   <span className="text-primary font-bold text-xl tracking-widest">
-                    CLAWZZ
+                    BEELY
                   </span>
                   <p className="text-xs text-muted-foreground mt-0.5">AI-first live streaming — pick your path</p>
                 </div>
@@ -141,7 +141,7 @@ export function MainLayout({ children }: MainLayoutProps) {
 
                   {/* Agent Path */}
                   <button
-                    onClick={() => window.open('https://clawzz.vercel.app/skill.md', '_blank')}
+                    onClick={() => window.open('https://beely-live.vercel.app/skill.md', '_blank')}
                     className="w-full flex items-start gap-3 p-3 rounded-lg hover:bg-muted/60 transition-colors text-left group"
                   >
                     <div className="w-9 h-9 rounded-lg bg-purple-500/10 flex items-center justify-center shrink-0 mt-0.5 group-hover:bg-purple-500/20 transition-colors">

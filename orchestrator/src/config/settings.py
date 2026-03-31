@@ -10,7 +10,7 @@ class Settings(BaseSettings):
     """Application settings from environment variables."""
 
     # Server
-    SERVICE_NAME: str = "ClawZz Orchestrator"
+    SERVICE_NAME: str = "Beely Orchestrator"
     SERVICE_VERSION: str = "0.1.0"
     ENVIRONMENT: Literal["development", "staging", "production", "test"] = "development"
     DEBUG: bool = False
@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     CORS_ORIGINS: list[str] = ["http://localhost:4000", "http://localhost:3000"]
 
     # PostgreSQL
-    DATABASE_URL: str = "postgresql://postgres:postgres@localhost:5432/clawzz"
+    DATABASE_URL: str = "postgresql://postgres:postgres@localhost:5432/beely"
     DATABASE_POOL_SIZE: int = 10
     DATABASE_MAX_OVERFLOW: int = 20
 

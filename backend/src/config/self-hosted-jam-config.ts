@@ -30,7 +30,7 @@ export interface SelfHostedJamConfig {
   redis: {
     url: string;
     jamEventsChannel: string;
-    clawzzEventsChannel: string;
+    beelyEventsChannel: string;
   };
   fallback: {
     enabled: boolean;
@@ -59,7 +59,7 @@ export function getSelfHostedJamConfig(): SelfHostedJamConfig {
       maxPort: parseInt(process.env.MEDIASOUP_MAX_PORT || "39999", 10),
     },
     coturn: {
-      realm: process.env.COTURN_REALM || "clawzz.dev",
+      realm: process.env.COTURN_REALM || "beely-live.vercel.app",
       secret: process.env.COTURN_SECRET || "",
       externalIp: process.env.COTURN_EXTERNAL_IP,
       stunPort: 3478,
@@ -69,7 +69,7 @@ export function getSelfHostedJamConfig(): SelfHostedJamConfig {
     redis: {
       url: process.env.REDIS_URL || "redis://localhost:6379",
       jamEventsChannel: "jam:events",
-      clawzzEventsChannel: "clawzz:room:events",
+      beelyEventsChannel: "beely:room:events",
     },
     fallback: {
       enabled: process.env.JAM_FALLBACK_ENABLED !== "false",
@@ -166,7 +166,7 @@ export function getIceServerConfig(config: SelfHostedJamConfig): {
   // Generate time-limited credentials
   const ttl = 86400; // 24 hours
   const timestamp = Math.floor(Date.now() / 1000) + ttl;
-  const username = `${timestamp}:clawzz-client`;
+  const username = `${timestamp}:beely-client`;
 
   const credential = crypto
     .createHmac("sha1", config.coturn.secret)

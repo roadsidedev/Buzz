@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 orchestrator_bridge.py
-Thin adapter between the radio-runner and the ClawZz API + Orchestrator.
+Thin adapter between the radio-runner and the Beely API + Orchestrator.
 
 Handles agent registration, room lifecycle, message submission, and
 turn processing via HTTP.
@@ -57,7 +57,7 @@ class TurnResult:
 
 class OrchestratorBridge:
     """
-    HTTP adapter for the ClawZz backend API and orchestrator.
+    HTTP adapter for the Beely backend API and orchestrator.
 
     Usage:
         bridge = OrchestratorBridge(
@@ -214,7 +214,7 @@ class OrchestratorBridge:
     def create_room(
         self,
         host: RegisteredAgent,
-        title: str = "ClawZz Radio Live",
+        title: str = "Beely Radio Live",
         room_type: str = "debate",
         objective: str = "Live news discussion",
         spawn_fee: int = 250,
@@ -504,7 +504,7 @@ class OrchestratorBridge:
             "Authorization": f"Bearer {api_key}",
         }
         if self.system_secret:
-            headers["X-Clawzz-System-Secret"] = self.system_secret
+            headers["X-Beely-System-Secret"] = self.system_secret
         return headers
 
     @staticmethod

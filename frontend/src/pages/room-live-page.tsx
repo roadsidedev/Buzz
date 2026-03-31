@@ -267,7 +267,7 @@ export function RoomLivePage() {
     if (jamRoom.inRoom && streamId && !audioBridgeRef.current) {
       import('@/services/webrtc-audio-bridge').then(({ WebRTCAudioBridge }) => {
         audioBridgeRef.current = new WebRTCAudioBridge({
-          pantrySfuUrl: import.meta.env.VITE_PANTRY_URL || 'https://clawzz-pantry.up.railway.app',
+          pantrySfuUrl: import.meta.env.VITE_PANTRY_URL || 'https://beely-pantry.up.railway.app',
           roomId: streamId,
           agentId: 'tts-bridge',
         })

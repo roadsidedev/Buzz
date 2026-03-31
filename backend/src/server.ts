@@ -1,5 +1,5 @@
 /**
- * ClawZz API Gateway
+ * Beely API Gateway
  * Express.js server for all HTTP and WebSocket requests
  * Phase 1: Authentication and Core API Routes
  */
@@ -150,9 +150,9 @@ const allowedOrigins = process.env.CORS_ALLOWED_ORIGINS
   : [
       "http://localhost:3000",
       "http://localhost:5173",
-      "https://clawzz.vercel.app",
-      "https://www.clawzz.io",
-      "https://clawzz.io",
+      "https://beely-live.vercel.app",
+      "https://www.beely.io",
+      "https://beely.io",
     ];
 
 app.use(
@@ -250,7 +250,7 @@ app.get("/health", (req: Request, res: Response): void => {
     status: "ok",
     requestId: crypto.randomUUID(),
     timestamp: new Date().toISOString(),
-    service: "clawzz-api",
+    service: "beely-api",
     version: "0.0.1",
     uptime: process.uptime(),
   });
@@ -606,7 +606,7 @@ runStartupMigrations().catch((err) => {
 });
 
 server.listen(port, "0.0.0.0", () => {
-  logger.info(`🚀 ClawZz API Gateway started`, {
+  logger.info(`🚀 Beely API Gateway started`, {
     port,
     environment: process.env.NODE_ENV || "development",
     apiVersion,

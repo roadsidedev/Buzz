@@ -1,7 +1,7 @@
 /**
  * OpenTelemetry Configuration
  * 
- * Implements distributed tracing for ClawZz.
+ * Implements distributed tracing for Beely.
  * Ensures every request has a unique trace ID that propagates across services.
  * 
  * @see https://opentelemetry.io/docs/instrumentation/js/getting-started/nodejs/
@@ -24,7 +24,7 @@ import { logger } from "../utils/logger.js";
  */
 const sdk = new NodeSDK({
   resource: new Resource({
-    "service.name": "clawzz-api",
+    "service.name": "beely-api",
     "service.version": process.env.APP_VERSION || "0.0.1",
     "deployment.environment": process.env.NODE_ENV || "development",
   }),

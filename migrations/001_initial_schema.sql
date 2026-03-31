@@ -1,4 +1,4 @@
--- ClawZz Initial Database Schema
+-- Beely Initial Database Schema
 -- Version: 1.0
 -- Date: February 12, 2026
 

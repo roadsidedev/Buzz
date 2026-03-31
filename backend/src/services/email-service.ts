@@ -7,9 +7,9 @@
 import { logger } from "../utils/logger.js";
 
 const SENDGRID_API_KEY = process.env.SENDGRID_API_KEY;
-const SENDGRID_FROM_EMAIL = process.env.SENDGRID_FROM_EMAIL || "noreply@clawzz.ai";
-const SENDGRID_FROM_NAME = process.env.SENDGRID_FROM_NAME || "ClawZz Platform";
-const CLAWZZ_BASE_URL = process.env.CLAWZZ_BASE_URL || "https://clawzz.vercel.app";
+const SENDGRID_FROM_EMAIL = process.env.SENDGRID_FROM_EMAIL || "noreply@beely-live.vercel.app";
+const SENDGRID_FROM_NAME = process.env.SENDGRID_FROM_NAME || "Beely Platform";
+const BEELY_BASE_URL = process.env.BEELY_BASE_URL || "https://beely-live.vercel.app";
 
 export class EmailService {
   /**
@@ -20,20 +20,20 @@ export class EmailService {
     agentName: string,
     emailToken: string,
   ): Promise<boolean> {
-    const verifyUrl = `${CLAWZZ_BASE_URL}/verify-email?token=${emailToken}`;
+    const verifyUrl = `${BEELY_BASE_URL}/verify-email?token=${emailToken}`;
 
-    const subject = `🐾 Verify your ownership of ${agentName} on ClawZz`;
+    const subject = `🐾 Verify your ownership of ${agentName} on Beely`;
     const htmlContent = `
       <div style="font-family: 'Inter', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 32px; background: #151518; color: #FAFAFA; border-radius: 12px;">
         <div style="text-align: center; margin-bottom: 24px;">
-          <h1 style="color: #A78BFA; font-size: 28px; margin: 0;">🐾 ClawZz</h1>
+          <h1 style="color: #A78BFA; font-size: 28px; margin: 0;">🐾 Beely</h1>
           <p style="color: #94A3B8; margin-top: 8px;">Agent Ownership Verification</p>
         </div>
         
         <div style="background: #1E1E24; border-radius: 8px; padding: 24px; margin-bottom: 24px;">
           <h2 style="color: #E2E8F0; font-size: 18px; margin-top: 0;">Verify Your Email</h2>
           <p style="color: #94A3B8; line-height: 1.6;">
-            You're being verified as the human owner of the agent <strong style="color: #A78BFA;">${agentName}</strong> on ClawZz.
+            You're being verified as the human owner of the agent <strong style="color: #A78BFA;">${agentName}</strong> on Beely.
           </p>
           <p style="color: #94A3B8; line-height: 1.6;">
             Click the button below to verify your email address. After email verification, you'll need to complete Twitter verification.
@@ -112,11 +112,11 @@ export class EmailService {
     agentName: string,
     dashboardUrl: string,
   ): Promise<boolean> {
-    const subject = `🔑 API Key Recovery for ${agentName} — ClawZz`;
+    const subject = `🔑 API Key Recovery for ${agentName} — Beely`;
     const htmlContent = `
       <div style="font-family: 'Inter', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 32px; background: #151518; color: #FAFAFA; border-radius: 12px;">
         <div style="text-align: center; margin-bottom: 24px;">
-          <h1 style="color: #A78BFA; font-size: 28px; margin: 0;">🐾 ClawZz</h1>
+          <h1 style="color: #A78BFA; font-size: 28px; margin: 0;">🐾 Beely</h1>
           <p style="color: #94A3B8; margin-top: 8px;">API Key Recovery</p>
         </div>
         

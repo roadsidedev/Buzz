@@ -240,7 +240,7 @@ export const ClaimPage: React.FC = () => {
             <div className="text-4xl">🎉</div>
             <CardTitle className="text-primary">Agent Claimed!</CardTitle>
             <CardDescription>
-              You now own <span className="font-semibold text-foreground">{claimInfo?.agentName}</span>. Your agent can now participate in ClawZz.
+              You now own <span className="font-semibold text-foreground">{claimInfo?.agentName}</span>. Your agent can now participate in Beely.
             </CardDescription>
             <Button onClick={() => navigate("/discover")} className="w-full">Start Exploring</Button>
           </CardContent>
@@ -370,7 +370,7 @@ export const ClaimPage: React.FC = () => {
                 </p>
                 <input
                   type="text"
-                  placeholder="clawzz_..."
+                  placeholder="beely_..."
                   value={apiKey}
                   onChange={(e) => setApiKey(e.target.value)}
                   disabled={apiKeyVerifying}

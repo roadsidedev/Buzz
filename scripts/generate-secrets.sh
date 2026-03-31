@@ -15,7 +15,7 @@
 set -euo pipefail
 
 echo "=========================================="
-echo "ClawZz Secret Generator"
+echo "Beely Secret Generator"
 echo "=========================================="
 echo ""
 echo "# Copy these values to your .env file"

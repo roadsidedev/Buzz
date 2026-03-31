@@ -148,7 +148,7 @@ export const RoomPage: React.FC = () => {
             <ArrowLeft className="w-4 h-4" />
             Back
           </Button>
-            <span className="text-primary font-bold text-xl hover:opacity-80 transition-opacity">clawzz</span>
+            <span className="text-primary font-bold text-xl hover:opacity-80 transition-opacity">beely</span>
         </div>
         <div className="flex items-center gap-2">
           {room?.status === "live" && <Badge variant="destructive" className="animate-pulse">Live</Badge>}

@@ -78,27 +78,43 @@ export const LoadingBar: React.FC = () => (
   <div className="h-1 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 animate-pulse rounded-full" />
 );
 
+const beeKeyframes = `
+  @keyframes beeFly {
+    0%   { transform: translateY(0px) rotate(-5deg); }
+    20%  { transform: translateY(-10px) rotate(4deg) scaleX(1.06); }
+    40%  { transform: translateY(-5px) rotate(-3deg) scaleX(0.96); }
+    60%  { transform: translateY(-12px) rotate(6deg) scaleX(1.06); }
+    80%  { transform: translateY(-3px) rotate(-4deg) scaleX(0.97); }
+    100% { transform: translateY(0px) rotate(-5deg); }
+  }
+`;
+
 /**
- * LoadingSpinner Component
- * Centered loading spinner
+ * BeeSpinner Component
+ * Animated flying bee loading indicator (Beely brand)
  */
-export const LoadingSpinner: React.FC<{ size?: "sm" | "md" | "lg" }> = ({
+export const BeeSpinner: React.FC<{ size?: "sm" | "md" | "lg" }> = ({
   size = "md",
 }) => {
-  const sizeClasses = {
-    sm: "w-6 h-6",
-    md: "w-10 h-10",
-    lg: "w-16 h-16",
-  };
+  const sizeClasses = { sm: "text-2xl", md: "text-4xl", lg: "text-6xl" };
 
   return (
     <div className="flex items-center justify-center">
-      <div
-        className={`${sizeClasses[size]} border-2 border-blue-200 border-t-blue-600 rounded-full animate-spin`}
-      />
+      <style>{beeKeyframes}</style>
+      <span
+        className={sizeClasses[size]}
+        style={{ display: "inline-block", animation: "beeFly 1.4s ease-in-out infinite" }}
+        role="status"
+        aria-label="Loading"
+      >
+        🐝
+      </span>
     </div>
   );
 };
+
+/** Alias for backward compatibility */
+export const LoadingSpinner = BeeSpinner;
 
 /**
  * LoadingOverlay Component
@@ -106,9 +122,9 @@ export const LoadingSpinner: React.FC<{ size?: "sm" | "md" | "lg" }> = ({
  */
 export const LoadingOverlay: React.FC = () => (
   <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-    <div className="bg-white rounded-lg p-6">
-      <LoadingSpinner size="lg" />
-      <p className="mt-4 text-center text-gray-600">Loading...</p>
+    <div className="bg-white rounded-2xl p-8 flex flex-col items-center gap-3 shadow-xl">
+      <BeeSpinner size="lg" />
+      <p className="text-center text-gray-600 font-medium">Beely is loading…</p>
     </div>
   </div>
 );

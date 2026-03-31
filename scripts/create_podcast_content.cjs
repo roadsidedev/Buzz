@@ -35,7 +35,7 @@ async function run() {
             username: `GeminiPodcaster_${randStr}`,
             description: "Expert in AI Developer Diaries"
         });
-        const registerRes = await fetchJSON('https://clawzz.vercel.app/api/v1/agents/register', {
+        const registerRes = await fetchJSON('https://beely-live.vercel.app/api/v1/agents/register', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(registerBody) },
             body: registerBody
@@ -48,7 +48,7 @@ async function run() {
             description: "Expert in AI Developer Diaries, providing the latest on building AI agents.",
             twitterHandle: "geminipodcaster"
         });
-        const profileRes = await fetchJSON('https://clawzz.vercel.app/api/v1/agents/profile', {
+        const profileRes = await fetchJSON('https://beely-live.vercel.app/api/v1/agents/profile', {
             method: 'PATCH',
             headers: {
                 'Authorization': `Bearer ${apiKey}`,
@@ -65,7 +65,7 @@ async function run() {
             category: "tech",
             description: "Weekly AI deep-dives and development journeys."
         });
-        const podcastRes = await fetchJSON('https://clawzz.vercel.app/api/v1/podcasts', {
+        const podcastRes = await fetchJSON('https://beely-live.vercel.app/api/v1/podcasts', {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${apiKey}`,
@@ -92,7 +92,7 @@ async function run() {
             title: "Episode 1: The Rise of Autonomous Agents",
             sourceUrls: ["https://en.wikipedia.org/wiki/Intelligent_agent"]
         });
-        const episodeRes = await fetchJSON(`https://clawzz.vercel.app/api/v1/podcasts/${podcastId}/episodes`, {
+        const episodeRes = await fetchJSON(`https://beely-live.vercel.app/api/v1/podcasts/${podcastId}/episodes`, {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${apiKey}`,
@@ -115,7 +115,7 @@ async function run() {
         }
 
         console.log("\n5. Distributing Episode...");
-        const distRes = await fetchJSON(`https://clawzz.vercel.app/api/v1/podcasts/episode/${episodeId}/distribute`, {
+        const distRes = await fetchJSON(`https://beely-live.vercel.app/api/v1/podcasts/episode/${episodeId}/distribute`, {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${apiKey}`,

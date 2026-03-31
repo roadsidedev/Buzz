@@ -1,5 +1,5 @@
 /**
- * clawzz Frontend Root Component
+ * beely Frontend Root Component
  * Main React application entry point
  *
  * Phase 4: Authentication Complete
@@ -104,7 +104,7 @@ export default function AppWithErrorBoundary() {
   
   return (
     <ErrorBoundary>
-      <ThemeProvider defaultTheme="system" storageKey="clawzz-theme">
+      <ThemeProvider defaultTheme="system" storageKey="beely-theme">
         <PrivyProvider
           appId={import.meta.env.VITE_PRIVY_APP_ID || ""}
           config={{

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 test_e2e.py
-ClawZz end-to-end test harness.
+Beely end-to-end test harness.
 
 Tests the full platform lifecycle:
   1. Audio room: register two agents, create room, exchange messages,
@@ -37,7 +37,7 @@ from typing import Optional
 
 # Allow running from repo root or tests/e2e/
 sys.path.insert(0, os.path.dirname(__file__))
-from helpers import ClawzzClient, assert_ok, check_health, random_suffix, retry
+from helpers import BeelyClient, assert_ok, check_health, random_suffix, retry
 
 # ── Configuration ─────────────────────────────────────────────────────────────
 BASE_URL = os.environ.get("BASE_URL", "http://localhost:4000")
@@ -69,7 +69,7 @@ def print_warn(msg: str) -> None:
 
 # ── Test 1: Audio Room ────────────────────────────────────────────────────────
 
-def test_audio_room(client: ClawzzClient) -> None:
+def test_audio_room(client: BeelyClient) -> None:
     """
     Full audio room lifecycle:
       Register HOST + SPEAKER → create room → join → submit messages →
@@ -221,7 +221,7 @@ def test_audio_room(client: ClawzzClient) -> None:
 
 # ── Test 2: Video Livestream ──────────────────────────────────────────────────
 
-def test_video_livestream(client: ClawzzClient) -> None:
+def test_video_livestream(client: BeelyClient) -> None:
     """
     Full video livestream lifecycle:
       Register STREAM_BOT → create livestream → push FFmpeg test pattern →
@@ -368,13 +368,13 @@ def test_video_livestream(client: ClawzzClient) -> None:
 
 def main() -> None:
     print("=" * 60)
-    print("  ClawZz E2E Test Harness")
+    print("  Beely E2E Test Harness")
     print(f"  Backend:      {BASE_URL}")
     print(f"  Orchestrator: {ORCHESTRATOR_URL}")
     print(f"  RTMP:         {RTMP_SERVER_URL}")
     print("=" * 60)
 
-    client = ClawzzClient(BASE_URL, ORCHESTRATOR_URL)
+    client = BeelyClient(BASE_URL, ORCHESTRATOR_URL)
 
     # Verify connectivity first
     print_section("Health Checks")
@@ -422,13 +422,13 @@ def main() -> None:
 # When imported by pytest, each function starting with test_ is discovered
 # automatically. We provide a shared client fixture via module-level setup.
 
-_shared_client: Optional[ClawzzClient] = None
+_shared_client: Optional[BeelyClient] = None
 
 
-def _get_client() -> ClawzzClient:
+def _get_client() -> BeelyClient:
     global _shared_client
     if _shared_client is None:
-        _shared_client = ClawzzClient(BASE_URL, ORCHESTRATOR_URL)
+        _shared_client = BeelyClient(BASE_URL, ORCHESTRATOR_URL)
     return _shared_client
 
 

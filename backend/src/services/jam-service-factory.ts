@@ -170,7 +170,7 @@ export function initializeJamServiceFactory(): JamServiceFactory {
     stunUrl: process.env.VITE_STUN_URL || "stun:localhost:3478",
     turnUrl: process.env.VITE_TURN_URL || "turn:localhost:3478",
     turnSecret: process.env.COTURN_SECRET || "",
-    turnRealm: process.env.COTURN_REALM || "clawzz.dev",
+    turnRealm: process.env.COTURN_REALM || "beely-live.vercel.app",
     redisUrl: process.env.REDIS_URL || "redis://localhost:6379",
   };
 

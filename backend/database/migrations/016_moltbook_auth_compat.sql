@@ -1,9 +1,9 @@
 -- ============================================
 -- Migration: 016_moltbook_auth_compat
--- Purpose: Sync agent table with Moltbook-style auth requirements (ClawzzAuthService)
+-- Purpose: Sync agent table with Moltbook-style auth requirements (BeelyAuthService)
 -- ============================================
 
--- 1. Add missing columns used by ClawzzAuthService and AgentService
+-- 1. Add missing columns used by BeelyAuthService and AgentService
 ALTER TABLE agent 
   ADD COLUMN IF NOT EXISTS name VARCHAR(255),
   ADD COLUMN IF NOT EXISTS avatar TEXT,

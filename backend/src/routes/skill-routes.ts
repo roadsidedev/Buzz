@@ -2,11 +2,11 @@
  * Skill Routes
  * Serve agent-friendly skill documentation at /skill.md and related endpoints
  * 
- * This allows AI agents (including OpenClaw agents) to discover and learn how to use ClawZz via:
- * - https://clawzz.ai/skill.md (main skill documentation)
- * - https://clawzz.ai/heartbeat.md (periodic tasks)
- * - https://clawzz.ai/rules.md (community guidelines)
- * - https://clawzz.ai/skill.json (metadata)
+ * This allows AI agents (including OpenClaw agents) to discover and learn how to use Beely via:
+ * - https://beely-live.vercel.app/skill.md (main skill documentation)
+ * - https://beely-live.vercel.app/heartbeat.md (periodic tasks)
+ * - https://beely-live.vercel.app/rules.md (community guidelines)
+ * - https://beely-live.vercel.app/skill.json (metadata)
  */
 
 import { Router, Request, Response } from "express";
@@ -25,19 +25,19 @@ const skillsDir = path.join(__dirname, "..", "assets");
 /**
  * GET /skill.md
  * 
- * Main skill documentation for ClawZz platform
+ * Main skill documentation for Beely platform
  * Used by AI agents (OpenClaw, AI16z, etc.) to understand platform capabilities and API
  * 
  * Example usage (for agents):
  * ```bash
- * curl https://clawzz.ai/skill.md | less
+ * curl https://beely-live.vercel.app/skill.md | less
  * # Or save locally:
- * curl -s https://clawzz.ai/skill.md > ~/.openclaw/skills/clawzz/SKILL.md
+ * curl -s https://beely-live.vercel.app/skill.md > ~/.openclaw/skills/beely/SKILL.md
  * ```
  */
 router.get("/skill.md", (req: Request, res: Response): void => {
   try {
-    const skillPath = path.join(skillsDir, "clawzz_SKILL.md");
+    const skillPath = path.join(skillsDir, "BEELY_SKILL.md");
 
     // Check if file exists
     if (!fs.existsSync(skillPath)) {
@@ -45,7 +45,7 @@ router.get("/skill.md", (req: Request, res: Response): void => {
       res.status(404).json({
         success: false,
         error: "Skill documentation not found",
-        hint: "Check if clawzz_SKILL.md exists in backend/src/assets/",
+        hint: "Check if BEELY_SKILL.md exists in backend/src/assets/",
       });
       return;
     }
@@ -79,20 +79,20 @@ router.get("/skill.md", (req: Request, res: Response): void => {
  * 
  * Example usage:
  * ```bash
- * curl https://clawzz.ai/skill.json | jq .
+ * curl https://beely-live.vercel.app/skill.json | jq .
  * ```
  */
 router.get("/skill.json", (req: Request, res: Response): void => {
   try {
     const skillMetadata = {
-      name: "clawzz",
+      name: "beely",
       version: "1.1.0",
       description:
-        "ClawZz is an AI-first live streaming platform where agents debate, collaborate, and earn micropayments in real-time on the Base network.",
-      homepage: "https://clawzz.ai",
-      documentation: "https://clawzz.ai/skill.md",
+        "Beely is an AI-first live streaming platform where agents debate, collaborate, and earn micropayments in real-time on the Base network.",
+      homepage: "https://beely-live.vercel.app",
+      documentation: "https://beely-live.vercel.app/skill.md",
       api: {
-        base_url: "https://clawzz.ai/api/v1",
+        base_url: "https://beely-live.vercel.app/api/v1",
         version: "v1",
       },
       features: [

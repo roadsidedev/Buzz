@@ -177,7 +177,7 @@ openssl rand -hex 32
 **How to set:**
 
 - Configure in your Jam dashboard under Webhooks
-- Must match between ClawZz and Jam dashboard
+- Must match between Beely and Jam dashboard
 
 ---
 
@@ -259,7 +259,7 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 | ----------------- | ----------------------- | -------------------------------- | ----------------------------------------- |
 | `JAM_HOST`        | Domain for Jam services | `localhost`                      | `your-domain.com`                         |
 | `PANTRY_URL`      | Pantry backend URL      | `http://localhost:3003`          | `https://pantry.your-domain.com`          |
-| `COTURN_REALM`    | TURN server realm       | `clawzz.dev`                     | `your-domain.com`                         |
+| `COTURN_REALM`    | TURN server realm       | `beely-live.vercel.app`                     | `your-domain.com`                         |
 | `VITE_PANTRY_URL` | Frontend pantry URL     | `http://localhost:3003/_/pantry` | `https://pantry.your-domain.com/_/pantry` |
 | `VITE_STUN_URL`   | STUN server URL         | `stun:localhost:3478`            | `stun:your-domain.com:3478`               |
 | `VITE_TURN_URL`   | TURN server URL         | `turn:localhost:3478`            | `turn:your-domain.com:3478`               |
@@ -308,7 +308,7 @@ API_PORT=4000
 # ============================================
 # DATABASE
 # ============================================
-DATABASE_URL=postgresql://clawzz:your_password@localhost:5432/clawzz
+DATABASE_URL=postgresql://beely:your_password@localhost:5432/beely
 REDIS_URL=redis://localhost:6379
 
 # ============================================
@@ -328,7 +328,7 @@ JAM_HOST=localhost
 # ============================================
 # COTURN (STUN/TURN Server)
 # ============================================
-COTURN_REALM=clawzz.dev
+COTURN_REALM=beely-live.vercel.app
 COTURN_SECRET=<generate-with: openssl rand -hex 32>
 COTURN_EXTERNAL_IP=              # Leave empty for local dev
 
@@ -374,7 +374,7 @@ Create this helper script to generate all secrets at once:
 #!/bin/bash
 # scripts/generate-secrets.sh
 
-echo "# Generated secrets for ClawZz"
+echo "# Generated secrets for Beely"
 echo "# Run: ./scripts/generate-secrets.sh"
 echo ""
 
@@ -460,11 +460,11 @@ docker-compose up -d
 ```bash
 # Store in AWS Secrets Manager
 aws secretsmanager create-secret \
-  --name clawzz/jwt-secret \
+  --name beely/jwt-secret \
   --secret-string "$(openssl rand -base64 48)"
 
 # Reference in task definition
-# ValueFrom: arn:aws:secretsmanager:region:account:secret:clawzz/jwt-secret
+# ValueFrom: arn:aws:secretsmanager:region:account:secret:beely/jwt-secret
 ```
 
 ### Google Cloud (Cloud Run/GKE)
@@ -475,7 +475,7 @@ echo -n "$(openssl rand -base64 48)" | \
   gcloud secrets create jwt-secret --data-file=-
 
 # Reference in Cloud Run
-gcloud run services update clawzz \
+gcloud run services update beely \
   --set-secrets=JWT_SECRET=jwt-secret:latest
 ```
 
@@ -515,7 +515,7 @@ export COTURN_SECRET=$(openssl rand -hex 32)
 # Verify COTURN_SECRET matches between:
 # 1. .env file
 # 2. Coturn container (COTURN_SECRET env var)
-# 3. ClawZz backend (COTURN_SECRET env var)
+# 3. Beely backend (COTURN_SECRET env var)
 ```
 
 ### "Cannot connect to Pantry"

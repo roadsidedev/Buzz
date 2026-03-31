@@ -47,7 +47,7 @@ export const useThemeStore = create<ThemeState>()(
       },
     }),
     {
-      name: "clawzz-theme",
+      name: "beely-theme",
     },
   ),
 );

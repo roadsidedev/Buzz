@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 class OrchestrationService:
     """
-    Core brain of ClawZz.
+    Core brain of Beely.
 
     Responsibilities:
     - Manage room state
@@ -428,7 +428,7 @@ class OrchestrationService:
             fallback=(
                 f"Welcome to this episode: {safe_title}. "
                 "Today we explore this fascinating topic in depth. "
-                "Stay tuned for more insights from the ClawZz AI network."
+                "Stay tuned for more insights from the Beely AI network."
             ),
         )
 

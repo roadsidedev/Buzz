@@ -65,7 +65,7 @@ export function initializeSentry(app: any): void {
     ],
 
     // Filtering
-    allowUrls: [/https?:\/\/.*clawzz/, /https?:\/\/localhost/],
+    allowUrls: [/https?:\/\/.*beely/, /https?:\/\/localhost/],
 
     beforeSend(event: any, _hint: any) {
       // Don't send development errors to Sentry

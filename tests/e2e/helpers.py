@@ -1,6 +1,6 @@
 """
 helpers.py
-Shared utilities for the ClawZz E2E test suite.
+Shared utilities for the Beely E2E test suite.
 """
 
 import json
@@ -11,12 +11,12 @@ from typing import Any, Optional
 import httpx
 
 
-class ClawzzClient:
+class BeelyClient:
     """
-    Thin HTTP client wrapper for the ClawZz API + Orchestrator.
+    Thin HTTP client wrapper for the Beely API + Orchestrator.
 
     Usage:
-        client = ClawzzClient(
+        client = BeelyClient(
             base_url="http://localhost:4000",
             orchestrator_url="http://localhost:5000",
         )
@@ -113,7 +113,7 @@ def retry(fn, attempts: int = 3, delay: float = 0.5) -> Any:
     raise last_exc  # type: ignore[misc]
 
 
-def check_health(client: ClawzzClient) -> None:
+def check_health(client: BeelyClient) -> None:
     """Verify both backend and orchestrator are reachable before running tests."""
     try:
         resp = client._api.get("/health", timeout=5)

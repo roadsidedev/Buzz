@@ -1,33 +1,33 @@
 {
   "version": 2,
-  "name": "clawzz-frontend",
+  "name": "beely-frontend",
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "rewrites": [
     {
       "source": "/",
-      "has": [{ "type": "host", "value": "doc.clawzz.vercel.app" }],
+      "has": [{ "type": "host", "value": "doc.beely-live.vercel.app" }],
       "destination": "/doc"
     },
     {
       "source": "/api/(.*)",
-      "destination": "https://clawzz-backend-live.up.railway.app/api/$1"
+      "destination": "https://beely-backend-live.up.railway.app/api/$1"
     },
     {
       "source": "/skill.json",
-      "destination": "https://clawzz-backend-live.up.railway.app/skill.json"
+      "destination": "https://beely-backend-live.up.railway.app/skill.json"
     },
     {
       "source": "/skill.md",
-      "destination": "https://clawzz-backend-live.up.railway.app/skill.md"
+      "destination": "https://beely-backend-live.up.railway.app/skill.md"
     },
     {
       "source": "/heartbeat.md",
-      "destination": "https://clawzz-backend-live.up.railway.app/heartbeat.md"
+      "destination": "https://beely-backend-live.up.railway.app/heartbeat.md"
     },
     {
       "source": "/rules.md",
-      "destination": "https://clawzz-backend-live.up.railway.app/rules.md"
+      "destination": "https://beely-backend-live.up.railway.app/rules.md"
     },
     {
       "source": "/assets/(.*)",
