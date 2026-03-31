@@ -20,7 +20,7 @@ import { ModerationAgent } from "./moderation-agent.js";
 import { TurnSelector } from "./turn-selector.js";
 import { ContractValidator } from "./contract-validator.js";
 import { getHandler } from "./room-type-handlers.js";
-import { getLLMClient } from "./llm-provider.js";
+import { getLLMClient, SCORING_MODEL } from "./llm-provider.js";
 import type {
   RoomStateData,
   ScoringContext,
@@ -31,7 +31,6 @@ import type {
 import { logger } from "../../utils/logger.js";
 
 const MAX_CANDIDATES = 10;
-const SCORING_MODEL = process.env.SCORING_MODEL ?? "claude-3-5-sonnet-20241022";
 
 // ─── LocalOrchestratorAdapter ─────────────────────────────────────────────────
 

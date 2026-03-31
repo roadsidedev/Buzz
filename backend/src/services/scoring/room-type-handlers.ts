@@ -28,15 +28,11 @@ const DEFAULT_WEIGHTS: ScoringWeights = {
   engagement: 0.05,
 };
 
-// ─── Concrete handlers ────────────────────────────────────────────────────────
+// ─── Base handler (default implementations shared by all room types) ──────────
 
-class DebateHandler implements RoomTypeHandler {
-  getScoringWeights(): ScoringWeights {
-    // Debate: argumentation quality prioritises novelty of argument and coherence;
-    // relevance stays high; actionability is low (debate rarely ends with actions).
-    // Sum: 0.35 + 0.30 + 0.25 + 0.05 + 0.05 = 1.00
-    return { relevance: 0.35, novelty: 0.30, coherence: 0.25, actionability: 0.05, engagement: 0.05 };
-  }
+abstract class BaseHandler implements RoomTypeHandler {
+  abstract getScoringWeights(): ScoringWeights;
+  abstract extractArtifacts(transcript: TranscriptEntry[]): Record<string, unknown>;
 
   validateMessageContent(text: string): boolean {
     return text.trim().length > 0;
@@ -44,6 +40,17 @@ class DebateHandler implements RoomTypeHandler {
 
   evaluateContractProgress(turnCount: number, minTurns: number): number {
     return Math.min(100, (turnCount / minTurns) * 100);
+  }
+}
+
+// ─── Concrete handlers ────────────────────────────────────────────────────────
+
+class DebateHandler extends BaseHandler {
+  getScoringWeights(): ScoringWeights {
+    // Debate: argumentation quality prioritises novelty of argument and coherence;
+    // relevance stays high; actionability is low (debate rarely ends with actions).
+    // Sum: 0.35 + 0.30 + 0.25 + 0.05 + 0.05 = 1.00
+    return { relevance: 0.35, novelty: 0.30, coherence: 0.25, actionability: 0.05, engagement: 0.05 };
   }
 
   extractArtifacts(transcript: TranscriptEntry[]): Record<string, unknown> {
@@ -55,20 +62,12 @@ class DebateHandler implements RoomTypeHandler {
   }
 }
 
-class CodingHandler implements RoomTypeHandler {
+class CodingHandler extends BaseHandler {
   getScoringWeights(): ScoringWeights {
     // Coding: coherence of the solution and concrete actionability (actual code) matter most;
     // novelty and relevance are lower; engagement minimal.
     // Sum: 0.25 + 0.20 + 0.30 + 0.20 + 0.05 = 1.00
     return { relevance: 0.25, novelty: 0.20, coherence: 0.30, actionability: 0.20, engagement: 0.05 };
-  }
-
-  validateMessageContent(text: string): boolean {
-    return text.trim().length > 0;
-  }
-
-  evaluateContractProgress(turnCount: number, minTurns: number): number {
-    return Math.min(100, (turnCount / minTurns) * 100);
   }
 
   extractArtifacts(transcript: TranscriptEntry[]): Record<string, unknown> {
@@ -83,17 +82,10 @@ class CodingHandler implements RoomTypeHandler {
   }
 }
 
-class ResearchHandler implements RoomTypeHandler {
+class ResearchHandler extends BaseHandler {
   getScoringWeights(): ScoringWeights {
-    return { ...DEFAULT_WEIGHTS, relevance: 0.35, novelty: 0.30, coherence: 0.20, actionability: 0.10 };
-  }
-
-  validateMessageContent(text: string): boolean {
-    return text.trim().length > 0;
-  }
-
-  evaluateContractProgress(turnCount: number, minTurns: number): number {
-    return Math.min(100, (turnCount / minTurns) * 100);
+    // Sum: 0.35 + 0.30 + 0.20 + 0.10 + 0.05 = 1.00
+    return { relevance: 0.35, novelty: 0.30, coherence: 0.20, actionability: 0.10, engagement: 0.05 };
   }
 
   extractArtifacts(transcript: TranscriptEntry[]): Record<string, unknown> {
@@ -107,20 +99,12 @@ class ResearchHandler implements RoomTypeHandler {
   }
 }
 
-class TradingHandler implements RoomTypeHandler {
+class TradingHandler extends BaseHandler {
   getScoringWeights(): ScoringWeights {
     // Trading: actionability (concrete trade setups) and relevance (to the market/asset)
     // dominate; coherence of analysis is important; engagement is irrelevant.
     // Sum: 0.30 + 0.15 + 0.25 + 0.25 + 0.05 = 1.00
     return { relevance: 0.30, novelty: 0.15, coherence: 0.25, actionability: 0.25, engagement: 0.05 };
-  }
-
-  validateMessageContent(text: string): boolean {
-    return text.trim().length > 0;
-  }
-
-  evaluateContractProgress(turnCount: number, minTurns: number): number {
-    return Math.min(100, (turnCount / minTurns) * 100);
   }
 
   extractArtifacts(transcript: TranscriptEntry[]): Record<string, unknown> {
@@ -131,20 +115,12 @@ class TradingHandler implements RoomTypeHandler {
   }
 }
 
-class SimulationHandler implements RoomTypeHandler {
+class SimulationHandler extends BaseHandler {
   getScoringWeights(): ScoringWeights {
     // Simulation: scenario coherence is paramount; actionability (decisions/moves) is high;
     // relevance to scenario objective matters; novelty of actions is secondary.
     // Sum: 0.25 + 0.15 + 0.35 + 0.20 + 0.05 = 1.00
     return { relevance: 0.25, novelty: 0.15, coherence: 0.35, actionability: 0.20, engagement: 0.05 };
-  }
-
-  validateMessageContent(text: string): boolean {
-    return text.trim().length > 0;
-  }
-
-  evaluateContractProgress(turnCount: number, minTurns: number): number {
-    return Math.min(100, (turnCount / minTurns) * 100);
   }
 
   extractArtifacts(transcript: TranscriptEntry[]): Record<string, unknown> {
@@ -155,8 +131,10 @@ class SimulationHandler implements RoomTypeHandler {
   }
 }
 
-class CustomHandler implements RoomTypeHandler {
-  constructor(private readonly typeConfig: Record<string, unknown>) {}
+class CustomHandler extends BaseHandler {
+  constructor(private readonly typeConfig: Record<string, unknown>) {
+    super();
+  }
 
   getScoringWeights(): ScoringWeights {
     const custom = this.typeConfig.custom_scoring_weights as Partial<ScoringWeights> | undefined;
@@ -168,14 +146,6 @@ class CustomHandler implements RoomTypeHandler {
       actionability: custom.actionability ?? DEFAULT_WEIGHTS.actionability,
       engagement: custom.engagement ?? DEFAULT_WEIGHTS.engagement,
     };
-  }
-
-  validateMessageContent(text: string): boolean {
-    return text.trim().length > 0;
-  }
-
-  evaluateContractProgress(turnCount: number, minTurns: number): number {
-    return Math.min(100, (turnCount / minTurns) * 100);
   }
 
   extractArtifacts(transcript: TranscriptEntry[]): Record<string, unknown> {
