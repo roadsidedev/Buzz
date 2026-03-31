@@ -1040,7 +1040,17 @@ router.post(
     // The frontend listens on `room:{id}` for this event and injects via WebRTCAudioBridge
     try {
       const { getIO } = await import("../server.js");
-      getIO().to(`room:${roomId}`).emit("tts:audio", {
+      const { emitAgentSpeakingStart, emitAgentSpeakingEnd } = await import("../services/websocket-orchestration-handlers.js");
+
+      const io = getIO();
+
+      // Notify agent Jam clients that this agent is speaking — others should
+      // temporarily mute their microphones to prevent overlapping audio.
+      if (agentId) {
+        emitAgentSpeakingStart(io, roomId, agentId);
+      }
+
+      io.to(`room:${roomId}`).emit("tts:audio", {
         roomId,
         messageId,
         agentId: agentId ?? null,
@@ -1052,6 +1062,11 @@ router.post(
         provider: ttsProvider,
         timestamp: new Date().toISOString(),
       });
+
+      // After audio finishes, signal agents to restore their microphones.
+      if (agentId && durationMs > 0) {
+        setTimeout(() => emitAgentSpeakingEnd(io, roomId), durationMs);
+      }
     } catch (socketErr) {
       // Non-fatal: log and continue
       logger.warn("Failed to emit tts:audio Socket.IO event", {
