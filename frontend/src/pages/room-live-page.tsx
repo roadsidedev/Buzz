@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from "react"
 import { useParams, useNavigate } from "react-router-dom"
 import {
   MessageSquare, Share2, DollarSign,
-  Copy, ChevronDown, Mic, MicOff, Headphones, ArrowLeft, PhoneOff, Send, Users,
+  Copy, ChevronDown, MicOff, Headphones, ArrowLeft, PhoneOff, Send, Users,
   Volume2, VolumeX,
 } from "lucide-react"
 import axios from "axios"
@@ -218,6 +218,9 @@ export function RoomLivePage() {
   const [showChat, setShowChat] = useState(false)
   const [showTipModal, setShowTipModal] = useState(false)
   const [agentScores, setAgentScores] = useState<Record<string, number>>({})
+  // Local sound-mute state — starts muted so browser autoplay policy is satisfied.
+  // This decouples the mute button from Jam's connection state so it works immediately.
+  const [soundMuted, setSoundMuted] = useState(true)
   const [isRecording, setIsRecording] = useState(false)
   const [recordingUploading, setRecordingUploading] = useState(false)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
@@ -240,12 +243,12 @@ export function RoomLivePage() {
     autoJoin: !streamLoading && !!stream,
   })
 
-  // Sync the HTML5 audio element's muted state with Jam's soundMuted
+  // Sync the HTML5 audio element's muted state with local soundMuted state
   useEffect(() => {
     if (audioPlayerRef.current) {
-      audioPlayerRef.current.muted = jamRoom.isSoundMuted
+      audioPlayerRef.current.muted = soundMuted
     }
-  }, [jamRoom.isSoundMuted])
+  }, [soundMuted])
 
   // ── Initialize WebRTCAudioBridge when Jam room connects ─────────────────────
   useEffect(() => {
@@ -463,10 +466,16 @@ export function RoomLivePage() {
   const supporters = stageParticipants.filter((p) => p !== host)
 
   const listenerProfiles = React.useMemo(() => {
-    return safeListeners.map(id => {
-      const p = participants.find(part => part.id === id);
-      return p || { id, name: id.slice(0, 8), avatar: null, role: "listener" };
-    });
+    // Merge Jam WebRTC listeners + WebSocket spectators so humans who join via
+    // socket (role: "spectator") appear in the listener section immediately.
+    const wsSpectatorIds = participants
+      .filter((p) => p.role === "spectator")
+      .map((p) => p.id)
+    const mergedIds = [...new Set([...safeListeners, ...wsSpectatorIds])]
+    return mergedIds.map((id) => {
+      const p = participants.find((part) => part.id === id)
+      return p || { id, name: id.slice(0, 8), avatar: null, role: "listener" }
+    })
   }, [safeListeners, participants]);
 
   const isHostSpeaking = host
@@ -531,6 +540,21 @@ export function RoomLivePage() {
     jamRoom.disconnect()
     navigate(-1)
   }, [stopRecording, jamRoom, navigate])
+
+  // Mute/unmute the room audio output — always works regardless of Jam state.
+  // Directly controls the HTML5 audio element and syncs Jam when connected.
+  const handleSoundMuteToggle = useCallback(() => {
+    setSoundMuted((prev) => {
+      const next = !prev
+      if (audioPlayerRef.current) {
+        audioPlayerRef.current.muted = next
+      }
+      if (jamRoom.inRoom) {
+        jamRoom.toggleSoundMute()
+      }
+      return next
+    })
+  }, [jamRoom.inRoom, jamRoom.toggleSoundMute])
 
   // ── Chat ────────────────────────────────────────────────────────────────────
   const sendMsg = (e: React.FormEvent) => {
@@ -653,7 +677,8 @@ export function RoomLivePage() {
   }
 
   // ── LIVE ROOM ───────────────────────────────────────────────────────────────
-  const totalListeners = safeListeners.length + (stream.viewerCount || 0)
+  // listenerProfiles now includes both Jam WebRTC peers and WS spectators — use it as the live count.
+  const totalListeners = listenerProfiles.length
 
   // ── DESKTOP: Three-column Clubhouse layout ──────────────────────────────────
   if (isDesktop) {
@@ -724,11 +749,11 @@ export function RoomLivePage() {
               style={{ background: "radial-gradient(ellipse at 50% 0%, rgba(108,92,231,0.22) 0%, transparent 65%)" }}
             />
 
-            {/* ── Unmute banner — shown when connected but audio is muted ── */}
-            {jamRoom.inRoom && jamRoom.isSoundMuted && (
+            {/* ── Unmute banner — shown when audio output is muted ── */}
+            {soundMuted && (
               <button
                 type="button"
-                onClick={jamRoom.toggleSoundMute}
+                onClick={handleSoundMuteToggle}
                 className="relative z-20 flex items-center gap-3 w-full max-w-xs mx-auto mb-6 px-5 py-3 rounded-2xl bg-amber-500/15 border border-amber-500/30 text-amber-300 hover:bg-amber-500/25 transition-all duration-200 group"
               >
                 <VolumeX size={18} className="shrink-0" />
@@ -808,36 +833,17 @@ export function RoomLivePage() {
               {/* Speaker / audio-output mute — primary CTA for listeners */}
               <button
                 type="button"
-                onClick={jamRoom.inRoom ? jamRoom.toggleSoundMute : undefined}
+                onClick={handleSoundMuteToggle}
                 className={cn(
                   "w-16 h-16 rounded-full border-2 flex items-center justify-center transition-all duration-200 shadow-lg",
-                  !jamRoom.inRoom
-                    ? "border-border text-foreground/25 cursor-default"
-                    : jamRoom.isSoundMuted
-                      ? "border-amber-500 bg-amber-500/20 text-amber-600 dark:text-amber-400 shadow-amber-500/20 animate-pulse"
-                      : "border-violet-500 bg-violet-600 text-white shadow-violet-500/40",
+                  soundMuted
+                    ? "border-amber-500 bg-amber-500/20 text-amber-600 dark:text-amber-400 shadow-amber-500/20 animate-pulse"
+                    : "border-violet-500 bg-violet-600 text-white shadow-violet-500/40",
                 )}
-                aria-label={jamRoom.isSoundMuted ? "Unmute audio" : "Mute audio"}
-                title={jamRoom.isSoundMuted ? "Tap to hear the room" : "Mute room audio"}
+                aria-label={soundMuted ? "Unmute audio" : "Mute audio"}
+                title={soundMuted ? "Tap to hear the room" : "Mute room audio"}
               >
-                {jamRoom.isSoundMuted ? <VolumeX size={24} /> : <Volume2 size={24} />}
-              </button>
-
-              {/* Mic — secondary CTA */}
-              <button
-                type="button"
-                onClick={jamRoom.inRoom ? jamRoom.toggleMute : undefined}
-                className={cn(
-                  "w-12 h-12 rounded-full border-2 flex items-center justify-center transition-all duration-200",
-                  !jamRoom.inRoom
-                    ? "border-border text-foreground/25 cursor-default"
-                    : jamRoom.isMuted
-                      ? "border-border bg-muted text-foreground/50"
-                      : "border-violet-400/60 bg-violet-500/10 text-violet-600 dark:text-violet-400",
-                )}
-                aria-label={jamRoom.isMuted ? "Unmute mic" : "Mute mic"}
-              >
-                {jamRoom.isMuted || !jamRoom.inRoom ? <MicOff size={18} /> : <Mic size={18} />}
+                {soundMuted ? <VolumeX size={24} /> : <Volume2 size={24} />}
               </button>
 
               <button
@@ -1012,10 +1018,10 @@ export function RoomLivePage() {
       </div>
 
       {/* ── Unmute banner (mobile) ── */}
-      {jamRoom.inRoom && jamRoom.isSoundMuted && (
+      {soundMuted && (
         <button
           type="button"
-          onClick={jamRoom.toggleSoundMute}
+          onClick={handleSoundMuteToggle}
           className="mx-5 mb-4 flex items-center gap-3 w-full px-4 py-3 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-600 dark:text-amber-300 hover:bg-amber-500/25 transition-all duration-200"
         >
           <VolumeX size={16} className="shrink-0" />
@@ -1112,38 +1118,19 @@ export function RoomLivePage() {
             <PhoneOff size={20} />
             <span className="text-[9px] font-bold uppercase tracking-wide">Leave</span>
           </button>
-          {/* Mic mute */}
-          <button
-            type="button"
-            onClick={jamRoom.inRoom ? jamRoom.toggleMute : undefined}
-            className={cn(
-              "flex flex-col items-center gap-0.5 transition-colors",
-              !jamRoom.inRoom
-                ? "text-foreground/25 cursor-default"
-                : jamRoom.isMuted
-                  ? "text-red-400"
-                  : "text-muted-foreground hover:text-foreground/80",
-            )}
-            aria-label={jamRoom.isMuted ? "Unmute mic" : "Mute mic"}
-          >
-            {jamRoom.isMuted ? <MicOff size={20} /> : <Mic size={20} />}
-            <span className="text-[9px] font-bold uppercase tracking-wide">Mic</span>
-          </button>
           {/* Speaker mute — primary CTA on mobile */}
           <button
             type="button"
-            onClick={jamRoom.inRoom ? jamRoom.toggleSoundMute : undefined}
+            onClick={handleSoundMuteToggle}
             className={cn(
               "w-14 h-14 rounded-full border-2 flex items-center justify-center transition-all duration-200 shadow-lg",
-              !jamRoom.inRoom
-                ? "border-border text-foreground/25 cursor-default"
-                : jamRoom.isSoundMuted
-                  ? "border-amber-500 bg-amber-500/20 text-amber-600 dark:text-amber-400 shadow-amber-500/20 animate-pulse"
-                  : "border-violet-500 bg-violet-600 text-white shadow-violet-500/40",
+              soundMuted
+                ? "border-amber-500 bg-amber-500/20 text-amber-600 dark:text-amber-400 shadow-amber-500/20 animate-pulse"
+                : "border-violet-500 bg-violet-600 text-white shadow-violet-500/40",
             )}
-            aria-label={jamRoom.isSoundMuted ? "Unmute audio" : "Mute audio"}
+            aria-label={soundMuted ? "Unmute audio" : "Mute audio"}
           >
-            {jamRoom.isSoundMuted ? <VolumeX size={22} /> : <Volume2 size={22} />}
+            {soundMuted ? <VolumeX size={22} /> : <Volume2 size={22} />}
           </button>
           <button type="button" onClick={() => setShowChat(true)} className="relative flex flex-col items-center gap-0.5 text-muted-foreground hover:text-foreground/80 transition-colors" aria-label="Chat">
             <MessageSquare size={22} />

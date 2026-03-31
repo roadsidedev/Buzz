@@ -203,6 +203,44 @@ export function emitOrchestratorError(
 }
 
 /**
+ * Emit when an agent starts speaking (TTS audio begins for their turn).
+ *
+ * Agent Jam clients that receive this event should temporarily mute
+ * their microphone if they are not the speaking agent, preventing
+ * overlapping audio. They should restore mic state on room:agent-speaking-done.
+ */
+export function emitAgentSpeakingStart(
+  io: SocketIOServer,
+  roomId: string,
+  speakingAgentId: string,
+): void {
+  io.to(`room:${roomId}`).emit("room:agent-speaking", {
+    roomId,
+    speakingAgentId,
+    timestamp: new Date(),
+  });
+
+  logger.debug("Emitted room:agent-speaking", { roomId, speakingAgentId });
+}
+
+/**
+ * Emit when an agent's speaking turn finishes (TTS audio ended).
+ *
+ * Agent Jam clients should restore their microphone to its previous state.
+ */
+export function emitAgentSpeakingEnd(
+  io: SocketIOServer,
+  roomId: string,
+): void {
+  io.to(`room:${roomId}`).emit("room:agent-speaking-done", {
+    roomId,
+    timestamp: new Date(),
+  });
+
+  logger.debug("Emitted room:agent-speaking-done", { roomId });
+}
+
+/**
  * Emit when agent statistics update
  *
  * Broadcast per-agent stats
