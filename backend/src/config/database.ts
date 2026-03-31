@@ -504,6 +504,103 @@ export async function runStartupMigrations(): Promise<void> {
         ADD COLUMN IF NOT EXISTS recording_ended_at   TIMESTAMP WITH TIME ZONE
     `);
 
+    // ── Migration 018: Missing discovery & room lifecycle columns ──────────
+    // Fixes 500 errors on /discover/live-now, /discover/recently-ended,
+    // and room heartbeat/participant tracking.
+    //
+    // Root cause: The discovery queries reference tables and columns that were
+    // never created by any migration or startup script.
+
+    // 1. room_participant table — referenced by discovery-service.ts getLiveNow()
+    //    subqueries (speaker lists, participant counts), room-repository.ts
+    //    addParticipant(), and migration 017 (which ALTERs it but never CREATEs).
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS room_participant (
+        room_id    UUID NOT NULL REFERENCES room(id) ON DELETE CASCADE,
+        agent_id   UUID NOT NULL REFERENCES agent(id) ON DELETE CASCADE,
+        role       VARCHAR(50) NOT NULL DEFAULT 'speaker',
+        status     VARCHAR(50) NOT NULL DEFAULT 'joined',
+        joined_at  TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        left_at    TIMESTAMP WITH TIME ZONE,
+        PRIMARY KEY (room_id, agent_id)
+      )
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_room_participant_room
+        ON room_participant(room_id)
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_room_participant_agent
+        ON room_participant(agent_id)
+    `);
+
+    // 2. recording_available — referenced by /discover/recently-ended
+    //    (WHERE recording_available = TRUE) and room-repository.ts
+    //    setRecordingAvailable().  Migration 014 adds recording_enabled
+    //    but skips this column.
+    await client.query(`
+      ALTER TABLE room
+        ADD COLUMN IF NOT EXISTS recording_available BOOLEAN NOT NULL DEFAULT FALSE
+    `);
+
+    // 3. last_seen_at — heartbeat column used by discovery-service.ts
+    //    getLiveNow() to filter stale rooms and by room-repository.ts
+    //    updateHeartbeat().
+    await client.query(`
+      ALTER TABLE room
+        ADD COLUMN IF NOT EXISTS last_seen_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_room_last_seen
+        ON room(last_seen_at) WHERE status = 'live'
+    `);
+
+    // 4. search_vector — tsvector column for full-text search on room
+    //    objective and title. Referenced by discovery-service.ts searchRooms().
+    await client.query(`
+      ALTER TABLE room
+        ADD COLUMN IF NOT EXISTS search_vector tsvector
+    `);
+
+    // Backfill search_vector for existing rows
+    await client.query(`
+      UPDATE room
+      SET search_vector = to_tsvector('english', COALESCE(objective, '') || ' ' || COALESCE(title, ''))
+      WHERE search_vector IS NULL
+    `);
+
+    // Trigger function to auto-update search_vector on INSERT/UPDATE
+    await client.query(`
+      CREATE OR REPLACE FUNCTION room_search_vector_update()
+      RETURNS TRIGGER AS $$
+      BEGIN
+        NEW.search_vector := to_tsvector('english', COALESCE(NEW.objective, '') || ' ' || COALESCE(NEW.title, ''));
+        RETURN NEW;
+      END;
+      $$ LANGUAGE plpgsql
+    `);
+
+    await client.query(`
+      DO $$ BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_trigger WHERE tgname = 'room_search_vector_trigger'
+        ) THEN
+          CREATE TRIGGER room_search_vector_trigger
+            BEFORE INSERT OR UPDATE OF objective, title ON room
+            FOR EACH ROW EXECUTE FUNCTION room_search_vector_update();
+        END IF;
+      END $$
+    `);
+
+    // GIN index for fast full-text search
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_room_search_vector
+        ON room USING GIN(search_vector)
+    `);
+
     await client.query("COMMIT");
 
     logger.info("Startup schema migrations applied successfully");
