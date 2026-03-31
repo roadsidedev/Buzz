@@ -14,7 +14,7 @@ export interface RoomMetricsUpdate {
   roomId: string;
   viewerCount: number;
   trendingScore: number;
-  status: "pending" | "live" | "completed" | "archived";
+  status: "pending" | "live" | "scheduled" | "ended" | "closed" | "completed" | "cancelled" | "failed" | "archived";
   lastUpdated: string;
 }
 
@@ -24,7 +24,7 @@ export interface RoomMetricsUpdate {
 export interface WebsocketRoomState {
   viewerCount: number;
   trendingScore: number;
-  status: "pending" | "live" | "completed" | "archived";
+  status: "pending" | "live" | "scheduled" | "ended" | "closed" | "completed" | "cancelled" | "failed" | "archived";
   lastUpdated: string | null;
   isConnected: boolean;
   error: Error | null;

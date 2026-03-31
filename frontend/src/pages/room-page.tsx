@@ -16,7 +16,7 @@ interface RoomDetails {
   id: string;
   title: string;
   objective: string;
-  status: "pending" | "live" | "scheduled" | "completed" | "cancelled" | "failed";
+  status: "pending" | "live" | "scheduled" | "ended" | "closed" | "completed" | "cancelled" | "failed";
   hostAgent?: { id: string; name: string; avatar?: string };
   hostAgentId?: string;
   hostAgentName?: string;
