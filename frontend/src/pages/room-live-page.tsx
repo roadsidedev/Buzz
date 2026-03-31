@@ -958,7 +958,7 @@ export function RoomLivePage() {
   // ── MOBILE LAYOUT ─────────────────────────────────────────────────────────────
   return (
     <div
-      className="animate-in fade-in duration-500 min-h-screen pb-28 bg-background text-foreground"
+      className="animate-in fade-in duration-500 min-h-screen pb-36 bg-background text-foreground"
     >
       {/* Hidden persistent audio element — shared TTS player */}
       <audio ref={audioPlayerRef} preload="none" style={{ display: "none" }} />
@@ -994,6 +994,9 @@ export function RoomLivePage() {
         </div>
 
         <div className="flex items-center gap-1">
+          <button type="button" onClick={handleLeave} className="p-2 text-xl leading-none" aria-label="Leave room">
+            ✌🏿
+          </button>
           <button type="button" onClick={() => setShareWizardOpen(true)} className="p-2 text-white/50 hover:text-white/80 transition-colors" aria-label="Share">
             <Share2 size={18} />
           </button>
@@ -1039,33 +1042,24 @@ export function RoomLivePage() {
             <p className="text-xs uppercase tracking-widest">No speakers yet</p>
           </div>
         ) : (
-          <>
-            {host && (
-              <div className="flex justify-center mb-8">
-                <HostTile participant={host} isSpeaking={isHostSpeaking} score={agentScores[host.id]} />
-              </div>
-            )}
-            {supporters.length > 0 && (
-              <div className="grid grid-cols-3 gap-6 justify-items-center">
-                {supporters.map((p, idx) => (
-                  <SpeakerTile
-                    key={p.id}
-                    participant={p}
-                    isSpeaking={jamRoom.speaking.includes(p.id) || (jamRoom.speaking.length > 0 && idx + 1 < jamRoom.speaking.length)}
-                    score={agentScores[p.id]}
-                  />
-                ))}
-              </div>
-            )}
-          </>
+          <div className="grid grid-cols-3 gap-6 justify-items-center">
+            {stageParticipants.map((p, idx) => (
+              <SpeakerTile
+                key={p.id}
+                participant={p}
+                isSpeaking={safeSpeaking.includes(p.id) || (safeSpeaking.length > 0 && idx < safeSpeaking.length)}
+                score={agentScores[p.id]}
+              />
+            ))}
+          </div>
         )}
       </div>
 
       {/* ── Listeners (Mobile) ── */}
-      <div className="px-5 pt-4 pb-6 border-t border-border">
+      <div className="px-5 pt-2 pb-6">
         <div className="flex items-center justify-between mb-4">
-          <span className="font-black text-[11px] uppercase tracking-widest text-muted-foreground">Listeners</span>
-          <span className="text-[10px] font-bold text-muted-foreground/60">{listenerProfiles.length}</span>
+          <span className="font-black text-[11px] uppercase tracking-widest text-muted-foreground/50">Listeners</span>
+          <span className="text-[10px] font-bold text-muted-foreground/40">{listenerProfiles.length}</span>
         </div>
         
         {listenerProfiles.length === 0 ? (
@@ -1112,7 +1106,7 @@ export function RoomLivePage() {
       </div>
 
       {/* ── Fixed bottom action bar ── */}
-      <div className="fixed bottom-0 inset-x-0 backdrop-blur-sm border-t border-border z-30 bg-background/95">
+      <div className="fixed bottom-0 inset-x-0 backdrop-blur-sm border-t border-border z-[60] bg-background/95" style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}>
         <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
           <button type="button" onClick={handleLeave} className="flex flex-col items-center gap-0.5 text-red-400 hover:text-red-300 transition-colors" aria-label="Leave">
             <PhoneOff size={20} />

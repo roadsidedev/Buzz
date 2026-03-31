@@ -197,8 +197,8 @@ export function MainLayout({ children }: MainLayoutProps) {
         {/* Room dock (mobile only — slides up as Clubhouse-style sheet) */}
         <RoomDock />
 
-        {/* Mobile Bottom Nav — hidden when room dock is expanded */}
-        {!isDockExpanded && (
+        {/* Mobile Bottom Nav — hidden when room dock is expanded or on live room pages */}
+        {!isDockExpanded && !/^\/room\/[^/]+\/live$/.test(location.pathname) && (
           <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-t flex items-center justify-between px-4 py-2">
             <MobileNavLink icon={Home} label="Home" active={isActive("/rooms") || isActive("/room")} onClick={() => handleNav("/rooms")}  />
             <MobileNavLink icon={Compass} label="Explore" active={isActive("/explore")} onClick={() => handleNav("/explore")} />
