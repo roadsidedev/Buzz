@@ -53,8 +53,8 @@ export class RoomRepository {
     recording_enabled?: boolean;
   }): Promise<Room> {
     const text = `
-      INSERT INTO room (id, host_agent_id, title, type, status, objective, spawn_fee, viewer_count, participant_count, completion_level, visibility, recording_enabled, created_at, updated_at, scheduled_for)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, 0, 1, 'minimum', 'public', $8, NOW(), NOW(), $9)
+      INSERT INTO room (id, host_agent_id, title, type, status, objective, spawn_fee, viewer_count, participant_count, completion_level, visibility, recording_enabled, created_at, updated_at, last_seen_at, scheduled_for)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, 0, 1, 'minimum', 'public', $8, NOW(), NOW(), NOW(), $9)
       RETURNING id, host_agent_id, title, type, status, objective, spawn_fee, jam_room_id, jam_room_url, spawn_fee_payment_id, viewer_count, participant_count, completion_level, recording_enabled, recording_url, recording_started_at, recording_ended_at, created_at, started_at, ended_at, updated_at, scheduled_for
     `;
 

@@ -628,9 +628,43 @@ router.post(
 );
 
 /**
- * POST /rooms/:id/close
- * Close room (host only)
+ * POST /rooms/:id/heartbeat
+ * Record host heartbeat — keeps room visible in discovery.
+ *
+ * The discovery feed filters by `last_seen_at > NOW() - INTERVAL '60 seconds'`.
+ * The radio-runner calls this endpoint every ~30s via the room_keeper watchdog.
+ *
+ * Auth: Bearer API key (host only)
  */
+router.post(
+  "/:id/heartbeat",
+  requireApiKey,
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const { id } = req.params;
+    const agent = req.agent!;
+
+    const room = await roomService.getRoomById(id);
+    if (room.hostAgentId !== agent.agentId) {
+      res.status(403).json({
+        success: false,
+        error: {
+          code: "UNAUTHORIZED",
+          message: "Only the room host can send heartbeats",
+          statusCode: 403,
+        },
+      });
+      return;
+    }
+
+    await roomService.recordHeartbeat(id);
+
+    res.json({
+      success: true,
+      data: { lastSeenAt: new Date().toISOString() },
+    });
+  })
+);
+
 /**
  * POST /rooms/:id/close
  * Close room and trigger revenue distribution (host only)

@@ -306,6 +306,36 @@ class OrchestratorBridge:
         self._assert_ok(resp, "close_room")
         logger.info("Room closed", extra={"room_id": room_id[:8]})
 
+    def send_heartbeat(self, room_id: str, api_key: str) -> bool:
+        """
+        Send a heartbeat to signal the room host is still alive.
+
+        The backend uses this to keep the room visible in discovery
+        (last_seen_at > NOW() - INTERVAL '60 seconds').
+
+        Args:
+            room_id: Room ID to heartbeat
+            api_key: Host agent API key for auth
+
+        Returns:
+            True if heartbeat was accepted
+        """
+        try:
+            resp = self._backend.post(
+                f"/api/v1/rooms/{room_id}/heartbeat",
+                headers=self._auth_headers(api_key),
+            )
+            if resp.status_code >= 300:
+                logger.warning(
+                    "Heartbeat rejected",
+                    extra={"room_id": room_id[:8], "status": resp.status_code},
+                )
+                return False
+            return True
+        except Exception as exc:
+            logger.warning("Heartbeat failed", extra={"error": str(exc)})
+            return False
+
     # ── Message Submission & Turn Processing ─────────────────────────────────
 
     def submit_message(

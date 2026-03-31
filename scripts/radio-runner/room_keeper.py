@@ -179,6 +179,14 @@ class RoomKeeper:
 
                 if status in ALIVE_STATUSES:
                     backoff = 1.0  # reset backoff on healthy check
+                    # Send heartbeat to keep room visible in discovery
+                    try:
+                        self._bridge.send_heartbeat(
+                            current_room_id,
+                            self._host_agent.api_key if self._host_agent else "",
+                        )
+                    except Exception as hb_exc:
+                        logger.warning("Heartbeat send failed", extra={"error": str(hb_exc)})
                     logger.debug(
                         "Room healthy",
                         extra={"room_id": current_room_id[:8], "status": status},
