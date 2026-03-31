@@ -22,8 +22,6 @@ import { logger } from "../../utils/logger.js";
 
 const ROOM_STATE_KEY = (id: string) => `room_state:${id}`;
 const ROOM_INDEX_KEY = "room_index";
-const ROOM_PARTICIPANTS_KEY = (id: string) => `room_participants:${id}`;
-const ROOM_MESSAGES_KEY = (id: string) => `room_messages:${id}`;
 
 const DEFAULT_TTL_SECONDS = 48 * 60 * 60; // 48 hours
 
@@ -67,10 +65,7 @@ export class RoomStateStore {
     if (!this.redis) return;
     try {
       const key = ROOM_STATE_KEY(state.roomId);
-      // Preserve remaining TTL on update
-      const ttl = await this.redis.ttl(key);
-      const effectiveTtl = ttl > 0 ? ttl : DEFAULT_TTL_SECONDS;
-      await this.redis.setEx(key, effectiveTtl, JSON.stringify(this._serialize(state)));
+      await this.redis.setEx(key, DEFAULT_TTL_SECONDS, JSON.stringify(this._serialize(state)));
     } catch (err) {
       logger.warn("Failed to update room state in Redis", {
         roomId: state.roomId,
@@ -95,26 +90,6 @@ export class RoomStateStore {
       return await this.redis.zRange(ROOM_INDEX_KEY, 0, -1);
     } catch {
       return [];
-    }
-  }
-
-  async storeParticipant(roomId: string, agentId: string, data: object): Promise<void> {
-    if (!this.redis) return;
-    try {
-      await this.redis.hSet(ROOM_PARTICIPANTS_KEY(roomId), agentId, JSON.stringify(data));
-      await this.redis.expire(ROOM_PARTICIPANTS_KEY(roomId), DEFAULT_TTL_SECONDS);
-    } catch (err) {
-      logger.warn("Failed to store participant in Redis", { roomId, agentId });
-    }
-  }
-
-  async storeMessage(roomId: string, messageId: string, data: object): Promise<void> {
-    if (!this.redis) return;
-    try {
-      await this.redis.hSet(ROOM_MESSAGES_KEY(roomId), messageId, JSON.stringify(data));
-      await this.redis.expire(ROOM_MESSAGES_KEY(roomId), DEFAULT_TTL_SECONDS);
-    } catch (err) {
-      logger.warn("Failed to store message in Redis", { roomId, messageId });
     }
   }
 

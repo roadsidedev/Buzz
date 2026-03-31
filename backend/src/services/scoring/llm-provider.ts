@@ -201,3 +201,20 @@ export function getLLMClient(): LLMClient {
 export function resetLLMClient(): void {
   _client = null;
 }
+
+// ─── Shared scoring config ────────────────────────────────────────────────────
+
+export const SCORING_MODEL = process.env.SCORING_MODEL ?? "claude-3-5-sonnet-20241022";
+
+/**
+ * Strip markdown code fences from LLM responses before JSON.parse.
+ * Handles ` ```json ... ``` ` and ` ``` ... ``` `.
+ */
+export function stripMarkdownFences(text: string): string {
+  const trimmed = text.trim();
+  if (!trimmed.startsWith("```")) return trimmed;
+  const parts = trimmed.split("```");
+  let inner = parts[1] ?? "";
+  if (inner.startsWith("json")) inner = inner.slice(4);
+  return inner.trim();
+}

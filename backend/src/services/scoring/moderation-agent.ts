@@ -8,7 +8,7 @@
  * from blocking all messages during an outage.
  */
 
-import { getLLMClient } from "./llm-provider.js";
+import { getLLMClient, stripMarkdownFences } from "./llm-provider.js";
 import type { ScoringMessage, ScoringResult, ModerationResult } from "./types.js";
 import { logger } from "../../utils/logger.js";
 
@@ -94,15 +94,7 @@ export class ModerationAgent {
   }
 
   private _parseResponse(text: string): ModerationResult {
-    let json = text.trim();
-    if (json.startsWith("```")) {
-      const parts = json.split("```");
-      json = parts[1] ?? "";
-      if (json.startsWith("json")) json = json.slice(4);
-      json = json.trim();
-    }
-
-    const data = JSON.parse(json) as {
+    const data = JSON.parse(stripMarkdownFences(text)) as {
       is_safe: boolean;
       violation_type?: string | null;
       explanation?: string;

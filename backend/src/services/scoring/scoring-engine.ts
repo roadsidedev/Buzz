@@ -13,15 +13,12 @@
  *  - JSON code-block unwrapping
  */
 
-import { getLLMClient } from "./llm-provider.js";
+import { getLLMClient, SCORING_MODEL, stripMarkdownFences } from "./llm-provider.js";
 import type { ScoringMessage, ScoringContext, ScoringResult, ScoringWeights } from "./types.js";
 import { logger } from "../../utils/logger.js";
 
 // ─── Config ───────────────────────────────────────────────────────────────────
-// Model names are the only things that should vary between deployments.
 // All tuning constants are encoded here — not in environment variables.
-
-const SCORING_MODEL = process.env.SCORING_MODEL ?? "claude-3-5-sonnet-20241022";
 const SCORING_TIMEOUT_MS = 10_000;   // 10 seconds per LLM call
 const SCORING_RETRY_ATTEMPTS = 3;
 const SCORING_RETRY_DELAY_MS = 1_000;
@@ -52,9 +49,10 @@ interface ScoringData {
 
 // ─── Prompt sanitizer (minimal injection prevention) ─────────────────────────
 
+const INJECTION_PATTERN = /<[^>]{0,200}>/g;
+
 function sanitize(text: string): string {
-  // Strip angle-bracket instruction-style injections: <anything>
-  return text.replace(/<[^>]{0,200}>/g, "").trim();
+  return text.replace(INJECTION_PATTERN, "").trim();
 }
 
 // ─── ScoringEngine ────────────────────────────────────────────────────────────
@@ -257,17 +255,7 @@ Respond ONLY with valid JSON.`;
     messageId: string,
     weights: ScoringWeights,
   ): ScoringData {
-    let json = responseText.trim();
-
-    // Unwrap markdown code blocks: ```json ... ``` or ``` ... ```
-    if (json.startsWith("```")) {
-      const parts = json.split("```");
-      json = parts[1] ?? "";
-      if (json.startsWith("json")) json = json.slice(4);
-      json = json.trim();
-    }
-
-    const data = JSON.parse(json) as Record<string, unknown>; // throws on invalid JSON → triggers retry
+    const data = JSON.parse(stripMarkdownFences(responseText)) as Record<string, unknown>; // throws on invalid JSON → triggers retry
 
     const w = weights;
     const missing: string[] = [];
