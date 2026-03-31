@@ -91,7 +91,10 @@ export class DiscoveryService {
           LEFT JOIN room_viewers rv ON r.id = rv.room_id
           LEFT JOIN room_engagement re ON r.id = re.room_id
           LEFT JOIN room_participant rp ON r.id = rp.room_id AND rp.left_at IS NULL
-          WHERE r.status = 'live' AND r.visibility = 'public' ${mainTypeClause}
+          WHERE r.status = 'live'
+            AND r.visibility = 'public'
+            AND r.last_seen_at > NOW() - INTERVAL '60 seconds'
+            ${mainTypeClause}
           GROUP BY r.id, r.objective, r.description, r.type, r.status, r.thumbnail_url,
                    r.created_at, r.started_at,
                    c.id, c.name, c.color, c.slug,
@@ -102,7 +105,7 @@ export class DiscoveryService {
           mainParams,
         ),
         this.db.query(
-          `SELECT COUNT(*) as total_count FROM room WHERE status = 'live' AND visibility = 'public' ${countTypeClause}`,
+          `SELECT COUNT(*) as total_count FROM room WHERE status = 'live' AND visibility = 'public' AND last_seen_at > NOW() - INTERVAL '60 seconds' ${countTypeClause}`,
           countParams,
         ),
       ]);
@@ -173,7 +176,7 @@ export class DiscoveryService {
         LEFT JOIN room_viewers rv ON r.id = rv.room_id
         LEFT JOIN room_engagement re ON r.id = re.room_id
         LEFT JOIN room_participant rp ON r.id = rp.room_id AND rp.left_at IS NULL
-        WHERE (r.status = 'live' OR r.status = 'completed' OR r.status = 'pending') AND r.visibility = 'public'
+        WHERE (r.status = 'live' OR r.status = 'closed') AND r.visibility = 'public'
         GROUP BY r.id, r.objective, r.description, r.type, r.status, r.thumbnail_url, r.created_at, r.started_at,
                  c.id, c.name, c.color, c.slug, a.id
         ORDER BY trending_score DESC, viewer_count DESC
@@ -378,7 +381,7 @@ export class DiscoveryService {
 
       if (filters?.status) {
         // Validate status is an allowed value
-        const allowedStatuses = ["live", "completed", "pending", "cancelled"];
+        const allowedStatuses = ["live", "ended", "closed", "completed", "cancelled", "failed"];
         if (!allowedStatuses.includes(filters.status)) {
           throw new Error("Invalid status filter");
         }
@@ -468,10 +471,13 @@ export class DiscoveryService {
         LEFT JOIN room_engagement re ON r.id = re.room_id
         LEFT JOIN room_participant rp ON r.id = rp.room_id AND rp.left_at IS NULL
         WHERE
-          r.objective ILIKE $1 OR
-          r.description ILIKE $1 OR
-          a.username ILIKE $1 OR
-          a.name ILIKE $1
+          r.status NOT IN ('cancelled', 'failed', 'pending')
+          AND (
+            r.objective ILIKE $1 OR
+            r.description ILIKE $1 OR
+            a.username ILIKE $1 OR
+            a.name ILIKE $1
+          )
         GROUP BY r.id, r.objective, r.status, r.thumbnail_url, r.created_at, r.started_at,
                  c.id, c.name, c.color, c.slug,
                  a.id, a.name, a.username, a.avatar

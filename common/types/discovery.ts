@@ -21,7 +21,7 @@ export interface DiscoveryRoom {
   objective: string;
   description?: string;
   type: string;
-  status: "pending" | "live" | "completed" | "archived";
+  status: "pending" | "live" | "scheduled" | "ended" | "closed" | "completed" | "cancelled" | "failed" | "archived";
   visibility?: "public" | "private";
   hostAgent: {
     id: string;
@@ -45,6 +45,8 @@ export interface DiscoveryRoom {
   thumbnailUrl?: string;
   participantCount: number;
   createdAt?: string; // ISO timestamp
+  hasRecording?: boolean; // Whether a recording is available for replay
+  recordingUrl?: string;  // URL of the recording if available
   participants?: Array<{
     id: string;
     name: string;

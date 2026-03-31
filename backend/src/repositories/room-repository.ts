@@ -204,11 +204,11 @@ export class RoomRepository {
   }
 
   /**
-   * Get discoverable rooms (live + pending) for public listing.
+   * Get discoverable rooms (live only with active heartbeat) for public listing.
    *
-   * Rooms with status 'pending' (Jam unavailable at creation) are still
-   * valid — agents can join them and trigger audio initialization.
-   * Live rooms sort first, then by viewer count and creation date.
+   * Only rooms where the host has sent a heartbeat within the last 60 seconds
+   * are included. Pending rooms are excluded — they are not discoverable until
+   * audio is initialized and the host is connected.
    *
    * @param limit - Max results per page
    * @param offset - Pagination offset
@@ -223,7 +223,8 @@ export class RoomRepository {
     let text = `
       SELECT id, host_agent_id, type, status, title, objective, spawn_fee, jam_room_id, jam_room_url, spawn_fee_payment_id, viewer_count, participant_count, completion_level, recording_enabled, recording_url, recording_started_at, recording_ended_at, created_at, started_at, ended_at, updated_at, scheduled_for
       FROM room
-      WHERE status IN ('live', 'pending')
+      WHERE status = 'live'
+        AND last_seen_at > NOW() - INTERVAL '60 seconds'
     `;
 
     const params: any[] = [];
@@ -234,7 +235,7 @@ export class RoomRepository {
     }
 
     text += `
-      ORDER BY (CASE WHEN status = 'live' THEN 0 ELSE 1 END), viewer_count DESC, created_at DESC
+      ORDER BY viewer_count DESC, created_at DESC
       LIMIT $${params.length + 1} OFFSET $${params.length + 2}
     `;
 
@@ -253,7 +254,7 @@ export class RoomRepository {
   }
 
   /**
-   * Get total count of discoverable rooms (live + pending)
+   * Get total count of discoverable rooms (live with active heartbeat)
    *
    * @param type - Optional room type filter for count
    * @returns Total count of rooms matching criteria
@@ -262,7 +263,8 @@ export class RoomRepository {
     let text = `
       SELECT COUNT(*) as count
       FROM room
-      WHERE status IN ('live', 'pending')
+      WHERE status = 'live'
+        AND last_seen_at > NOW() - INTERVAL '60 seconds'
     `;
 
     const params: any[] = [];
@@ -297,7 +299,7 @@ export class RoomRepository {
     let text = `
       SELECT id, host_agent_id, type, status, title, objective, spawn_fee, jam_room_id, jam_room_url, spawn_fee_payment_id, viewer_count, participant_count, completion_level, recording_enabled, recording_url, recording_started_at, recording_ended_at, created_at, started_at, ended_at, updated_at, scheduled_for
       FROM room
-      WHERE status IN ('live', 'completed')
+      WHERE status IN ('live', 'closed')
         AND created_at > NOW() - INTERVAL '${hours} hours'
     `;
 
@@ -375,7 +377,7 @@ export class RoomRepository {
     // Build conditional timestamp assignments in JS to avoid CASE/enum issues.
     const setStartedAt = status === "live" ? ", started_at = NOW()" : "";
     const setEndedAt =
-      status === "completed" || status === "cancelled" || status === "failed"
+      status === "ended" || status === "completed" || status === "cancelled" || status === "failed"
         ? ", ended_at = NOW()"
         : "";
 
@@ -593,6 +595,35 @@ export class RoomRepository {
   }
 
   /**
+   * Get all participants for a room
+   *
+   * @param roomId - Room ID
+   * @returns Array of participants (all statuses)
+   */
+  async getParticipants(roomId: string): Promise<Array<{
+    agent_id: string;
+    role: string;
+    status: string;
+    joined_at: string;
+  }>> {
+    const text = `
+      SELECT agent_id, role, status, joined_at
+      FROM room_participant
+      WHERE room_id = $1
+      ORDER BY joined_at ASC
+    `;
+
+    const rows = await query<{
+      agent_id: string;
+      role: string;
+      status: string;
+      joined_at: string;
+    }>(text, [roomId]);
+
+    return rows;
+  }
+
+  /**
    * Save recording URL and timestamps after upload completes
    */
   async updateRecordingUrl(
@@ -613,6 +644,79 @@ export class RoomRepository {
     await query(text, [recordingUrl, startedAt || null, endedAt || null, roomId]);
 
     logger.info("Room recording URL saved", { roomId, recordingUrl });
+  }
+
+  /**
+   * Mark recording as available and transition room from 'ended' to 'closed'.
+   *
+   * Called after a recording has been uploaded and is ready for replay.
+   * This is the signal that makes a room eligible for the "recently ended"
+   * and "episodes" discovery feeds.
+   *
+   * @param roomId - Room ID
+   */
+  async setRecordingAvailable(roomId: string): Promise<void> {
+    const text = `
+      UPDATE room
+      SET recording_available = TRUE,
+          status = 'closed',
+          updated_at = NOW()
+      WHERE id = $1 AND status = 'ended'
+    `;
+
+    await query(text, [roomId]);
+
+    logger.info("Room recording marked available", { roomId });
+  }
+
+  /**
+   * Update host heartbeat timestamp for a room.
+   *
+   * Called by the agent WebSocket every ~30s while the host is connected.
+   * The orchestration service checks this to auto-end rooms where the host
+   * has gone stale (no heartbeat for >60s).
+   *
+   * @param roomId - Room ID
+   */
+  async updateHeartbeat(roomId: string): Promise<void> {
+    const text = `
+      UPDATE room
+      SET last_seen_at = NOW(), updated_at = NOW()
+      WHERE id = $1
+    `;
+
+    await query(text, [roomId]);
+  }
+
+  /**
+   * Get rooms that are marked 'live' but whose host heartbeat is stale.
+   *
+   * A room is considered stale if `last_seen_at` is older than `staleSeconds`
+   * from now. These rooms should be transitioned to 'ended' automatically.
+   *
+   * @param staleSeconds - Seconds since last heartbeat before considered stale (default 60)
+   * @returns Array of rooms with stale heartbeats
+   */
+  async getRoomsWithStaleHeartbeat(staleSeconds: number = 60): Promise<Room[]> {
+    const text = `
+      SELECT id, host_agent_id, type, status, title, objective, spawn_fee,
+             jam_room_id, jam_room_url, spawn_fee_payment_id, viewer_count,
+             participant_count, completion_level, recording_enabled,
+             recording_url, recording_started_at, recording_ended_at,
+             created_at, started_at, ended_at, updated_at, scheduled_for
+      FROM room
+      WHERE status = 'live'
+        AND last_seen_at < NOW() - INTERVAL '${staleSeconds} seconds'
+    `;
+
+    const rows = await query<RoomRow>(text);
+
+    logger.debug("Found rooms with stale heartbeat", {
+      count: rows.length,
+      staleSeconds,
+    });
+
+    return rows.map((row) => this.mapRowToRoom(row));
   }
 
   /**

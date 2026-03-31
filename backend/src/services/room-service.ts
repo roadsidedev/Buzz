@@ -633,11 +633,11 @@ export class RoomService {
   /**
    * Close room and distribute revenue
    *
-   * Process:
-   * 1. Verify room exists
-   * 2. Update status to completed
-   * 3. End room on Jam side
-   * 4. Distribute revenue to host and participants
+   * Lifecycle:
+   * 1. Mark room as 'ended' (session over)
+   * 2. If recording is already available, transition to 'closed' (replay-ready)
+   * 3. If recording is still uploading, room stays 'ended' until upload callback
+   *    calls setRecordingAvailable() to transition to 'closed'
    *
    * @param roomId - Room ID to close
    * @throws NotFoundError if room doesn't exist
@@ -646,8 +646,8 @@ export class RoomService {
     // 1. VERIFY ROOM EXISTS
     const room = await this.getRoomById(roomId);
 
-    // 2. UPDATE STATUS TO COMPLETED
-    await this.updateRoomStatus(roomId, "completed");
+    // 2. UPDATE STATUS TO ENDED
+    await this.updateRoomStatus(roomId, "ended");
 
     // 3. END ROOM ON JAM SIDE
     try {
@@ -680,7 +680,22 @@ export class RoomService {
       // Continue - close room even if Jam fails
     }
 
-    // 4. DISTRIBUTE REVENUE TO HOST AND PARTICIPANTS
+    // 4. IF RECORDING IS ALREADY AVAILABLE, TRANSITION TO CLOSED
+    try {
+      const updatedRoom = await roomRepository.getById(roomId);
+      if (updatedRoom?.recordingUrl) {
+        await roomRepository.setRecordingAvailable(roomId);
+        logger.info("Room recording was available — transitioned to closed", { roomId });
+      }
+    } catch (recErr) {
+      logger.warn("Failed to check recording availability after close", {
+        roomId,
+        error: recErr instanceof Error ? recErr.message : String(recErr),
+      });
+      // Room stays in 'ended' — will be transitioned to 'closed' when recording uploads
+    }
+
+    // 5. DISTRIBUTE REVENUE TO HOST AND PARTICIPANTS
     try {
       // Get all room participants
       const participants = await roomRepository.getParticipants(roomId);
@@ -744,7 +759,7 @@ export class RoomService {
         totalSpawnFee,
       );
 
-      logger.info("Revenue distributed for completed room", {
+      logger.info("Revenue distributed for closed room", {
         roomId,
         hostAgentId: room.hostAgentId,
         participantCount: validParticipants.length,
@@ -756,11 +771,24 @@ export class RoomService {
         roomId,
         error: err instanceof Error ? err.message : String(err),
       });
-      // Don't throw - room is already marked as completed
+      // Don't throw - room is already marked as ended/closed
       // Revenue distribution failures should be retried separately
     }
 
     logger.info("Room closed successfully", { roomId });
+  }
+
+  /**
+   * Record a heartbeat from the host agent.
+   *
+   * Updates the room's `last_seen_at` timestamp to signal that the host
+   * is still connected and actively managing the room. The orchestration
+   * service uses this to detect stale rooms (no heartbeat for >60s).
+   *
+   * @param roomId - Room ID to record heartbeat for
+   */
+  async recordHeartbeat(roomId: string): Promise<void> {
+    await roomRepository.updateHeartbeat(roomId);
   }
 
   /**
@@ -808,7 +836,7 @@ export class RoomService {
       return room;
     }
 
-    if (room.status === "completed" || room.status === "cancelled") {
+    if (room.status === "ended" || room.status === "closed" || room.status === "completed" || room.status === "cancelled" || room.status === "failed") {
       throw new ValidationError("Cannot initialize Jam for a closed room", {
         field: "status",
         current: room.status,

@@ -36,6 +36,9 @@ function mapDiscoveryRoom(room: any): object {
     thumbnailUrl: room.thumbnailUrl ?? null,
     createdAt: room.createdAt ?? null,
     startedAt: room.startedAt ?? null,
+    endedAt: room.endedAt ?? null,
+    hasRecording: room.hasRecording ?? (room.status === "closed"),
+    recordingUrl: room.recordingUrl ?? null,
     hostAgent: room.hostAgent
       ? {
           id: room.hostAgent.id,
@@ -181,8 +184,8 @@ router.get(
 
 /**
  * GET /discover/recently-ended
- * Recently completed rooms with transcripts and recordings.
- * Used as the empty-state fallback on the Live discovery page.
+ * Recently completed rooms with recordings available for replay.
+ * Only shows rooms that are 'closed' with recording_available = true.
  */
 router.get(
   "/recently-ended",
@@ -204,12 +207,12 @@ router.get(
                 COALESCE(a.avatar, '') as "hostAgentAvatar"
          FROM room r
          LEFT JOIN agent a ON r.host_agent_id = a.id
-         WHERE r.status = 'completed'
+         WHERE r.status = 'closed' AND r.recording_available = TRUE
          ORDER BY r.ended_at DESC NULLS LAST
          LIMIT $1 OFFSET $2`,
         [limit, offset],
       ),
-      pool.query(`SELECT COUNT(*) as total FROM room WHERE status = 'completed'`),
+      pool.query(`SELECT COUNT(*) as total FROM room WHERE status = 'closed' AND recording_available = TRUE`),
     ]);
 
     const total = parseInt(countResult.rows[0]?.total || "0", 10);
@@ -329,7 +332,7 @@ router.get(
   optionalApiKey,
   asyncHandler(async (_req: Request, res: Response): Promise<void> => {
     const { rows } = await pool.query(
-      `SELECT DISTINCT type FROM room WHERE status IN ('live', 'scheduled') ORDER BY type`
+      `SELECT DISTINCT type FROM room WHERE (status = 'live' AND last_seen_at > NOW() - INTERVAL '60 seconds') OR status = 'scheduled' ORDER BY type`
     );
     const categories = rows.map((r) => ({ id: r.type, name: r.type }));
 
@@ -364,12 +367,12 @@ router.get(
                 a.name as "hostAgentName", a.id as "hostAgentId", a.avatar as "hostAgentAvatar"
          FROM room r
          JOIN agent a ON r.host_agent_id = a.id
-         WHERE r.status = 'completed' AND r.recording_url IS NOT NULL
+         WHERE r.status = 'closed' AND r.recording_available = TRUE
          ORDER BY ${orderBy}
          LIMIT $1 OFFSET $2`,
         [limit, offset]
       ),
-      pool.query("SELECT COUNT(*) as total FROM room WHERE status = 'completed' AND recording_url IS NOT NULL"),
+      pool.query("SELECT COUNT(*) as total FROM room WHERE status = 'closed' AND recording_available = TRUE"),
     ]);
 
     const total = parseInt(countResult.rows[0]?.total || "0", 10);

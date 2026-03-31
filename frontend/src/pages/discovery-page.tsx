@@ -69,6 +69,41 @@ const SpeakerGrid = ({ speakers, size = "md" }: { speakers: SpeakerInfo[]; size?
   )
 }
 
+// ─── Status Badge ─────────────────────────────────────────────────────────────
+
+function StatusBadge({ status, hasRecording }: { status: string; hasRecording?: boolean }) {
+  if (status === "live") {
+    return (
+      <span className="flex items-center gap-1 text-[10px] font-black uppercase text-red-500 tracking-widest">
+        <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+        Live
+      </span>
+    )
+  }
+  if (status === "closed" && hasRecording) {
+    return (
+      <span className="flex items-center gap-1 text-[10px] font-black uppercase text-emerald-500 tracking-widest">
+        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+        Replay
+      </span>
+    )
+  }
+  if (status === "ended") {
+    return (
+      <span className="text-[9px] font-bold text-muted-foreground/60 uppercase">Ended</span>
+    )
+  }
+  if (status === "scheduled") {
+    return (
+      <span className="flex items-center gap-1 text-[10px] font-black uppercase text-violet-400 tracking-widest">
+        <Clock size={9} />
+        Scheduled
+      </span>
+    )
+  }
+  return null
+}
+
 // ─── Clubhouse-style Room Card ────────────────────────────────────────────────
 
 const RoomCard = ({
@@ -83,7 +118,7 @@ const RoomCard = ({
   const title = room.title || room.objective || "Untitled Space"
   const tag = capitalizeType(room.category?.name || room.type)
   const listeners = room.viewerCount || room.viewer_count || 0
-  
+
   const hostInfo = {
     id: room.hostAgent?.id || room.host_agent_id,
     name: room.hostAgent?.name || room.hostAgentName || room.host_agent_name || "Agent",
@@ -91,6 +126,11 @@ const RoomCard = ({
   }
   const speakers = room.speakers || [hostInfo]
   const speakerNames = speakers.map((s: any) => typeof s === 'string' ? s : (s.name || s.id || 'speaker'))
+
+  const isLive = room.status === "live"
+  const isReplay = room.status === "closed" && room.hasRecording
+  const actionLabel = isReplay ? "Watch →" : "Join →"
+  const bottomLabel = isReplay ? "Watch replay" : (listeners > 0 ? `${listeners.toLocaleString()} listening` : "Live now")
 
   return (
     <div
@@ -103,15 +143,12 @@ const RoomCard = ({
       <div className="flex gap-3">
         {/* Left: meta + title + names */}
         <div className="flex-grow min-w-0 flex flex-col gap-2">
-          {/* Category + live badge */}
+          {/* Category + status badge */}
           <div className="flex items-center gap-2">
             <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
               {tag}
             </span>
-            <span className="flex items-center gap-1 text-[10px] font-black uppercase text-red-500 tracking-widest">
-              <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
-              Live
-            </span>
+            <StatusBadge status={room.status} hasRecording={room.hasRecording} />
             {isVideo && <Video size={10} className="text-muted-foreground" />}
           </div>
 
@@ -134,10 +171,10 @@ const RoomCard = ({
       <div className="flex items-center justify-between mt-3 pt-3 border-t border-border">
         <div className="flex items-center gap-1.5 text-muted-foreground text-[11px]">
           <Users size={12} />
-          {listeners > 0 ? `${listeners.toLocaleString()} listening` : "Live now"}
+          {bottomLabel}
         </div>
         <span className="text-[11px] font-bold text-violet-500 uppercase tracking-widest">
-          Join →
+          {actionLabel}
         </span>
       </div>
     </div>
@@ -166,6 +203,10 @@ const HeroCard = ({
   const speakerNames = speakers.map((s: any) => typeof s === 'string' ? s : (s.name || s.id || 'speaker'))
   const isVideo = room.format === "video" || room.stream_capabilities?.includes("video")
 
+  const isLive = room.status === "live"
+  const isReplay = room.status === "closed" && room.hasRecording
+  const actionLabel = isReplay ? "Watch Replay" : "Join Now"
+
   return (
     <div
       className="rounded-2xl p-5 cursor-pointer active:scale-[0.99] transition-transform select-none mb-3 bg-card border border-border"
@@ -181,10 +222,7 @@ const HeroCard = ({
             <Badge className="bg-accent-crimson/20 text-accent-crimson border-0 uppercase font-black text-[10px] tracking-widest">
               {tag}
             </Badge>
-            <span className="flex items-center gap-1.5 text-[10px] font-black uppercase text-red-500 tracking-widest">
-              <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-              Live
-            </span>
+            <StatusBadge status={room.status} hasRecording={room.hasRecording} />
             {isVideo ? <Video size={11} className="text-muted-foreground" /> : <Mic size={11} className="text-muted-foreground" />}
           </div>
 
@@ -204,10 +242,10 @@ const HeroCard = ({
       <div className="flex items-center justify-between mt-4 pt-3 border-t border-border">
         <div className="flex items-center gap-1.5 text-muted-foreground text-[12px]">
           <Users size={13} />
-          {listeners > 0 ? `${listeners.toLocaleString()} listening` : "Live now"}
+          {isReplay ? "Watch replay" : (listeners > 0 ? `${listeners.toLocaleString()} listening` : "Live now")}
         </div>
         <span className="px-4 py-1.5 bg-violet-600 text-white font-bold text-[12px] uppercase tracking-wide rounded-full pointer-events-none">
-          Join Now
+          {actionLabel}
         </span>
       </div>
     </div>
@@ -440,12 +478,15 @@ export function RoomsView() {
         </div>
       )}
 
-      {/* ── Recently Ended Strip ─────────────────────────────────────── */}
-      {format === "spaces" && !hasLive && !loading && recentRooms.length > 0 && (
-        <div className="mt-6">
+      {/* ── Replays Strip (ended rooms with recordings) ──────────────── */}
+      {format === "spaces" && !loading && recentRooms.length > 0 && (
+        <div className="mt-10">
           <div className="flex items-center gap-2 mb-4">
-            <Clock size={14} className="text-muted-foreground" />
-            <h2 className="font-black uppercase tracking-widest text-sm text-muted-foreground">Recently Ended</h2>
+            <Clock size={14} className="text-emerald-500" />
+            <h2 className="font-black uppercase tracking-widest text-sm text-foreground">Replays</h2>
+            <span className="bg-emerald-500/10 text-emerald-500 text-[9px] font-black px-1.5 py-0.5 rounded-full">
+              {recentRooms.length}
+            </span>
           </div>
           <div className="flex gap-3 overflow-x-auto pb-4 snap-x -mx-4 px-4">
             {recentRooms.map((room) => (

@@ -498,6 +498,21 @@ roomNamespace.on("connection", (socket) => {
     }),
   );
 
+  // Handle host heartbeat — agents send this every ~30s to signal liveness
+  socket.on("room:heartbeat", async () => {
+    try {
+      const { roomService } = await import("./services/room-service.js");
+      await roomService.recordHeartbeat(roomId);
+      logger.debug("Heartbeat recorded", { socketId: socket.id, roomId });
+    } catch (err) {
+      logger.warn("Failed to record heartbeat", {
+        socketId: socket.id,
+        roomId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  });
+
   // Handle disconnect
   socket.on("disconnect", () => {
     logger.info("Client disconnected", {

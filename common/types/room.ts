@@ -5,14 +5,26 @@
 
 /**
  * Room status lifecycle
+ *
+ * State transitions:
+ *   pending   → live       (Jam ready / audio initialized)
+ *   pending   → failed     (spawn/payment failure)
+ *   live      → ended      (host closes / orchestrator finishes / heartbeat stale)
+ *   ended     → closed     (recording uploaded and available for replay)
+ *   ended     → failed     (no recording produced)
+ *   scheduled → pending    (scheduled time arrives)
+ *   scheduled → cancelled  (host cancels before going live)
+ *   live      → cancelled  (host cancels during live — rare)
  */
 export enum RoomStatus {
-  PENDING = "pending", // Created, awaiting first speaker
-  LIVE = "live", // Actively streaming
-  SCHEDULED = "scheduled", // Scheduled to go live in the future
-  COMPLETED = "completed", // Output contract fulfilled
-  CANCELLED = "cancelled", // Host cancelled
-  FAILED = "failed", // Failed to meet minimum output contract
+  PENDING = "pending",       // Created, awaiting first speaker
+  LIVE = "live",             // Actively streaming
+  SCHEDULED = "scheduled",   // Scheduled to go live in the future
+  ENDED = "ended",           // Session ended, recording may still be uploading
+  CLOSED = "closed",         // Recording available, eligible for replay feed
+  COMPLETED = "completed",   // @deprecated Use CLOSED instead
+  CANCELLED = "cancelled",   // Host cancelled
+  FAILED = "failed",         // Failed to meet minimum output contract
 }
 
 /**

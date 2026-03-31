@@ -60,7 +60,8 @@ export class RoomOrchestrationService {
   /**
    * Start the main orchestration loop
    *
-   * Discovers live rooms and manages them
+   * Discovers live rooms, manages them, and runs startup reconciliation
+   * to fix any rooms stuck in invalid states from a previous crash.
    */
   async start(): Promise<void> {
     if (this.isRunning) {
@@ -71,6 +72,9 @@ export class RoomOrchestrationService {
     this.isRunning = true;
 
     logger.info("Starting room orchestration service");
+
+    // Run startup reconciliation to fix stuck rooms
+    await this._reconcileStuckRooms();
 
     // Start discovery loop (check for new live rooms every 5s)
     this.orchestratorTimerId = setInterval(
@@ -209,6 +213,68 @@ export class RoomOrchestrationService {
   }
 
   /**
+   * Startup reconciliation: fix rooms stuck in invalid states from a previous crash.
+   *
+   * Handles:
+   * - 'live' rooms with stale heartbeat (>60s) → transition to 'ended'
+   * - 'ended' rooms with recording_url → transition to 'closed' with recording_available
+   * - 'pending' rooms older than 10 minutes → transition to 'failed'
+   */
+  private async _reconcileStuckRooms(): Promise<void> {
+    try {
+      logger.info("Running startup reconciliation for stuck rooms");
+
+      // 1. Stale live rooms: host disconnected during a previous server run
+      const staleLive = await roomRepository.getRoomsWithStaleHeartbeat(60);
+      for (const room of staleLive) {
+        logger.info("Reconcile: ending stale live room", { roomId: room.id });
+        await roomRepository.updateStatus(room.id, "ended");
+        if (room.recordingUrl) {
+          await roomRepository.setRecordingAvailable(room.id);
+        }
+      }
+
+      // 2. Ended rooms with recording: mark as closed
+      const endedWithRecording = await roomRepository.getRoomsWithStaleHeartbeat(99999999);
+      // Use direct query instead — find rooms with status 'ended' that have recording_url
+      try {
+        const { query: dbQuery } = await import("../config/database.js");
+        const stuckClosed = await dbQuery<{ id: string }>(`
+          SELECT id FROM room
+          WHERE status = 'ended' AND recording_url IS NOT NULL AND recording_available = FALSE
+        `);
+        for (const row of stuckClosed) {
+          logger.info("Reconcile: closing ended room with recording", { roomId: row.id });
+          await roomRepository.setRecordingAvailable(row.id);
+        }
+      } catch { /* schema may not have columns yet */ }
+
+      // 3. Old pending rooms: mark as failed (stuck with no Jam initialization)
+      try {
+        const { query: dbQuery } = await import("../config/database.js");
+        const stuckPending = await dbQuery<{ id: string }>(`
+          SELECT id FROM room
+          WHERE status = 'pending'
+            AND created_at < NOW() - INTERVAL '10 minutes'
+        `);
+        for (const row of stuckPending) {
+          logger.info("Reconcile: failing stuck pending room", { roomId: row.id });
+          await roomRepository.updateStatus(row.id, "failed" as RoomStatus);
+        }
+      } catch { /* schema may not have columns yet */ }
+
+      logger.info("Startup reconciliation complete", {
+        staleLiveCount: staleLive.length,
+      });
+    } catch (err) {
+      logger.error("Startup reconciliation failed", {
+        error: err instanceof Error ? err.message : String(err),
+      });
+      // Non-fatal — don't block server startup
+    }
+  }
+
+  /**
    * Internal: Discover and manage live rooms
    *
    * Called every 5 seconds to:
@@ -235,7 +301,39 @@ export class RoomOrchestrationService {
         }
       }
 
-      // 3. CLEAN UP COMPLETED/CANCELLED ROOMS
+      // 3. CHECK FOR STALE HEARTBEATS — auto-end rooms where host disconnected
+      try {
+        const staleRooms = await roomRepository.getRoomsWithStaleHeartbeat(60);
+        for (const room of staleRooms) {
+          logger.info("Auto-ending room with stale heartbeat", {
+            roomId: room.id,
+            lastSeenAt: room.lastSeenAt,
+          });
+          await this.stopRoom(room.id);
+          await roomRepository.updateStatus(room.id, "ended");
+
+          // If recording available, transition to closed
+          if (room.recordingUrl) {
+            await roomRepository.setRecordingAvailable(room.id);
+          }
+
+          // Notify connected clients
+          try {
+            const { getIO } = await import("../server.js");
+            getIO().to(`room:${room.id}`).emit("room:ended", {
+              roomId: room.id,
+              reason: "Host disconnected",
+              timestamp: new Date().toISOString(),
+            });
+          } catch { /* non-fatal */ }
+        }
+      } catch (staleErr) {
+        logger.warn("Failed to check stale heartbeats", {
+          error: staleErr instanceof Error ? staleErr.message : String(staleErr),
+        });
+      }
+
+      // 4. CLEAN UP COMPLETED/CANCELLED ROOMS
       const activeRoomIds = Array.from(this.activeRooms.keys());
       for (const roomId of activeRoomIds) {
         const room = await roomRepository.getById(roomId);
@@ -346,7 +444,8 @@ export class RoomOrchestrationService {
   /**
    * Internal: Close a room and trigger payment distribution
    *
-   * Called when room meets output contract
+   * Called when room meets output contract.
+   * Transitions: live → ended, then ended → closed if recording available.
    */
   private async _closeRoom(
     roomId: string,
@@ -406,10 +505,24 @@ export class RoomOrchestrationService {
         // Continue despite payment error
       }
 
-      // 4. UPDATE ROOM STATUS
-      await roomRepository.updateStatus(roomId, "completed");
+      // 4. UPDATE ROOM STATUS TO ENDED
+      await roomRepository.updateStatus(roomId, "ended");
 
-      // 5. EMIT ROOM COMPLETED EVENT via WebSocket
+      // 5. IF RECORDING IS ALREADY AVAILABLE, TRANSITION TO CLOSED
+      try {
+        const updatedRoom = await roomRepository.getById(roomId);
+        if (updatedRoom?.recordingUrl) {
+          await roomRepository.setRecordingAvailable(roomId);
+          logger.info("Room has recording — transitioned to closed", { roomId });
+        }
+      } catch (recErr) {
+        logger.warn("Failed to check recording for closed transition", {
+          roomId,
+          error: recErr instanceof Error ? recErr.message : String(recErr),
+        });
+      }
+
+      // 6. EMIT ROOM COMPLETED EVENT via WebSocket
       try {
         const { getIO } = await import("../server.js");
         const io = getIO();
@@ -459,7 +572,9 @@ export class RoomOrchestrationService {
   /**
    * Internal: Handle room timeout
    *
-   * Called when room exceeds time limit without progress
+   * Called when room exceeds time limit without progress.
+   * Transitions room to 'ended' (not 'failed') since the session itself ended
+   * cleanly — it just didn't produce output. Refund is still issued.
    */
   private async _handleRoomTimeout(roomId: string): Promise<void> {
     try {
@@ -468,8 +583,8 @@ export class RoomOrchestrationService {
       // 1. STOP ORCHESTRATION
       await this.stopRoom(roomId);
 
-      // 2. UPDATE ROOM STATUS
-      await roomRepository.updateStatus(roomId, "failed");
+      // 2. UPDATE ROOM STATUS TO ENDED
+      await roomRepository.updateStatus(roomId, "ended");
 
       // 3. ISSUE REFUND via payment service (uses spawn fee payment ID)
       try {
@@ -489,7 +604,7 @@ export class RoomOrchestrationService {
           roomId,
           error: refundErr instanceof Error ? refundErr.message : String(refundErr),
         });
-        // Non-fatal — room is already marked failed
+        // Non-fatal — room is already marked ended
       }
 
       // 4. NOTIFY CONNECTED CLIENTS via WebSocket
