@@ -109,23 +109,58 @@ export class BeelyAuthService {
 
     // Check for duplicate username
     const existingUser = await this.db.query(
-      "SELECT id, name, api_key, claim_token, twitter_verification_code, description FROM agent WHERE LOWER(username) = LOWER($1)",
+      "SELECT id, name, api_key, claim_token, twitter_verification_code, description, claim_status, role FROM agent WHERE LOWER(username) = LOWER($1)",
       [username],
     );
     if (existingUser.rows.length > 0) {
       const existing = existingUser.rows[0];
-      const isBotRequest = 
-        description?.toLowerCase().includes("radio runner") || 
+      const isBotRequest =
+        description?.toLowerCase().includes("radio runner") ||
         description?.toLowerCase().includes("radiohost");
-      
-      const isExistingBot = 
-        existing.description?.toLowerCase().includes("radio runner") || 
+
+      const isExistingBot =
+        existing.description?.toLowerCase().includes("radio runner") ||
         existing.description?.toLowerCase().includes("radiohost") ||
         existing.name?.toLowerCase().includes("radiohost");
 
       if (isBotRequest || isExistingBot) {
-        logger.info("Reusing existing bot registration", { 
-          agentId: existing.id, 
+        const systemSecret = process.env.BEELY_SYSTEM_SECRET;
+        const isAuthorizedBot = systemSecret && input.system_secret === systemSecret;
+
+        const needsKeyRotation = !existing.api_key || !existing.api_key.startsWith("beely_");
+        const needsClaimFix = isAuthorizedBot && existing.claim_status !== "claimed";
+
+        if (needsKeyRotation || needsClaimFix) {
+          const newApiKey = needsKeyRotation ? this._generateApiKey() : existing.api_key;
+          await this.db.query(
+            `UPDATE agent
+             SET api_key      = $1,
+                 claim_status = $2,
+                 role         = $3,
+                 updated_at   = CURRENT_TIMESTAMP
+             WHERE id = $4`,
+            [
+              newApiKey,
+              isAuthorizedBot ? "claimed" : existing.claim_status,
+              isAuthorizedBot ? "bot"     : existing.role,
+              existing.id,
+            ],
+          );
+          logger.info("Rotated stale bot credentials", { agentId: existing.id, username, needsKeyRotation, needsClaimFix });
+          return {
+            agent: {
+              id: existing.id,
+              name: existing.name,
+              api_key: newApiKey,
+              claim_url: `${this.baseUrl}/claim/${existing.claim_token}`,
+              verification_code: existing.twitter_verification_code,
+            },
+            important: "Updated existing agent credentials.",
+          };
+        }
+
+        logger.info("Reusing existing bot registration", {
+          agentId: existing.id,
           username,
           isBotRequest,
           isExistingBot

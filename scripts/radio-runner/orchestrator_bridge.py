@@ -212,18 +212,22 @@ class OrchestratorBridge:
         creds = self._load_agent_credentials()
         cached = creds.get(username)
         if cached:
-            try:
-                # Verify the agent still exists on the backend
-                resp = self._backend.get(
-                    f"/api/v1/agents/{cached['id']}",
-                    headers=self._auth_headers(cached["api_key"]),
-                )
-                if resp.status_code < 300:
-                    logger.info("Reusing cached agent credentials for '%s'", username)
-                    return RegisteredAgent(**cached)
-            except Exception:
-                pass
-            logger.info("Cached credentials for '%s' are stale — re-registering", username)
+            # Treat legacy-format keys (pre-rebrand) as stale immediately
+            if not cached.get("api_key", "").startswith("beely_"):
+                logger.info("Cached key for '%s' uses legacy format — re-registering", username)
+            else:
+                try:
+                    # Verify the agent still exists on the backend
+                    resp = self._backend.get(
+                        f"/api/v1/agents/{cached['id']}",
+                        headers=self._auth_headers(cached["api_key"]),
+                    )
+                    if resp.status_code < 300:
+                        logger.info("Reusing cached agent credentials for '%s'", username)
+                        return RegisteredAgent(**cached)
+                except Exception:
+                    pass
+                logger.info("Cached credentials for '%s' are stale — re-registering", username)
 
         # 3. Fresh registration
         agent = self.register_agent(name, username)
