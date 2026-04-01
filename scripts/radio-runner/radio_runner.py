@@ -62,8 +62,9 @@ logger = logging.getLogger("radio_runner")
 
 # ── Configuration ────────────────────────────────────────────────────────────
 
-BACKEND_URL = os.environ.get("BEELY_BACKEND_URL", "http://localhost:4000")
-ORCHESTRATOR_URL = os.environ.get("ORCHESTRATOR_URL", "http://localhost:5000")
+BACKEND_URL = os.environ.get("BEELY_BACKEND_URL", "https://clawzz-backend-live.up.railway.app")
+# Orchestrator is now part of the backend — keep env var for backward compat but unused
+ORCHESTRATOR_URL = os.environ.get("ORCHESTRATOR_URL")
 NEWS_POLL_INTERVAL = int(os.environ.get("NEWS_POLL_INTERVAL_SECONDS", "180"))  # 3 min
 
 
@@ -97,7 +98,7 @@ class RadioRunner:
         self._engine = DialogueEngine()
         self._bridge = OrchestratorBridge(
             backend_url=BACKEND_URL,
-            orchestrator_url=ORCHESTRATOR_URL,
+            orchestrator_url=ORCHESTRATOR_URL,  # None = use backend_url
         )
         self._scheduler = MusicScheduler(
             break_interval=break_interval,
@@ -157,11 +158,14 @@ class RadioRunner:
         logger.info("=" * 60)
         logger.info("  Beely Radio Runner — Starting up")
         logger.info(f"  Backend      : {BACKEND_URL}")
-        logger.info(f"  Orchestrator : {ORCHESTRATOR_URL}")
         logger.info(f"  Turn interval: {self._turn_interval}s")
         logger.info(f"  Break every  : {self._scheduler.break_interval} turns")
         logger.info(f"  Max turns    : {self._max_turns or 'unlimited'}")
         logger.info("=" * 60)
+
+        # 0. Wait for backend to be reachable (exponential backoff)
+        logger.info("Waiting for backend health check...")
+        self._bridge.wait_for_backend()
 
         # 1. Register HOST agent (Alex) — reuses cached credentials if available
         logger.info("Registering HOST agent (Alex)...")
@@ -206,7 +210,7 @@ class RadioRunner:
         )
 
         logger.info(f"Radio show ready — Room: {self._room_id[:8]}...")
-        logger.info(f"Open in browser: {BACKEND_URL.replace(':4000', ':3000')}/room/{self._room_id}/live")
+        logger.info(f"Open in browser: {BACKEND_URL}/room/{self._room_id}/live")
 
         # 6. Start Webhook server for external interruptions
         self._webhook_server.start()

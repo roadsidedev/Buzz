@@ -57,34 +57,38 @@ class TurnResult:
 
 class OrchestratorBridge:
     """
-    HTTP adapter for the Beely backend API and orchestrator.
+    HTTP adapter for the Beely backend API.
+
+    Since the orchestrator is now part of the backend service, all requests
+    go through a single base URL.
 
     Usage:
         bridge = OrchestratorBridge(
-            backend_url="http://localhost:4000",
-            orchestrator_url="http://localhost:5000",
+            backend_url="https://clawzz-backend-live.up.railway.app",
         )
+        bridge.wait_for_backend()       # startup health check
         host = bridge.register_agent("RadioHost", "radio_host_001")
         room_id = bridge.create_room(host, "debate", "Today's top news")
     """
 
     def __init__(
         self,
-        backend_url: str = "http://localhost:4000",
-        orchestrator_url: str = "http://localhost:5000",
+        backend_url: str = "https://clawzz-backend-live.up.railway.app",
+        orchestrator_url: Optional[str] = None,
         timeout: float = 30.0,
         system_secret: Optional[str] = None,
     ) -> None:
         self.backend_url = backend_url.rstrip("/")
-        self.orchestrator_url = orchestrator_url.rstrip("/")
-        
+        # Orchestrator is now part of the backend — keep param for backward compat
+        self.orchestrator_url = (orchestrator_url or self.backend_url).rstrip("/")
+
         # Load system secret (check both standard casing and user-provided lowercase)
         self.system_secret = (
-            system_secret or 
-            os.environ.get("RADIO_SYSTEM_SECRET") or 
+            system_secret or
+            os.environ.get("RADIO_SYSTEM_SECRET") or
             os.environ.get("radio_system_secret")
         )
-        
+
         if self.system_secret:
             logger.info("System secret loaded for platform bypass")
         else:
@@ -104,6 +108,58 @@ class OrchestratorBridge:
         self._backend.close()
         self._orchestrator.close()
 
+    # ── Startup Health Check ──────────────────────────────────────────────────
+
+    def wait_for_backend(
+        self,
+        max_attempts: int = 12,
+        initial_delay: float = 2.0,
+        max_delay: float = 30.0,
+    ) -> bool:
+        """
+        Block until the backend responds to /health, with exponential backoff.
+
+        Args:
+            max_attempts: Maximum number of health-check attempts before giving up.
+            initial_delay: Seconds to wait before the first retry.
+            max_delay: Cap on the exponential backoff delay.
+            health_path: Endpoint to probe.
+
+        Returns:
+            True once the backend is reachable.
+
+        Raises:
+            RuntimeError: If max_attempts is exhausted without a successful probe.
+        """
+        delay = initial_delay
+        for attempt in range(1, max_attempts + 1):
+            try:
+                resp = self._backend.get("/health", timeout=5.0)
+                if resp.status_code < 500:
+                    logger.info(
+                        "Backend health check passed (attempt %d/%d, status %d)",
+                        attempt, max_attempts, resp.status_code,
+                    )
+                    return True
+                logger.warning(
+                    "Backend health check returned %d (attempt %d/%d)",
+                    resp.status_code, attempt, max_attempts,
+                )
+            except Exception as exc:
+                logger.warning(
+                    "Backend not ready yet (attempt %d/%d): %s",
+                    attempt, max_attempts, exc,
+                )
+            if attempt < max_attempts:
+                logger.info("Retrying in %.1fs…", delay)
+                time.sleep(delay)
+                delay = min(delay * 1.5, max_delay)
+
+        raise RuntimeError(
+            f"Backend at {self.backend_url} did not become healthy "
+            f"after {max_attempts} attempts"
+        )
+
     # ── Agent Credential Persistence ─────────────────────────────────────────
 
     def register_or_reuse_agent(
@@ -117,14 +173,16 @@ class OrchestratorBridge:
         agent is still valid.  Falls back to registering a fresh agent.
 
         If pre_auth_key is provided, it takes priority and registration is skipped.
+        All backend calls are retried with backoff to handle transient failures.
         """
         # 1. Check for pre-authorized key
         if pre_auth_key:
             logger.info("Using pre-authorized API key for '%s'", username)
             try:
-                resp = self._backend.get(
+                resp = self._retry_get(
                     "/api/v1/auth/me",
                     headers=self._auth_headers(pre_auth_key),
+                    label=f"auth_me({username})",
                 )
                 self._assert_ok(resp, "auth_me")
                 agent_data = resp.json().get("data")
@@ -517,6 +575,32 @@ class OrchestratorBridge:
             raise RuntimeError(
                 f"[{context}] HTTP {resp.status_code}: {body}"
             )
+
+    def _retry_get(
+        self,
+        path: str,
+        headers: Optional[dict[str, str]] = None,
+        label: str = "",
+        attempts: int = 4,
+        delay: float = 1.0,
+    ) -> httpx.Response:
+        """GET with retry logic for transient connection failures."""
+        last_exc: Optional[Exception] = None
+        for i in range(attempts):
+            try:
+                resp = self._backend.get(path, headers=headers, timeout=10.0)
+                if resp.status_code < 500:
+                    return resp
+                logger.warning(
+                    f"Retry {i+1}/{attempts} for {label}",
+                    extra={"status": resp.status_code},
+                )
+            except Exception as exc:
+                last_exc = exc
+                logger.warning(f"Retry {i+1}/{attempts} for {label}", extra={"error": str(exc)})
+            if i < attempts - 1:
+                time.sleep(delay * (i + 1))
+        raise last_exc or RuntimeError(f"All {attempts} retries failed for {label}")
 
     def _retry_post(
         self,
