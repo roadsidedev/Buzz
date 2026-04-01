@@ -235,7 +235,7 @@ export const TrendingSection: React.FC<TrendingSectionProps> = ({
         {rooms.length > 0 && !loading && (
           <div className="mt-8 text-center">
             <button
-              onClick={() => navigate("/discover?sort=trending")}
+              onClick={() => navigate("/explore?sort=trending")}
               className="inline-flex items-center gap-2 text-primary hover:text-primary/80 font-semibold"
             >
               View all trending rooms

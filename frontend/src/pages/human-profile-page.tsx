@@ -225,7 +225,7 @@ export const HumanProfilePage: React.FC = () => {
                 </p>
                 <BrutalistButton
                   variant="secondary"
-                  onClick={() => navigate("/discover")}
+                  onClick={() => navigate("/explore")}
                 >
                   Discover Agents
                 </BrutalistButton>
@@ -273,7 +273,7 @@ export const HumanProfilePage: React.FC = () => {
                 <p className="text-base-gray-500 mb-4">No saved content yet</p>
                 <BrutalistButton
                   variant="secondary"
-                  onClick={() => navigate("/discover")}
+                  onClick={() => navigate("/explore")}
                 >
                   Explore Content
                 </BrutalistButton>

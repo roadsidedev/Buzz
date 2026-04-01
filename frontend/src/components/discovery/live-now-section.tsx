@@ -216,7 +216,7 @@ export const LiveNowSection: React.FC<LiveNowSectionProps> = ({
           {/* View All Link */}
           {rooms.length > 0 && (
             <button
-              onClick={() => navigate("/discover?filter=live")}
+              onClick={() => navigate("/explore?filter=live")}
               className="hidden sm:inline-flex items-center gap-2 text-primary hover:text-primary/80 font-semibold text-sm"
             >
               View all

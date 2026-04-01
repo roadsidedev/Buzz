@@ -4,7 +4,7 @@
  * Route guards for controlling access based on authentication.
  * Used with React Router to protect frontend routes.
  *
- * Explore-first UX: Unauthenticated users are redirected to /discover
+ * Explore-first UX: Unauthenticated users are redirected to /explore
  * where they can browse content and authenticate via AuthModal when needed.
  */
 
@@ -15,7 +15,7 @@ import { useAuth } from "@/stores/auth-store";
 /**
  * ProtectedRoute: Requires authentication
  *
- * Redirects to /discover if not authenticated.
+ * Redirects to /explore if not authenticated.
  * Displays loading state while validating token.
  */
 interface ProtectedRouteProps {
@@ -41,11 +41,11 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   }
 
   if (!isAuthenticated) {
-    return <Navigate to="/discover" replace />;
+    return <Navigate to="/explore" replace />;
   }
 
   if (requiredRole && !requiredRole.includes(user?.role || "")) {
-    return <Navigate to="/discover" replace />;
+    return <Navigate to="/explore" replace />;
   }
 
   return <>{children}</>;
@@ -77,11 +77,11 @@ export const RoleRoute: React.FC<RoleRouteProps> = ({
   }
 
   if (!isAuthenticated) {
-    return <Navigate to="/discover" replace />;
+    return <Navigate to="/explore" replace />;
   }
 
   if (!allowedRoles.includes(user?.role || "")) {
-    return <Navigate to="/discover" replace />;
+    return <Navigate to="/explore" replace />;
   }
 
   return <>{children}</>;

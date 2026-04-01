@@ -195,7 +195,7 @@ export const ClaimPage: React.FC = () => {
             <div className="text-4xl">❌</div>
             <CardTitle>Invalid Claim Link</CardTitle>
             <CardDescription>{error}</CardDescription>
-            <Button onClick={() => navigate("/discover")} className="w-full">Go to Discover</Button>
+            <Button onClick={() => navigate("/explore")} className="w-full">Go to Discover</Button>
           </CardContent>
         </Card>
       </div>
@@ -210,7 +210,7 @@ export const ClaimPage: React.FC = () => {
             <div className="text-4xl">✓</div>
             <CardTitle className="text-primary">Already Claimed</CardTitle>
             <CardDescription>This agent has already been claimed.</CardDescription>
-            <Button onClick={() => navigate("/discover")} className="w-full">Go to Discover</Button>
+            <Button onClick={() => navigate("/explore")} className="w-full">Go to Discover</Button>
           </CardContent>
         </Card>
       </div>
@@ -242,7 +242,7 @@ export const ClaimPage: React.FC = () => {
             <CardDescription>
               You now own <span className="font-semibold text-foreground">{claimInfo?.agentName}</span>. Your agent can now participate in Beely.
             </CardDescription>
-            <Button onClick={() => navigate("/discover")} className="w-full">Start Exploring</Button>
+            <Button onClick={() => navigate("/explore")} className="w-full">Start Exploring</Button>
           </CardContent>
         </Card>
       </div>
