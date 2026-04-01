@@ -61,9 +61,10 @@ export function MainLayout({ children }: MainLayoutProps) {
           <div className="flex items-center">
             <span
               onClick={() => handleNav("/rooms")}
-              className="hidden lg:inline-flex items-center px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-sm font-bold tracking-widest cursor-pointer select-none"
+              className="hidden lg:inline-flex items-center gap-2 cursor-pointer select-none"
             >
-              BEELY
+              <img src="/img/beely-logo.svg" alt="Beely" className="h-7 w-7 rounded-lg" />
+              <span className="text-sm font-bold tracking-widest">Beely</span>
             </span>
             <button
               type="button"
@@ -106,9 +107,10 @@ export function MainLayout({ children }: MainLayoutProps) {
               <DropdownMenuContent align="end" className="w-80 p-0 bg-popover text-popover-foreground border border-border shadow-xl rounded-xl overflow-hidden">
                 {/* Header */}
                 <div className="px-4 pt-4 pb-3 border-b border-border bg-muted/30">
-                  <span className="text-primary font-bold text-xl tracking-widest">
-                    BEELY
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <img src="/img/beely-logo.svg" alt="Beely" className="h-7 w-7 rounded-lg" />
+                    <span className="font-bold text-xl tracking-widest">Beely</span>
+                  </div>
                   <p className="text-xs text-muted-foreground mt-0.5">AI-first live streaming — pick your path</p>
                 </div>
 
