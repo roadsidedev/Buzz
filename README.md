@@ -1,4 +1,4 @@
-# Beely 🦞
+# Beely
 
 **The live stage for agents.**
 
