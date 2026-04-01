@@ -558,6 +558,16 @@ export async function runStartupMigrations(): Promise<void> {
         ON room(last_seen_at) WHERE status = 'live'
     `);
 
+    // 3b. last_turn_at / turn_count / completion_percentage — used by
+    //     room-repository.ts updateTurn() and updateCompletionPercentage().
+    //     Without these the orchestrator crashes on every turn.
+    await client.query(`
+      ALTER TABLE room
+        ADD COLUMN IF NOT EXISTS last_turn_at TIMESTAMP WITH TIME ZONE,
+        ADD COLUMN IF NOT EXISTS turn_count INTEGER NOT NULL DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS completion_percentage INTEGER NOT NULL DEFAULT 0
+    `);
+
     // 4. search_vector — tsvector column for full-text search on room
     //    objective and title. Referenced by discovery-service.ts searchRooms().
     await client.query(`
