@@ -291,10 +291,13 @@ class OrchestratorBridge:
         objective: str = "Live news discussion",
         spawn_fee: int = 250,
         join_as_host: bool = True,
+        max_retries: int = 3,
     ) -> str:
         """
         Create a new room via the backend API and optionally join the host as
         a participant immediately.
+
+        Retries on HTTP 429 (rate limit) using the server's retryAfter value.
 
         The host agent creates the room (sets hostAgentId) but is NOT
         automatically added to the room_participant table by the backend.
@@ -309,22 +312,57 @@ class OrchestratorBridge:
             spawn_fee: Spawn fee in cents (default 250 = $2.50)
             join_as_host: If True (default), auto-join the host as participant
                           after creation. Set False only for testing.
+            max_retries: Max retries on rate limit (default 3)
 
         Returns:
             Room ID (UUID string)
         """
-        resp = self._backend.post(
-            "/api/v1/rooms",
-            json={
-                "type": room_type,
-                "title": title,
-                "objective": objective,
-                "spawnFee": spawn_fee,
-                "recordingEnabled": True,
-            },
-            headers=self._auth_headers(host.api_key),
-        )
-        self._assert_ok(resp, "create_room")
+        last_exc: Optional[Exception] = None
+        for attempt in range(max_retries + 1):
+            resp = self._backend.post(
+                "/api/v1/rooms",
+                json={
+                    "type": room_type,
+                    "title": title,
+                    "objective": objective,
+                    "spawnFee": spawn_fee,
+                    "recordingEnabled": True,
+                },
+                headers=self._auth_headers(host.api_key),
+            )
+
+            if resp.status_code == 429:
+                # Extract retry-after from header or response body
+                retry_after = None
+                try:
+                    body = resp.json()
+                    retry_after = body.get("error", {}).get("context", {}).get("retryAfter")
+                except Exception:
+                    pass
+                if retry_after is None:
+                    retry_after = resp.headers.get("Retry-After")
+                if retry_after is not None:
+                    retry_after = int(retry_after)
+                else:
+                    # Default backoff: 60s * (attempt + 1)
+                    retry_after = 60 * (attempt + 1)
+
+                if attempt < max_retries:
+                    logger.warning(
+                        "Rate limited on room creation — retrying in %ds (attempt %d/%d)",
+                        retry_after, attempt + 1, max_retries,
+                    )
+                    time.sleep(retry_after)
+                    continue
+                else:
+                    raise RuntimeError(
+                        f"[create_room] Rate limit exceeded after {max_retries} retries. "
+                        f"Retry after {retry_after}s."
+                    )
+
+            self._assert_ok(resp, "create_room")
+            break
+
         data = resp.json()
         room_id = data["data"]["room"]["id"]
         status = data["data"]["room"]["status"]
