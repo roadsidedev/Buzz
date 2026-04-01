@@ -184,19 +184,29 @@ class OrchestratorBridge:
                     headers=self._auth_headers(pre_auth_key),
                     label=f"auth_me({username})",
                 )
-                self._assert_ok(resp, "auth_me")
-                agent_data = resp.json().get("data")
-                if not agent_data:
-                    raise RuntimeError("Invalid response from /auth/me")
-                
-                return RegisteredAgent(
-                    id=agent_data["id"],
-                    api_key=pre_auth_key,
-                    name=agent_data["name"],
-                )
+                if resp.status_code == 401 or resp.status_code == 403:
+                    logger.warning(
+                        "Pre-authorized key for '%s' is invalid (HTTP %d) — "
+                        "falling back to fresh registration",
+                        username, resp.status_code,
+                    )
+                else:
+                    self._assert_ok(resp, "auth_me")
+                    agent_data = resp.json().get("data")
+                    if not agent_data:
+                        raise RuntimeError("Invalid response from /auth/me")
+
+                    return RegisteredAgent(
+                        id=agent_data["id"],
+                        api_key=pre_auth_key,
+                        name=agent_data["name"],
+                    )
             except Exception as exc:
-                logger.error("Failed to validate pre-authorized key for '%s': %s", username, exc)
-                raise
+                logger.warning(
+                    "Pre-authorized key validation failed for '%s': %s — "
+                    "falling back to fresh registration",
+                    username, exc,
+                )
 
         # 2. Check cache
         creds = self._load_agent_credentials()
