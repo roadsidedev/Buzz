@@ -18,6 +18,7 @@ import { turnManagementService } from "./turn-management-service.js";
 import { outputContractService } from "./output-contract-service.js";
 import { agentStatisticsService } from "./agent-statistics-service.js";
 import { revenueDistributionService } from "./revenue-distribution-service.js";
+import { orchestratorClient } from "./orchestrator-client.js";
 import { logger } from "../utils/logger.js";
 import { paymentService } from "./payment-service.js";
 
@@ -131,10 +132,14 @@ export class RoomOrchestrationService {
     logger.info("Starting orchestration for room", { roomId });
 
     try {
-      // 1. START TURN MANAGEMENT
+      // 1. TRANSITION ORCHESTRATOR STATE: pending → live
+      // Without this, processTurn() finds status "pending" and returns error
+      await orchestratorClient.startRoom(roomId);
+
+      // 2. START TURN MANAGEMENT
       await turnManagementService.startTurnManagement(roomId);
 
-      // 2. SET UP COMPLETION CHECK LOOP
+      // 3. SET UP COMPLETION CHECK LOOP
       const completionCheckId = setInterval(
         () =>
           this._checkCompletion(roomId).catch((err) => {

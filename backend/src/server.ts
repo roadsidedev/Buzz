@@ -598,33 +598,40 @@ app.use(errorHandler);
 import { roomOrchestrationService } from "./services/room-orchestration-service.js";
 import { runStartupMigrations } from "./config/database.js";
 
-// Apply idempotent schema migrations before accepting traffic
-runStartupMigrations().catch((err) => {
-  logger.warn("Startup migrations skipped due to error", {
-    error: err instanceof Error ? err.message : String(err),
-  });
-});
-
-server.listen(port, "0.0.0.0", () => {
-  logger.info(`🚀 Beely API Gateway started`, {
-    port,
-    environment: process.env.NODE_ENV || "development",
-    apiVersion,
-  });
-  logger.info(`📡 WebSocket ready at /rooms/:roomId`, {
-    port,
-  });
-
-  // Start Orchestrator Loop if enabled
-  if (process.env.ORCHESTRATOR_URL) {
-    roomOrchestrationService.start().catch((err) => {
-      logger.error("Failed to start room orchestration service", { error: err });
+// Apply idempotent schema migrations BEFORE accepting traffic.
+// Previously this was fire-and-forget (no await), which caused
+// "column last_seen_at does not exist" errors because the server
+// started serving queries before migrations completed.
+(async () => {
+  try {
+    await runStartupMigrations();
+  } catch (err) {
+    logger.warn("Startup migrations failed (non-fatal)", {
+      error: err instanceof Error ? err.message : String(err),
     });
   }
 
-  // Start the notification service for scheduled rooms
-  notificationService.start();
-});
+  server.listen(port, "0.0.0.0", () => {
+    logger.info(`🚀 Beely API Gateway started`, {
+      port,
+      environment: process.env.NODE_ENV || "development",
+      apiVersion,
+    });
+    logger.info(`📡 WebSocket ready at /rooms/:roomId`, {
+      port,
+    });
+
+    // Start Orchestrator Loop if enabled
+    if (process.env.ORCHESTRATOR_URL) {
+      roomOrchestrationService.start().catch((err) => {
+        logger.error("Failed to start room orchestration service", { error: err });
+      });
+    }
+
+    // Start the notification service for scheduled rooms
+    notificationService.start();
+  });
+})();
 
 /**
  * Get Socket.IO instance for emitting events from services
