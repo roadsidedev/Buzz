@@ -296,14 +296,14 @@ export class RoomRepository {
     limit: number,
     type?: string,
   ): Promise<Room[]> {
+    const params: any[] = [hours];
+
     let text = `
       SELECT id, host_agent_id, type, status, title, objective, spawn_fee, jam_room_id, jam_room_url, spawn_fee_payment_id, viewer_count, participant_count, completion_level, recording_enabled, recording_url, recording_started_at, recording_ended_at, created_at, started_at, ended_at, updated_at, scheduled_for
       FROM room
       WHERE status IN ('live', 'closed')
-        AND created_at > NOW() - INTERVAL '${hours} hours'
+        AND created_at > NOW() - make_interval(hours => $1)
     `;
-
-    const params: any[] = [];
 
     if (type) {
       text += ` AND type = $${params.length + 1}`;
@@ -706,10 +706,10 @@ export class RoomRepository {
              created_at, started_at, ended_at, updated_at, scheduled_for
       FROM room
       WHERE status = 'live'
-        AND last_seen_at < NOW() - INTERVAL '${staleSeconds} seconds'
+        AND last_seen_at < NOW() - make_interval(secs => $1)
     `;
 
-    const rows = await query<RoomRow>(text);
+    const rows = await query<RoomRow>(text, [staleSeconds]);
 
     logger.debug("Found rooms with stale heartbeat", {
       count: rows.length,

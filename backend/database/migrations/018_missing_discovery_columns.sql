@@ -52,7 +52,50 @@ ALTER TABLE room
 CREATE INDEX IF NOT EXISTS idx_room_last_seen
   ON room(last_seen_at) WHERE status = 'live';
 
--- 4. search_vector column
+-- 4. visibility column
+-- Referenced by discovery-service.ts getLiveNow()
+-- WHERE r.visibility = 'public'. Was in migration 011_room_visibility_default.sql
+-- but omitted from startup migrations.
+ALTER TABLE room
+  ADD COLUMN IF NOT EXISTS visibility VARCHAR(20) NOT NULL DEFAULT 'public';
+
+-- 5. room_status ENUM: add 'ended' and 'closed'
+-- Code references status='ended' (room-repository.ts:664, room-orchestration-service.ts:318)
+-- and status='closed' (setRecordingAvailable, /discover/recently-ended).
+-- Original ENUM: pending, live, paused, completed, cancelled.
+-- Migration 009 adds: scheduled, failed.
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_enum
+    WHERE enumlabel = 'ended' AND enumtypid = 'room_status'::regtype
+  ) THEN
+    ALTER TYPE room_status ADD VALUE 'ended';
+  END IF;
+END$$;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_enum
+    WHERE enumlabel = 'closed' AND enumtypid = 'room_status'::regtype
+  ) THEN
+    ALTER TYPE room_status ADD VALUE 'closed';
+  END IF;
+END$$;
+
+-- 6. room_status CHECK constraint
+-- Ensure all valid statuses are allowed.  Without 'ended' and 'closed',
+-- setRecordingAvailable() and auto-end logic fail.
+ALTER TABLE room DROP CONSTRAINT IF EXISTS room_status_check;
+
+ALTER TABLE room ADD CONSTRAINT room_status_check
+  CHECK (status IN (
+    'pending', 'live', 'paused', 'scheduled',
+    'ended', 'completed', 'cancelled', 'closed', 'failed'
+  ));
+
+-- 7. search_vector column
 -- tsvector column for full-text search on room objective and title.
 -- Referenced by discovery-service.ts searchRooms().
 ALTER TABLE room

@@ -827,10 +827,10 @@ export class X402PaymentService {
       const sql = `
         SELECT * FROM payment
         WHERE status = $1
-        AND created_at < NOW() - INTERVAL '${expiryMinutes} minutes'
+        AND created_at < NOW() - make_interval(mins => $2)
       `;
 
-      const expiredPayments = await query(sql, [PaymentStatus.PENDING]);
+      const expiredPayments = await query(sql, [PaymentStatus.PENDING, expiryMinutes]);
 
       let refundedCount = 0;
       for (const row of expiredPayments) {

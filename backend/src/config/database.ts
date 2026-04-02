@@ -144,15 +144,34 @@ export async function queryOne<T extends Record<string, unknown>>(
  */
 export async function runStartupMigrations(): Promise<void> {
   const client: PoolClient = await pool.connect();
+  let failed = 0;
+
+  /**
+   * Execute a migration statement with isolated error handling.
+   *
+   * Previously all migrations ran inside a single BEGIN/COMMIT transaction —
+   * one failure rolled back every column and table addition.  Each call now
+   * gets its own transaction so a failure in one migration (e.g. podcast
+   * tables) does not silently prevent critical columns (last_seen_at,
+   * recording_available, visibility) from being added.
+   */
+  async function runSafely(label: string, sql: string): Promise<void> {
+    try {
+      await client.query("BEGIN");
+      await client.query(sql);
+      await client.query("COMMIT");
+    } catch (err) {
+      await client.query("ROLLBACK");
+      failed++;
+      logger.error(`Startup migration failed: ${label}`, {
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
 
   try {
-    await client.query("BEGIN");
-
-    // ── Migration 011: agent Jam / ERC-8004 identity columns ────────────────
-    // These columns are referenced by room-service.ts when creating V2 Jam
-    // rooms with SSR auth.  Without them every room creation attempt throws
-    // "column jam_public_key of relation agent does not exist".
-    await client.query(`
+    // ── Agent columns: Jam / ERC-8004 identity ──────────────────────────────
+    await runSafely("agent Jam/ERC-8004 columns", `
       ALTER TABLE agent
         ADD COLUMN IF NOT EXISTS jam_public_key           VARCHAR(128),
         ADD COLUMN IF NOT EXISTS jam_private_key_encrypted TEXT,
@@ -173,45 +192,27 @@ export async function runStartupMigrations(): Promise<void> {
         ADD COLUMN IF NOT EXISTS verification_status      VARCHAR(50) DEFAULT 'unverified'
     `);
 
-    // Relax NOT NULL constraints for Moltbook-style human users
-    await client.query(`
-      ALTER TABLE agent 
+    await runSafely("agent relax NOT NULL", `
+      ALTER TABLE agent
         ALTER COLUMN llm_provider DROP NOT NULL,
         ALTER COLUMN llm_model DROP NOT NULL,
         ALTER COLUMN display_name DROP NOT NULL
     `);
 
-    await client.query(`
-      CREATE INDEX IF NOT EXISTS idx_agent_api_key ON agent(api_key)
-    `);
+    await runSafely("idx_agent_api_key", `CREATE INDEX IF NOT EXISTS idx_agent_api_key ON agent(api_key)`);
+    await runSafely("idx_agent_claim_token", `CREATE INDEX IF NOT EXISTS idx_agent_claim_token ON agent(claim_token)`);
+    await runSafely("idx_agent_jam_identity", `CREATE INDEX IF NOT EXISTS idx_agent_jam_identity ON agent(jam_identity_id)`);
+    await runSafely("idx_agent_erc8004_identity", `CREATE INDEX IF NOT EXISTS idx_agent_erc8004_identity ON agent(erc8004_identity)`);
 
-    await client.query(`
-      CREATE INDEX IF NOT EXISTS idx_agent_claim_token ON agent(claim_token)
-    `);
+    // ── Room base columns ───────────────────────────────────────────────────
+    await runSafely("room jam_room_url",
+      `ALTER TABLE room ADD COLUMN IF NOT EXISTS jam_room_url TEXT`);
 
-    await client.query(`
-      CREATE INDEX IF NOT EXISTS idx_agent_jam_identity
-        ON agent(jam_identity_id)
-    `);
+    await runSafely("room scheduled_for",
+      `ALTER TABLE room ADD COLUMN IF NOT EXISTS scheduled_for TIMESTAMP WITH TIME ZONE NULL`);
 
-    await client.query(`
-      CREATE INDEX IF NOT EXISTS idx_agent_erc8004_identity
-        ON agent(erc8004_identity)
-    `);
-
-    // ── Migration 010: jam_room_url on room table ───────────────────────────
-    await client.query(`
-      ALTER TABLE room
-        ADD COLUMN IF NOT EXISTS jam_room_url TEXT
-    `);
-
-    // ── Migration: Room Scheduling ───────────────────────────────────────
-    await client.query(`
-      ALTER TABLE room
-        ADD COLUMN IF NOT EXISTS scheduled_for TIMESTAMP WITH TIME ZONE NULL
-    `);
-
-    await client.query(`
+    // ── Notification tables ─────────────────────────────────────────────────
+    await runSafely("room_notification table", `
       CREATE TABLE IF NOT EXISTS room_notification (
         id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         room_id       UUID NOT NULL,
@@ -223,8 +224,7 @@ export async function runStartupMigrations(): Promise<void> {
       )
     `);
 
-    // ── Migration: User Notifications ─────────────────────────────────────
-    await client.query(`
+    await runSafely("user_notification table", `
       CREATE TABLE IF NOT EXISTS user_notification (
         id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         user_id       VARCHAR(255) NOT NULL,
@@ -235,31 +235,13 @@ export async function runStartupMigrations(): Promise<void> {
         created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
-    await client.query(`
-      CREATE INDEX IF NOT EXISTS idx_user_notif_user 
-        ON user_notification(user_id, created_at DESC)
-    `);
 
-    // ── Migration 011 (room): pantry / self-hosted SFU columns ─────────────
-    await client.query(`
-      ALTER TABLE room
-        ADD COLUMN IF NOT EXISTS pantry_room_id    VARCHAR(128),
-        ADD COLUMN IF NOT EXISTS pantry_sfu_enabled BOOLEAN DEFAULT false,
-        ADD COLUMN IF NOT EXISTS category_id       UUID REFERENCES category(id) ON DELETE SET NULL
-    `);
+    await runSafely("idx_user_notif_user",
+      `CREATE INDEX IF NOT EXISTS idx_user_notif_user ON user_notification(user_id, created_at DESC)`);
 
-    await client.query(`
-      CREATE INDEX IF NOT EXISTS idx_room_pantry_room_id
-        ON room(pantry_room_id)
-    `);
-
-    await client.query(`
-      CREATE INDEX IF NOT EXISTS idx_room_category
-        ON room(category_id)
-    `);
-
-    // ── Migration: Discovery & Engagement Tables ──────────────────────────
-    await client.query(`
+    // ── Discovery tables (category, room_viewers, room_engagement) ──────────
+    // category MUST be created BEFORE room.category_id FK references it.
+    await runSafely("category table", `
       CREATE TABLE IF NOT EXISTS category (
         id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         name        VARCHAR(100) NOT NULL UNIQUE,
@@ -272,7 +254,7 @@ export async function runStartupMigrations(): Promise<void> {
       )
     `);
 
-    await client.query(`
+    await runSafely("room_viewers table", `
       CREATE TABLE IF NOT EXISTS room_viewers (
         room_id      UUID PRIMARY KEY REFERENCES room(id) ON DELETE CASCADE,
         viewer_count INT DEFAULT 0,
@@ -280,7 +262,7 @@ export async function runStartupMigrations(): Promise<void> {
       )
     `);
 
-    await client.query(`
+    await runSafely("room_engagement table", `
       CREATE TABLE IF NOT EXISTS room_engagement (
         room_id         UUID PRIMARY KEY REFERENCES room(id) ON DELETE CASCADE,
         total_messages  INT DEFAULT 0,
@@ -291,31 +273,178 @@ export async function runStartupMigrations(): Promise<void> {
     `);
 
     // Seed default categories if none exist
-    const catCheck = await client.query("SELECT COUNT(*) FROM category");
-    if (parseInt(catCheck.rows[0].count) === 0) {
-      const categories = [
-        { name: "Debate", slug: "debate", color: "#EF4444" },
-        { name: "Coding", slug: "coding", color: "#10B981" },
-        { name: "Research", slug: "research", color: "#3B82F6" },
-        { name: "Trading", slug: "trading", color: "#F59E0B" },
-        { name: "Simulation", slug: "simulation", color: "#8B5CF6" },
-        { name: "Podcast", slug: "podcast", color: "#EC4899" }
-      ];
-      
-      for (const cat of categories) {
-        await client.query(
-          "INSERT INTO category (name, slug, color) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING",
-          [cat.name, cat.slug, cat.color]
-        );
+    try {
+      const catCheck = await client.query("SELECT COUNT(*) FROM category");
+      if (parseInt(catCheck.rows[0].count) === 0) {
+        const categories = [
+          { name: "Debate", slug: "debate", color: "#EF4444" },
+          { name: "Coding", slug: "coding", color: "#10B981" },
+          { name: "Research", slug: "research", color: "#3B82F6" },
+          { name: "Trading", slug: "trading", color: "#F59E0B" },
+          { name: "Simulation", slug: "simulation", color: "#8B5CF6" },
+          { name: "Podcast", slug: "podcast", color: "#EC4899" }
+        ];
+        for (const cat of categories) {
+          await client.query(
+            "INSERT INTO category (name, slug, color) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING",
+            [cat.name, cat.slug, cat.color]
+          );
+        }
       }
+    } catch (err) {
+      logger.error("Failed to seed categories", {
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
 
-    // ── Migration 003: podcast tables ────────────────────────────────────────
-    // The original SQL file used MySQL-style INDEX clauses inside CREATE TABLE
-    // blocks, which PostgreSQL rejects.  We create the tables here with valid
-    // PostgreSQL syntax so they exist regardless of whether the file was applied.
+    // ── Room columns dependent on discovery tables ──────────────────────────
+    // Moved AFTER category table creation so the FK reference resolves.
+    await runSafely("room pantry/category_id", `
+      ALTER TABLE room
+        ADD COLUMN IF NOT EXISTS pantry_room_id     VARCHAR(128),
+        ADD COLUMN IF NOT EXISTS pantry_sfu_enabled BOOLEAN DEFAULT false,
+        ADD COLUMN IF NOT EXISTS category_id        UUID REFERENCES category(id) ON DELETE SET NULL
+    `);
 
-    await client.query(`
+    await runSafely("idx_room_pantry_room_id",
+      `CREATE INDEX IF NOT EXISTS idx_room_pantry_room_id ON room(pantry_room_id)`);
+    await runSafely("idx_room_category",
+      `CREATE INDEX IF NOT EXISTS idx_room_category ON room(category_id)`);
+
+    // ── visibility column ───────────────────────────────────────────────────
+    // Referenced by discovery-service.ts getLiveNow() WHERE r.visibility = 'public'.
+    // Was in migration 011_room_visibility_default.sql but omitted from startup.
+    await runSafely("room visibility", `
+      ALTER TABLE room ADD COLUMN IF NOT EXISTS visibility VARCHAR(20) NOT NULL DEFAULT 'public'
+    `);
+
+    // ── Room recording columns ──────────────────────────────────────────────
+    await runSafely("room recording columns", `
+      ALTER TABLE room
+        ADD COLUMN IF NOT EXISTS recording_enabled    BOOLEAN                   NOT NULL DEFAULT TRUE,
+        ADD COLUMN IF NOT EXISTS recording_url        TEXT,
+        ADD COLUMN IF NOT EXISTS recording_started_at TIMESTAMP WITH TIME ZONE,
+        ADD COLUMN IF NOT EXISTS recording_ended_at   TIMESTAMP WITH TIME ZONE
+    `);
+
+    // ── room_participant table ──────────────────────────────────────────────
+    await runSafely("room_participant table", `
+      CREATE TABLE IF NOT EXISTS room_participant (
+        room_id    UUID NOT NULL REFERENCES room(id) ON DELETE CASCADE,
+        agent_id   UUID NOT NULL REFERENCES agent(id) ON DELETE CASCADE,
+        role       VARCHAR(50) NOT NULL DEFAULT 'speaker',
+        status     VARCHAR(50) NOT NULL DEFAULT 'joined',
+        joined_at  TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        left_at    TIMESTAMP WITH TIME ZONE,
+        PRIMARY KEY (room_id, agent_id)
+      )
+    `);
+
+    await runSafely("idx_room_participant_room",
+      `CREATE INDEX IF NOT EXISTS idx_room_participant_room ON room_participant(room_id)`);
+    await runSafely("idx_room_participant_agent",
+      `CREATE INDEX IF NOT EXISTS idx_room_participant_agent ON room_participant(agent_id)`);
+
+    // ── recording_available ─────────────────────────────────────────────────
+    await runSafely("room recording_available", `
+      ALTER TABLE room ADD COLUMN IF NOT EXISTS recording_available BOOLEAN NOT NULL DEFAULT FALSE
+    `);
+
+    // ── last_seen_at ────────────────────────────────────────────────────────
+    await runSafely("room last_seen_at", `
+      ALTER TABLE room ADD COLUMN IF NOT EXISTS last_seen_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    `);
+
+    await runSafely("idx_room_last_seen",
+      `CREATE INDEX IF NOT EXISTS idx_room_last_seen ON room(last_seen_at) WHERE status = 'live'`);
+
+    // ── last_turn_at / turn_count / completion_percentage ───────────────────
+    await runSafely("room turn tracking", `
+      ALTER TABLE room
+        ADD COLUMN IF NOT EXISTS last_turn_at          TIMESTAMP WITH TIME ZONE,
+        ADD COLUMN IF NOT EXISTS turn_count            INTEGER NOT NULL DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS completion_percentage INTEGER NOT NULL DEFAULT 0
+    `);
+
+    // ── room_status ENUM: add 'ended' and 'closed' ─────────────────────────
+    // Code references status='ended' (room-repository.ts:664, room-orchestration-service.ts:318)
+    // and status='closed' (setRecordingAvailable, /discover/recently-ended).
+    // Original ENUM only has: pending, live, paused, completed, cancelled.
+    // Migration 009 adds: scheduled, failed.
+    await runSafely("room_status add ended", `
+      DO $$ BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_enum
+          WHERE enumlabel = 'ended' AND enumtypid = 'room_status'::regtype
+        ) THEN
+          ALTER TYPE room_status ADD VALUE 'ended';
+        END IF;
+      END $$
+    `);
+
+    await runSafely("room_status add closed", `
+      DO $$ BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_enum
+          WHERE enumlabel = 'closed' AND enumtypid = 'room_status'::regtype
+        ) THEN
+          ALTER TYPE room_status ADD VALUE 'closed';
+        END IF;
+      END $$
+    `);
+
+    // ── room_status CHECK constraint ────────────────────────────────────────
+    // Ensure all valid statuses are allowed.  Without 'ended' and 'closed',
+    // setRecordingAvailable() and auto-end logic fail.
+    await runSafely("room_status_check constraint", `
+      ALTER TABLE room DROP CONSTRAINT IF EXISTS room_status_check
+    `);
+    await runSafely("room_status_check add", `
+      ALTER TABLE room ADD CONSTRAINT room_status_check
+        CHECK (status IN (
+          'pending', 'live', 'paused', 'scheduled',
+          'ended', 'completed', 'cancelled', 'closed', 'failed'
+        ))
+    `);
+
+    // ── search_vector ───────────────────────────────────────────────────────
+    await runSafely("room search_vector", `
+      ALTER TABLE room ADD COLUMN IF NOT EXISTS search_vector tsvector
+    `);
+
+    await runSafely("room search_vector backfill", `
+      UPDATE room
+      SET search_vector = to_tsvector('english', COALESCE(objective, '') || ' ' || COALESCE(title, ''))
+      WHERE search_vector IS NULL
+    `);
+
+    await runSafely("room_search_vector_update function", `
+      CREATE OR REPLACE FUNCTION room_search_vector_update()
+      RETURNS TRIGGER AS $$
+      BEGIN
+        NEW.search_vector := to_tsvector('english', COALESCE(NEW.objective, '') || ' ' || COALESCE(NEW.title, ''));
+        RETURN NEW;
+      END;
+      $$ LANGUAGE plpgsql
+    `);
+
+    await runSafely("room_search_vector_trigger", `
+      DO $$ BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_trigger WHERE tgname = 'room_search_vector_trigger'
+        ) THEN
+          CREATE TRIGGER room_search_vector_trigger
+            BEFORE INSERT OR UPDATE OF objective, title ON room
+            FOR EACH ROW EXECUTE FUNCTION room_search_vector_update();
+        END IF;
+      END $$
+    `);
+
+    await runSafely("idx_room_search_vector",
+      `CREATE INDEX IF NOT EXISTS idx_room_search_vector ON room USING GIN(search_vector)`);
+
+    // ── Podcast tables ──────────────────────────────────────────────────────
+    await runSafely("podcast table", `
       CREATE TABLE IF NOT EXISTS podcast (
         id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         agent_id         UUID NOT NULL,
@@ -330,7 +459,7 @@ export async function runStartupMigrations(): Promise<void> {
       )
     `);
 
-    await client.query(`
+    await runSafely("podcast_episode table", `
       CREATE TABLE IF NOT EXISTS podcast_episode (
         id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         podcast_id          UUID NOT NULL,
@@ -349,7 +478,7 @@ export async function runStartupMigrations(): Promise<void> {
       )
     `);
 
-    await client.query(`
+    await runSafely("podcast_distribution table", `
       CREATE TABLE IF NOT EXISTS podcast_distribution (
         id                   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         episode_id           UUID NOT NULL,
@@ -365,7 +494,7 @@ export async function runStartupMigrations(): Promise<void> {
       )
     `);
 
-    await client.query(`
+    await runSafely("podcast_subscription table", `
       CREATE TABLE IF NOT EXISTS podcast_subscription (
         id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         agent_id      UUID NOT NULL,
@@ -381,7 +510,7 @@ export async function runStartupMigrations(): Promise<void> {
       )
     `);
 
-    await client.query(`
+    await runSafely("podcast_generation_cost table", `
       CREATE TABLE IF NOT EXISTS podcast_generation_cost (
         id                    UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         episode_id            UUID NOT NULL,
@@ -395,7 +524,7 @@ export async function runStartupMigrations(): Promise<void> {
       )
     `);
 
-    await client.query(`
+    await runSafely("podcast_analytics table", `
       CREATE TABLE IF NOT EXISTS podcast_analytics (
         id                          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         episode_id                  UUID NOT NULL,
@@ -412,30 +541,31 @@ export async function runStartupMigrations(): Promise<void> {
     `);
 
     // Podcast indexes
-    await client.query(`CREATE INDEX IF NOT EXISTS idx_podcast_agent    ON podcast(agent_id)`);
-    await client.query(`CREATE INDEX IF NOT EXISTS idx_podcast_category  ON podcast(category)`);
-    await client.query(`CREATE INDEX IF NOT EXISTS idx_podcast_by_agent  ON podcast(agent_id, created_at DESC)`);
-    await client.query(`CREATE INDEX IF NOT EXISTS idx_episode_podcast   ON podcast_episode(podcast_id)`);
-    await client.query(`CREATE INDEX IF NOT EXISTS idx_episode_status    ON podcast_episode(status)`);
-    await client.query(`CREATE INDEX IF NOT EXISTS idx_episode_status_created ON podcast_episode(status, created_at ASC)`);
-    await client.query(`CREATE INDEX IF NOT EXISTS idx_distribution_episode  ON podcast_distribution(episode_id)`);
-    await client.query(`CREATE INDEX IF NOT EXISTS idx_distribution_platform ON podcast_distribution(platform)`);
-    await client.query(`CREATE INDEX IF NOT EXISTS idx_subscription_agent   ON podcast_subscription(agent_id)`);
-    await client.query(`CREATE INDEX IF NOT EXISTS idx_subscription_podcast ON podcast_subscription(podcast_id)`);
-    await client.query(`CREATE INDEX IF NOT EXISTS idx_cost_episode          ON podcast_generation_cost(episode_id)`);
-    await client.query(`CREATE INDEX IF NOT EXISTS idx_analytics_episode     ON podcast_analytics(episode_id)`);
-    await client.query(`CREATE INDEX IF NOT EXISTS idx_podcast_trending      ON podcast_analytics(recorded_at DESC)`);
+    await runSafely("idx_podcast_agent", `CREATE INDEX IF NOT EXISTS idx_podcast_agent ON podcast(agent_id)`);
+    await runSafely("idx_podcast_category", `CREATE INDEX IF NOT EXISTS idx_podcast_category ON podcast(category)`);
+    await runSafely("idx_podcast_by_agent", `CREATE INDEX IF NOT EXISTS idx_podcast_by_agent ON podcast(agent_id, created_at DESC)`);
+    await runSafely("idx_episode_podcast", `CREATE INDEX IF NOT EXISTS idx_episode_podcast ON podcast_episode(podcast_id)`);
+    await runSafely("idx_episode_status", `CREATE INDEX IF NOT EXISTS idx_episode_status ON podcast_episode(status)`);
+    await runSafely("idx_episode_status_created", `CREATE INDEX IF NOT EXISTS idx_episode_status_created ON podcast_episode(status, created_at ASC)`);
+    await runSafely("idx_distribution_episode", `CREATE INDEX IF NOT EXISTS idx_distribution_episode ON podcast_distribution(episode_id)`);
+    await runSafely("idx_distribution_platform", `CREATE INDEX IF NOT EXISTS idx_distribution_platform ON podcast_distribution(platform)`);
+    await runSafely("idx_subscription_agent", `CREATE INDEX IF NOT EXISTS idx_subscription_agent ON podcast_subscription(agent_id)`);
+    await runSafely("idx_subscription_podcast", `CREATE INDEX IF NOT EXISTS idx_subscription_podcast ON podcast_subscription(podcast_id)`);
+    await runSafely("idx_cost_episode", `CREATE INDEX IF NOT EXISTS idx_cost_episode ON podcast_generation_cost(episode_id)`);
+    await runSafely("idx_analytics_episode", `CREATE INDEX IF NOT EXISTS idx_analytics_episode ON podcast_analytics(episode_id)`);
+    await runSafely("idx_podcast_trending", `CREATE INDEX IF NOT EXISTS idx_podcast_trending ON podcast_analytics(recorded_at DESC)`);
 
-    // Podcast-related columns on existing tables
-    await client.query(`ALTER TABLE agent ADD COLUMN IF NOT EXISTS podcast_specialization VARCHAR(100)`);
+    await runSafely("agent podcast_specialization",
+      `ALTER TABLE agent ADD COLUMN IF NOT EXISTS podcast_specialization VARCHAR(100)`);
 
-    // ── Migration 015: dialogue format support for podcast_episode ──────────
-    await client.query(`
+    // Podcast episode format
+    await runSafely("podcast_episode format", `
       ALTER TABLE podcast_episode
         ADD COLUMN IF NOT EXISTS format VARCHAR(20) NOT NULL DEFAULT 'monologue',
         ADD COLUMN IF NOT EXISTS secondary_voice_id VARCHAR(100)
     `);
-    await client.query(`
+
+    await runSafely("chk_episode_format", `
       DO $$ BEGIN
         IF NOT EXISTS (
           SELECT 1 FROM information_schema.table_constraints
@@ -447,10 +577,12 @@ export async function runStartupMigrations(): Promise<void> {
         END IF;
       END $$
     `);
-    await client.query(`CREATE INDEX IF NOT EXISTS idx_episode_format ON podcast_episode(format)`);
 
-    // Podcast timestamp triggers
-    await client.query(`
+    await runSafely("idx_episode_format",
+      `CREATE INDEX IF NOT EXISTS idx_episode_format ON podcast_episode(format)`);
+
+    // Podcast triggers
+    await runSafely("update_podcast_timestamp function", `
       CREATE OR REPLACE FUNCTION update_podcast_timestamp()
       RETURNS TRIGGER AS $$
       BEGIN
@@ -459,11 +591,10 @@ export async function runStartupMigrations(): Promise<void> {
       END;
       $$ LANGUAGE plpgsql
     `);
-    await client.query(`
+
+    await runSafely("podcast_update_timestamp trigger", `
       DO $$ BEGIN
-        IF NOT EXISTS (
-          SELECT 1 FROM pg_trigger WHERE tgname = 'podcast_update_timestamp'
-        ) THEN
+        IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'podcast_update_timestamp') THEN
           CREATE TRIGGER podcast_update_timestamp
             BEFORE UPDATE ON podcast
             FOR EACH ROW EXECUTE FUNCTION update_podcast_timestamp();
@@ -471,7 +602,7 @@ export async function runStartupMigrations(): Promise<void> {
       END $$
     `);
 
-    await client.query(`
+    await runSafely("update_episode_timestamp function", `
       CREATE OR REPLACE FUNCTION update_episode_timestamp()
       RETURNS TRIGGER AS $$
       BEGIN
@@ -480,11 +611,10 @@ export async function runStartupMigrations(): Promise<void> {
       END;
       $$ LANGUAGE plpgsql
     `);
-    await client.query(`
+
+    await runSafely("episode_update_timestamp trigger", `
       DO $$ BEGIN
-        IF NOT EXISTS (
-          SELECT 1 FROM pg_trigger WHERE tgname = 'episode_update_timestamp'
-        ) THEN
+        IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'episode_update_timestamp') THEN
           CREATE TRIGGER episode_update_timestamp
             BEFORE UPDATE ON podcast_episode
             FOR EACH ROW EXECUTE FUNCTION update_episode_timestamp();
@@ -492,136 +622,11 @@ export async function runStartupMigrations(): Promise<void> {
       END $$
     `);
 
-    // ── Migration 014: room recording columns ─────────────────────────────
-    // Required by room-repository SELECT queries. Without these columns every
-    // GET /rooms/:id returns a DB error which the frontend shows as
-    // "Room not found or unavailable."
-    await client.query(`
-      ALTER TABLE room
-        ADD COLUMN IF NOT EXISTS recording_enabled  BOOLEAN                   NOT NULL DEFAULT TRUE,
-        ADD COLUMN IF NOT EXISTS recording_url      TEXT,
-        ADD COLUMN IF NOT EXISTS recording_started_at TIMESTAMP WITH TIME ZONE,
-        ADD COLUMN IF NOT EXISTS recording_ended_at   TIMESTAMP WITH TIME ZONE
-    `);
-
-    // ── Migration 018: Missing discovery & room lifecycle columns ──────────
-    // Fixes 500 errors on /discover/live-now, /discover/recently-ended,
-    // and room heartbeat/participant tracking.
-    //
-    // Root cause: The discovery queries reference tables and columns that were
-    // never created by any migration or startup script.
-
-    // 1. room_participant table — referenced by discovery-service.ts getLiveNow()
-    //    subqueries (speaker lists, participant counts), room-repository.ts
-    //    addParticipant(), and migration 017 (which ALTERs it but never CREATEs).
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS room_participant (
-        room_id    UUID NOT NULL REFERENCES room(id) ON DELETE CASCADE,
-        agent_id   UUID NOT NULL REFERENCES agent(id) ON DELETE CASCADE,
-        role       VARCHAR(50) NOT NULL DEFAULT 'speaker',
-        status     VARCHAR(50) NOT NULL DEFAULT 'joined',
-        joined_at  TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-        left_at    TIMESTAMP WITH TIME ZONE,
-        PRIMARY KEY (room_id, agent_id)
-      )
-    `);
-
-    await client.query(`
-      CREATE INDEX IF NOT EXISTS idx_room_participant_room
-        ON room_participant(room_id)
-    `);
-
-    await client.query(`
-      CREATE INDEX IF NOT EXISTS idx_room_participant_agent
-        ON room_participant(agent_id)
-    `);
-
-    // 2. recording_available — referenced by /discover/recently-ended
-    //    (WHERE recording_available = TRUE) and room-repository.ts
-    //    setRecordingAvailable().  Migration 014 adds recording_enabled
-    //    but skips this column.
-    await client.query(`
-      ALTER TABLE room
-        ADD COLUMN IF NOT EXISTS recording_available BOOLEAN NOT NULL DEFAULT FALSE
-    `);
-
-    // 3. last_seen_at — heartbeat column used by discovery-service.ts
-    //    getLiveNow() to filter stale rooms and by room-repository.ts
-    //    updateHeartbeat().
-    await client.query(`
-      ALTER TABLE room
-        ADD COLUMN IF NOT EXISTS last_seen_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-    `);
-
-    await client.query(`
-      CREATE INDEX IF NOT EXISTS idx_room_last_seen
-        ON room(last_seen_at) WHERE status = 'live'
-    `);
-
-    // 3b. last_turn_at / turn_count / completion_percentage — used by
-    //     room-repository.ts updateTurn() and updateCompletionPercentage().
-    //     Without these the orchestrator crashes on every turn.
-    await client.query(`
-      ALTER TABLE room
-        ADD COLUMN IF NOT EXISTS last_turn_at TIMESTAMP WITH TIME ZONE,
-        ADD COLUMN IF NOT EXISTS turn_count INTEGER NOT NULL DEFAULT 0,
-        ADD COLUMN IF NOT EXISTS completion_percentage INTEGER NOT NULL DEFAULT 0
-    `);
-
-    // 4. search_vector — tsvector column for full-text search on room
-    //    objective and title. Referenced by discovery-service.ts searchRooms().
-    await client.query(`
-      ALTER TABLE room
-        ADD COLUMN IF NOT EXISTS search_vector tsvector
-    `);
-
-    // Backfill search_vector for existing rows
-    await client.query(`
-      UPDATE room
-      SET search_vector = to_tsvector('english', COALESCE(objective, '') || ' ' || COALESCE(title, ''))
-      WHERE search_vector IS NULL
-    `);
-
-    // Trigger function to auto-update search_vector on INSERT/UPDATE
-    await client.query(`
-      CREATE OR REPLACE FUNCTION room_search_vector_update()
-      RETURNS TRIGGER AS $$
-      BEGIN
-        NEW.search_vector := to_tsvector('english', COALESCE(NEW.objective, '') || ' ' || COALESCE(NEW.title, ''));
-        RETURN NEW;
-      END;
-      $$ LANGUAGE plpgsql
-    `);
-
-    await client.query(`
-      DO $$ BEGIN
-        IF NOT EXISTS (
-          SELECT 1 FROM pg_trigger WHERE tgname = 'room_search_vector_trigger'
-        ) THEN
-          CREATE TRIGGER room_search_vector_trigger
-            BEFORE INSERT OR UPDATE OF objective, title ON room
-            FOR EACH ROW EXECUTE FUNCTION room_search_vector_update();
-        END IF;
-      END $$
-    `);
-
-    // GIN index for fast full-text search
-    await client.query(`
-      CREATE INDEX IF NOT EXISTS idx_room_search_vector
-        ON room USING GIN(search_vector)
-    `);
-
-    await client.query("COMMIT");
-
-    logger.info("Startup schema migrations applied successfully");
-  } catch (err) {
-    await client.query("ROLLBACK");
-    // Non-fatal: log the error but don't crash the server.
-    // The application may still work if the columns already exist or the
-    // relevant features (V2 Jam) are not in use.
-    logger.error("Startup schema migration failed (non-fatal)", {
-      error: err instanceof Error ? err.message : String(err),
-    });
+    if (failed > 0) {
+      logger.warn(`Startup migrations completed with ${failed} failure(s)`);
+    } else {
+      logger.info("Startup schema migrations applied successfully");
+    }
   } finally {
     client.release();
   }
