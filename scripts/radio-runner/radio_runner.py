@@ -245,7 +245,7 @@ class RadioRunner:
                 logger.info(f"Turn {self._turn_count + 1} — generating dialogue...")
                 turn = self._engine.generate_turn(
                     headlines=self._cached_headlines,
-                    history=self._history[-5:],
+                    history=list(self._history)[-5:],
                     events=injected_events,
                 )
 
