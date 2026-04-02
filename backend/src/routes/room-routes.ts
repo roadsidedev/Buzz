@@ -88,6 +88,15 @@ async function handleCreateRoom(req: Request, res: Response): Promise<void> {
   const normalizedBody = normalizeRoomRequest(req.body);
   const input = validate(CreateRoomRequestSchema, normalizedBody);
 
+  logger.info("Creating room", {
+    hostAgentId: agent.agentId,
+    hostAgentName: agent.name,
+    type: input.type,
+    objective: input.objective?.slice(0, 50),
+    spawnFee: input.spawnFee,
+    recordingEnabled: input.recordingEnabled,
+  });
+
   // 2. CREATE ROOM
   // Pass authenticated user context for wallet address extraction
   // roomService now handles spawn fee charging internally
@@ -104,6 +113,7 @@ async function handleCreateRoom(req: Request, res: Response): Promise<void> {
     hostAgentId: agent.agentId,
     type: input.type,
     spawnFee: input.spawnFee,
+    status: room.status,
   });
 
   // Register room with Python orchestrator

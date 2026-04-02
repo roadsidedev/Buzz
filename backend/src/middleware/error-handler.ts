@@ -55,6 +55,14 @@ export function errorHandler(
     statusCode = 400;
     code = "INVALID_JSON";
     message = "Invalid JSON in request body";
+  } else {
+    // For unexpected errors, expose the actual error message for debugging
+    // In production, you may want to sanitize this to avoid leaking internals
+    message = err.message || message;
+    context = {
+      errorType: err.constructor.name,
+      ...(process.env.NODE_ENV !== "production" && { stack: err.stack }),
+    };
   }
 
   const response: ApiResponse<null> = {

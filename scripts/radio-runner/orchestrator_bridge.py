@@ -360,6 +360,35 @@ class OrchestratorBridge:
                         f"Retry after {retry_after}s."
                     )
 
+            if resp.status_code == 500:
+                # Server error — retry with exponential backoff
+                if attempt < max_retries:
+                    backoff = min(2 ** (attempt + 1), 30)  # 2s, 4s, 8s, max 30s
+                    try:
+                        error_body = resp.json()
+                        error_msg = error_body.get("error", {}).get("message", "Unknown server error")
+                    except Exception:
+                        error_msg = resp.text[:200] if resp.text else "Empty response"
+                    logger.warning(
+                        "Server error on room creation — retrying in %ds (attempt %d/%d): %s",
+                        backoff, attempt + 1, max_retries, error_msg,
+                    )
+                    time.sleep(backoff)
+                    continue
+                else:
+                    try:
+                        error_body = resp.json()
+                        error_detail = error_body.get("error", {})
+                        error_msg = error_detail.get("message", "Unknown server error")
+                        error_context = error_detail.get("context", {})
+                    except Exception:
+                        error_msg = resp.text[:500] if resp.text else "Empty response"
+                        error_context = {}
+                    raise RuntimeError(
+                        f"[create_room] Server error after {max_retries} retries: {error_msg}. "
+                        f"Context: {error_context}"
+                    )
+
             self._assert_ok(resp, "create_room")
             break
 
