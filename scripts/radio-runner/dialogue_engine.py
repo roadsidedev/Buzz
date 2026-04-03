@@ -12,8 +12,11 @@ import logging
 import os
 import sys
 import time
+from collections import namedtuple
 from dataclasses import dataclass
 from typing import Any, Optional
+
+import httpx
 
 from agent import RadioAgent
 from event_listener import RadioEvent
@@ -87,7 +90,6 @@ def _resolve_provider() -> Any:
         class StandaloneNvidia:
             def __init__(self, key: str):
                 self.key = key
-                import httpx
                 self.client = httpx.Client(timeout=120.0)
 
             def _chat_completion_with_retry(
@@ -130,7 +132,6 @@ def _resolve_provider() -> Any:
                     }
                 )
                 data = resp.json()
-                from collections import namedtuple
                 TextObj = namedtuple("TextObj", ["text"])
                 ContentObj = namedtuple("ContentObj", ["content"])
                 return ContentObj(content=[TextObj(text=data["choices"][0]["message"]["content"])])
@@ -143,7 +144,6 @@ def _resolve_provider() -> Any:
     class StandaloneAnthropic:
         def __init__(self, key: str):
             self.key = key
-            import httpx
             self.client = httpx.Client(timeout=30.0)
             
         def messages_create(self, model: str, max_tokens: int, system: str, messages: list):
@@ -174,7 +174,7 @@ def _resolve_provider() -> Any:
             
             return MockResponse(data["content"][0]["text"])
 
-    return StandaloneAnthropic(api_key)
+    return StandaloneAnthropic(anthropic_key)
 
 
 def _resolve_model(provider: Any) -> str:
