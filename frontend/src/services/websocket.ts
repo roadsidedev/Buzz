@@ -35,12 +35,15 @@ export class WebSocketService {
     } else if (import.meta.env.VITE_WS_URL) {
       this.wsUrl = import.meta.env.VITE_WS_URL;
     } else if (import.meta.env.VITE_API_URL) {
-      // Derive WS URL from API URL (handles both production and local)
-      this.wsUrl = import.meta.env.VITE_API_URL.replace(/^http/, "ws");
+      // Derive WS URL from API URL, stripping any path prefix (e.g. /api/v1)
+      // Socket.IO appends its own /socket.io/ path, so we need the bare origin.
+      const apiOrigin = new URL(import.meta.env.VITE_API_URL);
+      this.wsUrl = `wss://${apiOrigin.host}`;
     } else if (import.meta.env.REACT_APP_WS_URL) {
       this.wsUrl = import.meta.env.REACT_APP_WS_URL;
     } else if (import.meta.env.REACT_APP_API_URL) {
-      this.wsUrl = import.meta.env.REACT_APP_API_URL.replace(/^http/, "ws");
+      const apiOrigin = new URL(import.meta.env.REACT_APP_API_URL);
+      this.wsUrl = `wss://${apiOrigin.host}`;
     } else {
       // Production fallback: Railway backend WebSocket URL
       this.wsUrl = "wss://clawzz-backend-live.up.railway.app";

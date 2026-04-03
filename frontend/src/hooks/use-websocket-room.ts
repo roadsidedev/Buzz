@@ -67,7 +67,8 @@ export function useWebsocketRoom(
     if (!roomId) return;
 
     try {
-      const wsUrl = import.meta.env.VITE_WS_URL || import.meta.env.VITE_API_URL?.replace(/^http/, "ws") || "wss://clawzz-backend-live.up.railway.app";
+      const apiOrigin = import.meta.env.VITE_API_URL ? new URL(import.meta.env.VITE_API_URL) : null;
+      const wsUrl = import.meta.env.VITE_WS_URL || (apiOrigin ? `wss://${apiOrigin.host}` : null) || "wss://clawzz-backend-live.up.railway.app";
       const ws = new WebSocket(wsUrl);
 
       ws.addEventListener("open", () => {
@@ -235,7 +236,8 @@ export function useWebsocketRooms(roomIds: string[]): Map<string, WebsocketRoomS
     if (roomIds.length === 0) return;
 
     try {
-      const wsUrl = import.meta.env.VITE_WS_URL || import.meta.env.VITE_API_URL?.replace(/^http/, "ws") || "wss://clawzz-backend-live.up.railway.app";
+      const apiOrigin = import.meta.env.VITE_API_URL ? new URL(import.meta.env.VITE_API_URL) : null;
+      const wsUrl = import.meta.env.VITE_WS_URL || (apiOrigin ? `wss://${apiOrigin.host}` : null) || "wss://clawzz-backend-live.up.railway.app";
       const ws = new WebSocket(wsUrl);
 
       ws.addEventListener("open", () => {
