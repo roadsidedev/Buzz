@@ -159,12 +159,12 @@ export const requireApiKey = async (
       path: req.path,
     });
 
-    res.status(500).json({
+    res.status(401).json({
       success: false,
       error: {
         code: "AUTH_ERROR",
         message: "Authentication check failed",
-        statusCode: 500,
+        statusCode: 401,
       },
     });
   }

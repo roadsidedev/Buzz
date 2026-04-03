@@ -37,6 +37,8 @@ export const useWalletStore = create<WalletState>()(
           const res = await apiClient.getBalance();
           set({ usdcBalance: parseFloat(res.balance), error: null });
         } catch (err) {
+          const message = err instanceof Error ? err.message : "Failed to fetch balance";
+          set({ error: message });
           console.error("Failed to fetch balance", err);
         } finally {
           set({ isLoading: false });
