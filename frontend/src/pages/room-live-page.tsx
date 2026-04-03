@@ -257,9 +257,8 @@ export function RoomLivePage() {
     autoJoin: !streamLoading && !!stream,
   })
 
-  // ── Keep room alive with periodic heartbeats (host only) ────────────────────
-  const isHost = !!stream && stream.hostAgentId === useAuthStore.getState().agentId
-  useRoomHeartbeat(streamId, isHost)
+  // ── Keep room alive with periodic heartbeats (any authenticated viewer) ─────
+  useRoomHeartbeat(streamId, !!stream && authenticated)
 
   // Sync the HTML5 audio element's muted state with local soundMuted state
   useEffect(() => {

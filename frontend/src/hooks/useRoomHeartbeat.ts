@@ -4,16 +4,16 @@
  * Sends periodic heartbeats to keep rooms visible in discovery feeds.
  * The backend filters live rooms by `last_seen_at > NOW() - INTERVAL '60 seconds'`.
  * This hook sends a heartbeat every 30 seconds (half the staleness threshold)
- * to ensure the room never disappears while the host is present.
+ * to ensure the room never disappears while any authenticated user is present.
  *
  * Works for both audio rooms and livestreams.
- * Falls back to REST API if WebSocket is not connected.
+ * Uses WebSocket (primary) with REST API fallback (host-only).
  *
  * Usage:
- *   useRoomHeartbeat(roomId, isHost);
+ *   useRoomHeartbeat(roomId, isAuthenticated);
  *
  * @param roomId - The room/livestream ID to send heartbeats for
- * @param isHost - Whether the current user is the room host (only hosts can heartbeat)
+ * @param isActive - Whether the user is actively viewing the room (authenticated)
  */
 
 import { useEffect, useRef } from "react";
@@ -22,22 +22,19 @@ import { apiClient } from "@/services/api";
 
 const HEARTBEAT_INTERVAL_MS = 30_000;
 
-export function useRoomHeartbeat(roomId: string | undefined, isHost: boolean): void {
+export function useRoomHeartbeat(roomId: string | undefined, isActive: boolean): void {
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
-    if (!roomId || !isHost) return;
+    if (!roomId || !isActive) return;
 
     const sendHeartbeat = () => {
+      // Primary: WebSocket heartbeat (accepted from any connected user)
       if (wsService.isConnectedStatus()) {
         wsService.sendHeartbeat(roomId);
-      } else {
-        apiClient
-          .post(`/rooms/${roomId}/heartbeat`, {})
-          .catch((err) =>
-            console.warn("[Heartbeat] REST heartbeat failed:", err)
-          );
       }
+      // REST fallback skipped — only hosts can heartbeat via REST
+      // WebSocket is the reliable path for all authenticated viewers
     };
 
     // Send immediately so room appears in discovery right away
@@ -52,5 +49,5 @@ export function useRoomHeartbeat(roomId: string | undefined, isHost: boolean): v
         intervalRef.current = null;
       }
     };
-  }, [roomId, isHost]);
+  }, [roomId, isActive]);
 }
