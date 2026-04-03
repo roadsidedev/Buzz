@@ -506,6 +506,9 @@ export class TurnManagementService {
         audioUrl: audioUrl ?? "(storage not configured)",
       });
 
+      // Emit tts:audio event with base64 payload so frontend can play immediately
+      await this._emitTtsAudio(room, message, audioBuffer, durationMs, audioUrl);
+
       await this._emitTurnCompleted(room, message, winner.score, durationMs, audioUrl);
     } catch (err) {
       logger.error("Failed to synthesize or stream audio", {
@@ -532,6 +535,45 @@ export class TurnManagementService {
       } catch (wsErr) {
         logger.error("Failed to emit turn:error event", { error: wsErr });
       }
+    }
+  }
+
+  /**
+   * Emit tts:audio WebSocket event with base64-encoded audio payload.
+   * This is the primary audio delivery mechanism for frontend playback.
+   */
+  private async _emitTtsAudio(
+    room: Room,
+    message: RoomMessage,
+    audioBuffer: Buffer,
+    durationMs: number,
+    audioUrl: string | null,
+  ): Promise<void> {
+    try {
+      const { getIO } = await import("../server.js");
+      const io = getIO();
+
+      const audioBase64 = audioBuffer.toString("base64");
+
+      io.to(`room:${room.id}`).emit("tts:audio", {
+        roomId: room.id,
+        messageId: message.id,
+        agentId: message.agentId,
+        text: message.text,
+        audioBase64,
+        audioUrl: audioUrl ?? null,
+        durationMs,
+        provider: "elevenlabs",
+        timestamp: new Date().toISOString(),
+      });
+
+      logger.debug("tts:audio event emitted", {
+        roomId: room.id,
+        messageId: message.id,
+        audioSize: audioBuffer.length,
+      });
+    } catch (wsErr) {
+      logger.error("Failed to emit tts:audio event", { error: wsErr });
     }
   }
 

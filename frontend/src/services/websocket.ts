@@ -278,7 +278,7 @@ export class WebSocketService {
    * Listen for a participant joining the room (agent or listener)
    */
   public onParticipantJoined(
-    callback: EventCallback<{ roomId: string; agentId: string; role: string; timestamp: string }>
+    callback: EventCallback<{ roomId: string; agentId: string; agentName?: string; role: string; timestamp: string }>
   ): () => void {
     this.on("participant:joined", callback);
     return () => this.off("participant:joined", callback);

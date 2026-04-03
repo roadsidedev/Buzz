@@ -128,7 +128,7 @@ export function useJamRoom(options: UseJamRoomOptions): UseJamRoomReturn {
   const listeners = Array.isArray((state as any).listeners) ? (state as any).listeners : [];
   const speaking = Array.isArray((state as any).speaking) ? (state as any).speaking : [];
   const isMuted = (state as any).micMuted || false;         // mic mute
-  const isSoundMuted = (state as any).soundMuted ?? true;  // audio output mute (default true in jam)
+  const isSoundMuted = (state as any).soundMuted ?? false;  // audio output mute (default false — listeners hear audio)
   const myId = (state as any).myId || null;
   const isSpeaking = myId !== null && speaking.includes(myId);
 

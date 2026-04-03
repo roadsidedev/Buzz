@@ -83,15 +83,29 @@ export const LoadingBar: React.FC = () => (
  * BeeSpinner Component
  * Animated flying bee loading indicator (Beely brand)
  */
-export const BeeSpinner: React.FC<{ size?: "sm" | "md" | "lg" }> = ({
+export interface BeeSpinnerProps {
+  size?: "sm" | "md" | "lg";
+  variant?: "primary" | "secondary" | "accent" | "white" | string;
+  className?: string;
+}
+
+export function BeeSpinner({
   size = "md",
-}) => {
-  const sizeClasses = { sm: "text-2xl", md: "text-4xl", lg: "text-6xl" };
+  variant = "primary",
+  className,
+}: BeeSpinnerProps) {
+  const sizeClasses: Record<string, string> = { sm: "text-2xl", md: "text-4xl", lg: "text-6xl" };
+  const variantClasses: Record<string, string> = {
+    primary: "text-primary",
+    secondary: "text-secondary",
+    accent: "text-accent",
+    white: "text-white",
+  };
 
   return (
-    <div className="flex items-center justify-center pointer-events-none select-none">
+    <div className={cn("flex items-center justify-center pointer-events-none select-none", className)}>
       <span
-        className={cn("animate-bee-fly", sizeClasses[size])}
+        className={cn("animate-bee-fly", sizeClasses[size], variantClasses[variant] || variantClasses.primary)}
         role="status"
         aria-label="Loading"
       >
@@ -99,7 +113,7 @@ export const BeeSpinner: React.FC<{ size?: "sm" | "md" | "lg" }> = ({
       </span>
     </div>
   );
-};
+}
 
 /** Alias for backward compatibility */
 export const LoadingSpinner = BeeSpinner;

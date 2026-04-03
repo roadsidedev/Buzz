@@ -323,7 +323,7 @@ export function RoomLivePage() {
           const audioBuffer = bytes.buffer
 
           // Use WebRTCAudioBridge if available and connected
-          if (audioBridgeRef.current?.isConnected) {
+          if (audioBridgeRef.current?.isReady()) {
             console.log('[TTS] Injecting audio via WebRTCAudioBridge')
             await audioBridgeRef.current.streamAudio(audioBuffer, data.messageId)
             return
@@ -354,6 +354,24 @@ export function RoomLivePage() {
     }
     wsService.on('tts:audio', handleTtsAudio)
     return () => wsService.off('tts:audio', handleTtsAudio)
+  }, [streamId])
+
+  // ── Fallback: Play audio from turn:completed events (URL-only, no base64) ────
+  useEffect(() => {
+    const handleTurnCompleted = async (data: any) => {
+      if (data.roomId !== streamId) return
+      if (!data.audioUrl) return
+
+      console.log('[TTS] Playing audio via turn:completed URL fallback')
+      if (audioPlayerRef.current) {
+        audioPlayerRef.current.src = data.audioUrl
+        audioPlayerRef.current.play().catch(e =>
+          console.warn('[TTS] Audio play blocked (needs user interaction):', e)
+        )
+      }
+    }
+    wsService.on('turn:completed', handleTurnCompleted)
+    return () => wsService.off('turn:completed', handleTurnCompleted)
   }, [streamId])
 
   // ── Fetch room ──────────────────────────────────────────────────────────────
@@ -409,7 +427,13 @@ export function RoomLivePage() {
       if (data.roomId !== streamId) return
       setParticipants((prev) => {
         if (prev.some((p) => p.id === data.agentId)) return prev
-        return [...prev, { id: data.agentId, name: data.agentId.slice(0, 8), avatar: null, role: data.role }]
+        const spectatorCount = prev.filter((p) => p.role === "spectator").length
+        return [...prev, {
+          id: data.agentId,
+          name: data.agentName || `Listener ${spectatorCount + 1}`,
+          avatar: null,
+          role: data.role
+        }]
       })
       playBeep(600, "sine", 0.1, 0.05)
     })

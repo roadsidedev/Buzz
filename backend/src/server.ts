@@ -549,7 +549,8 @@ io.on("connection", (socket) => {
       // Notify others in the room that a listener joined
       io.to(`room:${roomId}`).emit("participant:joined", {
         roomId,
-        agentId: socket.id,
+        agentId: data.agentId || socket.id,
+        agentName: data.agentId ? undefined : "Anonymous Listener",
         role,
         timestamp: new Date().toISOString(),
       });
