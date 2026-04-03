@@ -878,9 +878,10 @@ router.post(
 
     const { pool } = await import("../config/database.js");
 
-    // Insert message into room_message table
+    // Insert message into message table (the canonical table used by the
+    // orchestrator adapter and message-repository).
     await pool.query(
-      `INSERT INTO room_message (id, room_id, agent_id, text, status, created_at)
+      `INSERT INTO message (id, room_id, agent_id, text, status, created_at)
        VALUES ($1, $2, $3, $4, $5, NOW())
        ON CONFLICT (id) DO NOTHING`,
       [
@@ -888,7 +889,7 @@ router.post(
         roomId,
         message.agent_id,
         message.text,
-        message.status || "submitted",
+        message.status || "candidate",
       ],
     );
 

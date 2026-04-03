@@ -135,8 +135,28 @@ export class LocalOrchestratorAdapter {
     // 1. Load room state (create minimal state from DB if missing in Redis)
     const state = await this._getOrCreateState(roomId);
 
+    // Auto-start: if orchestrator state is "pending" but DB room is "live",
+    // transition to live. This handles cases where startRoom() failed silently
+    // (e.g. Redis error during agent join) or the radio-runner created the room
+    // directly without going through the frontend join flow.
     if (state.status !== "live") {
-      return { status: "error", error: `Room ${roomId} is not live (status: ${state.status})` };
+      try {
+        const { pool } = await import("../../config/database.js");
+        const { rows } = await pool.query(
+          `SELECT status FROM room WHERE id = $1`,
+          [roomId],
+        );
+        if (rows.length > 0 && rows[0].status === "live") {
+          logger.info("Auto-starting room in orchestrator (DB is live, orchestrator is pending)", { roomId });
+          state.status = "live";
+          state.startedAt = new Date().toISOString();
+          await this.stateStore.updateRoom(state);
+        } else {
+          return { status: "error", error: `Room ${roomId} is not live (status: ${state.status})` };
+        }
+      } catch {
+        return { status: "error", error: `Room ${roomId} is not live (status: ${state.status})` };
+      }
     }
 
     // 2. Fetch candidate messages directly from DB (eliminates HTTP callback)
@@ -326,16 +346,36 @@ export class LocalOrchestratorAdapter {
     const existing = await this.stateStore.getRoom(roomId);
     if (existing) return existing;
 
-    // Minimal state — used when Redis was wiped after room creation.
-    // Status defaults to "pending" (not "live") so that processTurn() correctly
-    // returns an error instead of blindly processing messages for an unknown room.
-    // startRoom() will transition it to "live" if needed.
+    // Redis state was wiped or never created — recover from DB.
+    // The radio-runner creates rooms with status "live" in the DB, so we
+    // must check the actual DB status instead of defaulting to "pending",
+    // otherwise processTurn() will reject every turn for radio rooms.
+    let dbStatus = "pending";
+    let dbRoomType = "custom";
+    let dbObjective = "";
+    let dbHostAgentId = "";
+    try {
+      const { pool } = await import("../../config/database.js");
+      const { rows } = await pool.query(
+        `SELECT status, type, objective, host_agent_id FROM room WHERE id = $1`,
+        [roomId],
+      );
+      if (rows.length > 0) {
+        dbStatus = rows[0].status;
+        dbRoomType = rows[0].type || "custom";
+        dbObjective = rows[0].objective || "";
+        dbHostAgentId = rows[0].host_agent_id || "";
+      }
+    } catch {
+      // DB unavailable — fall back to defaults
+    }
+
     const minimal: RoomStateData = {
       roomId,
-      hostAgentId: "",
-      roomType: "custom",
-      status: "pending",
-      roomObjective: "",
+      hostAgentId: dbHostAgentId,
+      roomType: dbRoomType,
+      status: dbStatus,
+      roomObjective: dbObjective,
       typeConfig: {},
       turnCount: 0,
       lastSpeakerId: null,
