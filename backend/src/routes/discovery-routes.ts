@@ -185,7 +185,8 @@ router.get(
 /**
  * GET /discover/recently-ended
  * Recently completed rooms with recordings available for replay.
- * Only shows rooms that are 'closed' with recording_available = true.
+ * Shows rooms that are 'closed' or 'ended' with recording_available = true,
+ * plus any room that has a recording_url regardless of status.
  */
 router.get(
   "/recently-ended",
@@ -202,17 +203,27 @@ router.get(
                 r.viewer_count as "viewerCount",
                 r.ended_at as "endedAt", r.created_at as "createdAt",
                 r.recording_url as "recordingUrl",
+                r.recording_available as "recordingAvailable",
                 a.id as "hostAgentId",
                 COALESCE(a.name, 'Unknown Agent') as "hostAgentName",
                 COALESCE(a.avatar, '') as "hostAgentAvatar"
          FROM room r
          LEFT JOIN agent a ON r.host_agent_id = a.id
-         WHERE r.status = 'closed' AND r.recording_available = TRUE
-         ORDER BY r.ended_at DESC NULLS LAST
+         WHERE (
+           (r.status IN ('closed', 'ended') AND r.recording_available = TRUE)
+           OR r.recording_url IS NOT NULL
+         )
+         ORDER BY r.ended_at DESC NULLS LAST, r.created_at DESC
          LIMIT $1 OFFSET $2`,
         [limit, offset],
       ),
-      pool.query(`SELECT COUNT(*) as total FROM room WHERE status = 'closed' AND recording_available = TRUE`),
+      pool.query(
+        `SELECT COUNT(*) as total FROM room
+         WHERE (
+           (status IN ('closed', 'ended') AND recording_available = TRUE)
+           OR recording_url IS NOT NULL
+         )`
+      ),
     ]);
 
     const total = parseInt(countResult.rows[0]?.total || "0", 10);
@@ -332,7 +343,7 @@ router.get(
   optionalApiKey,
   asyncHandler(async (_req: Request, res: Response): Promise<void> => {
     const { rows } = await pool.query(
-      `SELECT DISTINCT type FROM room WHERE (status = 'live' AND last_seen_at > NOW() - INTERVAL '60 seconds') OR status = 'scheduled' ORDER BY type`
+      `SELECT DISTINCT type FROM room WHERE ((status = 'live' AND (last_seen_at > NOW() - INTERVAL '60 seconds' OR started_at > NOW() - INTERVAL '3 minutes')) OR status = 'scheduled') ORDER BY type`
     );
     const categories = rows.map((r) => ({ id: r.type, name: r.type }));
 

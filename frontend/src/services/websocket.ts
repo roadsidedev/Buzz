@@ -221,8 +221,18 @@ export class WebSocketService {
    * Leave a room
    */
   public leaveRoom(roomId: string): void {
-    this.joinedRooms.delete(roomId); // stop re-joining on reconnect
+    this.joinedRooms.delete(roomId);
     this.send("room:leave", { roomId });
+  }
+
+  /**
+   * Send a host heartbeat to keep the room visible in discovery.
+   * Emits the room:heartbeat event that the backend handles at server.ts:509-522.
+   *
+   * @param roomId - Room ID to send heartbeat for
+   */
+  public sendHeartbeat(roomId: string): void {
+    this.send("room:heartbeat", { roomId });
   }
 
   /**

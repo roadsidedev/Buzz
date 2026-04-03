@@ -39,6 +39,13 @@ export class DiscoveryService {
 
   /**
    * Get all live rooms with pagination
+   *
+   * Returns rooms that are:
+   * - Currently live with a fresh heartbeat (<60s stale)
+   * - Currently live within a 3-minute grace period (new rooms without heartbeat yet)
+   *
+   * Scheduled rooms are returned via getUpcoming(), and ended rooms with
+   * recordings via getRecentlyEnded().
    */
   async getLiveNow(
     page: number = 1,
@@ -93,7 +100,10 @@ export class DiscoveryService {
           LEFT JOIN room_participant rp ON r.id = rp.room_id AND rp.left_at IS NULL
           WHERE r.status = 'live'
             AND r.visibility = 'public'
-            AND r.last_seen_at > NOW() - INTERVAL '60 seconds'
+            AND (
+              r.last_seen_at > NOW() - INTERVAL '60 seconds'
+              OR r.started_at > NOW() - INTERVAL '3 minutes'
+            )
             ${mainTypeClause}
           GROUP BY r.id, r.objective, r.description, r.type, r.status, r.thumbnail_url,
                    r.created_at, r.started_at,
@@ -105,7 +115,7 @@ export class DiscoveryService {
           mainParams,
         ),
         this.db.query(
-          `SELECT COUNT(*) as total_count FROM room WHERE status = 'live' AND visibility = 'public' AND last_seen_at > NOW() - INTERVAL '60 seconds' ${countTypeClause}`,
+          `SELECT COUNT(*) as total_count FROM room WHERE status = 'live' AND visibility = 'public' AND (last_seen_at > NOW() - INTERVAL '60 seconds' OR started_at > NOW() - INTERVAL '3 minutes') ${countTypeClause}`,
           countParams,
         ),
       ]);
@@ -177,6 +187,11 @@ export class DiscoveryService {
         LEFT JOIN room_engagement re ON r.id = re.room_id
         LEFT JOIN room_participant rp ON r.id = rp.room_id AND rp.left_at IS NULL
         WHERE (r.status = 'live' OR r.status = 'closed') AND r.visibility = 'public'
+          AND (
+            r.status != 'live'
+            OR r.last_seen_at > NOW() - INTERVAL '60 seconds'
+            OR r.started_at > NOW() - INTERVAL '3 minutes'
+          )
         GROUP BY r.id, r.objective, r.description, r.type, r.status, r.thumbnail_url, r.created_at, r.started_at,
                  c.id, c.name, c.color, c.slug, a.id
         ORDER BY trending_score DESC, viewer_count DESC

@@ -307,9 +307,25 @@ export class RoomOrchestrationService {
       }
 
       // 3. CHECK FOR STALE HEARTBEATS — auto-end rooms where host disconnected
+      // Grace period: rooms that started within the last 3 minutes are not auto-ended
+      // even if heartbeat is stale, giving API-created rooms time for the host to connect.
       try {
         const staleRooms = await roomRepository.getRoomsWithStaleHeartbeat(60);
+        const GRACE_PERIOD_MS = 3 * 60 * 1000; // 3 minutes
         for (const room of staleRooms) {
+          // Skip rooms still within the grace period
+          if (room.startedAt) {
+            const ageMs = Date.now() - room.startedAt.getTime();
+            if (ageMs < GRACE_PERIOD_MS) {
+              logger.debug("Skipping stale heartbeat check — room within grace period", {
+                roomId: room.id,
+                ageSeconds: Math.round(ageMs / 1000),
+                gracePeriodSeconds: GRACE_PERIOD_MS / 1000,
+              });
+              continue;
+            }
+          }
+
           logger.info("Auto-ending room with stale heartbeat", {
             roomId: room.id,
             lastSeenAt: room.lastSeenAt,

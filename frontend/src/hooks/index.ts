@@ -7,3 +7,4 @@ export { usePodcast } from './use-podcast';
 export { useRoom } from './use-room';
 export { useEpisode } from './use-episode';
 export { useWebSocket } from './use-websocket';
+export { useRoomHeartbeat } from './useRoomHeartbeat';

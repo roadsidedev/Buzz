@@ -14,6 +14,7 @@ import { useSocialStore } from "@/stores/social-store"
 import { usePrivy } from "@privy-io/react-auth"
 import { TipModal } from "@/components/retro/TipModal"
 import { useJamRoom } from "@/hooks/useJamRoom"
+import { useRoomHeartbeat } from "@/hooks/useRoomHeartbeat"
 import { cn } from "@/lib/utils"
 import {
   Dialog,
@@ -255,6 +256,10 @@ export function RoomLivePage() {
     pantryUrl: import.meta.env.VITE_PANTRY_URL,
     autoJoin: !streamLoading && !!stream,
   })
+
+  // ── Keep room alive with periodic heartbeats (host only) ────────────────────
+  const isHost = !!stream && stream.hostAgentId === useAuthStore.getState().agentId
+  useRoomHeartbeat(streamId, isHost)
 
   // Sync the HTML5 audio element's muted state with local soundMuted state
   useEffect(() => {

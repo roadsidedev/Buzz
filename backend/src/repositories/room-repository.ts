@@ -204,11 +204,11 @@ export class RoomRepository {
   }
 
   /**
-   * Get discoverable rooms (live only with active heartbeat) for public listing.
+   * Get discoverable rooms (live with active heartbeat or within grace period).
    *
-   * Only rooms where the host has sent a heartbeat within the last 60 seconds
-   * are included. Pending rooms are excluded — they are not discoverable until
-   * audio is initialized and the host is connected.
+   * Rooms are included if:
+   * - Host has sent a heartbeat within the last 60 seconds, OR
+   * - Room started within the last 3 minutes (grace period for API-created rooms)
    *
    * @param limit - Max results per page
    * @param offset - Pagination offset
@@ -224,7 +224,10 @@ export class RoomRepository {
       SELECT id, host_agent_id, type, status, title, objective, spawn_fee, jam_room_id, jam_room_url, spawn_fee_payment_id, viewer_count, participant_count, completion_level, recording_enabled, recording_url, recording_started_at, recording_ended_at, created_at, started_at, ended_at, updated_at, scheduled_for
       FROM room
       WHERE status = 'live'
-        AND last_seen_at > NOW() - INTERVAL '60 seconds'
+        AND (
+          last_seen_at > NOW() - INTERVAL '60 seconds'
+          OR started_at > NOW() - INTERVAL '3 minutes'
+        )
     `;
 
     const params: any[] = [];
@@ -254,7 +257,7 @@ export class RoomRepository {
   }
 
   /**
-   * Get total count of discoverable rooms (live with active heartbeat)
+   * Get total count of discoverable rooms (live with active heartbeat or grace period)
    *
    * @param type - Optional room type filter for count
    * @returns Total count of rooms matching criteria
@@ -264,7 +267,10 @@ export class RoomRepository {
       SELECT COUNT(*) as count
       FROM room
       WHERE status = 'live'
-        AND last_seen_at > NOW() - INTERVAL '60 seconds'
+        AND (
+          last_seen_at > NOW() - INTERVAL '60 seconds'
+          OR started_at > NOW() - INTERVAL '3 minutes'
+        )
     `;
 
     const params: any[] = [];
