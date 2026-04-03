@@ -26,7 +26,8 @@ export class WebSocketService {
   private listeners: Map<string, Set<EventCallback<any>>> = new Map();
   // All rooms currently subscribed to — persists through reconnects so
   // socket.io auto-reconnect always restores live room event delivery.
-  private joinedRooms: Set<string> = new Set();
+  // Maps roomId -> role for proper reconnection with listener/speaker role.
+  private joinedRooms: Map<string, string> = new Map();
 
   constructor(wsUrl?: string) {
     this.wsUrl = wsUrl || import.meta.env.VITE_WS_URL || "ws://localhost:4000";
@@ -66,8 +67,8 @@ export class WebSocketService {
           // (Re-)join all tracked rooms — handles both the initial connect and
           // every subsequent auto-reconnect. joinedRooms is never cleared, so
           // room subscriptions are fully restored after a network blip.
-          this.joinedRooms.forEach((roomId) => {
-            this.socket!.emit("room:join", { roomId });
+          this.joinedRooms.forEach((role, roomId) => {
+            this.socket!.emit("room:join", { roomId, role });
           });
 
           resolve();
@@ -194,12 +195,12 @@ export class WebSocketService {
    * Persists across reconnects — if the socket isn't connected yet the join
    * is sent automatically once the connection is established.
    */
-  public joinRoom(roomId: string, agentId?: string): void {
-    this.joinedRooms.add(roomId); // persist for reconnect recovery
+  public joinRoom(roomId: string, agentId?: string, role?: string): void {
+    this.joinedRooms.set(roomId, role || "spectator"); // persist for reconnect recovery
     if (!this.isConnectedStatus()) {
       return; // connect handler will flush joinedRooms on next connect
     }
-    this.socket?.emit("room:join", { roomId, agentId });
+    this.socket?.emit("room:join", { roomId, agentId, role: role || "spectator" });
   }
 
   /**

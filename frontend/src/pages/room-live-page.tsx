@@ -218,9 +218,9 @@ export function RoomLivePage() {
   const [showChat, setShowChat] = useState(false)
   const [showTipModal, setShowTipModal] = useState(false)
   const [agentScores, setAgentScores] = useState<Record<string, number>>({})
-  // Local sound-mute state — starts muted so browser autoplay policy is satisfied.
-  // This decouples the mute button from Jam's connection state so it works immediately.
-  const [soundMuted, setSoundMuted] = useState(true)
+  // Local sound-mute state — starts UNMUTED for radio rooms so listeners
+  // hear audio immediately without needing a click to unlock.
+  const [soundMuted, setSoundMuted] = useState(false)
   const [isRecording, setIsRecording] = useState(false)
   const [recordingUploading, setRecordingUploading] = useState(false)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
@@ -398,7 +398,7 @@ export function RoomLivePage() {
   // ── Join socket room for live events (tts:audio, participant changes, status) ─
   useEffect(() => {
     if (!streamId || !stream) return
-    wsService.joinRoom(streamId)
+    wsService.joinRoom(streamId, undefined, "spectator")
     return () => wsService.leaveRoom(streamId)
   }, [streamId, stream])
 

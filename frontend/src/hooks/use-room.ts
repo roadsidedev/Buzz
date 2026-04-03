@@ -147,7 +147,7 @@ export function useRoom(roomId?: string) {
     }
 
     // Join room
-    wsService.joinRoom(roomId);
+    wsService.joinRoom(roomId, undefined, "spectator");
     setState((prev) => ({ ...prev, wsConnected: true, connectionError: null }));
 
     // Track live connection state so the UI can show a reconnection banner (M9).

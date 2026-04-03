@@ -125,7 +125,7 @@ class RadioAgent:
         # Inject memory of past topics to avoid repetition
         memory_instruction = ""
         if self.covered_topics:
-            topics_str = ", ".join(self.covered_topics[-5:])
+            topics_str = ", ".join(list(self.covered_topics)[-5:])
             memory_instruction = f"\n\n=== MEMORY ===\nYou recently discussed: {topics_str}. Do not repeat the exact same takes."
 
         system_instruction = f"{self.core_identity}\n\n=== CURRENT INSTRUCTIONS ===\n{self.active_skill_prompt}{memory_instruction}"
@@ -198,7 +198,11 @@ class RadioAgent:
             try:
                 with open(self.memory_file, "r", encoding="utf-8") as f:
                     data = json.load(f)
-                    return data.get("covered_topics", [])
+                    topics = data.get("covered_topics", [])
+                    if not isinstance(topics, list):
+                        logger.warning("Corrupted memory file for %s — resetting", self.name)
+                        return []
+                    return topics
             except Exception as e:
                 logger.error("Failed to load memory for %s: %s", self.name, e)
         return []

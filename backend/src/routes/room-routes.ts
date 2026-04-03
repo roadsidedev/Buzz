@@ -823,6 +823,92 @@ router.post(
 );
 
 /**
+ * POST /rooms/:id/messages
+ * Submit a message for orchestrator scoring.
+ *
+ * Called by the radio-runner daemon after generating dialogue from both
+ * agents (Alex and Mira). The message is stored in the room_message table
+ * so that the orchestrator can score and select the winning turn.
+ *
+ * Body shape (from orchestrator_bridge.py):
+ *   { message: { id, room_id, agent_id, text, status } }
+ *
+ * Auth: Bearer API key (internal agent auth)
+ */
+router.post(
+  "/:id/messages",
+  optionalApiKey,
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const { id: roomId } = req.params;
+    const { message } = req.body as {
+      message?: {
+        id?: string;
+        room_id?: string;
+        agent_id?: string;
+        text?: string;
+        status?: string;
+      };
+    };
+
+    if (!message?.id || !message?.agent_id || !message?.text) {
+      res.status(400).json({
+        success: false,
+        error: {
+          code: "MISSING_FIELDS",
+          message: "message.id, message.agent_id, and message.text are required",
+          statusCode: 400,
+        },
+      });
+      return;
+    }
+
+    // Verify room exists
+    const room = await roomService.getRoomById(roomId);
+    if (!room) {
+      res.status(404).json({
+        success: false,
+        error: {
+          code: "ROOM_NOT_FOUND",
+          message: `Room ${roomId} not found`,
+          statusCode: 404,
+        },
+      });
+      return;
+    }
+
+    const { pool } = await import("../config/database.js");
+
+    // Insert message into room_message table
+    await pool.query(
+      `INSERT INTO room_message (id, room_id, agent_id, text, status, created_at)
+       VALUES ($1, $2, $3, $4, $5, NOW())
+       ON CONFLICT (id) DO NOTHING`,
+      [
+        message.id,
+        roomId,
+        message.agent_id,
+        message.text,
+        message.status || "submitted",
+      ],
+    );
+
+    logger.info("Message submitted for scoring", {
+      roomId,
+      messageId: message.id,
+      agentId: message.agent_id,
+    });
+
+    res.json({
+      success: true,
+      data: {
+        messageId: message.id,
+        status: message.status || "submitted",
+      },
+    });
+  })
+);
+
+/**
  * POST /rooms/:id/events
  * Emit a typed event into a room's event stream.
  *

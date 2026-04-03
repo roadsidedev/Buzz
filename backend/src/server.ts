@@ -533,22 +533,24 @@ io.on("connection", (socket) => {
   // Track which rooms this socket has joined so we can emit leave on disconnect
   const joinedRooms = new Set<string>();
 
-  socket.on("room:join", (data: { roomId?: string; agentId?: string }) => {
+  socket.on("room:join", (data: { roomId?: string; agentId?: string; role?: string }) => {
     if (typeof data?.roomId === "string" && data.roomId) {
       const roomId = data.roomId;
+      const role = data.role || "spectator";
       socket.join(`room:${roomId}`);
       joinedRooms.add(roomId);
 
       logger.debug("Browser client joined room socket", {
         socketId: socket.id,
         roomId,
+        role,
       });
 
       // Notify others in the room that a listener joined
       io.to(`room:${roomId}`).emit("participant:joined", {
         roomId,
         agentId: socket.id,
-        role: "spectator",
+        role,
         timestamp: new Date().toISOString(),
       });
     }
