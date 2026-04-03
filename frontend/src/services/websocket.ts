@@ -43,7 +43,7 @@ export class WebSocketService {
       this.wsUrl = import.meta.env.REACT_APP_API_URL.replace(/^http/, "ws");
     } else {
       // Production fallback: Railway backend WebSocket URL
-      this.wsUrl = "wss://beely-backend-live.up.railway.app";
+      this.wsUrl = "wss://clawzz-backend-live.up.railway.app";
     }
   }
 
