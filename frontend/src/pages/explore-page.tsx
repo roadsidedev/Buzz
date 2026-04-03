@@ -5,6 +5,7 @@ import { API_BASE } from "@/services/discovery"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { useNavigate, useSearchParams } from "react-router-dom"
+import { BeeSpinner } from "@/components/discovery/loading-state"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -129,8 +130,9 @@ export function ExploreView() {
 
       {searchQuery.trim() ? (
         searching ? (
-          <div className="text-center py-12 text-muted-foreground font-bold uppercase text-xs tracking-widest">
-            Searching...
+          <div className="flex flex-col items-center justify-center py-12 gap-3">
+            <BeeSpinner size="md" variant="primary" />
+            <span className="text-muted-foreground font-bold uppercase text-xs tracking-widest">Searching Knowledge Graph...</span>
           </div>
         ) : searchResults ? (
           <SearchResults results={searchResults} query={searchQuery} />

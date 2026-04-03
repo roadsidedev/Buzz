@@ -4,6 +4,7 @@
  */
 
 import React from "react";
+import { cn } from "@/lib/utils";
 
 interface LoadingStateProps {
   count?: number;
@@ -78,17 +79,6 @@ export const LoadingBar: React.FC = () => (
   <div className="h-1 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 animate-pulse rounded-full" />
 );
 
-const beeKeyframes = `
-  @keyframes beeFly {
-    0%   { transform: translateY(0px) rotate(-5deg); }
-    20%  { transform: translateY(-10px) rotate(4deg) scaleX(1.06); }
-    40%  { transform: translateY(-5px) rotate(-3deg) scaleX(0.96); }
-    60%  { transform: translateY(-12px) rotate(6deg) scaleX(1.06); }
-    80%  { transform: translateY(-3px) rotate(-4deg) scaleX(0.97); }
-    100% { transform: translateY(0px) rotate(-5deg); }
-  }
-`;
-
 /**
  * BeeSpinner Component
  * Animated flying bee loading indicator (Beely brand)
@@ -99,11 +89,9 @@ export const BeeSpinner: React.FC<{ size?: "sm" | "md" | "lg" }> = ({
   const sizeClasses = { sm: "text-2xl", md: "text-4xl", lg: "text-6xl" };
 
   return (
-    <div className="flex items-center justify-center">
-      <style>{beeKeyframes}</style>
+    <div className="flex items-center justify-center pointer-events-none select-none">
       <span
-        className={sizeClasses[size]}
-        style={{ display: "inline-block", animation: "beeFly 1.4s ease-in-out infinite" }}
+        className={cn("animate-bee-fly", sizeClasses[size])}
         role="status"
         aria-label="Loading"
       >

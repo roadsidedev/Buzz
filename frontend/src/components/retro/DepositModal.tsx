@@ -21,6 +21,7 @@ import {
 import { useWalletStore } from "@/stores/wallet-store";
 import { useAuthStore } from "@/stores/auth-store";
 import { apiClient } from "@/services/api";
+import { BeeSpinner } from "@/components/discovery/loading-state";
 import {
   Dialog,
   DialogContent,
@@ -200,7 +201,7 @@ export const DepositModal: React.FC<DepositModalProps> = ({
                   onClick={() => selectedAmount && handleDeposit(selectedAmount)}
                 >
                   {isLoading ? (
-                    <RefreshCw className="w-4 h-4 animate-spin mr-2" />
+                    <BeeSpinner size="sm" variant="primary" className="mr-2" />
                   ) : (
                     <Wallet size={16} className="mr-2" />
                   )}

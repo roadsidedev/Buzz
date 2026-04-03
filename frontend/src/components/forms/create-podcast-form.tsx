@@ -11,7 +11,8 @@ import { Input } from '../Input';
 import { Textarea } from '../Textarea';
 import { MediaService } from '../../services/media';
 import { CreatePodcastRequest, PodcastCategory } from '../../types';
-import { Upload, Loader2, CheckCircle } from 'lucide-react';
+import { Upload, CheckCircle } from 'lucide-react';
+import { BeeSpinner } from '../discovery/loading-state';
 
 const PODCAST_CATEGORIES: Array<{ value: PodcastCategory; label: string }> = [
   { value: 'tech', label: 'Technology' },
@@ -210,7 +211,7 @@ export function CreatePodcastForm({
               <p className="text-sm font-medium">Click to upload album art</p>
               {isUploading && (
                 <div className="flex items-center gap-2 text-cyan-600 text-xs font-bold">
-                  <Loader2 size={14} className="animate-spin" /> Uploading...
+                  <BeeSpinner size="sm" /> Uploading...
                 </div>
               )}
             </div>

@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/dialog"
 import { apiClient } from "@/services/api"
 import wsService from "@/services/websocket"
+import { BeeSpinner } from "@/components/discovery/loading-state"
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -512,7 +513,7 @@ export function RoomDock() {
             </p>
             {jamRoom.isLoading ? (
               <div className="flex items-center gap-3 py-8">
-                <div className="w-6 h-6 border-2 border-violet-500/30 border-t-violet-500 rounded-full animate-spin" />
+                <BeeSpinner size="sm" variant="primary" />
                 <p className="text-xs text-muted-foreground uppercase tracking-widest">Connecting…</p>
               </div>
             ) : stageParticipants.length === 0 ? (

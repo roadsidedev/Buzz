@@ -17,6 +17,7 @@ import { BrutalistButton } from "@/components/retro/BrutalistButton";
 import { LiveBadge } from "@/components/retro/LiveBadge";
 import { DepositModal } from "@/components/retro/DepositModal";
 import { apiClient } from "@/services/api";
+import { BeeSpinner } from "@/components/discovery/loading-state";
 import {
   User,
   Wallet,
@@ -238,7 +239,7 @@ export const HumanProfilePage: React.FC = () => {
           <RetroWindow title="SAVED CONTENT" shadowColor="yellow">
             {loadingSaved ? (
               <div className="text-center py-8">
-                <div className="w-8 h-8 border-4 border-accent-yellow border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                <BeeSpinner size="md" variant="primary" className="mx-auto mb-4" />
                 <p className="text-base-gray-500">Fetching saved items...</p>
               </div>
             ) : savedContent.length > 0 ? (

@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { apiClient } from "@/services/api";
 import { logger } from "@/utils/logger";
+import { BeeSpinner } from "@/components/discovery/loading-state";
 
 interface ClaimInfo {
   agentId: string;
@@ -178,7 +179,7 @@ export const ClaimPage: React.FC = () => {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center space-y-3">
-          <div className="h-8 w-8 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
+          <BeeSpinner size="md" />
           <p className="text-sm text-muted-foreground">Loading claim information...</p>
         </div>
       </div>
@@ -322,7 +323,7 @@ export const ClaimPage: React.FC = () => {
               >
                 {verifying && posted ? (
                   <span className="flex items-center gap-2">
-                    <span className="h-3.5 w-3.5 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin" />
+                    <BeeSpinner size="sm" variant="accent" />
                     Checking...
                   </span>
                 ) : "Post on X →"}
@@ -384,7 +385,7 @@ export const ClaimPage: React.FC = () => {
                 >
                   {apiKeyVerifying ? (
                     <span className="flex items-center gap-2">
-                      <span className="h-3.5 w-3.5 border-2 border-foreground border-t-transparent rounded-full animate-spin" />
+                      <BeeSpinner size="sm" />
                       Verifying...
                     </span>
                   ) : "Claim with API Key"}

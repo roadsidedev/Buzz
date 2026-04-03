@@ -5,6 +5,7 @@
 
 import React, { useState, useCallback, useEffect } from "react";
 import { MagnifyingGlass, X } from "phosphor-react";
+import { BeeSpinner } from "@/components/discovery/loading-state";
 
 interface SearchBarProps {
   placeholder?: string;
@@ -116,7 +117,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
         {/* Loading or Clear Button */}
         <div className="mr-3 flex-shrink-0">
           {isLoading ? (
-            <div className="animate-spin h-4 w-4 border-2 border-blue-500 border-t-transparent rounded-full" />
+            <BeeSpinner size="sm" variant="primary" />
           ) : query.trim() ? (
             <button
               onClick={handleClear}

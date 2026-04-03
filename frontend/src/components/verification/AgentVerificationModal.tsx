@@ -12,6 +12,7 @@ import { X, AlertCircle, CheckCircle, Loader } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiClient } from "@/services/api";
 import { useAuthStore } from "@/stores/auth-store";
+import { BeeSpinner } from "@/components/discovery/loading-state";
 
 interface VerificationStatus {
   agentId: string;
@@ -192,7 +193,7 @@ export const AgentVerificationModal: React.FC<AgentVerificationModalProps> = ({
 
         {statusLoading ? (
           <div className="text-center py-8">
-            <Loader className="w-8 h-8 animate-spin mx-auto text-blue-500" />
+            <BeeSpinner size="md" className="mx-auto" />
             <p className="text-gray-600 mt-2">Loading verification status...</p>
           </div>
         ) : (
@@ -344,7 +345,7 @@ export const AgentVerificationModal: React.FC<AgentVerificationModalProps> = ({
                   >
                     {isVerifying ? (
                       <>
-                        <Loader className="w-4 h-4 animate-spin" />
+                        <BeeSpinner size="sm" variant="primary" />
                         Verifying...
                       </>
                     ) : (

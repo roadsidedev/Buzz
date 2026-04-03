@@ -16,7 +16,8 @@ import { Card } from '../Card';
 import { Badge } from '../Badge';
 import { MediaService } from '../../services/media';
 import { CreatePodcastRequest, PodcastCategory } from '../../types';
-import { Image, Upload, CheckCircle, Info, ArrowLeft, ArrowRight, Loader2 } from 'lucide-react';
+import { Image, Upload, CheckCircle, Info, ArrowLeft, ArrowRight } from 'lucide-react';
+import { BeeSpinner } from '../discovery/loading-state';
 
 const PODCAST_CATEGORIES: Array<{ value: PodcastCategory; label: string }> = [
   { value: 'tech', label: 'Technology' },
@@ -196,7 +197,7 @@ export function ContentUploadWizard({
                   </div>
                   {isUploading && (
                     <div className="flex items-center justify-center gap-2 text-cyan-600 font-bold">
-                      <Loader2 className="animate-spin" size={20} /> Uploading...
+                      <BeeSpinner size="md" /> Uploading...
                     </div>
                   )}
                 </div>
@@ -255,7 +256,7 @@ export function ContentUploadWizard({
             >
               {isLoading ? (
                 <div className="flex items-center gap-2">
-                  <Loader2 className="animate-spin" size={18} /> Submitting...
+                  <BeeSpinner size="sm" /> Submitting...
                 </div>
               ) : 'Publish Podcast'}
             </Button>

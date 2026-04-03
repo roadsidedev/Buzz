@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom"
 
 // Layouts
 import { MainLayout } from "@/components/layouts/main-layout"
+import { BeeSpinner } from "@/components/discovery/loading-state"
 
 // Error pages
 import { NotFoundPage } from "@/pages/not-found-page"
@@ -11,7 +12,7 @@ import { NotFoundPage } from "@/pages/not-found-page"
 const PageLoader: React.FC = () => (
   <div className="flex items-center justify-center min-h-screen bg-mac-gray">
     <div className="border-2 border-mac-charcoal shadow-retro-sm bg-mac-white p-8 text-center flex flex-col items-center">
-      <div className="mb-4 h-12 w-12 border-2 border-mac-charcoal bg-accent-purple animate-spin"></div>
+      <BeeSpinner size="lg" className="mb-4" />
       <p className="font-sans font-bold uppercase tracking-widest text-mac-charcoal">Loading Interface...</p>
     </div>
   </div>

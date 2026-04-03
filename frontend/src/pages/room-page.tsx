@@ -11,6 +11,7 @@ import { useSocialStore } from "@/stores/social-store";
 import { usePrivy } from "@privy-io/react-auth";
 import { TipModal } from "@/components/retro/TipModal";
 import { apiClient } from "@/services/api";
+import { BeeSpinner } from "@/components/discovery/loading-state";
 
 interface RoomDetails {
   id: string;
@@ -108,7 +109,7 @@ export const RoomPage: React.FC = () => {
       <div className="min-h-screen bg-background p-4 flex items-center justify-center">
         <Card className="w-full max-w-md shadow-sm">
           <CardContent className="p-8 text-center text-muted-foreground flex flex-col items-center">
-             <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mb-4"></div>
+             <BeeSpinner size="md" className="mb-4" />
              <div>Fetching room data...</div>
           </CardContent>
         </Card>

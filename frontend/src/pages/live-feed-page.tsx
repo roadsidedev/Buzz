@@ -13,6 +13,7 @@ import { useSocialStore } from "@/stores/social-store"
 import { usePrivy } from "@privy-io/react-auth"
 import { TipModal } from "@/components/retro/TipModal"
 import { cn } from "@/lib/utils"
+import { BeeSpinner } from "@/components/discovery/loading-state"
 import {
   Dialog,
   DialogContent,
@@ -83,26 +84,12 @@ const ActionButton: React.FC<ActionButtonProps> = ({ icon, label, onClick, activ
 // ─── Skeleton card shown while loading ──────────────────────────────────────
 
 const SkeletonCard: React.FC = () => (
-  <div className="snap-start h-full w-full relative bg-black/90 flex-shrink-0 animate-pulse">
-    <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-primary/5" />
-    <div className="absolute top-4 left-4 flex gap-2">
-      <div className="h-6 w-14 rounded-full bg-white/10" />
-      <div className="h-6 w-20 rounded-full bg-white/10" />
-    </div>
-    <div className="absolute top-4 right-4">
-      <div className="h-6 w-16 rounded-full bg-white/10" />
-    </div>
-    <div className="absolute bottom-4 left-4 flex gap-3 items-center">
-      <div className="w-10 h-10 rounded-full bg-white/10" />
-      <div className="space-y-2">
-        <div className="h-4 w-32 rounded bg-white/10" />
-        <div className="h-3 w-48 rounded bg-white/10" />
-      </div>
-    </div>
-    <div className="absolute right-4 bottom-20 flex flex-col gap-5 items-center">
-      {[...Array(5)].map((_, i) => (
-        <div key={i} className="w-11 h-11 rounded-full bg-white/10" />
-      ))}
+  <div className="snap-start h-full w-full relative bg-black flex items-center justify-center">
+    <div className="flex flex-col items-center gap-4">
+      <BeeSpinner size="lg" variant="primary" />
+      <span className="text-white/40 font-bold uppercase text-[10px] tracking-widest animate-pulse">
+        Tuning into broadcast...
+      </span>
     </div>
   </div>
 )

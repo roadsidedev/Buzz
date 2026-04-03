@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/dialog"
 import { apiClient } from "@/services/api"
 import wsService from "@/services/websocket"
+import { BeeSpinner } from "@/components/discovery/loading-state"
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -578,7 +579,7 @@ export function RoomLivePage() {
     return (
       <div className="flex items-center justify-center h-[60vh]">
         <div className="text-center flex flex-col items-center gap-3">
-          <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+          <BeeSpinner size="lg" />
           <p className="text-muted-foreground font-medium text-sm">Loading room…</p>
         </div>
       </div>
@@ -770,7 +771,7 @@ export function RoomLivePage() {
 
             {jamRoom.isLoading ? (
               <div className="flex flex-col items-center gap-3 py-16">
-                <div className="w-8 h-8 border-4 border-violet-500/30 border-t-violet-400 rounded-full animate-spin" />
+                <BeeSpinner variant="primary" size="md" />
                 <p className="text-xs text-white/40 animate-pulse tracking-widest uppercase">Connecting…</p>
               </div>
             ) : stageParticipants.length === 0 ? (
@@ -1045,7 +1046,7 @@ export function RoomLivePage() {
 
         {jamRoom.isLoading ? (
           <div className="flex flex-col items-center gap-3 py-10">
-            <div className="w-8 h-8 border-4 border-violet-500/30 border-t-violet-400 rounded-full animate-spin" />
+            <BeeSpinner variant="primary" size="md" />
             <p className="text-xs text-muted-foreground/60 animate-pulse tracking-widest uppercase">Connecting…</p>
           </div>
         ) : stageParticipants.length === 0 ? (

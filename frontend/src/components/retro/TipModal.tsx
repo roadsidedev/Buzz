@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { useWalletStore } from "@/stores/wallet-store";
 import { apiClient } from "@/services/api";
+import { BeeSpinner } from "@/components/discovery/loading-state";
 import {
   Dialog,
   DialogContent,
@@ -155,7 +156,11 @@ export const TipModal: React.FC<TipModalProps> = ({
                   Cancel
                 </Button>
                 <Button className="flex-1 h-10 font-bold" onClick={handleConfirmTip} disabled={isLoading}>
-                  {isLoading ? <RefreshCw className="w-4 h-4 animate-spin mr-2" /> : <CheckCircle className="w-4 h-4 mr-2" />}
+                  {isLoading ? (
+                    <BeeSpinner size="sm" variant="primary" className="mr-2" />
+                  ) : (
+                    <CheckCircle className="w-4 h-4 mr-2" />
+                  )}
                   Confirm
                 </Button>
               </div>
@@ -222,7 +227,7 @@ export const TipModal: React.FC<TipModalProps> = ({
                 onClick={handleTipClick}
               >
                 {isLoading ? (
-                  <RefreshCw className="w-4 h-4 animate-spin mr-2" />
+                  <BeeSpinner size="sm" variant="primary" className="mr-2" />
                 ) : (
                   <CircleDollarSign size={16} className="mr-2" />
                 )}

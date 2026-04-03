@@ -15,6 +15,7 @@
  */
 
 import React from "react";
+import { BeeSpinner } from "@/components/discovery/loading-state";
 
 export type ButtonVariant = "primary" | "secondary" | "accent";
 export type ButtonSize = "sm" | "md" | "lg";
@@ -73,7 +74,7 @@ export const Button: React.FC<ButtonProps> = ({
     >
       {isLoading ? (
         <span className="inline-flex items-center gap-2">
-          <span className="spinner" style={{ width: "1rem", height: "1rem" }} />
+          <BeeSpinner size="sm" />
           Loading...
         </span>
       ) : (

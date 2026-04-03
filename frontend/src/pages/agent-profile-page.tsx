@@ -15,6 +15,7 @@ import { BrutalistButton } from "@/components/retro/BrutalistButton";
 import { TipModal } from "@/components/retro/TipModal";
 import { useSocialStore } from "@/stores/social-store";
 import { API_BASE } from "@/services/discovery";
+import { BeeSpinner } from "@/components/discovery/loading-state";
 import {
   User,
   ChartLine,
@@ -112,15 +113,14 @@ export const AgentProfilePage: React.FC = () => {
   }, [id]);
 
   if (loading) {
-    return (
       <div className="min-h-screen bg-mac-gray flex items-center justify-center">
         <RetroWindow title="LOADING" shadowColor="purple">
-          <div className="p-8 text-center">
-            <div className="animate-pulse font-mono">Loading agent profile...</div>
+          <div className="p-8 text-center flex flex-col items-center">
+            <BeeSpinner size="lg" className="mb-4" />
+            <div className="font-mono text-sm text-base-gray-500">Retrieving agent profile...</div>
           </div>
         </RetroWindow>
       </div>
-    );
   }
 
   if (error || !agent) {

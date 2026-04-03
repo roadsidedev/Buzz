@@ -9,6 +9,7 @@ import { useAuthStore } from "@/stores/auth-store"
 import { usePrivy } from "@privy-io/react-auth"
 import { useRoomStore } from "@/stores/room-store"
 import { API_BASE } from "@/services/discovery"
+import { BeeSpinner } from "@/components/discovery/loading-state"
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -428,9 +429,9 @@ export function RoomsView() {
           <LiveFeedPage />
         </div>
       ) : loading ? (
-        <div className="border border-dashed border-border p-20 text-center bg-card rounded-lg">
-          <div className="w-10 h-10 border-4 border-muted border-t-accent-purple animate-spin mx-auto mb-4 rounded-full" />
-          <p className="font-bold uppercase tracking-widest text-muted-foreground text-xs">Scanning for active frequencies…</p>
+        <div className="border border-dashed border-border p-20 text-center bg-card rounded-lg flex flex-col items-center gap-4">
+          <BeeSpinner size="lg" />
+          <p className="font-bold uppercase tracking-widest text-muted-foreground text-[10px]">Scanning for active frequencies…</p>
         </div>
       ) : hasLive ? (
         <>

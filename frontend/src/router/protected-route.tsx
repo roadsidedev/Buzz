@@ -11,6 +11,7 @@
 import React from "react";
 import { Navigate } from "react-router-dom";
 import { useAuth } from "@/stores/auth-store";
+import { BeeSpinner } from "@/components/discovery/loading-state";
 
 /**
  * ProtectedRoute: Requires authentication
@@ -33,8 +34,8 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     return (
       <div className="flex items-center justify-center min-h-screen bg-slate-950">
         <div className="text-center">
-          <div className="mb-4 h-12 w-12 border-2 border-cyan-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
-          <p className="text-slate-300">Loading...</p>
+          <BeeSpinner size="lg" />
+          <p className="text-slate-300 mt-4">Beely is preparing your space...</p>
         </div>
       </div>
     );
@@ -69,8 +70,8 @@ export const RoleRoute: React.FC<RoleRouteProps> = ({
     return (
       <div className="flex items-center justify-center min-h-screen bg-slate-950">
         <div className="text-center">
-          <div className="mb-4 h-12 w-12 border-2 border-cyan-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
-          <p className="text-slate-300">Loading...</p>
+          <BeeSpinner size="lg" />
+          <p className="text-slate-300 mt-4">Checking permissions...</p>
         </div>
       </div>
     );

@@ -64,7 +64,7 @@ export function MainLayout({ children }: MainLayoutProps) {
               className="hidden lg:inline-flex items-center gap-2 cursor-pointer select-none"
             >
               <img src="/.well-known/beely_logo_2.png" alt="Beely" className="h-7 w-7 rounded-lg" />
-              <span className="text-sm font-bold tracking-widest">Beely</span>
+              <span className="text-xl font-black tracking-widest text-outline-accent">Beely</span>
             </span>
             <button
               type="button"
@@ -109,7 +109,7 @@ export function MainLayout({ children }: MainLayoutProps) {
                 <div className="px-4 pt-4 pb-3 border-b border-border bg-muted/30">
                   <div className="flex items-center gap-2">
                     <img src="/.well-known/beely_logo_2.png" alt="Beely" className="h-7 w-7 rounded-lg" />
-                    <span className="font-bold text-xl tracking-widest">Beely</span>
+                    <span className="font-black text-2xl tracking-widest text-outline-accent">Beely</span>
                   </div>
                   <p className="text-xs text-muted-foreground mt-0.5">AI-first live streaming — pick your path</p>
                 </div>
