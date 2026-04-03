@@ -1,22 +1,20 @@
 /**
  * WebRTC Audio Bridge Service
  *
- * Handles streaming TTS-generated audio to Jam rooms via WebRTC.
- * Used for AI agents that need to stream pre-generated audio.
+ * Streams TTS-generated audio to Jam rooms via the SFU (Mediasoup).
+ * Used by the frontend to inject AI agent audio into the room so all
+ * listeners (WebRTC peers) can hear it.
  */
 
 import { Device } from "mediasoup-client";
 
 export interface WebRTCAudioBridgeConfig {
-  pantrySfuUrl: string;
+  /** SFU HTTP API URL (e.g. http://localhost:30002) */
+  sfuUrl: string;
+  /** Room ID */
   roomId: string;
+  /** Agent/peer ID for the producer */
   agentId: string;
-}
-
-export interface AudioTrack {
-  id: string;
-  audioBuffer: ArrayBuffer;
-  messageId: string;
 }
 
 export class WebRTCAudioBridge {
@@ -27,147 +25,147 @@ export class WebRTCAudioBridge {
   private consumers: Map<string, any> = new Map();
   private config: WebRTCAudioBridgeConfig;
   private isConnected: boolean = false;
+  private isConnecting: boolean = false;
 
   constructor(config: WebRTCAudioBridgeConfig) {
     this.config = config;
   }
 
-  /**
-   * Connect to the SFU
-   */
   async connect(): Promise<void> {
+    if (this.isConnected) return;
+    if (this.isConnecting) {
+      await new Promise<void>((resolve) => {
+        const check = setInterval(() => {
+          if (!this.isConnecting) { clearInterval(check); resolve(); }
+        }, 100);
+      });
+      if (this.isConnected) return;
+    }
+
+    this.isConnecting = true;
+
     try {
       this.device = new Device();
-
-      // Fetch router RTP capabilities from SFU
       const routerRtpCapabilities = await this.fetchRouterCapabilities();
-
       await this.device.load({ routerRtpCapabilities });
-
-      // Create send transport
       this.sendTransport = await this.createSendTransport();
-
-      // Create receive transport
       this.recvTransport = await this.createRecvTransport();
-
       this.isConnected = true;
-
-      console.log("WebRTC Audio Bridge connected", {
-        roomId: this.config.roomId,
-      });
+      console.log("[AudioBridge] Connected to SFU", { roomId: this.config.roomId });
     } catch (error) {
-      console.error("Failed to connect WebRTC Audio Bridge", error);
+      console.error("[AudioBridge] Failed to connect:", error);
       throw error;
+    } finally {
+      this.isConnecting = false;
     }
   }
 
-  /**
-   * Fetch router RTP capabilities from SFU
-   */
   private async fetchRouterCapabilities(): Promise<any> {
     const response = await fetch(
-      `${this.config.pantrySfuUrl}/rooms/${this.config.roomId}/router-rtp-capabilities`,
+      `${this.config.sfuUrl}/rooms/${this.config.roomId}/router-rtp-capabilities`,
     );
-
     if (!response.ok) {
-      throw new Error("Failed to fetch router capabilities");
+      const text = await response.text();
+      throw new Error(`Failed to fetch router capabilities: ${response.status} ${text}`);
     }
-
-    return response.json();
+    const data = await response.json();
+    return data.rtpCapabilities;
   }
 
-  /**
-   * Create send transport for producing audio
-   */
   private async createSendTransport(): Promise<any> {
-    if (!this.device) {
-      throw new Error("Device not loaded");
-    }
+    if (!this.device) throw new Error("Device not loaded");
 
     const response = await fetch(
-      `${this.config.pantrySfuUrl}/rooms/${this.config.roomId}/create-transport`,
+      `${this.config.sfuUrl}/rooms/${this.config.roomId}/create-transport`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ direction: "send" }),
+        body: JSON.stringify({
+          producing: true,
+          consuming: false,
+          rtpCapabilities: this.device.rtpCapabilities,
+          peerId: this.config.agentId,
+        }),
       },
     );
 
-    const { transportOptions } = await response.json();
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(`Failed to create send transport: ${response.status} ${text}`);
+    }
 
+    const { transportOptions } = await response.json();
     const transport = this.device.createSendTransport(transportOptions);
 
     transport.on("connect", async ({ dtlsParameters }, callback, errback) => {
       try {
-        await fetch(
-          `${this.config.pantrySfuUrl}/transports/${transport.id}/connect`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ dtlsParameters }),
-          },
-        );
+        await fetch(`${this.config.sfuUrl}/transports/${transport.id}/connect`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ dtlsParameters }),
+        });
         callback();
       } catch (error) {
         errback(error as Error);
       }
     });
 
-    transport.on(
-      "produce",
-      async ({ kind, rtpParameters }, callback, errback) => {
-        try {
-          const response = await fetch(
-            `${this.config.pantrySfuUrl}/transports/${transport.id}/produce`,
-            {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ kind, rtpParameters }),
-            },
-          );
-
-          const { id } = await response.json();
-          callback({ id });
-        } catch (error) {
-          errback(error as Error);
+    transport.on("produce", async ({ kind, rtpParameters, appData }, callback, errback) => {
+      try {
+        const response = await fetch(
+          `${this.config.sfuUrl}/transports/${transport.id}/produce`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ kind, rtpParameters, appData }),
+          },
+        );
+        if (!response.ok) {
+          const text = await response.text();
+          throw new Error(`Produce failed: ${response.status} ${text}`);
         }
-      },
-    );
+        const { id } = await response.json();
+        callback({ id });
+      } catch (error) {
+        errback(error as Error);
+      }
+    });
 
     return transport;
   }
 
-  /**
-   * Create receive transport for consuming audio
-   */
   private async createRecvTransport(): Promise<any> {
-    if (!this.device) {
-      throw new Error("Device not loaded");
-    }
+    if (!this.device) throw new Error("Device not loaded");
 
     const response = await fetch(
-      `${this.config.pantrySfuUrl}/rooms/${this.config.roomId}/create-transport`,
+      `${this.config.sfuUrl}/rooms/${this.config.roomId}/create-transport`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ direction: "recv" }),
+        body: JSON.stringify({
+          producing: false,
+          consuming: true,
+          rtpCapabilities: this.device.rtpCapabilities,
+          peerId: this.config.agentId,
+        }),
       },
     );
 
-    const { transportOptions } = await response.json();
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(`Failed to create recv transport: ${response.status} ${text}`);
+    }
 
+    const { transportOptions } = await response.json();
     const transport = this.device.createRecvTransport(transportOptions);
 
     transport.on("connect", async ({ dtlsParameters }, callback, errback) => {
       try {
-        await fetch(
-          `${this.config.pantrySfuUrl}/transports/${transport.id}/connect`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ dtlsParameters }),
-          },
-        );
+        await fetch(`${this.config.sfuUrl}/transports/${transport.id}/connect`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ dtlsParameters }),
+        });
         callback();
       } catch (error) {
         errback(error as Error);
@@ -177,145 +175,84 @@ export class WebRTCAudioBridge {
     return transport;
   }
 
-  /**
-   * Stream audio to the room
-   */
-  async streamAudio(
-    audioBuffer: ArrayBuffer,
-    messageId: string,
-  ): Promise<void> {
+  async streamAudio(audioBuffer: ArrayBuffer, messageId: string): Promise<void> {
     if (!this.isConnected || !this.sendTransport) {
       throw new Error("Not connected to SFU");
     }
 
-    try {
-      // Convert audio buffer to MediaStreamTrack
-      const audioContext = new AudioContext();
-      const decodedAudio = await audioContext.decodeAudioData(audioBuffer);
+    if (this.producer) {
+      try { this.producer.close(); } catch { /* ignore */ }
+      this.producer = null;
+    }
 
-      // Create media stream destination
+    const audioContext = new AudioContext({ sampleRate: 48000 });
+
+    try {
+      const decodedAudio = await audioContext.decodeAudioData(audioBuffer.slice(0));
       const destination = audioContext.createMediaStreamDestination();
       const source = audioContext.createBufferSource();
       source.buffer = decodedAudio;
       source.connect(destination);
+      source.connect(audioContext.destination);
 
-      // Get audio track
       const track = destination.stream.getAudioTracks()[0];
+      track.enabled = true;
 
-      // Produce the track
       this.producer = await this.sendTransport.produce({
         track,
-        codecOptions: {
-          opus: {
-            stereo: 0,
-            dtx: true,
-            fec: true,
-          },
-        },
+        codecOptions: { opusStereo: 1, opusDtx: 1 },
         appData: { messageId },
       });
 
-      // Start playback
+      console.log("[AudioBridge] Producing audio", { producerId: this.producer.id, messageId });
+
       source.start();
 
       return new Promise((resolve) => {
         source.onended = () => {
           this.stopStreaming();
-          audioContext.close();
+          audioContext.close().catch(() => {});
           resolve();
         };
       });
     } catch (error) {
-      console.error("Failed to stream audio", error);
+      audioContext.close().catch(() => {});
+      console.error("[AudioBridge] Failed to stream audio:", error);
       throw error;
     }
   }
 
-  /**
-   * Stop streaming audio
-   */
   stopStreaming(): void {
     if (this.producer) {
-      this.producer.close();
+      try { this.producer.close(); } catch { /* ignore */ }
       this.producer = null;
     }
   }
 
-  /**
-   * Consume audio from another speaker
-   */
-  async consumeAudio(producerId: string): Promise<MediaStreamTrack> {
-    if (!this.isConnected || !this.recvTransport || !this.device) {
-      throw new Error("Not connected to SFU");
-    }
-
-    const response = await fetch(
-      `${this.config.pantrySfuUrl}/rooms/${this.config.roomId}/consume`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          transportId: this.recvTransport.id,
-          producerId,
-          rtpCapabilities: this.device.rtpCapabilities,
-        }),
-      },
-    );
-
-    const { consumerOptions } = await response.json();
-
-    const consumer = await this.recvTransport.consume(consumerOptions);
-
-    this.consumers.set(consumer.id, consumer);
-
-    // Resume the consumer
-    await fetch(`${this.config.pantrySfuUrl}/consumers/${consumer.id}/resume`, {
-      method: "POST",
-    });
-
-    return consumer.track;
-  }
-
-  /**
-   * Disconnect from SFU
-   */
   async disconnect(): Promise<void> {
     this.stopStreaming();
-
     for (const consumer of this.consumers.values()) {
-      consumer.close();
+      try { consumer.close(); } catch { /* ignore */ }
     }
     this.consumers.clear();
-
     if (this.sendTransport) {
-      this.sendTransport.close();
+      try { this.sendTransport.close(); } catch { /* ignore */ }
       this.sendTransport = null;
     }
-
     if (this.recvTransport) {
-      this.recvTransport.close();
+      try { this.recvTransport.close(); } catch { /* ignore */ }
       this.recvTransport = null;
     }
-
     this.device = null;
     this.isConnected = false;
-
-    console.log("WebRTC Audio Bridge disconnected");
+    console.log("[AudioBridge] Disconnected from SFU");
   }
 
-  /**
-   * Check if connected
-   */
   isReady(): boolean {
-    return this.isConnected;
+    return this.isConnected && this.sendTransport !== null;
   }
 }
 
-/**
- * Create WebRTC Audio Bridge
- */
-export function createWebRTCAudioBridge(
-  config: WebRTCAudioBridgeConfig,
-): WebRTCAudioBridge {
+export function createWebRTCAudioBridge(config: WebRTCAudioBridgeConfig): WebRTCAudioBridge {
   return new WebRTCAudioBridge(config);
 }

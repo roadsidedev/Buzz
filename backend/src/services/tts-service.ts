@@ -23,7 +23,7 @@
 import { ElevenLabsClient } from "elevenlabs";
 import { logger } from "../utils/logger.js";
 import { ValidationError, ServiceUnavailableError } from "../utils/errors.js";
-import { getJamService } from "./jam-service.js";
+import { getJam } from "./jam-service-factory.js";
 
 // Buffer concatenation helper for ElevenLabs stream
 async function streamToBuffer(stream: AsyncIterable<Buffer>): Promise<Buffer> {
@@ -254,8 +254,14 @@ export class TTSService {
   }
 
   /**
-   * Synthesize and stream to Jam audio room
-   * This method generates audio and returns it - actual streaming is handled by the caller via WebSocket
+   * Synthesize and stream to Jam audio room.
+   *
+   * For self-hosted Jam (V2), audio is delivered via Socket.IO events to the
+   * frontend, which then injects it into the WebRTC/SFU pipeline. The backend
+   * does NOT directly stream audio to the SFU — that's the frontend's job.
+   *
+   * This method generates the audio buffer and signals the pantry that audio
+   * is starting/stopping via the beely routes.
    */
   async synthesizeAndStream(
     jamRoomId: string,
@@ -267,14 +273,34 @@ export class TTSService {
     // Generate audio with fallback
     const result = await this.synthesize({ text, voiceId, agentName });
 
-    // Try to stream to Jam (non-blocking - won't fail the whole operation)
-    const jamService = getJamService();
-    if (jamService) {
-      jamService.streamAudio(jamRoomId, result.audioBuffer, messageId).catch(e => {
-        logger.error("Error streaming audio to Jam REST API", { jamRoomId, messageId, error: e });
+    // For self-hosted Jam (V2), signal audio start/end via pantry beely routes.
+    // The actual audio data is delivered to listeners via Socket.IO tts:audio events
+    // emitted by the TTS route handler, which the frontend injects into WebRTC.
+    try {
+      const { getJam } = await import("./jam-service-factory.js");
+      const jamService = getJam();
+
+      // Signal audio start to pantry (for beely orchestration tracking)
+      jamService.sendToRoom(jamRoomId, "beely", "audio:start", {
+        messageId,
+        agentName,
+        durationMs: result.durationMs,
       });
-    } else {
-      logger.debug("Jam service not available, audio will be sent via WebSocket", { jamRoomId });
+
+      // Signal audio end after duration
+      if (result.durationMs > 0) {
+        setTimeout(() => {
+          jamService.sendToRoom(jamRoomId, "beely", "audio:end", {
+            messageId,
+          });
+        }, result.durationMs);
+      }
+    } catch (err) {
+      logger.warn("Failed to signal audio to Jam room (non-fatal)", {
+        jamRoomId,
+        messageId,
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
 
     return {

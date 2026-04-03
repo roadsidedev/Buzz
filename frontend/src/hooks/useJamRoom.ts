@@ -100,7 +100,7 @@ export function useJamRoom(options: UseJamRoomOptions): UseJamRoomReturn {
             stun: stunUrl,
             turn: turnUrl,
           },
-          sfu: false, // P2P mode — SFU requires UDP ports Railway can't expose
+          sfu: import.meta.env.VITE_SFU_ENABLED === 'true',
           development: import.meta.env.DEV,
         },
         ...(publicKey && privateKey ? { keys: { publicKey, privateKey } } : {}),

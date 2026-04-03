@@ -9,9 +9,9 @@ import {
   sendDirect,
 } from './ws.js';
 
-export {runMediasoup};
+export {runMediasoup, getRouterCapabilities, handleCreateTransport, handleConnectTransport, handleProduce, handleCloseProducer, findTransport};
 
-const hasMediasoup = true; //['true', '1'].includes(process.env.JAM_SFU);
+const hasMediasoup = true;
 const announcedIp =
   process.env.JAM_SFU_EXTERNAL_IP || (local ? localIp() : null);
 
@@ -48,6 +48,10 @@ If you do not wish to use mediasoup, make sure the JAM_SFU environment variable 
     console.log('mediasoup request', type, roomId, peerId);
 
     switch (type) {
+      case 'get-router-capabilities': {
+        accept({ rtpCapabilities: router.rtpCapabilities });
+        break;
+      }
       case 'createWebRtcTransport': {
         let {producing, consuming, rtpCapabilities} = data;
         peer.rtpCapabilities = rtpCapabilities;
@@ -82,7 +86,6 @@ If you do not wish to use mediasoup, make sure the JAM_SFU environment variable 
 
         transport.on('dtlsstatechange', dtlsState => {
           if (dtlsState === 'failed' || dtlsState === 'closed') {
-            // peer disconnected; called transport.close() or closed browser tab
             console.warn(
               'WebRtcTransport "dtlsstatechange" event, dtlsState',
               dtlsState
@@ -118,8 +121,6 @@ If you do not wish to use mediasoup, make sure the JAM_SFU environment variable 
         }
 
         if (consuming) {
-          // send this peer the existing tracks from other peers
-          // => create Consumers for existing Producers
           for (const otherPeer of yieldOtherPeers(room, peerId)) {
             for (const producer of otherPeer.producers.values()) {
               createConsumer(room, {
@@ -145,16 +146,6 @@ If you do not wish to use mediasoup, make sure the JAM_SFU environment variable 
         break;
       }
 
-      // case 'restartIce': {
-      //   const {transportId} = data;
-      //   const transport = peer.transports.get(transportId);
-      //   if (!transport)
-      //     throw new Error(`transport with id "${transportId}" not found`);
-      //   const iceParameters = await transport.restartIce();
-      //   accept(iceParameters);
-      //   break;
-      // }
-
       case 'produce': {
         let {transportId, kind, rtpParameters, appData} = data;
         const transport = peer.transports.get(transportId);
@@ -177,8 +168,6 @@ If you do not wish to use mediasoup, make sure the JAM_SFU environment variable 
 
         accept({id: producer.id});
 
-        // send this new track to all other peers
-        // => create Consumer on each peer except this one
         for (const otherPeer of yieldOtherPeers(room, peerId)) {
           createConsumer(room, {
             consumerPeer: otherPeer,
@@ -221,8 +210,125 @@ If you do not wish to use mediasoup, make sure the JAM_SFU environment variable 
   });
 }
 
+// ── HTTP API helpers (exported for http-api.js) ──────────────────────────────
+
+async function getRouterCapabilities(roomId) {
+  const room = await getOrCreateRoom(roomId);
+  return { rtpCapabilities: room.router.rtpCapabilities };
+}
+
+async function handleCreateTransport(roomId, { producing, consuming, rtpCapabilities, peerId }) {
+  const room = await getOrCreateRoom(roomId);
+  const router = room.router;
+  const peer = await getOrCreatePeer(room, peerId);
+  peer.rtpCapabilities = rtpCapabilities;
+
+  const transportOptions = {
+    ...config.mediasoup.webRtcTransportOptions,
+    appData: { producing, consuming },
+  };
+
+  const transport = await router.createWebRtcTransport(transportOptions);
+  if (consuming) {
+    peer.doesConsume = true;
+    peer.consumerTransport = transport;
+  }
+
+  peer.transports.set(transport.id, transport);
+
+  console.log(
+    'transports (HTTP)',
+    roomId,
+    peerId.slice(0, 4),
+    'consuming',
+    [...peer.transports.values()].filter(t => t.appData.consuming).length,
+    'producing',
+    [...peer.transports.values()].filter(t => t.appData.producing).length
+  );
+
+  if (consuming) {
+    for (const otherPeer of yieldOtherPeers(room, peerId)) {
+      for (const producer of otherPeer.producers.values()) {
+        createConsumer(room, {
+          consumerPeer: peer,
+          producerPeer: otherPeer,
+          producer,
+        });
+      }
+    }
+  }
+
+  return {
+    id: transport.id,
+    iceParameters: transport.iceParameters,
+    iceCandidates: transport.iceCandidates,
+    dtlsParameters: transport.dtlsParameters,
+  };
+}
+
+async function handleConnectTransport(roomId, peerId, transportId, { dtlsParameters }) {
+  const room = await getOrCreateRoom(roomId);
+  const peer = await getOrCreatePeer(room, peerId);
+  const transport = peer.transports.get(transportId);
+  if (!transport) {
+    throw new Error(`Transport not found: ${transportId}`);
+  }
+  await transport.connect({ dtlsParameters });
+  return { ok: true };
+}
+
+async function handleProduce(roomId, peerId, transportId, { kind, rtpParameters, appData }) {
+  const room = await getOrCreateRoom(roomId);
+  const peer = await getOrCreatePeer(room, peerId);
+  const transport = peer.transports.get(transportId);
+  if (!transport) {
+    throw new Error(`Transport not found: ${transportId}`);
+  }
+
+  const producer = await transport.produce({ kind, rtpParameters, appData });
+  peer.producers.set(producer.id, producer);
+
+  producer.on('score', score => {
+    console.log('producerScore (HTTP)', peerId, score);
+  });
+
+  for (const otherPeer of yieldOtherPeers(room, peerId)) {
+    createConsumer(room, {
+      consumerPeer: otherPeer,
+      producerPeer: peer,
+      producer,
+    });
+  }
+
+  return { id: producer.id };
+}
+
+async function handleCloseProducer(roomId, peerId, { producerId }) {
+  const room = await getOrCreateRoom(roomId);
+  const peer = await getOrCreatePeer(room, peerId);
+  const producer = peer.producers.get(producerId);
+  if (!producer) {
+    throw new Error(`Producer not found: ${producerId}`);
+  }
+  producer.close();
+  peer.producers.delete(producer.id);
+  return { ok: true };
+}
+
+function findTransport(transportId) {
+  for (const [roomId, room] of rooms) {
+    for (const [peerId, peer] of room.peers) {
+      if (peer.transports.has(transportId)) {
+        return { roomId, peerId };
+      }
+    }
+  }
+  return null;
+}
+
+// ── Internal helpers ─────────────────────────────────────────────────────────
+
 async function createConsumer(room, {consumerPeer, producerPeer, producer}) {
-  // don't create the Consumer if the remote Peer cannot consume it
   if (
     !consumerPeer.doesConsume ||
     !consumerPeer.rtpCapabilities ||
@@ -234,7 +340,6 @@ async function createConsumer(room, {consumerPeer, producerPeer, producer}) {
     return;
   }
 
-  // check if consumerPeer already has the same producer
   for (let otherProducer of consumerPeer.consumers.values()) {
     if (producer === otherProducer) return;
   }
@@ -260,12 +365,8 @@ async function createConsumer(room, {consumerPeer, producerPeer, producer}) {
 
   consumer.on('producerclose', () => {
     consumerPeer.consumers.delete(consumer.id);
-    // consumerPeer
-    //   .notify('consumerClosed', {consumerId: consumer.id})
-    //   .catch(() => {});
   });
 
-  // Send a request to the remote Peer with Consumer parameters.
   try {
     await sendRequest(room.id, consumerPeer.id, 'new-consumer', {
       peerId: producerPeer.id,
@@ -342,30 +443,18 @@ async function runMediasoupWorkers() {
       setTimeout(() => process.exit(1), 2000);
     });
     workers.push(worker);
-
-    // Log worker resource usage every X seconds.
-    // setInterval(async () => {
-    //   const usage = await worker.getResourceUsage();
-    //   console.log('mediasoup Worker resource usage', worker.pid, usage);
-    // }, 120000);
   }
 }
 
 const config = {
-  // mediasoup settings.
   mediasoup: {
-    // Number of mediasoup workers to launch.
     numWorkers: Object.keys(os.cpus()).length,
-    // mediasoup WorkerSettings.
-    // See https://mediasoup.org/documentation/v3/mediasoup/api/#WorkerSettings
     workerSettings: {
       logLevel: 'warn',
       logTags: ['info', 'ice', 'dtls', 'rtp', 'srtp', 'rtx', 'score', 'svc'],
       rtcMinPort: Number(process.env.MEDIASOUP_MIN_PORT || 30000),
       rtcMaxPort: Number(process.env.MEDIASOUP_MAX_PORT || 39999),
     },
-    // mediasoup Router options.
-    // See https://mediasoup.org/documentation/v3/mediasoup/api/#RouterOptions
     routerOptions: {
       mediaCodecs: [
         {
@@ -376,9 +465,6 @@ const config = {
         },
       ],
     },
-    // mediasoup WebRtcTransport options for WebRTC endpoints (mediasoup-client,
-    // libmediasoupclient).
-    // See https://mediasoup.org/documentation/v3/mediasoup/api/#WebRtcTransportOptions
     webRtcTransportOptions: {
       enableUdp: false,
       enableTcp: true,
@@ -391,8 +477,6 @@ const config = {
       initialAvailableOutgoingBitrate: 1000000,
       minimumAvailableOutgoingBitrate: 600000,
       maxSctpMessageSize: 262144,
-      // Additional options that are not part of WebRtcTransportOptions.
-      // maxIncomingBitrate: 1500000,
     },
   },
 };

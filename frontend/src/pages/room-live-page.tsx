@@ -266,16 +266,19 @@ export function RoomLivePage() {
   // ── Initialize WebRTCAudioBridge when Jam room connects ─────────────────────
   useEffect(() => {
     if (jamRoom.inRoom && streamId && !audioBridgeRef.current) {
+      const sfuUrl = import.meta.env.VITE_SFU_URL || 'http://localhost:30002';
+      console.log('[AudioBridge] Initializing with SFU URL:', sfuUrl);
       import('@/services/webrtc-audio-bridge').then(({ WebRTCAudioBridge }) => {
         audioBridgeRef.current = new WebRTCAudioBridge({
-          pantrySfuUrl: import.meta.env.VITE_PANTRY_URL || 'https://beely-pantry.up.railway.app',
+          sfuUrl,
           roomId: streamId,
           agentId: 'tts-bridge',
         })
         audioBridgeRef.current.connect().then(() => {
-          console.log('[AudioBridge] Connected to SFU')
+          console.log('[AudioBridge] Connected to SFU successfully')
         }).catch((err: Error) => {
-          console.error('[AudioBridge] Failed to connect:', err)
+          console.error('[AudioBridge] Failed to connect to SFU:', err)
+          // AudioBridge connection failure is non-fatal — HTML5 fallback still works
         })
       })
     }
@@ -311,10 +314,8 @@ export function RoomLivePage() {
         durationMs: data.durationMs 
       })
 
-      // Try to inject via WebRTCAudioBridge first (for listeners to hear)
       if (data.audioBase64) {
         try {
-          // Convert base64 to ArrayBuffer
           const binaryString = atob(data.audioBase64)
           const bytes = new Uint8Array(binaryString.length)
           for (let i = 0; i < binaryString.length; i++) {
@@ -322,21 +323,21 @@ export function RoomLivePage() {
           }
           const audioBuffer = bytes.buffer
 
-          // Use WebRTCAudioBridge if available and connected
+          // Primary path: inject via WebRTCAudioBridge so all SFU peers hear it
           if (audioBridgeRef.current?.isReady()) {
-            console.log('[TTS] Injecting audio via WebRTCAudioBridge')
+            console.log('[TTS] Injecting audio via WebRTCAudioBridge (SFU path)')
             await audioBridgeRef.current.streamAudio(audioBuffer, data.messageId)
             return
           }
 
-          // Fallback: use persistent audio element (respects the autoplay unlock gesture)
-          console.log('[TTS] WebRTCAudioBridge not connected, using HTML5 Audio fallback')
+          // Fallback: HTML5 Audio for local playback only
+          console.log('[TTS] WebRTCAudioBridge not ready, using HTML5 Audio fallback')
           const blob = new Blob([audioBuffer], { type: 'audio/mpeg' })
           const blobUrl = URL.createObjectURL(blob)
           if (audioPlayerRef.current) {
             audioPlayerRef.current.src = blobUrl
             audioPlayerRef.current.onended = () => URL.revokeObjectURL(blobUrl)
-            audioPlayerRef.current.play().catch(e => console.warn('[TTS] Audio play blocked (needs user interaction):', e))
+            audioPlayerRef.current.play().catch(e => console.warn('[TTS] Audio play blocked:', e))
           }
         } catch (err) {
           console.error('[TTS] Failed to inject audio:', err)
@@ -348,7 +349,7 @@ export function RoomLivePage() {
       } else if (data.audioUrl) {
         if (audioPlayerRef.current) {
           audioPlayerRef.current.src = data.audioUrl
-          audioPlayerRef.current.play().catch(e => console.warn('[TTS] Audio play blocked (needs user interaction):', e))
+          audioPlayerRef.current.play().catch(e => console.warn('[TTS] Audio play blocked:', e))
         }
       }
     }
@@ -490,11 +491,23 @@ export function RoomLivePage() {
   const host = stageParticipants.find((p) => p.role === "host") ?? stageParticipants[0] ?? null
   const supporters = stageParticipants.filter((p) => p !== host)
 
-  // All listener tracking comes exclusively from WebSocket spectator events
-  // (Jam-core does not expose a listeners array in its state tree).
+  // All listener tracking: merge WebSocket spectators with Jam-core listeners
+  // Jam-core may expose listeners when SFU is enabled; WS spectators always tracked
   const listenerProfiles = React.useMemo(
-    () => participants.filter((p) => p.role === "spectator"),
-    [participants]
+    () => {
+      const wsSpectators = participants.filter((p) => p.role === "spectator")
+      // Jam-core listeners (from SFU/WebRTC peers) — deduplicate by ID
+      const jamListeners: string[] = Array.isArray(jamRoom.listeners) ? jamRoom.listeners : []
+      const wsIds = new Set(wsSpectators.map(p => p.id))
+      const combined = [
+        ...wsSpectators,
+        ...jamListeners
+          .filter(id => !wsIds.has(id))
+          .map(id => ({ id, name: `Listener ${id.slice(0, 6)}`, avatar: null, role: "spectator" as const })),
+      ]
+      return combined
+    },
+    [participants, jamRoom.listeners]
   )
 
   // ── Sound Cues ──────────────────────────────────────────────────────────────

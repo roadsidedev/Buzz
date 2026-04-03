@@ -164,8 +164,7 @@ export function getJam(): JamServiceV2 {
  */
 export function initializeJamServiceFactory(): JamServiceFactory {
   const config: JamServiceConfig = {
-    // Pantry defaults to port 3001 (see jam/pantry/bin/www)
-    pantryUrl: process.env.PANTRY_URL || "http://localhost:3001",
+    pantryUrl: process.env.PANTRY_URL || process.env.PANTRY_REST_URL || "http://localhost:3003",
     sfuEnabled: process.env.JAM_SFU_ENABLED !== "false",
     stunUrl: process.env.VITE_STUN_URL || "stun:localhost:3478",
     turnUrl: process.env.VITE_TURN_URL || "turn:localhost:3478",

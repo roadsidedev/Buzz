@@ -13,9 +13,11 @@ services:
       - REACT_APP_API_URL=http://localhost:4000
       - REACT_APP_WS_URL=ws://localhost:4000
       - VITE_PANTRY_URL=http://localhost:3003/_/pantry
+      - VITE_SFU_URL=http://localhost:30002
       - VITE_STUN_URL=stun:localhost:3478
       - VITE_TURN_URL=turn:localhost:3478
       - VITE_TURN_SECRET=${COTURN_SECRET}
+      - VITE_SFU_ENABLED=true
     depends_on:
       - backend
       - pantry
@@ -57,8 +59,11 @@ services:
       - BANKR_API_KEY=${BANKR_API_KEY:-}
       # Self-hosted Jam configuration
       - PANTRY_URL=http://pantry:3000
+      - PANTRY_REST_URL=http://pantry:3000
+      - SFU_URL=http://pantry-sfu:30002
       - JAM_SELF_HOSTED_ENABLED=${JAM_SELF_HOSTED_ENABLED:-true}
       - JAM_FALLBACK_ENABLED=${JAM_FALLBACK_ENABLED:-true}
+      - JAM_SFU_ENABLED=true
       # Fallback (API-key Jam)
       - JAM_URL=${JAM_URL:-http://jam:3001}
       - JAM_API_KEY=${JAM_API_KEY}
@@ -116,7 +121,7 @@ services:
       - backend-net
       - audio-net
 
-  # Pantry-SFU - Mediasoup SFU for Large Rooms
+  # Pantry-SFU - Mediasoup SFU for Large Rooms (starts by default)
   pantry-sfu:
     build:
       context: ./jam/pantry-sfu
@@ -126,10 +131,13 @@ services:
       - JAM_SFU=true
       - JAM_SFU_EXTERNAL_IP=${COTURN_EXTERNAL_IP:-}
       - PANTRY_URL=ws://pantry:3000
+      - PANTRY_REST_URL=http://pantry:3000
+      - SFU_HTTP_PORT=30002
       - MEDIASOUP_MIN_PORT=30000
       - MEDIASOUP_MAX_PORT=39999
       - NODE_ENV=production
     ports:
+      - "30002:30002"
       - "30000-39999:30000-39999/udp"
       - "30000-39999:30000-39999/tcp"
     depends_on:
@@ -137,8 +145,7 @@ services:
       - redis
     networks:
       - audio-net
-    profiles:
-      - sfu
+      - backend-net
 
   # Coturn - STUN/TURN Server for NAT Traversal
   coturn:
