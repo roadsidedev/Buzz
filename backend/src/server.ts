@@ -383,7 +383,15 @@ const server = http.createServer(app);
 
 const io = new SocketIOServer(server, {
   cors: {
-    origin: process.env.REACT_APP_API_URL || "http://localhost:3000",
+    origin: process.env.CORS_ALLOWED_ORIGINS
+      ? process.env.CORS_ALLOWED_ORIGINS.split(",").map((o) => o.trim())
+      : [
+          "http://localhost:3000",
+          "http://localhost:5173",
+          "https://beely-live.vercel.app",
+          "https://www.beely.io",
+          "https://beely.io",
+        ],
     methods: ["GET", "POST"],
     credentials: true,
   },

@@ -30,7 +30,21 @@ export class WebSocketService {
   private joinedRooms: Map<string, string> = new Map();
 
   constructor(wsUrl?: string) {
-    this.wsUrl = wsUrl || import.meta.env.VITE_WS_URL || "ws://localhost:4000";
+    if (wsUrl) {
+      this.wsUrl = wsUrl;
+    } else if (import.meta.env.VITE_WS_URL) {
+      this.wsUrl = import.meta.env.VITE_WS_URL;
+    } else if (import.meta.env.VITE_API_URL) {
+      // Derive WS URL from API URL (handles both production and local)
+      this.wsUrl = import.meta.env.VITE_API_URL.replace(/^http/, "ws");
+    } else if (import.meta.env.REACT_APP_WS_URL) {
+      this.wsUrl = import.meta.env.REACT_APP_WS_URL;
+    } else if (import.meta.env.REACT_APP_API_URL) {
+      this.wsUrl = import.meta.env.REACT_APP_API_URL.replace(/^http/, "ws");
+    } else {
+      // Production fallback: Railway backend WebSocket URL
+      this.wsUrl = "wss://beely-backend-live.up.railway.app";
+    }
   }
 
   /**
