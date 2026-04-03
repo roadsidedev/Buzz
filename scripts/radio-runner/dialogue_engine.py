@@ -11,6 +11,7 @@ Used by: radio_runner.py
 import logging
 import os
 import sys
+import time
 from dataclasses import dataclass
 from typing import Any, Optional
 
@@ -87,23 +88,47 @@ def _resolve_provider() -> Any:
             def __init__(self, key: str):
                 self.key = key
                 import httpx
-                self.client = httpx.Client(timeout=60.0)
+                self.client = httpx.Client(timeout=120.0)
+
+            def _chat_completion_with_retry(
+                self, url: str, headers: dict, payload: dict, max_retries: int = 3
+            ) -> httpx.Response:
+                last_exc: Optional[Exception] = None
+                for attempt in range(max_retries):
+                    resp = self.client.post(url, headers=headers, json=payload)
+                    if resp.status_code == 429:
+                        wait = min(2 ** (attempt + 1), 30)
+                        retry_after = resp.headers.get("Retry-After")
+                        if retry_after:
+                            try:
+                                wait = int(retry_after)
+                            except ValueError:
+                                pass
+                        logger.warning(
+                            f"NVIDIA NIM rate limited (429), retrying in {wait}s "
+                            f"(attempt {attempt + 1}/{max_retries})"
+                        )
+                        time.sleep(wait)
+                        last_exc = httpx.HTTPStatusError(
+                            "429 Too Many Requests", request=resp.request, response=resp
+                        )
+                        continue
+                    resp.raise_for_status()
+                    return resp
+                raise last_exc or RuntimeError("All retries exhausted on 429")
+
             def messages_create(self, model: str, max_tokens: int, system: str, messages: list):
-                # Map Anthropic-style call to NVIDIA (OpenAI-compatible) endpoint
-                # Note: This is a placeholder for the basic structure.
-                # In practice, get_provider() from orchestrator should handle this better.
                 logger.debug("Standalone NVIDIA NIM call")
-                resp = self.client.post(
+                resp = self._chat_completion_with_retry(
                     "https://integrate.api.nvidia.com/v1/chat/completions",
                     headers={"Authorization": f"Bearer {self.key}", "Content-Type": "application/json"},
-                    json={
+                    payload={
                         "model": model or "meta/llama-3.1-405b-instruct",
                         "messages": [{"role": "system", "content": system}] + messages,
                         "max_tokens": max_tokens,
                         "temperature": 0.7,
                     }
                 )
-                resp.raise_for_status()
                 data = resp.json()
                 from collections import namedtuple
                 TextObj = namedtuple("TextObj", ["text"])

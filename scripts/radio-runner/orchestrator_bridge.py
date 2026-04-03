@@ -100,7 +100,7 @@ class OrchestratorBridge:
         )
         self._orchestrator = httpx.Client(
             base_url=self.orchestrator_url,
-            timeout=60.0,
+            timeout=120.0,
         )
 
     def close(self) -> None:
@@ -482,9 +482,16 @@ class OrchestratorBridge:
         room_id: str,
         agent_id: str,
         text: str,
+        api_key: Optional[str] = None,
     ) -> str:
         """
         Submit a message to the orchestrator for scoring.
+
+        Args:
+            room_id: The room to submit to
+            agent_id: The agent submitting the message
+            text: The message text
+            api_key: Agent API key for auth headers
 
         Returns:
             The message ID
@@ -499,23 +506,30 @@ class OrchestratorBridge:
                 "status": "submitted",
             }
         }
+        headers = self._auth_headers(api_key) if api_key else None
         resp = self._retry_post(
             f"/api/v1/rooms/{room_id}/messages",
             body,
             client=self._orchestrator,
             label="submit_message",
+            headers=headers,
         )
         self._assert_ok(resp, "submit_message")
         logger.debug("Message submitted", extra={"msg_id": msg_id[:8], "agent_id": agent_id[:8]})
         return msg_id
 
-    def process_turn(self, room_id: str) -> TurnResult:
+    def process_turn(self, room_id: str, api_key: Optional[str] = None) -> TurnResult:
         """
         Trigger orchestrator turn processing (LLM scoring + selection).
+
+        Args:
+            room_id: The room to process
+            api_key: Agent API key for auth headers
 
         Returns:
             TurnResult with the winning message and score
         """
+        headers = self._auth_headers(api_key) if api_key else None
         resp = self._retry_post(
             f"/api/v1/rooms/{room_id}/process-turn",
             {},
@@ -523,6 +537,7 @@ class OrchestratorBridge:
             label="process_turn",
             attempts=2,
             delay=2.0,
+            headers=headers,
         )
         self._assert_ok(resp, "process_turn")
         data = resp.json()
@@ -550,6 +565,7 @@ class OrchestratorBridge:
         host_text: str,
         cohost_agent_id: str,
         cohost_text: str,
+        host_api_key: Optional[str] = None,
     ) -> TurnResult:
         """
         Convenience: submit both agent messages then process the turn.
@@ -557,11 +573,11 @@ class OrchestratorBridge:
         Returns:
             TurnResult from the orchestrator
         """
-        self.submit_message(room_id, host_agent_id, host_text)
-        self.submit_message(room_id, cohost_agent_id, cohost_text)
+        self.submit_message(room_id, host_agent_id, host_text, api_key=host_api_key)
+        self.submit_message(room_id, cohost_agent_id, cohost_text, api_key=host_api_key)
         # Small delay to let orchestrator queue settle
         time.sleep(0.3)
-        return self.process_turn(room_id)
+        return self.process_turn(room_id, api_key=host_api_key)
 
     def play_audio(
         self,
@@ -691,25 +707,29 @@ class OrchestratorBridge:
         label: str = "",
         attempts: int = 4,
         delay: float = 0.75,
+        headers: Optional[dict[str, str]] = None,
     ) -> httpx.Response:
         """POST with retry logic for transient failures."""
+        default_headers = {"Content-Type": "application/json"}
+        if headers:
+            default_headers.update(headers)
         last_exc: Optional[Exception] = None
         for i in range(attempts):
             try:
                 resp = client.post(
                     path,
                     json=body,
-                    headers={"Content-Type": "application/json"},
+                    headers=default_headers,
                 )
                 if resp.status_code < 500:
                     return resp
                 logger.warning(
                     f"Retry {i+1}/{attempts} for {label}",
-                    extra={"status": resp.status_code},
+                    extra={"status": resp.status_code, "body": resp.text[:500]},
                 )
             except Exception as exc:
                 last_exc = exc
                 logger.warning(f"Retry {i+1}/{attempts} for {label}", extra={"error": str(exc)})
             if i < attempts - 1:
-                time.sleep(delay)
+                time.sleep(delay * (i + 1))
         raise last_exc or RuntimeError(f"All {attempts} retries failed for {label}")

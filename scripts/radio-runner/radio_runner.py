@@ -266,6 +266,7 @@ class RadioRunner:
                     host_text=turn.host_text,
                     cohost_agent_id=self._cohost.id,
                     cohost_text=turn.cohost_text,
+                    host_api_key=self._host.api_key,
                 )
 
                 # 4. Handle results & pacing
