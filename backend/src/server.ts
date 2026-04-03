@@ -632,12 +632,10 @@ import { runStartupMigrations } from "./config/database.js";
       port,
     });
 
-    // Start Orchestrator Loop if enabled
-    if (process.env.ORCHESTRATOR_URL) {
-      roomOrchestrationService.start().catch((err) => {
-        logger.error("Failed to start room orchestration service", { error: err });
-      });
-    }
+    // Start Orchestrator Loop (local in-process, always enabled)
+    roomOrchestrationService.start().catch((err) => {
+      logger.error("Failed to start room orchestration service", { error: err });
+    });
 
     // Start the notification service for scheduled rooms
     notificationService.start();
