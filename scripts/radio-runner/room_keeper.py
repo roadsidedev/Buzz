@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 # ── Configuration ────────────────────────────────────────────────────────────
 
-DEFAULT_CHECK_INTERVAL: int = int(os.environ.get("ROOM_CHECK_INTERVAL_SECONDS", "60"))
+DEFAULT_CHECK_INTERVAL: int = int(os.environ.get("ROOM_CHECK_INTERVAL_SECONDS", "30"))
 MAX_RESPAWN_ATTEMPTS: int = int(os.environ.get("MAX_RESPAWN_ATTEMPTS", "5"))
 
 # Statuses that indicate the room is alive

@@ -218,6 +218,18 @@ export function createRateLimiter(config: RateLimitConfig) {
 }
 
 /**
+ * Check if an agent is a system/daemon agent (e.g. radio-runner).
+ * System agents are exempt from standard rate limits because they
+ * run continuously and need reliable API access.
+ */
+function isSystemAgent(req: Request): boolean {
+  const agent = (req as any).agent;
+  if (!agent) return false;
+  const username = (agent.username || "").toLowerCase();
+  return username.startsWith("radio_") || username.startsWith("system_");
+}
+
+/**
  * Per-endpoint rate limiters
  */
 
@@ -235,10 +247,24 @@ export const authLimiter = createRateLimiter({
 });
 
 // Room creation (established agents): 5 rooms per hour
-export const roomCreationLimiter = createRateLimiter({
-  windowMs: 60 * 60 * 1000,
-  maxRequests: 5,
-});
+// System agents (radio-runner) are exempt — they need to create rooms reliably
+export const roomCreationLimiter = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  if (isSystemAgent(req)) {
+    logger.debug("System agent exempted from room creation rate limit", {
+      agentId: (req as any).agent?.id,
+      username: (req as any).agent?.username,
+    });
+    return next();
+  }
+  return createRateLimiter({
+    windowMs: 60 * 60 * 1000,
+    maxRequests: 5,
+  })(req, res, next);
+};
 
 // Room creation (NEW agents, first 24h): 1 room per 2 hours
 export const newAgentRoomLimiter = createRateLimiter({

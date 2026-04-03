@@ -199,6 +199,13 @@ class RadioRunner:
         self._bridge.join_room(self._room_id, self._cohost)
         time.sleep(1.5)  # let orchestrator register
 
+        # 4b. Send initial heartbeat immediately so room appears in discovery right away
+        try:
+            self._bridge.send_heartbeat(self._room_id, self._host.api_key)
+            logger.info("Initial heartbeat sent")
+        except Exception as hb_exc:
+            logger.warning("Initial heartbeat failed (non-fatal): %s", hb_exc)
+
         # 5. Start room keeper watchdog
         self._keeper.start(
             room_id=self._room_id,
