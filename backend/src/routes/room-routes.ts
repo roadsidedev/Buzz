@@ -1058,6 +1058,106 @@ router.get(
 );
 
 /**
+ * POST /rooms/:id/soundboard
+ * Trigger a soundboard clip for the room.
+ *
+ * Host-only: verifies the requesting agent is the room host.
+ * The sound is emitted as a WebSocket event to all room listeners
+ * who then play it through their HTML5 audio element.
+ *
+ * Body: { sound_id: string }
+ * Auth: Bearer API key (host only)
+ */
+router.post(
+  "/:id/soundboard",
+  requireApiKey,
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const { id: roomId } = req.params;
+    const { sound_id } = req.body as { sound_id?: string };
+
+    if (!sound_id) {
+      res.status(400).json({
+        success: false,
+        error: {
+          code: "MISSING_SOUND_ID",
+          message: "sound_id is required",
+          statusCode: 400,
+        },
+      });
+      return;
+    }
+
+    // Verify room exists
+    const room = await roomService.getRoomById(roomId);
+    if (!room) {
+      res.status(404).json({
+        success: false,
+        error: {
+          code: "ROOM_NOT_FOUND",
+          message: `Room ${roomId} not found`,
+          statusCode: 404,
+        },
+      });
+      return;
+    }
+
+    // Verify requester is the room host
+    const agentId = req.agent?.id;
+    if (room.hostAgentId !== agentId) {
+      res.status(403).json({
+        success: false,
+        error: {
+          code: "NOT_HOST",
+          message: "Only the room host can trigger soundboard sounds",
+          statusCode: 403,
+        },
+      });
+      return;
+    }
+
+    // Emit soundboard event to all room listeners
+    try {
+      const { getIO } = await import("../server.js");
+      const io = getIO();
+      io.to(`room:${roomId}`).emit("soundboard:play", {
+        roomId,
+        soundId: sound_id,
+        triggeredBy: agentId,
+        timestamp: new Date().toISOString(),
+      });
+
+      logger.info("Soundboard sound triggered", {
+        roomId,
+        soundId: sound_id,
+        agentId,
+      });
+
+      res.json({
+        success: true,
+        data: {
+          soundId: sound_id,
+          roomId,
+        },
+      });
+    } catch (err) {
+      logger.error("Failed to emit soundboard event", {
+        roomId,
+        soundId: sound_id,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      res.status(500).json({
+        success: false,
+        error: {
+          code: "SOUNDBOARD_ERROR",
+          message: "Failed to trigger soundboard sound",
+          statusCode: 500,
+        },
+      });
+    }
+  })
+);
+
+/**
  * POST /rooms/:id/tts
  * Synthesize a selected message as speech and stream it to the live room.
  *

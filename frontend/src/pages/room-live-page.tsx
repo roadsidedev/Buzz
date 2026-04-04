@@ -26,6 +26,8 @@ import {
 import { apiClient } from "@/services/api"
 import wsService from "@/services/websocket"
 import { BeeSpinner } from "@/components/discovery/loading-state"
+import { Soundboard } from "@/components/soundboard/Soundboard"
+import type { SoundClip } from "@/data/soundboard"
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -221,6 +223,7 @@ export function RoomLivePage() {
   const [shareWizardOpen, setShareWizardOpen] = useState(false)
   const [showChat, setShowChat] = useState(false)
   const [showTipModal, setShowTipModal] = useState(false)
+  const [soundboardOpen, setSoundboardOpen] = useState(false)
   const [agentScores, setAgentScores] = useState<Record<string, number>>({})
   // Local sound-mute state — starts UNMUTED for radio rooms so listeners
   // hear audio immediately without needing a click to unlock.
@@ -384,6 +387,51 @@ export function RoomLivePage() {
     }
     wsService.on('turn:completed', handleTurnCompleted)
     return () => wsService.off('turn:completed', handleTurnCompleted)
+  }, [streamId])
+
+  // ── Soundboard: Play sounds triggered by host ──────────────────────────────
+  useEffect(() => {
+    const handleSoundboardPlay = async (data: any) => {
+      if (data.roomId !== streamId) return
+
+      console.log('[Soundboard] Remote sound triggered:', data.soundId)
+
+      // Map sound ID to a known URL (same catalog as frontend soundboard)
+      const soundMap: Record<string, string> = {
+        'lofi-chill-1': 'https://cdn.pixabay.com/audio/2022/05/27/audio_1808fbf07a.mp3',
+        'lofi-rain-1': 'https://cdn.pixabay.com/audio/2022/03/24/audio_078e0b0763.mp3',
+        'lofi-night-1': 'https://cdn.pixabay.com/audio/2022/01/18/audio_d0a13f69d2.mp3',
+        'lofi-study-1': 'https://cdn.pixabay.com/audio/2022/04/27/audio_67bcf729cf.mp3',
+        'classic-funk-1': 'https://cdn.pixabay.com/audio/2022/03/15/audio_c9d6b5e6f1.mp3',
+        'classic-jazz-1': 'https://cdn.pixabay.com/audio/2022/01/21/audio_31b4b3c8b0.mp3',
+        'classic-soul-1': 'https://cdn.pixabay.com/audio/2022/11/22/audio_febc508520.mp3',
+        'classic-disco-1': 'https://cdn.pixabay.com/audio/2022/10/25/audio_9326f18c68.mp3',
+        'sfx-clap-1': 'https://cdn.pixabay.com/audio/2022/03/15/audio_c79f28e2d0.mp3',
+        'sfx-boo-1': 'https://cdn.pixabay.com/audio/2022/03/19/audio_31543f3d44.mp3',
+        'sfx-laugh-1': 'https://cdn.pixabay.com/audio/2022/03/15/audio_52995c6e2a.mp3',
+        'sfx-drumroll-1': 'https://cdn.pixabay.com/audio/2022/03/19/audio_03d9b4a9e6.mp3',
+        'sfx-airhorn-1': 'https://cdn.pixabay.com/audio/2022/03/15/audio_823775b972.mp3',
+        'sfx-whoosh-1': 'https://cdn.pixabay.com/audio/2022/03/15/audio_44675d9180.mp3',
+        'sfx-bell-1': 'https://cdn.pixabay.com/audio/2022/03/15/audio_3439b1b53e.mp3',
+        'sfx-gameover-1': 'https://cdn.pixabay.com/audio/2022/03/15/audio_c2c2315b55.mp3',
+      }
+
+      const url = soundMap[data.soundId]
+      if (!url) {
+        console.warn('[Soundboard] Unknown sound ID:', data.soundId)
+        return
+      }
+
+      if (audioPlayerRef.current) {
+        // If currently playing TTS, let it finish — play soundboard on a separate Audio element
+        const soundAudio = new Audio(url)
+        soundAudio.volume = 0.7
+        soundAudio.play().catch(e => console.warn('[Soundboard] Play blocked:', e))
+      }
+    }
+
+    wsService.on('soundboard:play', handleSoundboardPlay)
+    return () => wsService.off('soundboard:play', handleSoundboardPlay)
   }, [streamId])
 
   // ── Fetch room ──────────────────────────────────────────────────────────────
@@ -748,6 +796,12 @@ export function RoomLivePage() {
         </Dialog>
 
         {stream && <TipModal isOpen={showTipModal} onClose={() => setShowTipModal(false)} agentId={stream.hostAgentId} agentName={stream.hostAgentName} />}
+
+        <Soundboard
+          isOpen={soundboardOpen}
+          onClose={() => setSoundboardOpen(false)}
+          onSoundPlay={(sound: SoundClip) => console.log("[Soundboard] Playing:", sound.name)}
+        />
       </div>
     )
   }
@@ -950,6 +1004,17 @@ export function RoomLivePage() {
                 <span className="text-xs font-bold uppercase tracking-wide">Tip</span>
               </button>
 
+              {/* Soundboard — host-only control */}
+              <button
+                type="button"
+                onClick={() => setSoundboardOpen(true)}
+                className="flex items-center gap-1.5 text-muted-foreground hover:text-violet-400 transition-colors bg-muted hover:bg-violet-500/10 px-4 py-2 rounded-full"
+                aria-label="Soundboard"
+              >
+                <Volume2 size={16} />
+                <span className="text-xs font-bold uppercase tracking-wide">Sounds</span>
+              </button>
+
               {!isRecording && !recordingUploading && stream?.recordingEnabled && jamRoom.inRoom && (
                 <button
                   type="button"
@@ -1055,6 +1120,12 @@ export function RoomLivePage() {
         </Dialog>
 
         {stream && <TipModal isOpen={showTipModal} onClose={() => setShowTipModal(false)} agentId={stream.hostAgentId} agentName={stream.hostAgentName} />}
+
+        <Soundboard
+          isOpen={soundboardOpen}
+          onClose={() => setSoundboardOpen(false)}
+          onSoundPlay={(sound: SoundClip) => console.log("[Soundboard] Playing:", sound.name)}
+        />
       </div>
     )
   }
@@ -1311,6 +1382,12 @@ export function RoomLivePage() {
       </Dialog>
 
       {stream && <TipModal isOpen={showTipModal} onClose={() => setShowTipModal(false)} agentId={stream.hostAgentId} agentName={stream.hostAgentName} />}
+
+      <Soundboard
+        isOpen={soundboardOpen}
+        onClose={() => setSoundboardOpen(false)}
+        onSoundPlay={(sound: SoundClip) => console.log("[Soundboard] Playing:", sound.name)}
+      />
     </div>
   )
 }
