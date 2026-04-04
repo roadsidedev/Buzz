@@ -156,17 +156,19 @@ function SpeakerTile({
   isSpeaking,
   score,
   compact = false,
+  onProfileClick,
 }: {
   participant: ParticipantInfo
   isSpeaking: boolean
   score?: number
   compact?: boolean
+  onProfileClick?: () => void
 }) {
   const sizeClass = compact ? "w-16 h-16" : "w-[84px] h-[84px]"
   const innerClass = compact ? "w-[56px] h-[56px]" : "w-[76px] h-[76px]"
 
   return (
-    <div className="flex flex-col items-center gap-2">
+    <div className="flex flex-col items-center gap-2 cursor-pointer" onClick={onProfileClick}>
       <div className={cn("relative rounded-full flex items-center justify-center transition-all duration-300", sizeClass, isSpeaking ? "bg-violet-500/20" : "")}>
         {/* Ring */}
         {isSpeaking && (
@@ -341,19 +343,24 @@ export function RoomLivePage() {
           if (audioPlayerRef.current) {
             audioPlayerRef.current.src = blobUrl
             audioPlayerRef.current.onended = () => URL.revokeObjectURL(blobUrl)
-            audioPlayerRef.current.play().catch(e => console.warn('[TTS] Audio play blocked:', e))
+            // On mobile browsers, play() must be triggered by user gesture.
+            // The unlock handler (below) pre-warms the audio context.
+            const playPromise = audioPlayerRef.current.play()
+            if (playPromise) playPromise.catch(e => console.warn('[TTS] Audio play blocked:', e))
           }
         } catch (err) {
           console.error('[TTS] Failed to inject audio:', err)
           if (data.audioUrl && audioPlayerRef.current) {
             audioPlayerRef.current.src = data.audioUrl
-            audioPlayerRef.current.play().catch(e => console.warn('[TTS] Audio play blocked:', e))
+            const playPromise = audioPlayerRef.current.play()
+            if (playPromise) playPromise.catch(e => console.warn('[TTS] Audio play blocked:', e))
           }
         }
       } else if (data.audioUrl) {
         if (audioPlayerRef.current) {
           audioPlayerRef.current.src = data.audioUrl
-          audioPlayerRef.current.play().catch(e => console.warn('[TTS] Audio play blocked:', e))
+          const playPromise = audioPlayerRef.current.play()
+          if (playPromise) playPromise.catch(e => console.warn('[TTS] Audio play blocked:', e))
         }
       }
     }
@@ -428,15 +435,34 @@ export function RoomLivePage() {
 
   // ── Real-time participant lifecycle ─────────────────────────────────────────
   useEffect(() => {
-    const unsubJoined = wsService.onParticipantJoined((data) => {
+    const unsubJoined = wsService.onParticipantJoined(async (data) => {
       if (data.roomId !== streamId) return
+
+      // Fetch real user profile data if agentId is available
+      let name = data.agentName || `Listener`
+      let avatar: string | null = null
+
+      if (data.agentId) {
+        try {
+          const token = apiClient.getToken()
+          const res = await axios.get(`${apiUrl}/agents/${data.agentId}`, token ? { headers: { Authorization: `Bearer ${token}` } } : undefined)
+          const agent = res.data?.data?.agent || res.data?.data || null
+          if (agent) {
+            name = agent.name || agent.display_name || data.agentName || name
+            avatar = agent.avatar || agent.avatar_url || null
+          }
+        } catch {
+          // Use fallback name — profile fetch is non-critical
+        }
+      }
+
       setParticipants((prev) => {
         if (prev.some((p) => p.id === data.agentId)) return prev
         const spectatorCount = prev.filter((p) => p.role === "spectator").length
         return [...prev, {
           id: data.agentId,
-          name: data.agentName || `Listener ${spectatorCount + 1}`,
-          avatar: null,
+          name: name || `Listener ${spectatorCount + 1}`,
+          avatar,
           role: data.role
         }]
       })
@@ -447,7 +473,7 @@ export function RoomLivePage() {
       setParticipants((prev) => prev.filter((p) => p.id !== data.agentId))
     })
     return () => { unsubJoined(); unsubLeft() }
-  }, [streamId])
+  }, [streamId, apiUrl])
 
   // ── Real-time room status updates ───────────────────────────────────────────
   useEffect(() => {
@@ -458,17 +484,32 @@ export function RoomLivePage() {
   }, [streamId])
 
   // ── Unlock audio context on first user interaction ──────────────────────────
+  // Mobile browsers (especially iOS Safari) require a user gesture before any
+  // audio can play. This unlocks both the HTML5 <audio> element AND the
+  // AudioContext used by playBeep() and WebRTCAudioBridge.
   useEffect(() => {
     const unlock = () => {
+      // Unlock HTML5 <audio> element
       if (audioPlayerRef.current) {
         audioPlayerRef.current.play().then(() => audioPlayerRef.current?.pause()).catch(() => {})
       }
+      // Unlock AudioContext (used by playBeep and WebRTCAudioBridge on iOS Safari)
+      try {
+        const AudioCtx = window.AudioContext || (window as any).webkitAudioContext
+        const ctx = new AudioCtx()
+        if (ctx.state === "suspended") {
+          ctx.resume().catch(() => {})
+        }
+        ctx.close().catch(() => {})
+      } catch { /* AudioContext not supported or already unlocked */ }
     }
     document.addEventListener("click", unlock, { once: true })
     document.addEventListener("touchstart", unlock, { once: true })
+    document.addEventListener("touchend", unlock, { once: true })
     return () => {
       document.removeEventListener("click", unlock)
       document.removeEventListener("touchstart", unlock)
+      document.removeEventListener("touchend", unlock)
     }
   }, [])
 
@@ -735,7 +776,7 @@ export function RoomLivePage() {
         className="animate-in fade-in duration-500 flex flex-col h-full min-h-screen bg-background text-foreground"
       >
         {/* Hidden persistent audio element — reused for all TTS playback to satisfy browser autoplay policy */}
-        <audio ref={audioPlayerRef} preload="none" style={{ display: "none" }} />
+        <audio ref={audioPlayerRef} preload="auto" autoPlay playsInline style={{ display: "none" }} />
         {/* ── Desktop Header ── */}
         <div className="flex items-center gap-4 px-6 py-4 border-b border-white/8 shrink-0">
           <button
@@ -832,6 +873,7 @@ export function RoomLivePage() {
                         (safeSpeaking.length > 0 && idx < safeSpeaking.length)
                       }
                       score={agentScores[p.id]}
+                      onProfileClick={() => navigate(`/agent/${p.id}`)}
                     />
                   ))}
                 </div>
@@ -847,7 +889,11 @@ export function RoomLivePage() {
                 </div>
                 <div className="grid grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-x-6 gap-y-4 px-2">
                   {listenerProfiles.map((p) => (
-                    <div key={p.id} className="flex flex-col items-center gap-2 group cursor-pointer">
+                    <div
+                      key={p.id}
+                      className="flex flex-col items-center gap-2 group cursor-pointer"
+                      onClick={() => navigate(`/agent/${p.id}`)}
+                    >
                       <div className="relative">
                         <div className="w-14 h-14 rounded-[22px] overflow-hidden bg-muted border border-border/50 group-hover:border-primary/30 transition-all duration-300">
                           <img
@@ -931,7 +977,11 @@ export function RoomLivePage() {
                 <p className="text-[11px] text-muted-foreground/60 text-center mt-6">No listeners yet</p>
               )}
               {listenerProfiles.map((p) => (
-                <div key={p.id} className="flex items-center gap-2">
+                <div
+                  key={p.id}
+                  className="flex items-center gap-2 cursor-pointer hover:bg-muted/30 rounded-lg p-1 -m-1 transition-colors"
+                  onClick={() => navigate(`/agent/${p.id}`)}
+                >
                   <img
                     src={p.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${p.id}`}
                     className="w-7 h-7 rounded-full border border-border bg-muted"
@@ -1015,7 +1065,7 @@ export function RoomLivePage() {
       className="animate-in fade-in duration-500 min-h-screen pb-36 bg-background text-foreground"
     >
       {/* Hidden persistent audio element — shared TTS player */}
-      <audio ref={audioPlayerRef} preload="none" style={{ display: "none" }} />
+      <audio ref={audioPlayerRef} preload="auto" autoPlay playsInline style={{ display: "none" }} />
       {/* ── Header ── */}
       <div className="flex items-center justify-between px-4 pt-4 pb-3">
         <button
@@ -1103,6 +1153,7 @@ export function RoomLivePage() {
                 participant={p}
                 isSpeaking={safeSpeaking.includes(p.id) || (safeSpeaking.length > 0 && idx < safeSpeaking.length)}
                 score={agentScores[p.id]}
+                onProfileClick={() => navigate(`/agent/${p.id}`)}
               />
             ))}
           </div>
@@ -1121,7 +1172,11 @@ export function RoomLivePage() {
         ) : (
           <div className="grid grid-cols-4 gap-3 pb-4">
             {listenerProfiles.map((p) => (
-              <div key={p.id} className="flex flex-col items-center gap-1.5 w-[60px]">
+              <div
+                key={p.id}
+                className="flex flex-col items-center gap-1.5 w-[60px] cursor-pointer"
+                onClick={() => navigate(`/agent/${p.id}`)}
+              >
                 <img
                   src={p.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${p.id}`}
                   className="w-12 h-12 rounded-full border border-border bg-muted shadow-sm"
