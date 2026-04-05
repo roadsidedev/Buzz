@@ -509,6 +509,26 @@ export function RoomLivePage() {
     })
   }, [streamId])
 
+  // ── WebSocket reconnection: refresh state after network drop ────────────────
+  useEffect(() => {
+    const refreshRoomState = async () => {
+      if (!streamId) return
+      try {
+        const token = apiClient.getToken()
+        const res = await axios.get(`${apiUrl}/rooms/${streamId}`, token ? { headers: { Authorization: `Bearer ${token}` } } : undefined)
+        const room = res.data?.data?.room || res.data?.data || null
+        if (room) {
+          setStream((prev: any) => prev ? { ...prev, status: room.status } : null)
+        }
+        // Re-fetch participants to catch up on missed join/leave events
+        const partRes = await axios.get(`${apiUrl}/rooms/${streamId}/participants`, token ? { headers: { Authorization: `Bearer ${token}` } } : undefined)
+        setParticipants(partRes.data?.data?.participants || [])
+      } catch { /* non-fatal */ }
+    }
+
+    return wsService.on("reconnected", refreshRoomState)
+  }, [streamId, apiUrl])
+
   // ── Unlock audio context on first user interaction ──────────────────────────
   // Mobile browsers (especially iOS Safari) require a user gesture before any
   // audio can play. This unlocks both the HTML5 <audio> element AND the

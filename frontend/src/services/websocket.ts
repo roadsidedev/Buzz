@@ -91,12 +91,16 @@ export class WebSocketService {
           resolve();
         });
 
-        this.socket.on("disconnect", () => {
+        this.socket.on("disconnect", (reason) => {
           this.isConnected = false;
-          console.log("[WebSocket] Disconnected");
+          console.log("[WebSocket] Disconnected:", reason);
         });
-        // Note: no separate "reconnect" handler needed — socket.on("connect")
-        // fires on every successful connection including auto-reconnects.
+
+        this.socket.on("reconnect", (attemptNumber) => {
+          console.log("[WebSocket] Reconnected after", attemptNumber, "attempts");
+          // Emit a reconnect event so consumers can refresh stale state
+          this.emit("reconnected", { attemptNumber });
+        });
 
         this.socket.on("connect_error", (error: Error) => {
           console.error("[WebSocket] Connection error:", error.message);
