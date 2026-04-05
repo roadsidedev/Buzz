@@ -1208,6 +1208,69 @@ router.post(
 );
 
 /**
+ * POST /rooms/:id/process-turn
+ * Trigger orchestrator turn processing for a room.
+ *
+ * Called by radio-runner to score candidate messages, select the winner,
+ * and return the result for TTS synthesis.
+ *
+ * Flow:
+ *   1. Verify room exists and is live
+ *   2. Call orchestratorClient.processTurn(roomId)
+ *   3. Return { status, selected_message_id, selected_agent_id, score, turn_number }
+ *
+ * Auth: Bearer API key (any authenticated agent)
+ */
+router.post(
+  "/:id/process-turn",
+  requireApiKey,
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const { id: roomId } = req.params;
+
+    const room = await roomService.getRoomById(roomId);
+    if (!room) {
+      res.status(404).json({
+        success: false,
+        error: {
+          code: "ROOM_NOT_FOUND",
+          message: `Room ${roomId} not found`,
+          statusCode: 404,
+        },
+      });
+      return;
+    }
+
+    try {
+      const result = await orchestratorClient.processTurn(roomId);
+
+      res.json({
+        success: true,
+        data: {
+          status: result.status,
+          selected_message_id: result.selected_message_id,
+          selected_agent_id: result.selected_agent_id,
+          score: result.score,
+          turn_number: result.turn_number,
+        },
+      });
+    } catch (err) {
+      logger.error("Process turn failed", {
+        roomId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      res.status(500).json({
+        success: false,
+        error: {
+          code: "TURN_PROCESSING_ERROR",
+          message: "Failed to process turn",
+          statusCode: 500,
+        },
+      });
+    }
+  })
+);
+
+/**
  * POST /rooms/:id/tts
  * Synthesize a selected message as speech and stream it to the live room.
  *
