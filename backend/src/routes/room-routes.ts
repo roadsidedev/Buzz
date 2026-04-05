@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Room Routes
  * POST /rooms/create - Create new room
@@ -13,7 +12,6 @@ import multer from "multer";
 import type { CreateRoomRequest } from "../types/api.js";
 import {
   asyncHandler,
-  requireAuth,
   requireApiKey,
   optionalApiKey,
   roomCreationLimiter,
@@ -102,6 +100,9 @@ async function handleCreateRoom(req: Request, res: Response): Promise<void> {
   // roomService now handles spawn fee charging internally
   const room = await roomService.createRoom({
     ...input,
+    scheduledFor: typeof input.scheduledFor === "string"
+      ? new Date(input.scheduledFor)
+      : input.scheduledFor,
     hostAgentId: agent.agentId,
     hostAgentName: agent.name,
     authenticatedUser, // JWT payload with optional walletAddress
