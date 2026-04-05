@@ -890,7 +890,7 @@ router.post(
         roomId,
         message.agent_id,
         message.text,
-        message.status || "candidate",
+        "candidate", // always enforce candidate status — backend owns message lifecycle
       ],
     );
 

@@ -503,7 +503,7 @@ class OrchestratorBridge:
                 "room_id": room_id,
                 "agent_id": agent_id,
                 "text": text,
-                "status": "submitted",
+                "status": "candidate",
             }
         }
         headers = self._auth_headers(api_key) if api_key else None
@@ -540,12 +540,16 @@ class OrchestratorBridge:
             headers=headers,
         )
         self._assert_ok(resp, "process_turn")
-        data = resp.json()
+        raw = resp.json()
+        # Backend wraps the result under a "data" envelope:
+        # { success: true, data: { status, selected_message_id, ... } }
+        # Unwrap it; fall back to the top-level dict for backward compat.
+        data = raw.get("data") or raw
         result = TurnResult(
             status=data.get("status", "unknown"),
             selected_message_id=data.get("selected_message_id"),
             selected_agent_id=data.get("selected_agent_id"),
-            score=data.get("score", 0.0),
+            score=data.get("score") or 0.0,
             turn_number=data.get("turn_number"),
         )
         logger.info(
