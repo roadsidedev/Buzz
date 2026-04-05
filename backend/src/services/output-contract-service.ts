@@ -233,12 +233,13 @@ export class OutputContractService {
         exceptionalMet: roomState.contract_satisfaction >= 1.5,
       };
     } catch (err) {
-      if (err instanceof Error && !err.message.includes("404")) {
-        logger.error("Output contract validation failed to fetch state", {
-          roomId,
-          error: err.message,
-        });
-      }
+      // Room state missing from Redis — expected for rooms created before
+      // orchestrator started or after a server restart. Auto-recovery will
+      // initialize the state on the next turn loop iteration.
+      logger.debug("Room state not in Redis — using basic validation fallback", {
+        roomId,
+        reason: err instanceof Error ? err.message : String(err),
+      });
 
       // Fallback: basic validation
       return this._basicValidation(room, messages);
