@@ -164,10 +164,6 @@ export const SOUNDBOARD_CLIPS: SoundClip[] = [
   },
 ]
 
-export function getSoundsByCategory(category: string): SoundClip[] {
-  return SOUNDBOARD_CLIPS.filter((s) => s.category === category)
-}
-
 export function getSoundById(id: string): SoundClip | undefined {
   return SOUNDBOARD_CLIPS.find((s) => s.id === id)
 }
