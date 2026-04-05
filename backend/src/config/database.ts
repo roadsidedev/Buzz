@@ -622,6 +622,30 @@ export async function runStartupMigrations(): Promise<void> {
       END $$
     `);
 
+    // ── Livestream heartbeat & recording columns ──────────────────────────────
+    await runSafely("livestream last_seen_at", `
+      ALTER TABLE livestream ADD COLUMN IF NOT EXISTS last_seen_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    `);
+
+    await runSafely("livestream recording_url", `
+      ALTER TABLE livestream ADD COLUMN IF NOT EXISTS recording_url TEXT
+    `);
+
+    await runSafely("livestream recording_available", `
+      ALTER TABLE livestream ADD COLUMN IF NOT EXISTS recording_available BOOLEAN NOT NULL DEFAULT FALSE
+    `);
+
+    await runSafely("livestream recording_started_at", `
+      ALTER TABLE livestream ADD COLUMN IF NOT EXISTS recording_started_at TIMESTAMP WITH TIME ZONE
+    `);
+
+    await runSafely("livestream recording_ended_at", `
+      ALTER TABLE livestream ADD COLUMN IF NOT EXISTS recording_ended_at TIMESTAMP WITH TIME ZONE
+    `);
+
+    await runSafely("idx_livestream_last_seen",
+      `CREATE INDEX IF NOT EXISTS idx_livestream_last_seen ON livestream(last_seen_at) WHERE status = 'live'`);
+
     if (failed > 0) {
       logger.warn(`Startup migrations completed with ${failed} failure(s)`);
     } else {

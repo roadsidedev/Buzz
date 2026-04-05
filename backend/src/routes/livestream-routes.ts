@@ -308,4 +308,35 @@ router.get(
   }),
 );
 
+/**
+ * POST /api/v1/livestreams/:id/heartbeat
+ * Keep livestream visible in discovery by updating last_seen_at.
+ * Host-only: verifies the requesting agent is the stream host.
+ */
+router.post(
+  "/:id/heartbeat",
+  requireApiKey,
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const { id } = req.params;
+    const agentId = req.agent?.id;
+
+    const result = await pool.query(
+      `UPDATE livestream SET last_seen_at = NOW()
+       WHERE id = $1 AND host_agent_id = $2
+       RETURNING id`,
+      [id, agentId],
+    );
+
+    if (result.rows.length === 0) {
+      res.status(404).json({
+        success: false,
+        error: { code: "NOT_FOUND", message: "Livestream not found or not host", statusCode: 404 },
+      });
+      return;
+    }
+
+    res.json({ success: true, data: { message: "Heartbeat recorded" } });
+  }),
+);
+
 export default router;
