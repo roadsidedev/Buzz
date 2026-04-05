@@ -26,8 +26,6 @@ import {
 import { apiClient } from "@/services/api"
 import wsService from "@/services/websocket"
 import { BeeSpinner } from "@/components/discovery/loading-state"
-import { Soundboard } from "@/components/soundboard/Soundboard"
-import type { SoundClip } from "@/data/soundboard"
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -223,7 +221,6 @@ export function RoomLivePage() {
   const [shareWizardOpen, setShareWizardOpen] = useState(false)
   const [showChat, setShowChat] = useState(false)
   const [showTipModal, setShowTipModal] = useState(false)
-  const [soundboardOpen, setSoundboardOpen] = useState(false)
   const [agentScores, setAgentScores] = useState<Record<string, number>>({})
   // Local sound-mute state — starts UNMUTED for radio rooms so listeners
   // hear audio immediately without needing a click to unlock.
@@ -264,33 +261,6 @@ export function RoomLivePage() {
 
   // ── Keep room alive with periodic heartbeats (any authenticated viewer) ─────
   useRoomHeartbeat(streamId, !!stream && authenticated)
-
-  // ── Host check (for soundboard visibility) ─────────────────────────────────
-  // Note: hostAgentId is from the API-registered agent, while authenticated user
-  // may have a different agentId from Privy sync. For soundboard, we check if
-  // the current user's wallet matches the host's wallet, or if they have the
-  // API key for the host agent.
-  const isRoomHost = React.useMemo(() => {
-    if (!stream) return false
-    const authStore = useAuthStore.getState()
-    // Check if authenticated user's agentId matches the room's host
-    return authStore.agentId === stream.hostAgentId
-  }, [stream])
-
-  // ── Soundboard: Broadcast sound to all room listeners ──────────────────────
-  const handleSoundboardPlay = useCallback(async (sound: SoundClip) => {
-    try {
-      const token = apiClient.getToken()
-      if (!token) return
-      await axios.post(
-        `${apiUrl}/rooms/${streamId}/soundboard`,
-        { sound_id: sound.id },
-        { headers: { Authorization: `Bearer ${token}` } }
-      )
-    } catch (err) {
-      console.error('[Soundboard] Failed to broadcast sound:', err)
-    }
-  }, [streamId, apiUrl])
 
   // Sync the HTML5 audio element's muted state with local soundMuted state
   useEffect(() => {
@@ -804,12 +774,6 @@ export function RoomLivePage() {
         </Dialog>
 
         {stream && <TipModal isOpen={showTipModal} onClose={() => setShowTipModal(false)} agentId={stream.hostAgentId} agentName={stream.hostAgentName} />}
-
-        <Soundboard
-          isOpen={soundboardOpen}
-          onClose={() => setSoundboardOpen(false)}
-          onSoundPlay={handleSoundboardPlay}
-        />
       </div>
     )
   }
@@ -1012,19 +976,6 @@ export function RoomLivePage() {
                 <span className="text-xs font-bold uppercase tracking-wide">Tip</span>
               </button>
 
-              {/* Soundboard — host-only control */}
-              {isRoomHost && (
-                <button
-                  type="button"
-                  onClick={() => setSoundboardOpen(true)}
-                  className="flex items-center gap-1.5 text-muted-foreground hover:text-violet-400 transition-colors bg-muted hover:bg-violet-500/10 px-4 py-2 rounded-full"
-                  aria-label="Soundboard"
-                >
-                  <Volume2 size={16} />
-                  <span className="text-xs font-bold uppercase tracking-wide">Sounds</span>
-                </button>
-              )}
-
               {!isRecording && !recordingUploading && stream?.recordingEnabled && jamRoom.inRoom && (
                 <button
                   type="button"
@@ -1130,12 +1081,6 @@ export function RoomLivePage() {
         </Dialog>
 
         {stream && <TipModal isOpen={showTipModal} onClose={() => setShowTipModal(false)} agentId={stream.hostAgentId} agentName={stream.hostAgentName} />}
-
-        <Soundboard
-          isOpen={soundboardOpen}
-          onClose={() => setSoundboardOpen(false)}
-          onSoundPlay={handleSoundboardPlay}
-        />
       </div>
     )
   }
@@ -1329,13 +1274,6 @@ export function RoomLivePage() {
             <DollarSign size={22} />
             <span className="text-[9px] font-bold uppercase tracking-wide">Tip</span>
           </button>
-          {/* Soundboard — host-only */}
-          {isRoomHost && (
-            <button type="button" onClick={() => setSoundboardOpen(true)} className="flex flex-col items-center gap-0.5 text-muted-foreground hover:text-violet-400 transition-colors" aria-label="Soundboard">
-              <Volume2 size={22} />
-              <span className="text-[9px] font-bold uppercase tracking-wide">Sounds</span>
-            </button>
-          )}
         </div>
       </div>
 
@@ -1399,12 +1337,6 @@ export function RoomLivePage() {
       </Dialog>
 
       {stream && <TipModal isOpen={showTipModal} onClose={() => setShowTipModal(false)} agentId={stream.hostAgentId} agentName={stream.hostAgentName} />}
-
-      <Soundboard
-        isOpen={soundboardOpen}
-        onClose={() => setSoundboardOpen(false)}
-        onSoundPlay={handleSoundboardPlay}
-      />
     </div>
   )
 }
