@@ -265,6 +265,33 @@ export function RoomLivePage() {
   // ── Keep room alive with periodic heartbeats (any authenticated viewer) ─────
   useRoomHeartbeat(streamId, !!stream && authenticated)
 
+  // ── Host check (for soundboard visibility) ─────────────────────────────────
+  // Note: hostAgentId is from the API-registered agent, while authenticated user
+  // may have a different agentId from Privy sync. For soundboard, we check if
+  // the current user's wallet matches the host's wallet, or if they have the
+  // API key for the host agent.
+  const isRoomHost = React.useMemo(() => {
+    if (!stream) return false
+    const authStore = useAuthStore.getState()
+    // Check if authenticated user's agentId matches the room's host
+    return authStore.agentId === stream.hostAgentId
+  }, [stream])
+
+  // ── Soundboard: Broadcast sound to all room listeners ──────────────────────
+  const handleSoundboardPlay = useCallback(async (sound: SoundClip) => {
+    try {
+      const token = apiClient.getToken()
+      if (!token) return
+      await axios.post(
+        `${apiUrl}/rooms/${streamId}/soundboard`,
+        { sound_id: sound.id },
+        { headers: { Authorization: `Bearer ${token}` } }
+      )
+    } catch (err) {
+      console.error('[Soundboard] Failed to broadcast sound:', err)
+    }
+  }, [streamId, apiUrl])
+
   // Sync the HTML5 audio element's muted state with local soundMuted state
   useEffect(() => {
     if (audioPlayerRef.current) {
@@ -389,50 +416,31 @@ export function RoomLivePage() {
     return () => wsService.off('turn:completed', handleTurnCompleted)
   }, [streamId])
 
-  // ── Soundboard: Play sounds triggered by host ──────────────────────────────
+  // ── Soundboard: Play sounds triggered by host (remote listeners) ───────────
   useEffect(() => {
-    const handleSoundboardPlay = async (data: any) => {
+    const handleRemoteSoundboardPlay = async (data: any) => {
       if (data.roomId !== streamId) return
 
       console.log('[Soundboard] Remote sound triggered:', data.soundId)
 
-      // Map sound ID to a known URL (same catalog as frontend soundboard)
-      const soundMap: Record<string, string> = {
-        'lofi-chill-1': 'https://cdn.pixabay.com/audio/2022/05/27/audio_1808fbf07a.mp3',
-        'lofi-rain-1': 'https://cdn.pixabay.com/audio/2022/03/24/audio_078e0b0763.mp3',
-        'lofi-night-1': 'https://cdn.pixabay.com/audio/2022/01/18/audio_d0a13f69d2.mp3',
-        'lofi-study-1': 'https://cdn.pixabay.com/audio/2022/04/27/audio_67bcf729cf.mp3',
-        'classic-funk-1': 'https://cdn.pixabay.com/audio/2022/03/15/audio_c9d6b5e6f1.mp3',
-        'classic-jazz-1': 'https://cdn.pixabay.com/audio/2022/01/21/audio_31b4b3c8b0.mp3',
-        'classic-soul-1': 'https://cdn.pixabay.com/audio/2022/11/22/audio_febc508520.mp3',
-        'classic-disco-1': 'https://cdn.pixabay.com/audio/2022/10/25/audio_9326f18c68.mp3',
-        'sfx-clap-1': 'https://cdn.pixabay.com/audio/2022/03/15/audio_c79f28e2d0.mp3',
-        'sfx-boo-1': 'https://cdn.pixabay.com/audio/2022/03/19/audio_31543f3d44.mp3',
-        'sfx-laugh-1': 'https://cdn.pixabay.com/audio/2022/03/15/audio_52995c6e2a.mp3',
-        'sfx-drumroll-1': 'https://cdn.pixabay.com/audio/2022/03/19/audio_03d9b4a9e6.mp3',
-        'sfx-airhorn-1': 'https://cdn.pixabay.com/audio/2022/03/15/audio_823775b972.mp3',
-        'sfx-whoosh-1': 'https://cdn.pixabay.com/audio/2022/03/15/audio_44675d9180.mp3',
-        'sfx-bell-1': 'https://cdn.pixabay.com/audio/2022/03/15/audio_3439b1b53e.mp3',
-        'sfx-gameover-1': 'https://cdn.pixabay.com/audio/2022/03/15/audio_c2c2315b55.mp3',
-      }
-
-      const url = soundMap[data.soundId]
-      if (!url) {
+      // Use shared sound catalog — no duplicated URLs
+      const { getSoundById } = await import('@/data/soundboard')
+      const sound = getSoundById(data.soundId)
+      if (!sound) {
         console.warn('[Soundboard] Unknown sound ID:', data.soundId)
         return
       }
 
-      if (audioPlayerRef.current) {
-        // If currently playing TTS, let it finish — play soundboard on a separate Audio element
-        const soundAudio = new Audio(url)
-        soundAudio.volume = 0.7
-        soundAudio.play().catch(e => console.warn('[Soundboard] Play blocked:', e))
-      }
+      // Play on a separate Audio element so it doesn't interrupt TTS
+      const soundAudio = new Audio(sound.url)
+      soundAudio.volume = soundMuted ? 0 : 0.7
+      soundAudio.onerror = () => console.error('[Soundboard] Failed to load sound:', data.soundId)
+      soundAudio.play().catch(e => console.warn('[Soundboard] Play blocked:', e))
     }
 
-    wsService.on('soundboard:play', handleSoundboardPlay)
-    return () => wsService.off('soundboard:play', handleSoundboardPlay)
-  }, [streamId])
+    wsService.on('soundboard:play', handleRemoteSoundboardPlay)
+    return () => wsService.off('soundboard:play', handleRemoteSoundboardPlay)
+  }, [streamId, soundMuted])
 
   // ── Fetch room ──────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -800,7 +808,7 @@ export function RoomLivePage() {
         <Soundboard
           isOpen={soundboardOpen}
           onClose={() => setSoundboardOpen(false)}
-          onSoundPlay={(sound: SoundClip) => console.log("[Soundboard] Playing:", sound.name)}
+          onSoundPlay={handleSoundboardPlay}
         />
       </div>
     )
@@ -1005,15 +1013,17 @@ export function RoomLivePage() {
               </button>
 
               {/* Soundboard — host-only control */}
-              <button
-                type="button"
-                onClick={() => setSoundboardOpen(true)}
-                className="flex items-center gap-1.5 text-muted-foreground hover:text-violet-400 transition-colors bg-muted hover:bg-violet-500/10 px-4 py-2 rounded-full"
-                aria-label="Soundboard"
-              >
-                <Volume2 size={16} />
-                <span className="text-xs font-bold uppercase tracking-wide">Sounds</span>
-              </button>
+              {isRoomHost && (
+                <button
+                  type="button"
+                  onClick={() => setSoundboardOpen(true)}
+                  className="flex items-center gap-1.5 text-muted-foreground hover:text-violet-400 transition-colors bg-muted hover:bg-violet-500/10 px-4 py-2 rounded-full"
+                  aria-label="Soundboard"
+                >
+                  <Volume2 size={16} />
+                  <span className="text-xs font-bold uppercase tracking-wide">Sounds</span>
+                </button>
+              )}
 
               {!isRecording && !recordingUploading && stream?.recordingEnabled && jamRoom.inRoom && (
                 <button
@@ -1124,7 +1134,7 @@ export function RoomLivePage() {
         <Soundboard
           isOpen={soundboardOpen}
           onClose={() => setSoundboardOpen(false)}
-          onSoundPlay={(sound: SoundClip) => console.log("[Soundboard] Playing:", sound.name)}
+          onSoundPlay={handleSoundboardPlay}
         />
       </div>
     )
@@ -1319,6 +1329,13 @@ export function RoomLivePage() {
             <DollarSign size={22} />
             <span className="text-[9px] font-bold uppercase tracking-wide">Tip</span>
           </button>
+          {/* Soundboard — host-only */}
+          {isRoomHost && (
+            <button type="button" onClick={() => setSoundboardOpen(true)} className="flex flex-col items-center gap-0.5 text-muted-foreground hover:text-violet-400 transition-colors" aria-label="Soundboard">
+              <Volume2 size={22} />
+              <span className="text-[9px] font-bold uppercase tracking-wide">Sounds</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -1386,7 +1403,7 @@ export function RoomLivePage() {
       <Soundboard
         isOpen={soundboardOpen}
         onClose={() => setSoundboardOpen(false)}
-        onSoundPlay={(sound: SoundClip) => console.log("[Soundboard] Playing:", sound.name)}
+        onSoundPlay={handleSoundboardPlay}
       />
     </div>
   )

@@ -1068,6 +1068,29 @@ router.get(
  * Body: { sound_id: string }
  * Auth: Bearer API key (host only)
  */
+
+// Whitelist of valid soundboard sound IDs — prevents arbitrary sound injection
+const VALID_SOUND_IDS = new Set([
+  "lofi-chill-1", "lofi-rain-1", "lofi-night-1", "lofi-study-1",
+  "classic-funk-1", "classic-jazz-1", "classic-soul-1", "classic-disco-1",
+  "sfx-clap-1", "sfx-boo-1", "sfx-laugh-1", "sfx-drumroll-1",
+  "sfx-airhorn-1", "sfx-whoosh-1", "sfx-bell-1", "sfx-gameover-1",
+]);
+
+// Soundboard rate limiter: max 5 sounds per 10 seconds per room
+const soundboardRateLimit = new Map<string, { count: number; resetAt: number }>();
+function checkSoundboardRateLimit(roomId: string): boolean {
+  const now = Date.now();
+  const entry = soundboardRateLimit.get(roomId);
+  if (!entry || now > entry.resetAt) {
+    soundboardRateLimit.set(roomId, { count: 1, resetAt: now + 10_000 });
+    return true;
+  }
+  if (entry.count >= 5) return false;
+  entry.count++;
+  return true;
+}
+
 router.post(
   "/:id/soundboard",
   requireApiKey,
@@ -1082,6 +1105,32 @@ router.post(
           code: "MISSING_SOUND_ID",
           message: "sound_id is required",
           statusCode: 400,
+        },
+      });
+      return;
+    }
+
+    // Validate sound_id against whitelist
+    if (!VALID_SOUND_IDS.has(sound_id)) {
+      res.status(400).json({
+        success: false,
+        error: {
+          code: "INVALID_SOUND_ID",
+          message: `Unknown sound_id: ${sound_id}`,
+          statusCode: 400,
+        },
+      });
+      return;
+    }
+
+    // Rate limit: max 5 sounds per 10 seconds
+    if (!checkSoundboardRateLimit(roomId)) {
+      res.status(429).json({
+        success: false,
+        error: {
+          code: "RATE_LIMITED",
+          message: "Too many sounds — try again in a few seconds",
+          statusCode: 429,
         },
       });
       return;
