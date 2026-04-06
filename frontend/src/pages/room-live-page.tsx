@@ -222,6 +222,10 @@ export function RoomLivePage() {
   const [showChat, setShowChat] = useState(false)
   const [showTipModal, setShowTipModal] = useState(false)
   const [agentScores, setAgentScores] = useState<Record<string, number>>({})
+  // Tracks which agent is currently speaking (from tts:audio events) and the spoken text.
+  // Used for visual speaking indicator and transcript fallback when audio is blocked/missing.
+  const [speakingAgent, setSpeakingAgent] = useState<{ agentId: string | null; agentName: string | null; text: string } | null>(null)
+  const speakingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   // Local sound-mute state — starts UNMUTED for radio rooms so listeners
   // hear audio immediately without needing a click to unlock.
   const [soundMuted, setSoundMuted] = useState(false)
@@ -313,12 +317,21 @@ export function RoomLivePage() {
     const handleTtsAudio = async (data: any) => {
       if (data.roomId !== streamId) return
 
-      console.log('[TTS] Received audio event:', { 
-        provider: data.provider, 
+      console.log('[TTS] Received audio event:', {
+        provider: data.provider,
         hasAudioBase64: !!data.audioBase64,
         hasAudioUrl: !!data.audioUrl,
-        durationMs: data.durationMs 
+        durationMs: data.durationMs,
+        agentName: data.agentName,
       })
+
+      // ── Speaking indicator: show who is speaking + transcript text ──────────
+      // This fires regardless of whether audio is available so the UI always
+      // shows live transcript even when audio is blocked or TTS is disabled.
+      if (speakingTimerRef.current) clearTimeout(speakingTimerRef.current)
+      setSpeakingAgent({ agentId: data.agentId ?? null, agentName: data.agentName ?? null, text: data.text ?? '' })
+      const clearAfter = Math.max(3000, (data.durationMs ?? 0) + 1500)
+      speakingTimerRef.current = setTimeout(() => setSpeakingAgent(null), clearAfter)
 
       if (data.audioBase64) {
         try {
@@ -363,9 +376,14 @@ export function RoomLivePage() {
           if (playPromise) playPromise.catch(e => console.warn('[TTS] Audio play blocked:', e))
         }
       }
+      // If neither audioBase64 nor audioUrl → TTS disabled/failed; speaking indicator
+      // still shows the transcript text so listeners know what was said.
     }
     wsService.on('tts:audio', handleTtsAudio)
-    return () => wsService.off('tts:audio', handleTtsAudio)
+    return () => {
+      wsService.off('tts:audio', handleTtsAudio)
+      if (speakingTimerRef.current) clearTimeout(speakingTimerRef.current)
+    }
   }, [streamId])
 
   // ── Fallback: Play audio from turn:completed events (URL-only, no base64) ────
@@ -535,9 +553,16 @@ export function RoomLivePage() {
   // AudioContext used by playBeep() and WebRTCAudioBridge.
   useEffect(() => {
     const unlock = () => {
-      // Unlock HTML5 <audio> element
+      // Unlock HTML5 <audio> element using a silent 1-frame WAV so play() actually
+      // succeeds (playing an element with no src fails silently and does NOT unlock).
       if (audioPlayerRef.current) {
-        audioPlayerRef.current.play().then(() => audioPlayerRef.current?.pause()).catch(() => {})
+        // 44-byte PCM WAV with 1 frame of silence — always plays successfully.
+        const SILENT_WAV = "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA="
+        const el = audioPlayerRef.current
+        if (!el.src || el.src === window.location.href) {
+          el.src = SILENT_WAV
+        }
+        el.play().then(() => el.pause()).catch(() => {})
       }
       // Unlock AudioContext (used by playBeep and WebRTCAudioBridge on iOS Safari)
       try {
@@ -897,6 +922,21 @@ export function RoomLivePage() {
               </button>
             )}
 
+            {/* ── Live transcript banner — shows who is speaking and what they said ── */}
+            {speakingAgent && (
+              <div className="relative z-20 w-full max-w-2xl mx-auto mb-6 px-5 py-3 rounded-2xl bg-violet-500/10 border border-violet-500/20 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                <div className="flex items-start gap-3">
+                  <Waveform size="sm" />
+                  <div className="min-w-0 flex-1">
+                    {speakingAgent.agentName && (
+                      <p className="text-[10px] font-black uppercase tracking-widest text-violet-400 mb-0.5">{speakingAgent.agentName}</p>
+                    )}
+                    <p className="text-sm text-white/80 leading-snug line-clamp-3">{speakingAgent.text}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {jamRoom.isLoading ? (
               <div className="flex flex-col items-center gap-3 py-16">
                 <BeeSpinner variant="primary" size="md" />
@@ -1172,6 +1212,19 @@ export function RoomLivePage() {
           <span className="text-sm font-bold">Tap to hear the room</span>
           <Volume2 size={14} className="ml-auto opacity-60" />
         </button>
+      )}
+
+      {/* ── Live transcript banner (mobile) ── */}
+      {speakingAgent && (
+        <div className="mx-5 mb-4 flex items-start gap-3 px-4 py-3 rounded-xl bg-violet-500/10 border border-violet-500/20 animate-in fade-in slide-in-from-bottom-2 duration-300">
+          <Waveform size="sm" />
+          <div className="min-w-0 flex-1">
+            {speakingAgent.agentName && (
+              <p className="text-[10px] font-black uppercase tracking-widest text-violet-400 mb-0.5">{speakingAgent.agentName}</p>
+            )}
+            <p className="text-sm text-white/80 leading-snug line-clamp-3">{speakingAgent.text}</p>
+          </div>
+        </div>
       )}
 
       {/* ── Stage ── */}
