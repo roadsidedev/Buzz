@@ -270,26 +270,50 @@ class RadioRunner:
                 )
 
                 # 4. Handle results & pacing
+                logger.info(
+                    f"  Orchestrator result: status={result.status}  "
+                    f"winner={result.selected_message_id and result.selected_message_id[:8] or 'none'}  "
+                    f"score={result.score:.1f}"
+                )
+
                 if result.selected_message_id:
                     winner_text = turn.host_text if result.selected_agent_id == self._host.id else turn.cohost_text
                     winner_name = self._host.name if result.selected_agent_id == self._host.id else self._cohost.name
-                    
-                    logger.info("Triggering audio synthesis...")
-                    duration_ms = self._bridge.play_audio(
-                        room_id=self._room_id,
-                        message_id=result.selected_message_id,
-                        text=winner_text,
-                        agent_id=result.selected_agent_id,
-                        api_key=self._host.api_key,
-                        agent_name=winner_name
+
+                    logger.info(
+                        f"  → Winner: {winner_name} | "
+                        f"text[:{min(80, len(winner_text))}]: {winner_text[:80]!r}"
                     )
-                    
+                    logger.info("  → Triggering TTS synthesis + Socket.IO broadcast...")
+                    try:
+                        duration_ms = self._bridge.play_audio(
+                            room_id=self._room_id,
+                            message_id=result.selected_message_id,
+                            text=winner_text,
+                            agent_id=result.selected_agent_id,
+                            api_key=self._host.api_key,
+                            agent_name=winner_name,
+                        )
+                        if duration_ms > 0:
+                            logger.info(f"  → TTS OK — durationMs={duration_ms} ({duration_ms/1000:.1f}s)")
+                        else:
+                            logger.warning(
+                                "  → TTS returned durationMs=0 — provider may be disabled or no API key set. "
+                                "Check ELEVENLABS_API_KEY / GOOGLE_TTS_API_KEY on the backend."
+                            )
+                    except Exception as tts_exc:
+                        logger.error(f"  → play_audio failed: {tts_exc}")
+                        duration_ms = 0
+
                     # Sleep dynamically based on speech duration + 1.5s natural pause
                     sleep_time = max(1.5, (duration_ms / 1000.0) + 1.5)
-                    logger.info(f"Sleeping {sleep_time:.2f}s for audio playback + padding...")
+                    logger.info(f"  → Sleeping {sleep_time:.2f}s for audio playback + padding...")
                     time.sleep(sleep_time)
                 else:
-                    logger.warning("No message selected, turning over quickly")
+                    logger.warning(
+                        f"  → No message selected (status={result.status!r}). "
+                        "Possible causes: messages not stored as 'candidate', orchestrator state error."
+                    )
                     time.sleep(self._turn_interval)
 
                 self._turn_count += 1
@@ -300,7 +324,7 @@ class RadioRunner:
                 self._commit_headlines = lambda: None  # prevent double-commit
 
                 logger.info(
-                    f"  Turn {self._turn_count} result: "
+                    f"  Turn {self._turn_count} complete: "
                     f"status={result.status}  score={result.score:.1f}  "
                     f"topic=\"{turn.topic[:40]}\""
                 )
