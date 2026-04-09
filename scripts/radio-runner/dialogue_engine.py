@@ -26,6 +26,36 @@ logger = logging.getLogger(__name__)
 # Model to use for dialogue
 DIALOGUE_MODEL: str = os.environ.get("DIALOGUE_MODEL", "")
 
+# Generic dynamic provider env vars (preferred)
+LLM_PROVIDER: str = os.environ.get("LLM_PROVIDER", "").lower()
+LLM_API_KEY: str = os.environ.get("LLM_API_KEY", "")
+LLM_MODEL: str = os.environ.get("LLM_MODEL", "")
+
+# Provider base URLs for OpenAI-compatible endpoints
+_PROVIDER_BASE_URLS: dict = {
+    "nvidia": "https://integrate.api.nvidia.com/v1/chat/completions",
+    "openai": "https://api.openai.com/v1/chat/completions",
+    "openrouter": "https://openrouter.ai/api/v1/chat/completions",
+    "groq": "https://api.groq.com/openai/v1/chat/completions",
+    "together": "https://api.together.xyz/v1/chat/completions",
+    "mistral": "https://api.mistral.ai/v1/chat/completions",
+    "deepseek": "https://api.deepseek.com/v1/chat/completions",
+    "gemini": "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+}
+
+# Default models per provider when LLM_MODEL is not set
+_PROVIDER_DEFAULT_MODELS: dict = {
+    "anthropic": "claude-haiku-4-5-20251001",
+    "nvidia": "meta/llama-3.3-70b-instruct",
+    "openai": "gpt-4o-mini",
+    "openrouter": "openai/gpt-4o-mini",
+    "groq": "llama-3.3-70b-versatile",
+    "together": "meta-llama/Llama-3-70b-chat-hf",
+    "mistral": "mistral-small-latest",
+    "deepseek": "deepseek-chat",
+    "gemini": "gemini-2.0-flash",
+}
+
 
 @dataclass
 class DialogueTurn:
@@ -37,170 +67,194 @@ class DialogueTurn:
 
 # ── LLM Provider Resolution ─────────────────────────────────────────────────
 
-def _resolve_provider() -> Any:
-    """Resolve the LLM provider using the same adapter as the orchestrator."""
-    try:
-        from orchestrator.src.services.llm_provider import get_provider
-        return get_provider()
-    except (ImportError, ModuleNotFoundError):
-        pass
+def _build_openai_compat_provider(provider_name: str, api_key: str, base_url: str) -> Any:
+    """Build an OpenAI-compatible provider client (works for NVIDIA, OpenAI, OpenRouter, etc.)."""
+    class OpenAICompatProvider:
+        def __init__(self, name: str, key: str, url: str):
+            self.name = name
+            self.key = key
+            self.url = url
+            self.client = httpx.Client(timeout=120.0)
 
-    # Fallback search for orchestrator
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    # Try current dir (Docker/Railway flatten contents)
-    project_root = script_dir
-    # Try one level up (local dev)
-    parent_dir = os.path.abspath(os.path.join(script_dir, ".."))
-    # Try two levels up (standard layout)
-    grandparent_dir = os.path.abspath(os.path.join(script_dir, "..", ".."))
-    
-    potential_roots = [project_root, parent_dir, grandparent_dir]
-    for root in potential_roots:
-        if root not in sys.path:
-            sys.path.insert(0, root)
-        
-        # Try adding orchestrator dir itself to path to allow 'from src...'
-        orch_dir = os.path.join(root, "orchestrator")
-        if os.path.exists(orch_dir) and orch_dir not in sys.path:
-            sys.path.insert(0, orch_dir)
-
-    try:
-        # Try both package-prefixed and standalone imports
-        try:
-            from orchestrator.src.services.llm_provider import get_provider
-        except (ImportError, ModuleNotFoundError):
-            from src.services.llm_provider import get_provider
-            
-        return get_provider()
-    except (ImportError, ModuleNotFoundError):
-        pass
-
-    logger.warning(
-        "Could not resolve orchestrator LLM provider via import. "
-        "Falling back to standalone HTTP Anthropic provider."
-    )
-    
-    # Standalone fallback using exactly what we have (httpx)
-    # Check for NVIDIA NIM first as it's the primary for this deployment
-    nvidia_key = os.getenv("NVIDIA_API_KEY")
-    anthropic_key = os.getenv("ANTHROPIC_API_KEY")
-    
-    if nvidia_key:
-        logger.info("Using standalone NVIDIA NIM fallback")
-        class StandaloneNvidia:
-            def __init__(self, key: str):
-                self.key = key
-                self.client = httpx.Client(timeout=120.0)
-
-            def _chat_completion_with_retry(
-                self, url: str, headers: dict, payload: dict, max_retries: int = 3
-            ) -> httpx.Response:
-                last_exc: Optional[Exception] = None
-                for attempt in range(max_retries):
-                    resp = self.client.post(url, headers=headers, json=payload)
-                    if resp.status_code == 429:
-                        wait = min(2 ** (attempt + 1), 30)
-                        retry_after = resp.headers.get("Retry-After")
-                        if retry_after:
-                            try:
-                                wait = int(retry_after)
-                            except ValueError:
-                                pass
-                        logger.warning(
-                            f"NVIDIA NIM rate limited (429), retrying in {wait}s "
-                            f"(attempt {attempt + 1}/{max_retries})"
-                        )
-                        time.sleep(wait)
-                        last_exc = httpx.HTTPStatusError(
-                            "429 Too Many Requests", request=resp.request, response=resp
-                        )
-                        continue
-                    resp.raise_for_status()
-                    return resp
-                raise last_exc or RuntimeError("All retries exhausted on 429")
-
-            def messages_create(self, model: str, max_tokens: int, system: str, messages: list):
-                logger.debug("Standalone NVIDIA NIM call")
-                resp = self._chat_completion_with_retry(
-                    "https://integrate.api.nvidia.com/v1/chat/completions",
+        def _post_with_retry(self, payload: dict, max_retries: int = 3) -> httpx.Response:
+            last_exc: Optional[Exception] = None
+            for attempt in range(max_retries):
+                resp = self.client.post(
+                    self.url,
                     headers={"Authorization": f"Bearer {self.key}", "Content-Type": "application/json"},
-                    payload={
-                        "model": model or "meta/llama-3.1-405b-instruct",
-                        "messages": [{"role": "system", "content": system}] + messages,
-                        "max_tokens": max_tokens,
-                        "temperature": 0.7,
-                    }
+                    json=payload,
                 )
-                data = resp.json()
-                TextObj = namedtuple("TextObj", ["text"])
-                ContentObj = namedtuple("ContentObj", ["content"])
-                return ContentObj(content=[TextObj(text=data["choices"][0]["message"]["content"])])
-        return StandaloneNvidia(nvidia_key)
+                if resp.status_code == 429:
+                    wait = min(2 ** (attempt + 1), 30)
+                    try:
+                        wait = int(resp.headers.get("Retry-After", wait))
+                    except ValueError:
+                        pass
+                    logger.warning(
+                        f"[{self.name}] Rate limited (429), retrying in {wait}s "
+                        f"(attempt {attempt + 1}/{max_retries})"
+                    )
+                    time.sleep(wait)
+                    last_exc = httpx.HTTPStatusError(
+                        "429 Too Many Requests", request=resp.request, response=resp
+                    )
+                    continue
+                resp.raise_for_status()
+                return resp
+            raise last_exc or RuntimeError("All retries exhausted")
 
-    if not anthropic_key:
-        logger.error("No LLM API keys found for standalone provider fallback!")
-        return None
-        
-    class StandaloneAnthropic:
+        def messages_create(self, model: str, max_tokens: int, system: str, messages: list):
+            logger.debug(f"[{self.name}] chat/completions call — model={model}")
+            resp = self._post_with_retry({
+                "model": model,
+                "messages": [{"role": "system", "content": system}] + messages,
+                "max_tokens": max_tokens,
+                "temperature": 0.7,
+            })
+            data = resp.json()
+            TextObj = namedtuple("TextObj", ["text"])
+            ContentObj = namedtuple("ContentObj", ["content"])
+            return ContentObj(content=[TextObj(text=data["choices"][0]["message"]["content"])])
+
+    return OpenAICompatProvider(provider_name, api_key, base_url)
+
+
+def _build_anthropic_provider(api_key: str) -> Any:
+    """Build an Anthropic-native provider client."""
+    class AnthropicProvider:
         def __init__(self, key: str):
             self.key = key
-            self.client = httpx.Client(timeout=30.0)
-            
+            self.client = httpx.Client(timeout=60.0)
+
         def messages_create(self, model: str, max_tokens: int, system: str, messages: list):
+            logger.debug(f"[anthropic] messages call — model={model}")
             resp = self.client.post(
                 "https://api.anthropic.com/v1/messages",
                 headers={
                     "x-api-key": self.key,
                     "anthropic-version": "2023-06-01",
-                    "content-type": "application/json"
+                    "content-type": "application/json",
                 },
                 json={
                     "model": model,
                     "max_tokens": max_tokens,
                     "system": system,
-                    "messages": messages
-                }
+                    "messages": messages,
+                },
             )
             resp.raise_for_status()
             data = resp.json()
-            
-            # Mock the exact object structure expected by agent.py `resp.content[0].text`
+
             class MockText:
-                def __init__(self, text):
-                    self.text = text
+                def __init__(self, text): self.text = text
             class MockResponse:
-                def __init__(self, content):
-                    self.content = [MockText(content)]
-            
+                def __init__(self, content): self.content = [MockText(content)]
+
             return MockResponse(data["content"][0]["text"])
 
-    return StandaloneAnthropic(anthropic_key)
+    return AnthropicProvider(api_key)
+
+
+def _resolve_provider() -> Any:
+    """
+    Resolve the LLM provider.
+
+    Priority order:
+    1. Orchestrator import (when running inside the monorepo)
+    2. Generic env vars: LLM_PROVIDER + LLM_API_KEY
+    3. Legacy env vars: ANTHROPIC_API_KEY, NVIDIA_API_KEY (backwards compat)
+    """
+    # 1. Try orchestrator import
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    parent_dir = os.path.abspath(os.path.join(script_dir, ".."))
+    grandparent_dir = os.path.abspath(os.path.join(script_dir, "..", ".."))
+
+    for root in [script_dir, parent_dir, grandparent_dir]:
+        if root not in sys.path:
+            sys.path.insert(0, root)
+        orch_dir = os.path.join(root, "orchestrator")
+        if os.path.exists(orch_dir) and orch_dir not in sys.path:
+            sys.path.insert(0, orch_dir)
+
+    for import_path in (
+        "orchestrator.src.services.llm_provider",
+        "src.services.llm_provider",
+    ):
+        try:
+            module = __import__(import_path, fromlist=["get_provider"])
+            provider = module.get_provider()
+            logger.info(f"LLM provider resolved via orchestrator import ({import_path})")
+            return provider
+        except (ImportError, ModuleNotFoundError, Exception):
+            pass
+
+    # 2. Generic env vars — LLM_PROVIDER + LLM_API_KEY
+    if LLM_PROVIDER and LLM_API_KEY:
+        if LLM_PROVIDER == "anthropic":
+            logger.info("Using Anthropic provider (LLM_PROVIDER=anthropic)")
+            return _build_anthropic_provider(LLM_API_KEY)
+
+        base_url = _PROVIDER_BASE_URLS.get(LLM_PROVIDER)
+        if not base_url:
+            # Unknown provider — attempt OpenAI-compatible with a custom base URL
+            # Allow LLM_BASE_URL env var as escape hatch
+            base_url = os.getenv("LLM_BASE_URL", "")
+            if not base_url:
+                logger.error(
+                    f"Unknown LLM_PROVIDER '{LLM_PROVIDER}' and no LLM_BASE_URL set. "
+                    "Cannot build provider."
+                )
+                return None
+
+        logger.info(f"Using {LLM_PROVIDER} provider via LLM_PROVIDER env var")
+        return _build_openai_compat_provider(LLM_PROVIDER, LLM_API_KEY, base_url)
+
+    # 3. Legacy env var fallbacks
+    anthropic_key = os.getenv("ANTHROPIC_API_KEY")
+    nvidia_key = os.getenv("NVIDIA_API_KEY")
+
+    if anthropic_key:
+        logger.info("Using Anthropic provider (legacy ANTHROPIC_API_KEY)")
+        return _build_anthropic_provider(anthropic_key)
+
+    if nvidia_key:
+        logger.info("Using NVIDIA NIM provider (legacy NVIDIA_API_KEY)")
+        return _build_openai_compat_provider(
+            "nvidia", nvidia_key, _PROVIDER_BASE_URLS["nvidia"]
+        )
+
+    logger.error("No LLM provider configured. Set LLM_PROVIDER + LLM_API_KEY env vars.")
+    return None
 
 
 def _resolve_model(provider: Any) -> str:
-    """Pick the model name for dialogue generation."""
+    """
+    Pick the model name for dialogue generation.
+
+    Priority order:
+    1. DIALOGUE_MODEL env var (explicit override, legacy)
+    2. LLM_MODEL env var (generic)
+    3. Provider-specific default
+    """
     if DIALOGUE_MODEL:
         return DIALOGUE_MODEL
-        
-    # Check for NVIDIA key to provide better default
-    if os.getenv("NVIDIA_API_KEY"):
-        return "meta/llama-3.3-70b-instruct"
-        
-    try:
-        from orchestrator.src.config.settings import settings as orch_settings
-        # Use SCORING_MODEL (capable) not MODERATION_MODEL (cheap content filter)
-        return orch_settings.SCORING_MODEL
-    except (ImportError, ModuleNotFoundError, AttributeError):
-        pass
-    
-    # Check for src.config.settings if standalone
-    try:
-        from src.config.settings import settings as orch_settings
-        return orch_settings.SCORING_MODEL
-    except (ImportError, ModuleNotFoundError, AttributeError):
-        pass
 
-    return "claude-haiku-4-5-20251001"
+    if LLM_MODEL:
+        return LLM_MODEL
+
+    # Provider-specific defaults
+    if LLM_PROVIDER and LLM_PROVIDER in _PROVIDER_DEFAULT_MODELS:
+        return _PROVIDER_DEFAULT_MODELS[LLM_PROVIDER]
+
+    # Legacy fallbacks
+    if os.getenv("ANTHROPIC_API_KEY") and not os.getenv("LLM_PROVIDER"):
+        return _PROVIDER_DEFAULT_MODELS["anthropic"]
+
+    if os.getenv("NVIDIA_API_KEY") and not os.getenv("LLM_PROVIDER"):
+        return _PROVIDER_DEFAULT_MODELS["nvidia"]
+
+    # Last resort
+    return _PROVIDER_DEFAULT_MODELS["anthropic"]
 
 
 # ── DialogueEngine (Agent Orchestrator) ──────────────────────────────────────
