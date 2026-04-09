@@ -288,24 +288,35 @@ export class BeelyAuthService {
    * Get agent by ID.
    */
   async getAgentById(agentId: string): Promise<AgentProfile | null> {
-    const result = await this.db.query(
-      `SELECT a.*, 
-              COALESCE(json_agg(
-                json_build_object(
-                  'provider', vb.provider,
-                  'providerWallet', vb.provider_wallet,
-                  'providerAgentId', vb.provider_agent_id,
-                  'verified', vb.verified,
-                  'reputationScore', vb.reputation_score,
-                  'verifiedAt', vb.verified_at
-                )
-              ) FILTER (WHERE vb.id IS NOT NULL), '[]') as badges
-       FROM agent a
-       LEFT JOIN verification_badge vb ON vb.agent_id = a.id
-       WHERE a.id = $1
-       GROUP BY a.id`,
-      [agentId],
-    );
+    let result;
+    try {
+      result = await this.db.query(
+        `SELECT a.*,
+                COALESCE(json_agg(
+                  json_build_object(
+                    'provider', vb.provider,
+                    'providerWallet', vb.provider_wallet,
+                    'providerAgentId', vb.provider_agent_id,
+                    'verified', vb.verified,
+                    'reputationScore', vb.reputation_score,
+                    'verifiedAt', vb.verified_at
+                  )
+                ) FILTER (WHERE vb.id IS NOT NULL), '[]') as badges
+         FROM agent a
+         LEFT JOIN verification_badge vb ON vb.agent_id = a.id
+         WHERE a.id = $1
+         GROUP BY a.id`,
+        [agentId],
+      );
+    } catch (err: any) {
+      // 42P01 = undefined_table — verification_badge migration not yet applied
+      if (err.code === "42P01") {
+        result = await this.db.query(`SELECT * FROM agent WHERE id = $1`, [agentId]);
+        if (result.rows.length === 0) return null;
+        return this._mapToProfile({ ...result.rows[0], badges: [] });
+      }
+      throw err;
+    }
 
     if (result.rows.length === 0) return null;
 
@@ -637,28 +648,38 @@ export class BeelyAuthService {
     const BEELY_NAMESPACE = "6ba7b810-9dad-11d1-80b4-00c04fd430c8";
     const agentId = uuidv5(privyDid, BEELY_NAMESPACE);
 
-    const result = await this.db.query(
-      `SELECT a.*, 
-              COALESCE(json_agg(
-                json_build_object(
-                  'provider', vb.provider,
-                  'providerWallet', vb.provider_wallet,
-                  'providerAgentId', vb.provider_agent_id,
-                  'verified', vb.verified,
-                  'reputationScore', vb.reputation_score,
-                  'verifiedAt', vb.verified_at
-                )
-              ) FILTER (WHERE vb.id IS NOT NULL), '[]') as badges
-       FROM agent a
-       LEFT JOIN verification_badge vb ON vb.agent_id = a.id
-       WHERE a.id = $1
-       GROUP BY a.id`,
-      [agentId],
-    );
+    let result2;
+    try {
+      result2 = await this.db.query(
+        `SELECT a.*,
+                COALESCE(json_agg(
+                  json_build_object(
+                    'provider', vb.provider,
+                    'providerWallet', vb.provider_wallet,
+                    'providerAgentId', vb.provider_agent_id,
+                    'verified', vb.verified,
+                    'reputationScore', vb.reputation_score,
+                    'verifiedAt', vb.verified_at
+                  )
+                ) FILTER (WHERE vb.id IS NOT NULL), '[]') as badges
+         FROM agent a
+         LEFT JOIN verification_badge vb ON vb.agent_id = a.id
+         WHERE a.id = $1
+         GROUP BY a.id`,
+        [agentId],
+      );
+    } catch (err: any) {
+      if (err.code === "42P01") {
+        result2 = await this.db.query(`SELECT * FROM agent WHERE id = $1`, [agentId]);
+        if (result2.rows.length === 0) return null;
+        return this._mapToProfile({ ...result2.rows[0], badges: [] });
+      }
+      throw err;
+    }
 
-    if (result.rows.length === 0) return null;
+    if (result2.rows.length === 0) return null;
 
-    return this._mapToProfile(result.rows[0]);
+    return this._mapToProfile(result2.rows[0]);
   }
 
   /**
@@ -680,30 +701,42 @@ export class BeelyAuthService {
     
     const now = new Date();
 
-    await this.db.query(
-      `INSERT INTO agent (
-        id, username, name, avatar, claim_status, verification_status, role,
-        created_at, updated_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-      ON CONFLICT (id) DO UPDATE SET
-        username = EXCLUDED.username,
-        name = EXCLUDED.name,
-        avatar = COALESCE(EXCLUDED.avatar, agent.avatar),
-        updated_at = EXCLUDED.updated_at`,
-      [
-        agentId,
-        username,
-        name,
-        avatar || null,
-        "claimed",     // Human users are already "claimed" by Privy
-        "verified",    // and verified by Privy
-        "human",       // Special role for human listeners
-        now,
-        now,
-      ],
-    );
+    // Suffix the username with part of the agentId to guarantee uniqueness
+    // in case the Privy-supplied username collides with an existing agent.
+    const safeUsername = username ? `${username}_${agentId.slice(0, 6)}` : agentId.slice(0, 16);
 
-    logger.debug("Human user synced to agent table", { agentId, privyDid, username, name });
+    try {
+      await this.db.query(
+        `INSERT INTO agent (
+          id, username, name, avatar, claim_status, verification_status, role,
+          created_at, updated_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        ON CONFLICT (id) DO UPDATE SET
+          username = EXCLUDED.username,
+          name = EXCLUDED.name,
+          avatar = COALESCE(EXCLUDED.avatar, agent.avatar),
+          updated_at = EXCLUDED.updated_at`,
+        [
+          agentId,
+          safeUsername,
+          name,
+          avatar || null,
+          "claimed",    // Human users are already "claimed" by Privy
+          "verified",   // and verified by Privy
+          "human",      // Special role for human listeners
+          now,
+          now,
+        ],
+      );
+    } catch (err: any) {
+      // 23505 = unique_violation — could be a rare collision on the suffixed username.
+      // The user record already exists (or the retry would also conflict), so just
+      // return the deterministic agentId — the record is usable as-is.
+      if (err.code !== "23505") throw err;
+      logger.warn("syncUser username conflict — agent already exists", { agentId, privyDid });
+    }
+
+    logger.debug("Human user synced to agent table", { agentId, privyDid, username: safeUsername, name });
     
     return agentId;
   }

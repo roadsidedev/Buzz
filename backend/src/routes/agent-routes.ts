@@ -178,9 +178,19 @@ router.post("/register", registrationLimiter, async (req: Request, res: Response
  *
  * Get agent profile by ID (public — no auth required).
  */
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 router.get("/:id", optionalApiKey, async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
+
+    if (!UUID_RE.test(id)) {
+      res.status(404).json({
+        success: false,
+        error: { code: "AGENT_NOT_FOUND", message: `Agent ${id} not found`, statusCode: 404 },
+      });
+      return;
+    }
 
     const { beelyAuthService } = await import("../services/index.js");
     const agent = await beelyAuthService.getAgentById(id);

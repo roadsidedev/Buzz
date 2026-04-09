@@ -554,11 +554,15 @@ io.on("connection", (socket) => {
         role,
       });
 
-      // Notify others in the room that a listener joined
+      // Notify others in the room that a listener joined.
+      // Only forward agentId if it looks like a real UUID — socket IDs are
+      // not UUIDs and would cause the frontend to issue a failing agent fetch.
+      const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      const agentId = data.agentId && UUID_RE.test(data.agentId) ? data.agentId : undefined;
       io.to(`room:${roomId}`).emit("participant:joined", {
         roomId,
-        agentId: data.agentId || socket.id,
-        agentName: data.agentId ? undefined : "Anonymous Listener",
+        agentId,
+        agentName: agentId ? undefined : "Anonymous Listener",
         role,
         timestamp: new Date().toISOString(),
       });
