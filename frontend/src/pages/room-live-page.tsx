@@ -225,6 +225,9 @@ export function RoomLivePage() {
   // Local sound-mute state — starts UNMUTED for radio rooms so listeners
   // hear audio immediately without needing a click to unlock.
   const [soundMuted, setSoundMuted] = useState(false)
+  // Set to true when the browser's autoplay policy blocks audio playback.
+  // Cleared on first user interaction via the unlock handler.
+  const [audioBlocked, setAudioBlocked] = useState(false)
   const [isRecording, setIsRecording] = useState(false)
   const [recordingUploading, setRecordingUploading] = useState(false)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
@@ -269,33 +272,6 @@ export function RoomLivePage() {
     }
   }, [soundMuted])
 
-  // ── Initialize WebRTCAudioBridge when Jam room connects ─────────────────────
-  useEffect(() => {
-    if (jamRoom.inRoom && streamId && !audioBridgeRef.current) {
-      const sfuUrl = import.meta.env.VITE_SFU_URL || 'http://localhost:30002';
-      console.log('[AudioBridge] Initializing with SFU URL:', sfuUrl);
-      import('@/services/webrtc-audio-bridge').then(({ WebRTCAudioBridge }) => {
-        audioBridgeRef.current = new WebRTCAudioBridge({
-          sfuUrl,
-          roomId: streamId,
-          agentId: 'tts-bridge',
-        })
-        audioBridgeRef.current.connect().then(() => {
-          console.log('[AudioBridge] Connected to SFU successfully')
-        }).catch((err: Error) => {
-          console.error('[AudioBridge] Failed to connect to SFU:', err)
-          // AudioBridge connection failure is non-fatal — HTML5 fallback still works
-        })
-      })
-    }
-    return () => {
-      if (audioBridgeRef.current) {
-        audioBridgeRef.current.disconnect?.()
-        audioBridgeRef.current = null
-      }
-    }
-  }, [jamRoom.inRoom, streamId])
-
   // ── Live score updates ───────────────────────────────────────────────────────
   useEffect(() => {
     const unsubscribe = wsService.onMessageSelected((data) => {
@@ -306,67 +282,50 @@ export function RoomLivePage() {
     return unsubscribe
   }, [streamId])
 
-  // ── TTS Audio Playback via WebRTCAudioBridge ─────────────────────────────────
-  const audioBridgeRef = useRef<any>(null)
-
+  // ── TTS Audio Playback ───────────────────────────────────────────────────────
+  // Every listener receives the tts:audio Socket.IO event directly, so each
+  // client plays it locally via HTML5 Audio. No SFU/WebRTC injection needed —
+  // that architecture requires a browser to act as producer for others, which
+  // breaks for a 24/7 radio show with no guaranteed browser tab open.
   useEffect(() => {
-    const handleTtsAudio = async (data: any) => {
+    const handleTtsAudio = (data: any) => {
       if (data.roomId !== streamId) return
 
-      console.log('[TTS] Received audio event:', { 
-        provider: data.provider, 
+      console.log('[TTS] Received audio event:', {
+        provider: data.provider,
         hasAudioBase64: !!data.audioBase64,
         hasAudioUrl: !!data.audioUrl,
-        durationMs: data.durationMs 
+        durationMs: data.durationMs,
       })
 
+      const player = audioPlayerRef.current
+      if (!player) return
+
+      // Revoke previous blob URL to avoid memory leaks
+      if (player.src?.startsWith('blob:')) URL.revokeObjectURL(player.src)
+
       if (data.audioBase64) {
-        try {
-          const binaryString = atob(data.audioBase64)
-          const bytes = new Uint8Array(binaryString.length)
-          for (let i = 0; i < binaryString.length; i++) {
-            bytes[i] = binaryString.charCodeAt(i)
-          }
-          const audioBuffer = bytes.buffer
-
-          // Primary path: inject via WebRTCAudioBridge so all SFU peers hear it
-          if (audioBridgeRef.current?.isReady()) {
-            console.log('[TTS] Injecting audio via WebRTCAudioBridge (SFU path)')
-            await audioBridgeRef.current.streamAudio(audioBuffer, data.messageId)
-            return
-          }
-
-          // Fallback: HTML5 Audio for local playback only
-          console.log('[TTS] WebRTCAudioBridge not ready, using HTML5 Audio fallback')
-          const blob = new Blob([audioBuffer], { type: 'audio/mpeg' })
-          const blobUrl = URL.createObjectURL(blob)
-          if (audioPlayerRef.current) {
-            audioPlayerRef.current.src = blobUrl
-            audioPlayerRef.current.onended = () => URL.revokeObjectURL(blobUrl)
-            // On mobile browsers, play() must be triggered by user gesture.
-            // The unlock handler (below) pre-warms the audio context.
-            const playPromise = audioPlayerRef.current.play()
-            if (playPromise) playPromise.catch(e => console.warn('[TTS] Audio play blocked:', e))
-          }
-        } catch (err) {
-          console.error('[TTS] Failed to inject audio:', err)
-          if (data.audioUrl && audioPlayerRef.current) {
-            audioPlayerRef.current.src = data.audioUrl
-            const playPromise = audioPlayerRef.current.play()
-            if (playPromise) playPromise.catch(e => console.warn('[TTS] Audio play blocked:', e))
-          }
+        const bytes = Uint8Array.from(atob(data.audioBase64), c => c.charCodeAt(0))
+        const blob = new Blob([bytes.buffer], { type: 'audio/mpeg' })
+        player.src = URL.createObjectURL(blob)
+        player.onended = () => {
+          if (player.src?.startsWith('blob:')) URL.revokeObjectURL(player.src)
         }
       } else if (data.audioUrl) {
-        if (audioPlayerRef.current) {
-          audioPlayerRef.current.src = data.audioUrl
-          const playPromise = audioPlayerRef.current.play()
-          if (playPromise) playPromise.catch(e => console.warn('[TTS] Audio play blocked:', e))
-        }
+        player.src = data.audioUrl
+      } else {
+        return
       }
+
+      player.muted = soundMuted
+      player.play().catch(err => {
+        console.warn('[TTS] Autoplay blocked by browser:', err.message)
+        setAudioBlocked(true)
+      })
     }
     wsService.on('tts:audio', handleTtsAudio)
     return () => wsService.off('tts:audio', handleTtsAudio)
-  }, [streamId])
+  }, [streamId, soundMuted])
 
   // ── Fallback: Play audio from turn:completed events (URL-only, no base64) ────
   useEffect(() => {
@@ -532,14 +491,27 @@ export function RoomLivePage() {
   // ── Unlock audio context on first user interaction ──────────────────────────
   // Mobile browsers (especially iOS Safari) require a user gesture before any
   // audio can play. This unlocks both the HTML5 <audio> element AND the
-  // AudioContext used by playBeep() and WebRTCAudioBridge.
+  // AudioContext used by playBeep().
   useEffect(() => {
+    // A minimal valid WAV file (44 bytes of silence) used to pre-warm the audio
+    // element. Calling play() with no src always rejects, so we use this instead.
+    const SILENT_WAV = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA='
     const unlock = () => {
-      // Unlock HTML5 <audio> element
+      setAudioBlocked(false)
       if (audioPlayerRef.current) {
-        audioPlayerRef.current.play().then(() => audioPlayerRef.current?.pause()).catch(() => {})
+        const player = audioPlayerRef.current
+        // If there's a real src already (e.g. a blocked turn), try resuming it
+        if (player.src && !player.src.startsWith('data:') && player.src !== window.location.href) {
+          player.play().catch(() => {})
+        } else {
+          // Pre-warm with silent WAV so the browser marks audio as user-unlocked
+          player.src = SILENT_WAV
+          player.play()
+            .then(() => { player.pause(); player.src = '' })
+            .catch(() => {})
+        }
       }
-      // Unlock AudioContext (used by playBeep and WebRTCAudioBridge on iOS Safari)
+      // Unlock AudioContext (used by playBeep on iOS Safari)
       try {
         const AudioCtx = window.AudioContext || (window as any).webkitAudioContext
         const ctx = new AudioCtx()
@@ -897,6 +869,27 @@ export function RoomLivePage() {
               </button>
             )}
 
+            {/* ── Autoplay-blocked banner — shown when browser blocks audio until user gesture ── */}
+            {audioBlocked && !soundMuted && (
+              <button
+                type="button"
+                onClick={() => {
+                  const player = audioPlayerRef.current
+                  if (player) {
+                    player.play()
+                      .then(() => setAudioBlocked(false))
+                      .catch(() => setAudioBlocked(false))
+                  } else {
+                    setAudioBlocked(false)
+                  }
+                }}
+                className="relative z-20 flex items-center gap-3 w-full max-w-xs mx-auto mb-6 px-5 py-3 rounded-2xl bg-violet-500/15 border border-violet-500/30 text-violet-300 hover:bg-violet-500/25 transition-all duration-200 group"
+              >
+                <Volume2 size={18} className="shrink-0 animate-pulse" />
+                <span className="text-sm font-bold">Tap to hear the show</span>
+              </button>
+            )}
+
             {jamRoom.isLoading ? (
               <div className="flex flex-col items-center gap-3 py-16">
                 <BeeSpinner variant="primary" size="md" />
@@ -1171,6 +1164,27 @@ export function RoomLivePage() {
           <VolumeX size={16} className="shrink-0" />
           <span className="text-sm font-bold">Tap to hear the room</span>
           <Volume2 size={14} className="ml-auto opacity-60" />
+        </button>
+      )}
+
+      {/* ── Autoplay-blocked banner (mobile) ── */}
+      {audioBlocked && !soundMuted && (
+        <button
+          type="button"
+          onClick={() => {
+            const player = audioPlayerRef.current
+            if (player) {
+              player.play()
+                .then(() => setAudioBlocked(false))
+                .catch(() => setAudioBlocked(false))
+            } else {
+              setAudioBlocked(false)
+            }
+          }}
+          className="mx-5 mb-4 flex items-center gap-3 w-full px-4 py-3 rounded-xl bg-violet-500/15 border border-violet-500/30 text-violet-600 dark:text-violet-300 hover:bg-violet-500/25 transition-all duration-200"
+        >
+          <Volume2 size={16} className="shrink-0 animate-pulse" />
+          <span className="text-sm font-bold">Tap to hear the show</span>
         </button>
       )}
 
