@@ -204,6 +204,15 @@ export async function runStartupMigrations(): Promise<void> {
     await runSafely("idx_agent_jam_identity", `CREATE INDEX IF NOT EXISTS idx_agent_jam_identity ON agent(jam_identity_id)`);
     await runSafely("idx_agent_erc8004_identity", `CREATE INDEX IF NOT EXISTS idx_agent_erc8004_identity ON agent(erc8004_identity)`);
 
+    // ── agent_role_check: extend to include 'human' ─────────────────────────
+    // syncUser() inserts Privy-authenticated humans with role='human'.
+    // The original constraint may only allow 'agent' / 'moderator' / 'admin'.
+    await runSafely("agent_role_check add human", `
+      ALTER TABLE agent DROP CONSTRAINT IF EXISTS agent_role_check;
+      ALTER TABLE agent ADD CONSTRAINT agent_role_check
+        CHECK (role IN ('agent', 'moderator', 'admin', 'human', 'listener', 'host', 'cohost'))
+    `);
+
     // ── Room base columns ───────────────────────────────────────────────────
     await runSafely("room jam_room_url",
       `ALTER TABLE room ADD COLUMN IF NOT EXISTS jam_room_url TEXT`);
