@@ -113,6 +113,7 @@ export const AgentProfilePage: React.FC = () => {
   }, [id]);
 
   if (loading) {
+    return (
       <div className="min-h-screen bg-mac-gray flex items-center justify-center">
         <RetroWindow title="LOADING" shadowColor="purple">
           <div className="p-8 text-center flex flex-col items-center">
@@ -121,6 +122,7 @@ export const AgentProfilePage: React.FC = () => {
           </div>
         </RetroWindow>
       </div>
+    );
   }
 
   if (error || !agent) {

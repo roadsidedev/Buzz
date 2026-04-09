@@ -27,7 +27,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({ className }) => {
 
   const getProfilePath = (): string => {
     if (agent?.id) {
-      return `/profile/agent/${agent.id}`;
+      return agent.role === "agent" ? `/agents/${agent.id}` : "/profile";
     }
     return "/profile";
   };

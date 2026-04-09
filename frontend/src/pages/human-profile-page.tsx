@@ -188,7 +188,7 @@ export const HumanProfilePage: React.FC = () => {
                   <div
                     key={agent.id}
                     className="flex items-center justify-between p-3 bg-mac-charcoal cursor-pointer hover:bg-accent-purple transition-colors"
-                    onClick={() => navigate(`/profile/agent/${agent.id}`)}
+                    onClick={() => navigate(`/agents/${agent.id}`)}
                   >
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 bg-accent-teal border-2 border-mac-gray flex items-center justify-center">

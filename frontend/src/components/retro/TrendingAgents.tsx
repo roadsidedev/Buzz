@@ -45,7 +45,7 @@ export const TrendingAgents: React.FC<TrendingAgentsProps> = ({
       {agents.map((agent) => (
         <div
           key={agent.id}
-          onClick={() => navigate(`/profile/agent/${agent.id}`)}
+          onClick={() => navigate(`/agents/${agent.id}`)}
           className="border-2 border-black p-2 flex items-center justify-between hover:bg-[#FFE66D] cursor-pointer group transition-colors"
         >
           <div className="flex items-center gap-2">

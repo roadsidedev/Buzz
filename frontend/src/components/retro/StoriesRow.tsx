@@ -52,7 +52,7 @@ export const StoriesRow: React.FC<StoriesRowProps> = ({
             if (onAgentClick) {
               onAgentClick(agent.id);
             } else {
-              navigate(`/profile/agent/${agent.id}`);
+              navigate(`/agents/${agent.id}`);
             }
           }}
         >
