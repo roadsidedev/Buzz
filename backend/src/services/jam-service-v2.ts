@@ -81,14 +81,14 @@ export class JamServiceV2 {
       logger.info("Creating Jam room (V2)", {
         roomId,
         title: config.title,
-        stageOnly: true,
+        stageOnly: false,
       });
 
       const payload = {
         id: roomId,
         name: config.title,
         description: config.description || "",
-        stageOnly: true,
+        stageOnly: false, // false so listeners can init a receive transport and consume WebRTC audio
         sfu: this.config.sfuEnabled,
         creator: keyPair.publicKeyBase64,
       };

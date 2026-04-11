@@ -314,6 +314,13 @@ export function RoomLivePage() {
       } else if (data.audioUrl) {
         player.src = data.audioUrl
       } else {
+        // Both audioBase64 and audioUrl are null — TTS synthesis/upload failed
+        // on the backend. Not actionable by the user, but surface it for debugging.
+        console.warn('[TTS] Received tts:audio event with no audio data — backend TTS may be misconfigured', {
+          provider: data.provider,
+          messageId: data.messageId,
+          agentName: data.agentName,
+        })
         return
       }
 
@@ -345,6 +352,20 @@ export function RoomLivePage() {
     return () => wsService.off('turn:completed', handleTurnCompleted)
   }, [streamId])
 
+  // ── Room redirect (radio-runner room respawn) ────────────────────────────
+  // When the room-keeper creates a new room, the backend emits room:redirect
+  // to all clients in the old room. Navigate automatically so listeners are
+  // not stranded on a dead room URL with no audio.
+  useEffect(() => {
+    const handleRoomRedirect = (data: { newRoomId?: string }) => {
+      if (!data?.newRoomId) return
+      console.log('[Room] Redirecting to new room after respawn:', data.newRoomId)
+      navigate(`/room/${data.newRoomId}/live`, { replace: true })
+    }
+    wsService.on('room:redirect', handleRoomRedirect)
+    return () => wsService.off('room:redirect', handleRoomRedirect)
+  }, [navigate])
+
   // ── Soundboard: Play sounds triggered by host (remote listeners) ───────────
   useEffect(() => {
     const handleRemoteSoundboardPlay = async (data: any) => {
@@ -370,6 +391,27 @@ export function RoomLivePage() {
     wsService.on('soundboard:play', handleRemoteSoundboardPlay)
     return () => wsService.off('soundboard:play', handleRemoteSoundboardPlay)
   }, [streamId, soundMuted])
+
+  // ── Proactive autoplay pre-check ─────────────────────────────────────────
+  // Attempt a silent play immediately after the audio element mounts (stream
+  // loaded + live view rendered). This detects browser autoplay blocking
+  // BEFORE the first tts:audio event arrives, so the "Tap to hear the show"
+  // banner is visible from the start rather than only after audio is missed.
+  useEffect(() => {
+    if (!stream || streamLoading) return
+    const isReplayCheck = stream.status === 'completed' || stream.status === 'failed'
+    if (isReplayCheck) return // replay uses the native <audio controls> element
+    const player = audioPlayerRef.current
+    if (!player) return
+
+    player.play().catch((err: DOMException) => {
+      if (err.name === 'NotAllowedError') {
+        console.warn('[TTS] Autoplay blocked on page load — unlock banner shown')
+        setAudioBlocked(true)
+      }
+      // AbortError / other errors just mean there is no src yet — safe to ignore
+    })
+  }, [stream, streamLoading])
 
   // ── Fetch room ──────────────────────────────────────────────────────────────
   useEffect(() => {

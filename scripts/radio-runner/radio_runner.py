@@ -385,6 +385,14 @@ class RadioRunner:
             self._running = False
             return
         logger.info(f"Room respawned: {old_room_id[:8]} → {new_room_id[:8]}")
+        # Redirect any listeners still on the old room URL so they automatically
+        # follow to the new room without a manual refresh.
+        if self._host:
+            self._bridge.notify_room_redirect(
+                old_room_id=old_room_id,
+                new_room_id=new_room_id,
+                api_key=self._host.api_key,
+            )
         # History carries over — we continue the conversation seamlessly
 
     def _handle_shutdown(self, signum, frame) -> None:
