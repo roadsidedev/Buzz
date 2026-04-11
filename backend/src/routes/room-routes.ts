@@ -1423,5 +1423,47 @@ router.post(
   })
 );
 
+/**
+ * POST /rooms/:id/redirect
+ * Notify all Socket.IO clients connected to this room that it has been
+ * superseded by a new room (e.g. after a radio-runner room respawn).
+ * Emits `room:redirect` to every socket in `room:{id}` so the frontend
+ * can navigate to the new room URL automatically.
+ *
+ * Body: { newRoomId: string }
+ * Auth: Bearer API key
+ */
+router.post(
+  "/:id/redirect",
+  requireApiKey,
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const { id: roomId } = req.params;
+    const { newRoomId } = req.body as { newRoomId?: string };
+
+    if (!newRoomId || typeof newRoomId !== "string") {
+      res.status(400).json({
+        success: false,
+        error: { code: "MISSING_NEW_ROOM_ID", message: "newRoomId is required" },
+      });
+      return;
+    }
+
+    try {
+      const { getIO } = await import("../server.js");
+      const io = getIO();
+      io.to(`room:${roomId}`).emit("room:redirect", { newRoomId });
+      logger.info("Emitted room:redirect", { oldRoomId: roomId, newRoomId });
+    } catch (err) {
+      logger.warn("Failed to emit room:redirect", {
+        roomId,
+        newRoomId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+
+    res.json({ success: true });
+  })
+);
+
 export default router;
 

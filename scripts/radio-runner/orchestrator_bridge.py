@@ -655,6 +655,41 @@ class OrchestratorBridge:
             logger.warning("Room event emit failed", extra={"error": str(exc)})
             return False
 
+    def notify_room_redirect(
+        self,
+        old_room_id: str,
+        new_room_id: str,
+        api_key: str = "",
+    ) -> None:
+        """
+        Tell all Socket.IO clients connected to old_room_id to navigate
+        to new_room_id.  Called by radio-runner after a room respawn so
+        listeners are not stranded on the dead room's URL.
+
+        Non-fatal — failure is logged but does not stop the show.
+        """
+        try:
+            resp = self._backend.post(
+                f"/api/v1/rooms/{old_room_id}/redirect",
+                json={"newRoomId": new_room_id},
+                headers=self._auth_headers(api_key),
+            )
+            if resp.status_code < 300:
+                logger.info(
+                    "Room redirect notification sent",
+                    extra={"old": old_room_id[:8], "new": new_room_id[:8]},
+                )
+            else:
+                logger.warning(
+                    "Room redirect notification rejected",
+                    extra={"status": resp.status_code},
+                )
+        except Exception as exc:
+            logger.warning(
+                "Room redirect notify failed (non-fatal)",
+                extra={"error": str(exc)},
+            )
+
     # ── Internals ────────────────────────────────────────────────────────────
 
     def _auth_headers(self, api_key: str) -> dict[str, str]:
