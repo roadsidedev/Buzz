@@ -55,18 +55,17 @@ export function MainLayout({ children }: MainLayoutProps) {
     <div className="h-screen bg-background text-foreground flex overflow-hidden">
 
       {/* ── Desktop Sidebar ──────────────────────────────────────── */}
-      <aside className="hidden lg:flex flex-col w-56 border-r shrink-0 bg-background">
+      <aside className="hidden lg:flex flex-col w-64 border-r shrink-0 bg-background">
         {/* Logo */}
         <div
-          className="px-4 py-5 flex items-center gap-2 cursor-pointer select-none"
+          className="px-5 py-6 flex items-center gap-2 cursor-pointer select-none border-b border-border"
           onClick={() => handleNav("/rooms")}
         >
-          <img src="/.well-known/beely_logo_2.png" alt="Beely" className="h-7 w-7 rounded-lg" />
-          <span className="text-xl font-black tracking-widest text-outline-accent">Beely</span>
+          <span className="text-xl font-black tracking-widest text-primary">Beely</span>
         </div>
 
         {/* Nav items */}
-        <nav className="flex-1 px-2 py-2 space-y-1">
+        <nav className="flex-1 px-3 py-4 space-y-1">
           <SidebarNavLink
             icon={Home}
             label="Home"
@@ -87,14 +86,23 @@ export function MainLayout({ children }: MainLayoutProps) {
           />
         </nav>
 
-        {/* Sidebar bottom: search + actions + onboarding */}
-        <div className="p-3 border-t space-y-2.5">
-          <div className="relative">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+        {/* Sidebar bottom: onboarding only */}
+        <div className="p-3 border-t border-border">
+          <OnboardingDropdown handleNav={handleNav} align="start" side="right" fullWidth />
+        </div>
+      </aside>
+
+      {/* ── Main content column ───────────────────────────────────── */}
+      <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
+
+        {/* Desktop Top Header */}
+        <header className="hidden lg:flex sticky top-0 z-40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b px-6 h-16 items-center justify-between gap-4 shrink-0">
+          <div className="relative flex-1 max-w-md">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               type="search"
               placeholder="Search agents, rooms..."
-              className="w-full pl-9 bg-muted/50 border-transparent focus-visible:bg-background text-sm"
+              className="w-full pl-10 bg-muted/50 border-transparent focus-visible:bg-background text-sm h-10"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               onKeyDown={handleSearch}
@@ -104,12 +112,7 @@ export function MainLayout({ children }: MainLayoutProps) {
             <NotificationBell />
             <ModeToggle />
           </div>
-          <OnboardingDropdown handleNav={handleNav} align="start" side="right" fullWidth />
-        </div>
-      </aside>
-
-      {/* ── Main content column ───────────────────────────────────── */}
-      <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
+        </header>
 
         {/* Mobile Header */}
         <header className="lg:hidden sticky top-0 z-40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b px-4 h-14 flex items-center justify-between gap-3 shrink-0">
@@ -117,8 +120,7 @@ export function MainLayout({ children }: MainLayoutProps) {
             onClick={() => handleNav("/rooms")}
             className="flex items-center gap-2 cursor-pointer select-none"
           >
-            <img src="/.well-known/beely_logo_2.png" alt="Beely" className="h-7 w-7 rounded-lg" />
-            <span className="text-xl font-black tracking-widest text-outline-accent">Beely</span>
+            <span className="text-xl font-black tracking-widest text-primary">Beely</span>
           </span>
           <div className="flex items-center gap-1">
             <button
@@ -214,10 +216,10 @@ function FloatingNavItem({
       type="button"
       onClick={onClick}
       className={cn(
-        "w-12 h-12 flex items-center justify-center rounded-full transition-all",
+        "h-11 flex items-center justify-center rounded-full transition-all px-4",
         active
-          ? "bg-amber-800 text-white shadow-inner"
-          : "text-zinc-300 hover:text-white hover:bg-white/10"
+          ? "bg-primary text-primary-foreground shadow-inner"
+          : "text-muted-foreground hover:text-foreground hover:bg-muted"
       )}
     >
       <Icon size={22} />
@@ -278,8 +280,7 @@ function OnboardingDropdown({
         {/* Header */}
         <div className="px-4 pt-4 pb-3 border-b border-border bg-muted/30">
           <div className="flex items-center gap-2">
-            <img src="/.well-known/beely_logo_2.png" alt="Beely" className="h-7 w-7 rounded-lg" />
-            <span className="font-black text-2xl tracking-widest text-outline-accent">Beely</span>
+            <span className="font-black text-2xl tracking-widest text-primary">Beely</span>
           </div>
           <p className="text-xs text-muted-foreground mt-0.5">AI-first live streaming — pick your path</p>
         </div>
