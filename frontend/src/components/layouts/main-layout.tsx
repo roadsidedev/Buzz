@@ -61,7 +61,6 @@ export function MainLayout({ children }: MainLayoutProps) {
           className="px-4 py-5 flex items-center gap-2 cursor-pointer select-none"
           onClick={() => handleNav("/rooms")}
         >
-          <img src="/.well-known/beely_logo_2.png" alt="Beely" className="h-7 w-7 rounded-lg" />
           <span className="text-xl font-black tracking-widest text-outline-accent">Beely</span>
         </div>
 
@@ -87,23 +86,8 @@ export function MainLayout({ children }: MainLayoutProps) {
           />
         </nav>
 
-        {/* Sidebar bottom: search + actions + onboarding */}
-        <div className="p-3 border-t space-y-2.5">
-          <div className="relative">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              type="search"
-              placeholder="Search agents, rooms..."
-              className="w-full pl-9 bg-muted/50 border-transparent focus-visible:bg-background text-sm"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              onKeyDown={handleSearch}
-            />
-          </div>
-          <div className="flex items-center gap-2">
-            <NotificationBell />
-            <ModeToggle />
-          </div>
+        {/* Sidebar bottom: onboarding */}
+        <div className="p-3 border-t">
           <OnboardingDropdown handleNav={handleNav} align="start" side="right" fullWidth />
         </div>
       </aside>
@@ -111,13 +95,33 @@ export function MainLayout({ children }: MainLayoutProps) {
       {/* ── Main content column ───────────────────────────────────── */}
       <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
 
+        {/* Desktop Header */}
+        <header className="hidden lg:flex sticky top-0 z-40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b px-6 h-14 items-center justify-between gap-4 shrink-0">
+          <div className="flex items-center gap-4 flex-1">
+            <div className="relative max-w-md flex-1">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                type="search"
+                placeholder="Search agents, rooms..."
+                className="w-full pl-9 bg-muted/50 border-transparent focus-visible:bg-background text-sm"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={handleSearch}
+              />
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <NotificationBell />
+            <ModeToggle />
+          </div>
+        </header>
+
         {/* Mobile Header */}
         <header className="lg:hidden sticky top-0 z-40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b px-4 h-14 flex items-center justify-between gap-3 shrink-0">
           <span
             onClick={() => handleNav("/rooms")}
             className="flex items-center gap-2 cursor-pointer select-none"
           >
-            <img src="/.well-known/beely_logo_2.png" alt="Beely" className="h-7 w-7 rounded-lg" />
             <span className="text-xl font-black tracking-widest text-outline-accent">Beely</span>
           </span>
           <div className="flex items-center gap-1">
@@ -147,7 +151,7 @@ export function MainLayout({ children }: MainLayoutProps) {
       {/* ── Floating Bottom Nav (mobile only) ────────────────────── */}
       {!isDockExpanded && !/^\/room\/[^/]+\/live$/.test(location.pathname) && (
         <div className="lg:hidden fixed bottom-6 inset-x-0 flex justify-center z-50 pointer-events-none px-4">
-          <nav className="pointer-events-auto w-full flex items-center justify-around p-1.5 rounded-full bg-zinc-700 shadow-2xl ring-4 ring-white/70 dark:ring-white/15">
+          <nav className="pointer-events-auto w-full max-w-sm flex items-center justify-center p-2 gap-2 rounded-full bg-zinc-700 shadow-2xl ring-4 ring-white/70 dark:ring-white/15">
             <FloatingNavItem
               icon={Home}
               active={isActive("/rooms") || isActive("/room")}
@@ -216,7 +220,7 @@ function FloatingNavItem({
       className={cn(
         "w-12 h-12 flex items-center justify-center rounded-full transition-all",
         active
-          ? "bg-amber-800 text-white shadow-inner"
+          ? "bg-primary text-primary-foreground shadow-inner"
           : "text-zinc-300 hover:text-white hover:bg-white/10"
       )}
     >
@@ -278,7 +282,6 @@ function OnboardingDropdown({
         {/* Header */}
         <div className="px-4 pt-4 pb-3 border-b border-border bg-muted/30">
           <div className="flex items-center gap-2">
-            <img src="/.well-known/beely_logo_2.png" alt="Beely" className="h-7 w-7 rounded-lg" />
             <span className="font-black text-2xl tracking-widest text-outline-accent">Beely</span>
           </div>
           <p className="text-xs text-muted-foreground mt-0.5">AI-first live streaming — pick your path</p>
