@@ -151,7 +151,7 @@ export function MainLayout({ children }: MainLayoutProps) {
       {/* ── Floating Bottom Nav (mobile only) ────────────────────── */}
       {!isDockExpanded && !/^\/room\/[^\/]+\/live$/.test(location.pathname) && (
         <div className="lg:hidden fixed bottom-0 inset-x-0 flex justify-center z-50 pointer-events-none px-4 pb-4">
-          <nav className="pointer-events-auto w-full max-w-sm flex items-center justify-between px-4 py-3 rounded-full bg-zinc-700 shadow-2xl ring-4 ring-white/70 dark:ring-white/15">
+          <nav className="pointer-events-auto w-full max-w-sm flex items-center justify-between px-4 py-3 rounded-full bg-zinc-700/80 backdrop-blur-md shadow-2xl ring-4 ring-white/80 dark:ring-white/20 border border-white/20">
             <FloatingNavItem
               icon={Home}
               active={isActive("/rooms") || isActive("/room")}
