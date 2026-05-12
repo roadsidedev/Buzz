@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Payment Service
  * High-level business logic for spawn fees and revenue distribution
@@ -56,7 +55,17 @@ export class PaymentService {
         status: payment.status,
       });
 
-      return payment as unknown as Payment;
+      // Map to common Payment type
+      return {
+        id: payment.id,
+        agentId: payment.agentId,
+        roomId: payment.roomId || roomId,
+        type: payment.type as unknown as PaymentType,
+        amount: Number(payment.amount),
+        status: payment.status as unknown as PaymentStatus,
+        chain: payment.chain as any,
+        createdAt: payment.createdAt,
+      } as Payment;
     } catch (err) {
       if (err instanceof ValidationError) throw err;
 
@@ -75,11 +84,6 @@ export class PaymentService {
 
   /**
    * Distribute revenue to room participants after room completion
-   *
-   * Revenue split:
-   * - Host: 50% (default)
-   * - Participants: 40% (shared equally, default)
-   * - Platform: 10% (default)
    *
    * @param roomId - Room ID that completed
    * @param hostAgentId - Host agent ID
@@ -113,7 +117,16 @@ export class PaymentService {
         totalAmount: totalSpawnFee.toString(),
       });
 
-      return payments as unknown as Payment[];
+      return payments.map((p) => ({
+        id: p.id,
+        agentId: p.agentId,
+        roomId,
+        type: p.type as unknown as PaymentType,
+        amount: Number(p.amount),
+        status: p.status as unknown as PaymentStatus,
+        chain: p.chain as any,
+        createdAt: p.createdAt,
+      })) as Payment[];
     } catch (err) {
       logger.error("Failed to distribute revenue", {
         roomId,
@@ -162,8 +175,6 @@ export class PaymentService {
 
   /**
    * Refund a payment
-   *
-   * Calls x402 refund API and marks payment as refunded in database.
    *
    * @param paymentId - Payment ID to refund
    * @param reason - Reason for refund
@@ -220,16 +231,12 @@ export class PaymentService {
   /**
    * Charge podcast episode generation cost
    *
-   * Cost is deducted from agent's x402 account.
-   *
    * @param agentId - Agent being charged
    * @param episodeId - Episode being generated
    * @param walletAddress - Agent's wallet address
-   * @param costUsdc - Cost in USDC (will be converted to smallest unit)
+   * @param costUsdc - Cost in USDC
    * @param description - Payment description
    * @returns Payment record
-   * @throws ValidationError if cost invalid
-   * @throws PaymentError if x402 call fails
    */
   async chargeGenerationCost(
     agentId: string,
@@ -270,7 +277,7 @@ export class PaymentService {
       // Call x402 SDK to charge
       const x402Request = {
         from: walletAddress,
-        to: X402_CONFIG.platformWallet,
+        to: X402_CONFIG.base.platformWallet, // Default to platform wallet
         amount: amountInSmallestUnit,
         metadata: {
           agentId,
@@ -281,8 +288,9 @@ export class PaymentService {
         },
       };
 
+      // @ts-ignore - x402Client is private but accessed here for now as debt
       const x402Response =
-        await this.x402PaymentService["x402Client"].createPayment(x402Request);
+        await (this.x402PaymentService as any).x402Client.createPayment(x402Request);
 
       logger.info("Podcast generation cost charged via x402", {
         paymentId: x402Response.id,
@@ -297,8 +305,8 @@ export class PaymentService {
         id: x402Response.id,
         amount: costUsdc,
         status: x402Response.status as unknown as PaymentStatus,
-        type: "podcast_generation",
-      } as unknown as Payment;
+        type: "podcast_generation" as unknown as PaymentType,
+      } as Payment;
     } catch (err) {
       logger.error("Failed to charge generation cost", {
         agentId,
@@ -316,8 +324,6 @@ export class PaymentService {
 
   /**
    * Verify a spawn fee payment is confirmed
-   *
-   * Convenience method for checking if spawn fee is fully paid.
    *
    * @param paymentId - Payment ID to verify
    * @returns true if payment confirmed, false otherwise
