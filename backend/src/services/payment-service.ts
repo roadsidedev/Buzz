@@ -195,7 +195,7 @@ export class PaymentService {
       });
 
       // Call x402 refund endpoint
-      await this.x402PaymentService.refundPayment(paymentId, reason);
+      await this.x402PaymentService.issueRefund(paymentId, reason);
 
       // Mark as refunded (status update handled by x402 service)
       const status =

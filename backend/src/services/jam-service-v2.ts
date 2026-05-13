@@ -24,7 +24,21 @@ import {
   TurnCredentials,
 } from "../utils/turn-credentials.js";
 import logger from "../utils/logger.js";
-import type { JamRoomConfig, JamRoomResponse } from "./jam-service.js";
+export interface JamRoomConfig {
+  title: string;
+  description?: string;
+  hostId: string;
+  roomType: string;
+  maxParticipants?: number;
+  metadata?: Record<string, unknown>;
+}
+
+export interface JamRoomResponse {
+  roomId: string;
+  roomUrl: string;
+  createdAt: Date;
+  status: "created" | "active" | "ended";
+}
 
 export interface JamRoomV2 {
   id: string;
