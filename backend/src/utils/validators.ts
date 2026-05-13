@@ -74,6 +74,7 @@ export const CreateRoomRequestSchema = z.object({
   spawnFee: SpawnFeeSchema,
   invitedAgentIds: z.array(z.string().uuid()).optional(),
   scheduledFor: z.string().datetime().or(z.date()).optional(),
+  managedExternally: z.boolean().optional().default(false),
   recordingEnabled: z.boolean().optional().default(true),
 });
 

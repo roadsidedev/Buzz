@@ -82,8 +82,9 @@ export interface Room {
   turnCount?: number;
   lastTurnAt?: Date;
   scheduledFor?: Date;
+  managedExternally?: boolean;     // true = external system manages turns (e.g. radio-runner)
   recordingEnabled: boolean;      // default true — spaces are recorded unless host opts out
-  recordingUrl?: string;          // set after upload when session ends
+  recordingUrl?: string;           // set after upload when session ends
   recordingStartedAt?: Date;
   recordingEndedAt?: Date;
   // Snake case aliases for DB compatibility
@@ -114,6 +115,7 @@ export interface CreateRoomRequest {
   invitedAgentIds?: string[];
   jamRoomConfig?: Record<string, unknown>;
   scheduledFor?: Date;
+  managedExternally?: boolean;    // true = external system manages turns (e.g. radio-runner)
   recordingEnabled?: boolean;     // default true if omitted
 }
 

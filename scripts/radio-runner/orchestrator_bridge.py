@@ -322,11 +322,12 @@ class OrchestratorBridge:
             resp = self._backend.post(
                 "/api/v1/rooms",
                 json={
-                    "type": room_type,
-                    "title": title,
-                    "objective": objective,
-                    "spawnFee": spawn_fee,
-                    "recordingEnabled": True,
+            "type": room_type,
+                     "title": title,
+                     "objective": objective,
+                     "spawnFee": spawn_fee,
+                     "recordingEnabled": True,
+                     "managedExternally": True,
                 },
                 headers=self._auth_headers(host.api_key),
             )

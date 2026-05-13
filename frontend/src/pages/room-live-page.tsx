@@ -454,11 +454,14 @@ export function RoomLivePage() {
   }, [streamId, stream, apiUrl])
 
   // ── Join socket room for live events (tts:audio, participant changes, status) ─
+  // Join immediately on mount (not waiting for stream data) so the first
+  // tts:audio event is not missed.  The WebSocket service queues the join
+  // if the socket is not yet connected and flushes it on connect.
   useEffect(() => {
-    if (!streamId || !stream) return
+    if (!streamId) return
     wsService.joinRoom(streamId, undefined, "spectator")
     return () => wsService.leaveRoom(streamId)
-  }, [streamId, stream])
+  }, [streamId])
 
   // ── Real-time participant lifecycle ─────────────────────────────────────────
   useEffect(() => {

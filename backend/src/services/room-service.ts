@@ -38,6 +38,7 @@ interface CreateRoomInput extends CreateRoomRequest {
   hostAgentId: string;
   hostAgentName: string;
   authenticatedUser?: JWTPayload;
+  managedExternally?: boolean;
 }
 
 // Track if factory has been initialized
@@ -167,6 +168,7 @@ export class RoomService {
       spawn_fee: input.spawnFee,
       scheduled_for: input.scheduledFor ? new Date(input.scheduledFor) : undefined,
       recording_enabled: input.recordingEnabled !== false, // default true
+      managed_externally: input.managedExternally === true,
     });
 
     let updatedRoom = room;

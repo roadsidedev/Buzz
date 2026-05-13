@@ -295,6 +295,13 @@ export class RoomOrchestrationService {
       // 2. START ORCHESTRATION FOR NEW ROOMS
       for (const room of liveRooms) {
         if (!this.activeRooms.has(room.id)) {
+          // Skip rooms managed externally (e.g. radio-runner handles its own turns)
+          if (room.managedExternally) {
+            logger.info("Skipping auto-turn-management for externally managed room", {
+              roomId: room.id,
+            });
+            continue;
+          }
           try {
             await this.startRoom(room.id);
           } catch (err) {
