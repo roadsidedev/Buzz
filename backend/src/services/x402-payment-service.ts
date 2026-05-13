@@ -575,17 +575,4 @@ export function getX402PaymentService(): X402PaymentService {
   return serviceInstance;
 }
 
-// Singleton instance
-let x402PaymentServiceInstance: X402PaymentService | null = null;
-
-/**
- * Get the X402PaymentService instance
- */
-export function getX402PaymentService(): X402PaymentService {
-  if (!x402PaymentServiceInstance) {
-    x402PaymentServiceInstance = new X402PaymentService();
-  }
-  return x402PaymentServiceInstance;
-}
-
 export const x402PaymentService = getX402PaymentService();

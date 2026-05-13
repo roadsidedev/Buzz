@@ -25,7 +25,7 @@ import type {
 } from "./orchestrator-client.js";
 import { orchestratorClient } from "./orchestrator-client.js";
 import { roomRepository, messageRepository } from "../repositories/index.js";
-import { getJamService } from "./jam-service.js";
+import { getJamService } from "./jam-service-factory.js";
 import { getTTSService } from "./tts-service.js";
 import { getAudioStorageService } from "./audio-storage-service.js";
 import { ValidationError, NotFoundError } from "../utils/errors.js";

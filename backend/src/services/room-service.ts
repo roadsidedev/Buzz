@@ -911,3 +911,10 @@ export class RoomService {
 // Singleton instance - initialized without ERC8004
 // Can be updated with dependency injection via setERC8004Service()
 export const roomService = new RoomService();
+
+/**
+ * Get the room service instance
+ */
+export function getRoomService(): RoomService {
+  return roomService;
+}

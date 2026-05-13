@@ -12,7 +12,7 @@
 import { Router, Request, Response } from "express";
 import { RoomStatus } from "@common/types/index";
 import { getX402PaymentService } from "../services/x402-payment-service.js";
-import { getJamService } from "../services/jam-service.js";
+import { getJamServiceFactory } from "../services/jam-service-factory.js";
 import { getJamWebhookHandler } from "../services/jam-webhook-handler.js";
 import { roomService } from "../services/room-service.js";
 import { paymentRepository } from "../repositories/payment-repository.js";
