@@ -14,7 +14,7 @@
 import type { Request } from "express";
 import logger from "../utils/logger.js";
 import { ValidationError, SecurityError } from "../utils/errors.js";
-import { getJamService } from "./jam-service.js";
+import { getJamService } from "./jam-service-factory.js";
 import { roomService } from "./room-service.js";
 
 export interface JamWebhookPayload {

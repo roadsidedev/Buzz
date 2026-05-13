@@ -160,6 +160,13 @@ export function getJam(): JamServiceV2 {
 }
 
 /**
+ * Alias for getJam() to support legacy imports
+ */
+export function getJamService(): JamServiceV2 {
+  return getJam();
+}
+
+/**
  * Initialize Jam Service Factory from environment
  */
 export function initializeJamServiceFactory(): JamServiceFactory {
