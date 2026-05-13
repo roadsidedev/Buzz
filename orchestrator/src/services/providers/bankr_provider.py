@@ -13,6 +13,8 @@ import logging
 
 import httpx
 
+from ..llm_provider import ProviderResponse
+
 logger = logging.getLogger(__name__)
 
 BANKR_DEFAULT_BASE_URL = "https://llm.bankr.bot"
@@ -78,8 +80,4 @@ class BankrProvider:
             text = resp.text
             logger.warning("Bankr: unexpected response shape, using raw text body")
 
-        class _Resp:
-            def __init__(self, t: str):
-                self.content = [type("_Block", (), {"text": t})()]
-
-        return _Resp(str(text))
+        return ProviderResponse(str(text))

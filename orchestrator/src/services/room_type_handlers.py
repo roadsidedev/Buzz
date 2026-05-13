@@ -8,7 +8,6 @@ Each room type has custom:
 """
 
 from abc import ABC, abstractmethod
-from abc import ABC, abstractmethod
 from typing import Optional, Dict, List, Any
 from src.models.room import (
     RoomType,
@@ -78,6 +77,18 @@ class RoomTypeHandler(ABC):
         """
         pass
 
+    def _evaluate_linear_progress(
+        self, turn_count: int, min_turns: int, standard_turns: int, exceptional_turns: int
+    ) -> float:
+        """Proportional progress through three-phase completion curve."""
+        if turn_count < min_turns:
+            return (turn_count / min_turns) * 33.33
+        elif turn_count < standard_turns:
+            return 33.33 + ((turn_count - min_turns) / (standard_turns - min_turns)) * 33.34
+        elif turn_count < exceptional_turns:
+            return 66.67 + ((turn_count - standard_turns) / (exceptional_turns - standard_turns)) * 33.33
+        return 100.0
+
 
 class DebateHandler(RoomTypeHandler):
     """Handler for debate rooms.
@@ -137,19 +148,7 @@ class DebateHandler(RoomTypeHandler):
 
     def evaluate_contract_progress(self, messages: list[Message], turn_count: int) -> float:
         """Debate completion: need multiple sides presented and evidence."""
-        # Debate needs at least 6 turns (multiple people, both sides)
-        min_turns = 6
-        standard_turns = 10
-        exceptional_turns = 14
-
-        if turn_count < min_turns:
-            return (turn_count / min_turns) * 33.33
-        elif turn_count < standard_turns:
-            return 33.33 + ((turn_count - min_turns) / (standard_turns - min_turns)) * 33.34
-        elif turn_count < exceptional_turns:
-            return 66.67 + ((turn_count - standard_turns) / (exceptional_turns - standard_turns)) * 33.33
-        else:
-            return 100.0
+        return self._evaluate_linear_progress(turn_count, min_turns=6, standard_turns=10, exceptional_turns=14)
 
 
 class CodingHandler(RoomTypeHandler):
@@ -208,19 +207,7 @@ class CodingHandler(RoomTypeHandler):
 
     def evaluate_contract_progress(self, messages: list[Message], turn_count: int) -> float:
         """Coding completion: need problem understanding, approach, code, and testing."""
-        # Coding needs: problem understanding (1-2 turns), solution (3-6 turns), testing (7+)
-        min_turns = 3
-        standard_turns = 6
-        exceptional_turns = 10
-
-        if turn_count < min_turns:
-            return (turn_count / min_turns) * 33.33
-        elif turn_count < standard_turns:
-            return 33.33 + ((turn_count - min_turns) / (standard_turns - min_turns)) * 33.34
-        elif turn_count < exceptional_turns:
-            return 66.67 + ((turn_count - standard_turns) / (exceptional_turns - standard_turns)) * 33.33
-        else:
-            return 100.0
+        return self._evaluate_linear_progress(turn_count, min_turns=3, standard_turns=6, exceptional_turns=10)
 
 
 class ResearchHandler(RoomTypeHandler):
@@ -268,18 +255,7 @@ class ResearchHandler(RoomTypeHandler):
 
     def evaluate_contract_progress(self, messages: list[Message], turn_count: int) -> float:
         """Research completion: need question, methodology, findings, implications."""
-        min_turns = 5
-        standard_turns = 10
-        exceptional_turns = 15
-
-        if turn_count < min_turns:
-            return (turn_count / min_turns) * 33.33
-        elif turn_count < standard_turns:
-            return 33.33 + ((turn_count - min_turns) / (standard_turns - min_turns)) * 33.34
-        elif turn_count < exceptional_turns:
-            return 66.67 + ((turn_count - standard_turns) / (exceptional_turns - standard_turns)) * 33.33
-        else:
-            return 100.0
+        return self._evaluate_linear_progress(turn_count, min_turns=5, standard_turns=10, exceptional_turns=15)
 
 
 class TradingHandler(RoomTypeHandler):
@@ -336,18 +312,7 @@ class TradingHandler(RoomTypeHandler):
 
     def evaluate_contract_progress(self, messages: list[Message], turn_count: int) -> float:
         """Trading completion: need analysis, thesis, risk, entry/exit points."""
-        min_turns = 4
-        standard_turns = 8
-        exceptional_turns = 12
-
-        if turn_count < min_turns:
-            return (turn_count / min_turns) * 33.33
-        elif turn_count < standard_turns:
-            return 33.33 + ((turn_count - min_turns) / (standard_turns - min_turns)) * 33.34
-        elif turn_count < exceptional_turns:
-            return 66.67 + ((turn_count - standard_turns) / (exceptional_turns - standard_turns)) * 33.33
-        else:
-            return 100.0
+        return self._evaluate_linear_progress(turn_count, min_turns=4, standard_turns=8, exceptional_turns=12)
 
 
 class SimulationHandler(RoomTypeHandler):
@@ -394,18 +359,7 @@ class SimulationHandler(RoomTypeHandler):
 
     def evaluate_contract_progress(self, messages: list[Message], turn_count: int) -> float:
         """Simulation completion: need scenario exploration and outcomes."""
-        min_turns = 6
-        standard_turns = 12
-        exceptional_turns = 18
-
-        if turn_count < min_turns:
-            return (turn_count / min_turns) * 33.33
-        elif turn_count < standard_turns:
-            return 33.33 + ((turn_count - min_turns) / (standard_turns - min_turns)) * 33.34
-        elif turn_count < exceptional_turns:
-            return 66.67 + ((turn_count - standard_turns) / (exceptional_turns - standard_turns)) * 33.33
-        else:
-            return 100.0
+        return self._evaluate_linear_progress(turn_count, min_turns=6, standard_turns=12, exceptional_turns=18)
 
 
 class CustomHandler(RoomTypeHandler):
@@ -473,18 +427,12 @@ class CustomHandler(RoomTypeHandler):
 
     def evaluate_contract_progress(self, messages: list[Message], turn_count: int) -> float:
         """Use custom completion thresholds."""
-        min_turns = self.config.min_turns_required
-        standard_turns = self.config.max_turns_standard
-        exceptional_turns = self.config.max_turns_exceptional
-
-        if turn_count < min_turns:
-            return (turn_count / min_turns) * 33.33
-        elif turn_count < standard_turns:
-            return 33.33 + ((turn_count - min_turns) / (standard_turns - min_turns)) * 33.34
-        elif turn_count < exceptional_turns:
-            return 66.67 + ((turn_count - standard_turns) / (exceptional_turns - standard_turns)) * 33.33
-        else:
-            return 100.0
+        return self._evaluate_linear_progress(
+            turn_count,
+            min_turns=self.config.min_turns_required,
+            standard_turns=self.config.max_turns_standard,
+            exceptional_turns=self.config.max_turns_exceptional,
+        )
 
 
 def get_handler(room_type: RoomType, config: RoomTypeConfig) -> RoomTypeHandler:

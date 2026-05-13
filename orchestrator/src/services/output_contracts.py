@@ -1,7 +1,7 @@
 """Output contract validation and completion tracking."""
 
 import logging
-from typing import Optional
+
 
 from ..models.room import Room, RoomType, CompletionLevel, RoomState
 

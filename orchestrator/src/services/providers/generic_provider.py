@@ -11,6 +11,8 @@ from typing import Any, Optional
 import logging
 import httpx
 
+from ..llm_provider import ProviderResponse
+
 logger = logging.getLogger(__name__)
 
 
@@ -68,8 +70,4 @@ class GenericHTTPProvider:
         if text is None:
             text = resp.text
 
-        class _Resp:
-            def __init__(self, text: str):
-                self.content = [type("o", (), {"text": text})]
-
-        return _Resp(str(text))
+        return ProviderResponse(str(text))

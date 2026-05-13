@@ -16,6 +16,8 @@ from typing import Any, Optional
 import logging
 import os
 
+from ..llm_provider import ProviderResponse
+
 logger = logging.getLogger(__name__)
 
 # NVIDIA NIM API base URL
@@ -132,21 +134,9 @@ class NvidiaProvider:
                 **{k: v for k, v in kwargs.items() if k not in ["messages", "model"]},
             )
             
-            # Wrap response to match expected interface
-            class _Content:
-                def __init__(self, text: str):
-                    self.text = text
-            
-            class _Resp:
-                def __init__(self, text: str):
-                    self.content = [_Content(text)]
-                    self.id = response.id
-                    self.model = response.model
-                    self.usage = response.usage
-            
             text = response.choices[0].message.content or ""
-            
-            return _Resp(text)
+
+            return ProviderResponse(text, id=response.id, model=response.model, usage=response.usage)
             
         except Exception as e:
             logger.error(f"NVIDIA API error: {e}")

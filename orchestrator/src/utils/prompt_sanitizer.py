@@ -14,7 +14,7 @@ Defense Strategy:
 import re
 import logging
 from typing import Optional
-from html import escape
+
 
 logger = logging.getLogger(__name__)
 
@@ -164,12 +164,12 @@ class PromptSanitizer:
 
         if not is_safe:
             if self.strict_mode:
-                logger.warn(
+                logger.warning(
                     "Input rejected due to safety violations",
                     extra={"violations": violations, "text_preview": text[:100]},
                 )
             else:
-                logger.warn(
+                logger.warning(
                     "Input sanitized due to violations",
                     extra={
                         "violations": violations,

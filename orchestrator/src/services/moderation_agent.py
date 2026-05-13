@@ -1,5 +1,6 @@
 """Content moderation agent powered by Claude."""
 
+import json
 import logging
 from enum import Enum
 from typing import Optional
@@ -85,8 +86,6 @@ Respond ONLY with valid JSON."""
                 ),
                 messages=[{"role": "user", "content": prompt}],
             )
-
-            import json
 
             result = json.loads(response.content[0].text.strip())
 

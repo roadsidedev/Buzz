@@ -544,7 +544,7 @@ class OrchestratorBridge:
         # Backend wraps the result under a "data" envelope:
         # { success: true, data: { status, selected_message_id, ... } }
         # Unwrap it; fall back to the top-level dict for backward compat.
-        data = raw.get("data") or raw
+        data = raw.get("data", raw)
         result = TurnResult(
             status=data.get("status", "unknown"),
             selected_message_id=data.get("selected_message_id"),

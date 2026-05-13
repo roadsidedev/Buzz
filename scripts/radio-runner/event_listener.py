@@ -10,7 +10,6 @@ radio runner's main loop.
 Used by: radio_runner.py
 """
 
-import hashlib
 import hmac
 import json
 import logging

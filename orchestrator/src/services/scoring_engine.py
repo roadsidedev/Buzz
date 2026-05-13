@@ -4,9 +4,7 @@ import json
 import logging
 import asyncio
 import time
-from typing import Optional
 
-import httpx
 
 from ..config.settings import settings
 from .llm_provider import get_provider

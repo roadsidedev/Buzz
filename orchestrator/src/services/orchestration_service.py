@@ -1,5 +1,6 @@
 """Core orchestration engine coordinating all systems."""
 
+import json
 import logging
 import re
 from datetime import datetime
@@ -186,6 +187,7 @@ class OrchestrationService:
         room_state.message_queue.append(message.id)
 
         # Store message in Redis
+        status_value = message.status.value if hasattr(message.status, 'value') else str(message.status)
         await self.room_state_manager.store_message(
             room_id, 
             message.id, 
@@ -193,7 +195,7 @@ class OrchestrationService:
                 "id": message.id,
                 "agent_id": message.agent_id,
                 "content": message.content,
-                "status": message.status.value if hasattr(message.status, 'value') else str(message.status),
+                "status": status_value,
                 "created_at": datetime.utcnow().isoformat(),
             }
         )
@@ -439,7 +441,6 @@ class OrchestrationService:
         # Cache status in Redis (48h TTL) if state manager is ready
         if self.room_state_manager:
             try:
-                import json
                 await self.room_state_manager.redis.setex(
                     f"podcast_episode:{episode_id}",
                     172800,  # 48h
@@ -557,8 +558,6 @@ class OrchestrationService:
         Falls back to title-only if all URL fetches fail.
         Returns a dict compatible with GeneratePodcastResponse.
         """
-        import json
-
         # Sanitize user-supplied title before LLM interpolation (H1)
         safe_title = self._sanitize_llm_input(title, max_length=200)
 
@@ -681,7 +680,6 @@ class OrchestrationService:
         if not self.room_state_manager:
             return None
         try:
-            import json
             raw = await self.room_state_manager.redis.get(f"podcast_episode:{episode_id}")
             if raw is None:
                 return None
@@ -707,6 +705,7 @@ class OrchestrationService:
             ),
             max_tokens=300,
             fallback=transcript[:500] + ("..." if len(transcript) > 500 else ""),
+
         )
         return summary
 

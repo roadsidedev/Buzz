@@ -391,15 +391,4 @@ export function cleanupSocketRateLimit(socketId: string): void {
   rateLimiter.cleanup(socketId);
 }
 
-/**
- * Get rate limiter stats (for monitoring)
- */
-export function getRateLimiterStats(): {
-  activeSockets: number;
-  totalEventsTracked: number;
-} {
-  return {
-    activeSockets: 0, // Would need to implement tracking
-    totalEventsTracked: 0,
-  };
-}
+

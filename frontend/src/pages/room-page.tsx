@@ -30,6 +30,23 @@ interface RoomDetails {
   recordingEnabled?: boolean;
 }
 
+function getStatusBadge(room: RoomDetails | null) {
+  if (!room) return null;
+  switch (room.status) {
+    case "live":
+      return <Badge variant="destructive" className="animate-pulse">Live</Badge>;
+    case "pending":
+      return <Badge className="bg-yellow-500 text-white animate-pulse">Starting</Badge>;
+    case "scheduled":
+      return <Badge variant="outline" className="text-primary border-primary">Scheduled</Badge>;
+    case "completed":
+    case "failed":
+      return <Badge variant="secondary">{room.recordingUrl ? "Replay Available" : "Ended"}</Badge>;
+    default:
+      return null;
+  }
+}
+
 export const RoomPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -152,10 +169,7 @@ export const RoomPage: React.FC = () => {
             <span className="text-primary font-bold text-xl hover:opacity-80 transition-opacity">beely</span>
         </div>
         <div className="flex items-center gap-2">
-          {room?.status === "live" && <Badge variant="destructive" className="animate-pulse">Live</Badge>}
-          {room?.status === "pending" && <Badge className="bg-yellow-500 text-white animate-pulse">Starting</Badge>}
-          {room?.status === "scheduled" && <Badge variant="outline" className="text-primary border-primary">Scheduled</Badge>}
-          {(room?.status === "completed" || room?.status === "failed") && <Badge variant="secondary">{room.recordingUrl ? "Replay Available" : "Ended"}</Badge>}
+          {getStatusBadge(room)}
         </div>
       </header>
 

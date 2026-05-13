@@ -13,7 +13,6 @@ import json
 import logging
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any
-from dataclasses import dataclass, asdict
 import redis
 from redis.exceptions import ConnectionError, TimeoutError as RedisTimeoutError
 
@@ -141,7 +140,7 @@ class RoomStateManager:
 
             return self._deserialize_room_state(json.loads(data))
         except Exception as e:
-            logger.warn(
+            logger.warning(
                 "Failed to retrieve room from Redis",
                 extra={"room_id": room_id, "error": str(e)}
             )
@@ -256,7 +255,7 @@ class RoomStateManager:
                 extra={"room_id": room_id, "ttl": ttl_seconds}
             )
         except Exception as e:
-            logger.warn(
+            logger.warning(
                 "Failed to update room TTL",
                 extra={"room_id": room_id, "error": str(e)}
             )
@@ -280,7 +279,7 @@ class RoomStateManager:
             # Set TTL on hash
             self.client.expire(key, DEFAULT_ROOM_TTL)
         except Exception as e:
-            logger.warn(
+            logger.warning(
                 "Failed to store participant",
                 extra={"room_id": room_id, "agent_id": agent_id, "error": str(e)}
             )
@@ -307,7 +306,7 @@ class RoomStateManager:
                 for agent_id, info in data.items()
             }
         except Exception as e:
-            logger.warn(
+            logger.warning(
                 "Failed to retrieve participants",
                 extra={"room_id": room_id, "error": str(e)}
             )
@@ -333,7 +332,7 @@ class RoomStateManager:
             # Set TTL
             self.client.expire(key, DEFAULT_ROOM_TTL)
         except Exception as e:
-            logger.warn(
+            logger.warning(
                 "Failed to store message",
                 extra={"room_id": room_id, "message_id": message_id, "error": str(e)}
             )
@@ -361,7 +360,7 @@ class RoomStateManager:
             messages.sort(key=lambda m: m.get("created_at", 0), reverse=True)
             return messages[:limit]
         except Exception as e:
-            logger.warn(
+            logger.warning(
                 "Failed to retrieve messages",
                 extra={"room_id": room_id, "error": str(e)}
             )

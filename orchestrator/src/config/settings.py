@@ -51,13 +51,7 @@ class Settings(BaseSettings):
     SCORING_MODEL: str = "claude-3-5-sonnet-20241022"
     MODERATION_MODEL: str = "claude-3-5-haiku-20241022"
     
-    # NVIDIA NIM models (alternatives - set LLM_PROVIDER=nvidia)
-    # SCORING_MODEL: str = "meta/llama-3.3-70b-instruct"
-    # SCORING_MODEL: str = "qwen/qwen-3.5-397b"
-    # SCORING_MODEL: str = "deepseek-ai/deepseek-r1"
-    
-    # Kimi models (set LLM_PROVIDER=kimi)
-    # SCORING_MODEL: str = "moonshotai/kimi-k2-5"
+
 
     # Phase 1 API Gateway Integration
     API_GATEWAY_BASE_URL: str = "http://localhost:4000"

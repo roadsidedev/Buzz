@@ -67,7 +67,6 @@ async def lifespan(app: FastAPI):
 
     # 1b. Initialize LLM provider (if configured)
     try:
-        provider = None
         if settings.LLM_PROVIDER and settings.LLM_PROVIDER.lower() != "none":
             provider = get_provider(settings.LLM_PROVIDER, settings.LLM_API_KEY)
             logger.info("LLM provider set: %s", settings.LLM_PROVIDER)

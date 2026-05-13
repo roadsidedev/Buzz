@@ -36,9 +36,4 @@ class OpenAIProvider:
         """
         # Example for chat completions - return an object with `.content[0].text`
         resp = self._client.ChatCompletion.create(*args, **kwargs)
-        # Wrap into an object similar enough for scoring engine parsing
-        class _Resp:
-            def __init__(self, text: str):
-                self.content = [type("o", (), {"text": text})]
-
-        return _Resp(resp.choices[0].message.content)
+        return ProviderResponse(resp.choices[0].message.content)

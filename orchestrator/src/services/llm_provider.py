@@ -27,6 +27,22 @@ class LLMProvider(Protocol):
         """
 
 
+class ProviderContent:
+    """Single content block with `.text` attribute for response parsing."""
+
+    def __init__(self, text: str):
+        self.text = text
+
+
+class ProviderResponse:
+    """Standard wrapper exposing `.content[0].text` for scoring engine."""
+
+    def __init__(self, text: str, **extra):
+        self.content = [ProviderContent(text)]
+        for key, value in extra.items():
+            setattr(self, key, value)
+
+
 class FallbackProvider:
     """Wraps an active provider with a fallback.
 
@@ -100,7 +116,8 @@ def get_provider(name: str | None = None, api_key: str | None = None) -> LLMProv
     - If provider explicitly set to `none`, return a null provider that
       raises on use.
     """
-    provider = (name or settings.LLM_PROVIDER or "").lower() or None
+    raw_provider = name or settings.LLM_PROVIDER or ""
+    provider = raw_provider.lower() or None
     key = api_key or settings.LLM_API_KEY or None
 
     # Auto-detect if neither provided

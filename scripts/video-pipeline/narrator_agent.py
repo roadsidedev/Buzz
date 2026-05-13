@@ -24,7 +24,6 @@ Usage:
 
 import argparse
 import base64
-import json
 import os
 import pathlib
 import sys
@@ -102,8 +101,9 @@ def detect_moves(current: list[dict], previous: dict[str, float], threshold: flo
 
 def generate_commentary(anthropic_client, move: dict) -> str:
     """Ask Claude to generate a TV anchor commentary line for a price move."""
-    direction = "up" if move["pct_change"] > 0 else "down"
-    sign = "+" if move["pct_change"] > 0 else ""
+    is_up = move["pct_change"] > 0
+    direction = "up" if is_up else "down"
+    sign = "+" if is_up else ""
     prompt = (
         f"{move['name']} ({move['symbol']}) just moved {direction} "
         f"{sign}{move['pct_change']:.2f}% to ${move['price']:,.2f}. "

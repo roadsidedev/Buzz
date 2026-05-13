@@ -157,3 +157,7 @@ export class DatabaseError extends AppError {
 export function isAppError(error: unknown): error is AppError {
   return error instanceof AppError;
 }
+
+export function safeError(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
+}
