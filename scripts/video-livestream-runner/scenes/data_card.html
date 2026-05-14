@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=1280" />
+<title>Beely Data View</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    width: 1280px; height: 720px; overflow: hidden;
+    background: linear-gradient(135deg, #0a0a18 0%, #111133 100%);
+    color: #e0e0f0;
+    font-family: 'Segoe UI', 'Inter', system-ui, sans-serif;
+    display: flex; flex-direction: column;
+  }
+
+  .top-bar {
+    display: flex; align-items: center; padding: 12px 24px; height: 48px;
+    background: rgba(0,0,0,0.4); border-bottom: 1px solid rgba(255,255,255,0.08);
+  }
+  .brand { font-size: 18px; font-weight: 800; color: #00ff88; letter-spacing: 2px; }
+  .live-dot {
+    width: 8px; height: 8px; border-radius: 50%; background: #ff4444;
+    animation: pulse 1.5s ease-in-out infinite; margin-left: 12px;
+  }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+  .main-area {
+    flex: 1; display: flex; flex-direction: column;
+    justify-content: center; align-items: center; padding: 40px 60px;
+  }
+
+  .data-title {
+    font-size: 16px; color: #6666aa; text-transform: uppercase;
+    letter-spacing: 3px; margin-bottom: 8px;
+  }
+  .data-value {
+    font-size: 72px; font-weight: 700; margin-bottom: 8px;
+    transition: color 0.5s ease;
+  }
+  .data-value.positive { color: #00ff88; }
+  .data-value.negative { color: #ff4444; }
+  .data-value.neutral { color: #e0e0f0; }
+  .data-sub {
+    font-size: 20px; color: #8888aa; margin-bottom: 32px;
+  }
+  .data-context {
+    font-size: 18px; color: #aaaacc; text-align: center;
+    max-width: 900px; line-height: 1.5;
+  }
+
+  .footer-bar {
+    height: 32px; display: flex; align-items: center; justify-content: center;
+    padding: 0 24px; background: rgba(0,0,0,0.3);
+    font-size: 11px; color: #444466; border-top: 1px solid rgba(255,255,255,0.04);
+  }
+</style>
+</head>
+<body>
+<div class="top-bar">
+  <div class="brand">Beely</div>
+  <span class="live-dot"></span>
+  <span style="margin-left:12px;font-size:11px;color:#6666aa;letter-spacing:2px;text-transform:uppercase">DATA INSIGHT</span>
+</div>
+
+<div class="main-area">
+  <div class="data-title" id="dataTitle">MARKET SUMMARY</div>
+  <div class="data-value neutral" id="dataValue">—</div>
+  <div class="data-sub" id="dataSub">Live data feed</div>
+  <div class="data-context" id="dataContext">Loading latest data...</div>
+</div>
+
+<div class="footer-bar">
+  <span>BEELY NEWS — DATA VISUALIZATION</span>
+</div>
+
+<script>
+  function updateContent(headline, commentary, visualCue) {
+    var val = document.getElementById('dataValue');
+    var ctx = document.getElementById('dataContext');
+    var title = document.getElementById('dataTitle');
+    var sub = document.getElementById('dataSub');
+
+    // headline → data value
+    val.textContent = headline || '—';
+    ctx.textContent = commentary || '';
+    val.className = 'data-value ' + (visualCue || 'neutral');
+    title.textContent = 'TOP STORY';
+    sub.textContent = 'Live update';
+  }
+
+  function updateTicker() {}
+</script>
+</body>
+</html>

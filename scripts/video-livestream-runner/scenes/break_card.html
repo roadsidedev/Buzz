@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=1280" />
+<title>Beely — Break</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    width: 1280px; height: 720px; overflow: hidden;
+    background: linear-gradient(135deg, #050510 0%, #0d0d20 100%);
+    color: #e0e0f0;
+    font-family: 'Segoe UI', 'Inter', system-ui, sans-serif;
+    display: flex; flex-direction: column;
+    justify-content: center; align-items: center;
+  }
+
+  .logo {
+    font-size: 48px; font-weight: 800; letter-spacing: 6px;
+    color: #00ff88; text-transform: uppercase; margin-bottom: 20px;
+    opacity: 0.6;
+  }
+
+  .message {
+    font-size: 24px; color: #6666aa; letter-spacing: 2px;
+    margin-bottom: 40px;
+  }
+
+  .dots {
+    display: flex; gap: 12px;
+  }
+  .dot {
+    width: 12px; height: 12px; border-radius: 50%;
+    background: #00ff88; opacity: 0.3;
+    animation: bounce 1.5s ease-in-out infinite;
+  }
+  .dot:nth-child(2) { animation-delay: 0.3s; }
+  .dot:nth-child(3) { animation-delay: 0.6s; }
+  @keyframes bounce {
+    0%, 100% { transform: translateY(0); opacity: 0.3; }
+    50% { transform: translateY(-12px); opacity: 0.8; }
+  }
+
+  .footer {
+    position: absolute; bottom: 24px;
+    font-size: 12px; color: #333355;
+  }
+</style>
+</head>
+<body>
+  <div class="logo">Beely</div>
+  <div class="message" id="breakMessage">Live Stream Breaks</div>
+  <div class="dots">
+    <div class="dot"></div>
+    <div class="dot"></div>
+    <div class="dot"></div>
+  </div>
+  <div class="footer">BEELY NEWS — WE'LL BE RIGHT BACK</div>
+
+  <script>
+    function updateContent(headline, commentary, visualCue) {
+      var msg = document.getElementById('breakMessage');
+      msg.textContent = commentary || 'Live Stream Breaks';
+    }
+    function updateTicker() {}
+  </script>
+</body>
+</html>

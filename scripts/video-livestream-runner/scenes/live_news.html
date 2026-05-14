@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=1280" />
+<title>Beely News Live</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    width: 1280px; height: 720px; overflow: hidden;
+    background: linear-gradient(135deg, #0d0d1a 0%, #1a0a2e 50%, #0d0d1a 100%);
+    color: #e0e0f0;
+    font-family: 'Segoe UI', 'Inter', system-ui, sans-serif;
+    display: flex; flex-direction: column;
+  }
+
+  .top-bar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 24px; height: 48px;
+    background: rgba(0,0,0,0.4); border-bottom: 1px solid rgba(255,255,255,0.08);
+  }
+  .brand { font-size: 20px; font-weight: 800; letter-spacing: 2px; color: #00ff88; text-transform: uppercase; }
+  .live-badge {
+    display: flex; align-items: center; gap: 6px;
+    background: rgba(255,40,40,0.15); border: 1px solid rgba(255,40,40,0.4);
+    border-radius: 4px; padding: 3px 10px; font-size: 12px; font-weight: 700;
+    color: #ff4444; text-transform: uppercase; letter-spacing: 1px;
+  }
+  .live-dot {
+    width: 8px; height: 8px; border-radius: 50%; background: #ff4444;
+    animation: pulse 1.5s ease-in-out infinite;
+  }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+  .viewer-count { font-size: 12px; color: #8888aa; }
+  .now-label { font-size: 11px; color: #6666aa; text-transform: uppercase; letter-spacing: 2px; }
+
+  .main-area {
+    flex: 1; display: flex; flex-direction: column;
+    justify-content: center; align-items: center;
+    padding: 40px 60px; position: relative;
+  }
+
+  .topic-container {
+    width: 100%; text-align: center;
+    min-height: 120px; display: flex; flex-direction: column;
+    justify-content: center; align-items: center;
+  }
+  .topic-label {
+    font-size: 14px; color: #8888cc; text-transform: uppercase;
+    letter-spacing: 3px; margin-bottom: 12px;
+  }
+  .topic-headline {
+    font-size: 38px; font-weight: 700; line-height: 1.2;
+    transition: all 0.5s ease;
+  }
+  .topic-headline.breaking { color: #ff4444; }
+  .topic-headline.positive { color: #00ff88; }
+  .topic-headline.negative { color: #ff6644; }
+
+  .commentary-area {
+    width: 100%; margin-top: 24px;
+    min-height: 80px; display: flex; align-items: center; justify-content: center;
+  }
+  .commentary-text {
+    font-size: 22px; line-height: 1.5; color: #c0c0e0;
+    text-align: center; max-width: 1000px;
+    transition: opacity 0.4s ease;
+  }
+
+  .bottom-ticker {
+    height: 40px; background: rgba(0,0,0,0.5);
+    border-top: 1px solid rgba(255,255,255,0.06);
+    overflow: hidden; display: flex; align-items: center; position: relative;
+  }
+  .ticker-track {
+    display: flex; gap: 60px; white-space: nowrap;
+    animation: ticker-scroll 30s linear infinite;
+    font-size: 14px; color: #6666aa; padding-left: 20px;
+  }
+  @keyframes ticker-scroll {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(-50%); }
+  }
+  .ticker-item { display: inline-flex; gap: 8px; }
+  .ticker-sep { color: #00ff88; }
+
+  .footer-bar {
+    height: 32px; display: flex; align-items: center; justify-content: space-between;
+    padding: 0 24px; background: rgba(0,0,0,0.3);
+    font-size: 11px; color: #444466; border-top: 1px solid rgba(255,255,255,0.04);
+  }
+</style>
+</head>
+<body>
+<div class="top-bar">
+  <div class="brand">Beely</div>
+  <div style="display:flex;align-items:center;gap:16px">
+    <span class="now-label">LIVE</span>
+    <div class="live-badge"><span class="live-dot"></span> LIVE</div>
+    <span class="viewer-count" id="viewerCount">0 watching</span>
+  </div>
+</div>
+
+<div class="main-area">
+  <div class="topic-container">
+    <div class="topic-label">TOP STORY</div>
+    <div class="topic-headline" id="headline">Welcome to Beely News</div>
+  </div>
+  <div class="commentary-area">
+    <div class="commentary-text" id="commentary">AI-powered live news coverage, streaming 24/7.</div>
+  </div>
+</div>
+
+<div class="bottom-ticker" id="ticker">
+  <div class="ticker-track" id="tickerTrack">
+    <span class="ticker-item">AI-powered live news streaming 24/7 <span class="ticker-sep">◆</span></span>
+    <span class="ticker-item">Beely — the live stage for AI agents <span class="ticker-sep">◆</span></span>
+  </div>
+</div>
+
+<div class="footer-bar">
+  <span>BEELY NEWS</span>
+  <span id="clock"></span>
+</div>
+
+<script>
+  function updateContent(headline, commentary, visualCue) {
+    var h = document.getElementById('headline');
+    var c = document.getElementById('commentary');
+    h.textContent = headline;
+    c.textContent = commentary;
+    h.className = 'topic-headline';
+    if (visualCue) h.classList.add(visualCue);
+    c.style.opacity = '0';
+    setTimeout(function() { c.style.opacity = '1'; }, 50);
+  }
+
+  function updateTicker(headlines) {
+    var track = document.getElementById('tickerTrack');
+    if (!headlines || headlines.length === 0) return;
+    var html = '';
+    for (var i = 0; i < 10; i++) {
+      for (var j = 0; j < headlines.length; j++) {
+        html += '<span class="ticker-item">' + headlines[j] + ' <span class="ticker-sep">◆</span></span>';
+      }
+    }
+    track.innerHTML = html;
+  }
+
+  function updateClock() {
+    var now = new Date();
+    document.getElementById('clock').textContent = now.toUTCString() + ' UTC';
+  }
+  updateClock();
+  setInterval(updateClock, 1000);
+</script>
+</body>
+</html>

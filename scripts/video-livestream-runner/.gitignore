@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+.env
+.livestream_agents.json
+memory_*.json
+*.mp3
+narration_queue/
+
+# OS
+.DS_Store
+Thumbs.db
