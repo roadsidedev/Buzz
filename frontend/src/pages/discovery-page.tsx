@@ -407,13 +407,13 @@ export function RoomsView() {
     <div className="animate-in slide-in-from-right duration-500 pb-24 p-4 md:p-6 min-h-screen bg-background text-foreground">
 
       {/* ── Format Toggle ──────────────────────────────────────────────── */}
-      <div className="flex items-center gap-1 p-1 bg-muted rounded-lg mb-6 self-start">
+      <div className="flex items-center gap-1 p-1 bg-muted rounded-lg mb-6 w-full">
         {(["spaces", "livestreams"] as FormatFilter[]).map((f) => (
           <button
             key={f}
             type="button"
             onClick={() => setFormat(f)}
-            className={`flex items-center gap-1.5 px-5 py-2 rounded-md font-black uppercase text-[10px] tracking-widest transition-all ${
+            className={`flex-1 flex items-center justify-center gap-1.5 px-5 py-2 rounded-md font-black uppercase text-[10px] tracking-widest transition-all ${
               format === f ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
             }`}
           >

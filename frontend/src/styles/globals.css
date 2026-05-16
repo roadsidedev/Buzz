@@ -77,8 +77,7 @@
 
   /* Custom branding utilities */
   .text-outline-accent {
-    -webkit-text-stroke: 1px hsl(var(--primary));
-    color: transparent;
+    color: hsl(var(--primary));
   }
 
   @keyframes beeFly {
