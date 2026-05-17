@@ -220,6 +220,9 @@ export async function runStartupMigrations(): Promise<void> {
     await runSafely("room scheduled_for",
       `ALTER TABLE room ADD COLUMN IF NOT EXISTS scheduled_for TIMESTAMP WITH TIME ZONE NULL`);
 
+    await runSafely("room managed_externally",
+      `ALTER TABLE room ADD COLUMN IF NOT EXISTS managed_externally BOOLEAN NOT NULL DEFAULT FALSE`);
+
     // ── Notification tables ─────────────────────────────────────────────────
     await runSafely("room_notification table", `
       CREATE TABLE IF NOT EXISTS room_notification (
