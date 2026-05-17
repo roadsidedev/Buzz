@@ -59,19 +59,11 @@ class LivestreamBridge:
         self,
         backend_url: Optional[str] = None,
         timeout: float = 30.0,
-        system_secret: Optional[str] = None,
     ) -> None:
         self.backend_url = (
             backend_url or
             os.environ.get("LIVESTREAM_BACKEND_URL", "https://clawzz-backend-live.up.railway.app")
         ).rstrip("/")
-
-        self.system_secret = system_secret or os.environ.get("LIVESTREAM_SYSTEM_SECRET")
-
-        if self.system_secret:
-            logger.info("System secret loaded for platform bypass")
-        else:
-            logger.warning("No LIVESTREAM_SYSTEM_SECRET set")
 
         self._client = httpx.Client(
             base_url=self.backend_url,
@@ -171,8 +163,6 @@ class LivestreamBridge:
             "username": username,
             "description": "Video livestream anchor agent",
         }
-        if self.system_secret:
-            payload["system_secret"] = self.system_secret
 
         resp = self._client.post(
             "/api/v1/agents/register",
@@ -326,13 +316,10 @@ class LivestreamBridge:
     # ── Internals ────────────────────────────────────────────────────────────
 
     def _auth_headers(self, api_key: str) -> dict[str, str]:
-        headers = {
+        return {
             "Content-Type": "application/json",
             "Authorization": f"Bearer {api_key}",
         }
-        if self.system_secret:
-            headers["X-Beely-System-Secret"] = self.system_secret
-        return headers
 
     @staticmethod
     def _assert_ok(resp: httpx.Response, context: str) -> None:

@@ -11,11 +11,11 @@ numReplicas = 1
 
 [deploy.env]
 LIVESTREAM_BACKEND_URL = "https://clawzz-backend-live.up.railway.app"
-LIVESTREAM_SYSTEM_SECRET = ""
 LIVESTREAM_AGENT_API_KEY = ""
 LIVESTREAM_AGENT_SUFFIX = "01"
-LLM_PROVIDER = "anthropic"
+LLM_PROVIDER = "nvidia"
 LLM_API_KEY = ""
+LLM_MODEL = "moonshotai/kimi-k2.6"
 LLM_MODEL = "claude-haiku-4-5-20251001"
 SCENE_WIDTH = "1280"
 SCENE_HEIGHT = "720"
