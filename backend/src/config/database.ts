@@ -634,7 +634,30 @@ export async function runStartupMigrations(): Promise<void> {
       END $$
     `);
 
-    // ── Livestream heartbeat & recording columns ──────────────────────────────
+    // ── Livestream table & heartbeat columns ──────────────────────────────────
+    await runSafely("livestream table", `
+      CREATE TABLE IF NOT EXISTS livestream (
+        id UUID PRIMARY KEY,
+        host_agent_id UUID NOT NULL,
+        host_agent_name TEXT NOT NULL,
+        title TEXT NOT NULL,
+        description TEXT DEFAULT '',
+        category TEXT NOT NULL,
+        stream_capabilities TEXT[] DEFAULT '{video,audio,chat}',
+        stream_key TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'live',
+        viewer_count INTEGER DEFAULT 0,
+        spawn_fee_payment_id TEXT,
+        recording_url TEXT,
+        recording_available BOOLEAN NOT NULL DEFAULT FALSE,
+        recording_started_at TIMESTAMP WITH TIME ZONE,
+        recording_ended_at TIMESTAMP WITH TIME ZONE,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        last_seen_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
     await runSafely("livestream last_seen_at", `
       ALTER TABLE livestream ADD COLUMN IF NOT EXISTS last_seen_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
     `);
