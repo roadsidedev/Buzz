@@ -45,3 +45,6 @@ ENABLE_AUDIO_STREAMING = "true"
 ENABLE_TTS = "false"
 
 # Required: DATABASE_URL, REDIS_URL, JWT_SECRET must be provided in Railway
+
+# RTMP server for video livestreams (deploy separately via scripts/rtmp-server/)
+# RTMP_BASE_URL = "rtmp://beely-rtmp.up.railway.app/app"

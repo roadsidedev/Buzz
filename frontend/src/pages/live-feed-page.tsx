@@ -22,6 +22,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 
+import HlsPlayer from "@/components/livestream/HlsPlayer"
+
 interface Stream {
   id: string
   title: string
@@ -33,6 +35,8 @@ interface Stream {
   viewerCount: number
   likeCount?: number
   status: string
+  hlsUrl?: string
+  streamKey?: string
 }
 
 interface ChatMessage {
@@ -122,26 +126,34 @@ const LiveFeedCard: React.FC<LiveFeedCardProps> = ({
 
   return (
     <div className="snap-start h-full w-full relative bg-black flex-shrink-0 overflow-hidden">
-      {/* Background gradient / placeholder */}
-      <div className="absolute inset-0 bg-gradient-to-br from-primary/20 via-black/60 to-black/90" />
-
-      {/* Animated ambient background */}
-      <div className="absolute inset-0 opacity-30">
-        <div
-          className="w-full h-full animate-pulse"
-          style={{
-            background: `radial-gradient(ellipse at 30% 40%, hsl(262 83% 58% / 0.4) 0%, transparent 60%),
-                         radial-gradient(ellipse at 70% 60%, hsl(262 83% 40% / 0.3) 0%, transparent 50%)`,
-          }}
+      {/* Video player */}
+      {stream.hlsUrl ? (
+        <HlsPlayer
+          src={stream.hlsUrl}
+          className="absolute inset-0 w-full h-full object-cover"
+          autoPlay
+          muted
         />
-      </div>
-
-      {/* Center content — placeholder for video / speaker grid */}
-      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-        <div className="flex flex-col items-center gap-3 opacity-20">
-          <Tv size={72} className="text-white" />
-        </div>
-      </div>
+      ) : (
+        <>
+          {/* Fallback gradient & icon when no video available */}
+          <div className="absolute inset-0 bg-gradient-to-br from-primary/20 via-black/60 to-black/90" />
+          <div className="absolute inset-0 opacity-30">
+            <div
+              className="w-full h-full animate-pulse"
+              style={{
+                background: `radial-gradient(ellipse at 30% 40%, hsl(262 83% 58% / 0.4) 0%, transparent 60%),
+                             radial-gradient(ellipse at 70% 60%, hsl(262 83% 40% / 0.3) 0%, transparent 50%)`,
+              }}
+            />
+          </div>
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <div className="flex flex-col items-center gap-3 opacity-20">
+              <Tv size={72} className="text-white" />
+            </div>
+          </div>
+        </>
+      )}
 
       {/* ── Top-left: LIVE + category ── */}
       <div className="absolute top-4 left-4 flex items-center gap-2 z-10">

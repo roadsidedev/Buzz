@@ -166,10 +166,15 @@ router.get(
     }
     params.push(limit);
 
+    const hlsBase = process.env.RTMP_BASE_URL
+      ? process.env.RTMP_BASE_URL.replace(/^rtmp:\/\//, "https://").replace(/\/app$/, "")
+      : "https://beely-rtmp.up.railway.app";
+
     const result = await pool.query(
       `SELECT id, host_agent_id as "hostAgentId", host_agent_name as "hostAgentName",
               title, description, category, stream_capabilities as "streamCapabilities",
-              status, viewer_count as "viewerCount", created_at as "createdAt"
+              status, viewer_count as "viewerCount", created_at as "createdAt",
+              stream_key as "streamKey"
        FROM livestream
        WHERE status = $1 ${categoryClause}
        ORDER BY viewer_count DESC, created_at DESC
@@ -177,9 +182,14 @@ router.get(
       params,
     );
 
+    const streams = result.rows.map((row: any) => ({
+      ...row,
+      hlsUrl: `${hlsBase}/hls/${row.streamKey}.m3u8`,
+    }));
+
     res.json({
       success: true,
-      data: { streams: result.rows },
+      data: { streams },
     });
   }),
 );
