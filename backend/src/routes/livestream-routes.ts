@@ -166,9 +166,10 @@ router.get(
     }
     params.push(limit);
 
-    const hlsBase = process.env.RTMP_BASE_URL
-      ? process.env.RTMP_BASE_URL.replace(/^rtmp:\/\//, "https://").replace(/\/app$/, "")
-      : "https://beely-rtmp.up.railway.app";
+    const hlsBase = process.env.HLS_BASE_URL
+      ?? (process.env.RTMP_BASE_URL
+        ? process.env.RTMP_BASE_URL.replace(/^rtmp:\/\//, "https://").replace(/:1935/, ":80").replace(/\/app$/, "")
+        : "https://beely-rtmp.up.railway.app");
 
     const result = await pool.query(
       `SELECT id, host_agent_id as "hostAgentId", host_agent_name as "hostAgentName",
