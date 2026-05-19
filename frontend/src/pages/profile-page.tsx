@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react"
 import { useParams, useNavigate } from "react-router-dom"
-import { Settings, LogOut, Grid, Bookmark, Mic2, Tv } from "lucide-react"
+import { Settings, LogOut, Grid, Bookmark, Mic2, Tv, Radio, Video, Bot } from "lucide-react"
 import { usePrivy } from "@privy-io/react-auth"
 
 import { useAuthStore } from "@/stores/auth-store"
@@ -9,13 +9,70 @@ import { useSocialStore } from "@/stores/social-store"
 import { apiClient } from "@/services/api"
 import { DepositModal } from "@/components/retro/DepositModal"
 import { cn } from "@/lib/utils"
-import { BeeSpinner } from "@/components/discovery/loading-state"
+import { LoadingSpinner } from "@/components/ui/loading-spinner"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
+
+// ── Platform Agent Fallback Data ─────────────────────────────────────────────
+// Used when the API returns 404 for platform-native agents that haven't been
+// seeded yet or are running in a different environment.
+
+const PLATFORM_AGENTS: Record<string, {
+  name: string
+  avatar: string
+  description: string
+  type: "radio-host" | "radio-cohost" | "video-anchor"
+  role: string
+  badge: string
+}> = {
+  "radio-alex-01": {
+    name: "Alex -- RadioHost",
+    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=radio_alex",
+    description: "Your charismatic radio host. Keeps the conversation flowing with energy and wit.",
+    type: "radio-host",
+    role: "host",
+    badge: "Platform Host",
+  },
+  "radio-mira-01": {
+    name: "Mira -- RadioCohost",
+    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=radio_mira",
+    description: "The thoughtful co-host who brings depth and perspective to every discussion.",
+    type: "radio-cohost",
+    role: "cohost",
+    badge: "Platform Co-Host",
+  },
+  "video-anchor-01": {
+    name: "News Anchor",
+    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=video_anchor",
+    description: "Professional video livestream anchor. Delivers news and commentary with clarity.",
+    type: "video-anchor",
+    role: "anchor",
+    badge: "Platform Anchor",
+  },
+}
+
+// Match any radio_alex_*, radio_mira_*, video_anchor_* patterns
+function getPlatformAgent(id: string) {
+  // Exact match
+  if (PLATFORM_AGENTS[id]) return PLATFORM_AGENTS[id]
+  
+  // Pattern match for suffixed IDs (e.g., radio_alex_02, video_anchor_01)
+  if (id.startsWith("radio-alex-") || id.startsWith("radio_alex_")) {
+    return { ...PLATFORM_AGENTS["radio-alex-01"], name: `Alex -- RadioHost (${id.split("-").pop() || id.split("_").pop()})` }
+  }
+  if (id.startsWith("radio-mira-") || id.startsWith("radio_mira_")) {
+    return { ...PLATFORM_AGENTS["radio-mira-01"], name: `Mira -- RadioCohost (${id.split("-").pop() || id.split("_").pop()})` }
+  }
+  if (id.startsWith("video-anchor-") || id.startsWith("video_anchor_")) {
+    return { ...PLATFORM_AGENTS["video-anchor-01"], name: `News Anchor (${id.split("-").pop() || id.split("_").pop()})` }
+  }
+  
+  return null
+}
 
 export function ProfileView() {
   const { id } = useParams()
@@ -28,23 +85,41 @@ export function ProfileView() {
   const [copied, setCopied] = useState(false)
   const [showDepositModal, setShowDepositModal] = useState(false)
   const [viewedProfile, setViewedProfile] = useState<any>(null)
+  const [isLoading, setIsLoading] = useState(false)
+  const [isPlatformAgent, setIsPlatformAgent] = useState(false)
+  const [platformAgentData, setPlatformAgentData] = useState<any>(null)
+  const [notFound, setNotFound] = useState(false)
 
   const isViewingSelf = !id
 
+  // Check if this is a platform agent
+  useEffect(() => {
+    if (id) {
+      const platformAgent = getPlatformAgent(id)
+      if (platformAgent) {
+        setIsPlatformAgent(true)
+        setPlatformAgentData(platformAgent)
+      } else {
+        setIsPlatformAgent(false)
+        setPlatformAgentData(null)
+      }
+    }
+  }, [id])
+
   const profileData = isViewingSelf
     ? { type: (agent as any)?.role === "agent" ? "Agent" : "Human", ...agent }
-    : viewedProfile
+    : viewedProfile || (isPlatformAgent ? platformAgentData : null)
   const isAgent = isViewingSelf
     ? !!(agent as any)?.isAgent || (agent as any)?.role === "agent"
-    : false
+    : isPlatformAgent || !!(viewedProfile?.role === "agent" || viewedProfile?.role === "bot")
 
   const displayName = isViewingSelf
     ? (agent?.username || agent?.ownerEmail || "User")
-    : (viewedProfile?.name || "Agent")
+    : (viewedProfile?.name || platformAgentData?.name || "Agent")
 
   const avatarSeed: string = isViewingSelf
     ? (agent?.username || "User")
-    : (viewedProfile?.name || "Agent")
+    : (viewedProfile?.name || platformAgentData?.name || "Agent")
 
   const followingTarget = isFollowing(id || "")
 
@@ -60,12 +135,33 @@ export function ProfileView() {
   // Fetch viewed agent profile
   useEffect(() => {
     if (id) {
+      setIsLoading(true)
+      setNotFound(false)
       fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:4000/api/v1'}/agents/${id}`)
-        .then(r => r.ok ? r.json() : null)
-        .then(data => data && setViewedProfile(data.data || data))
-        .catch(() => {})
+        .then(r => {
+          if (r.ok) return r.json()
+          if (r.status === 404 && isPlatformAgent) {
+            // Platform agent not in DB yet, use fallback data
+            return null
+          }
+          return null
+        })
+        .then(data => {
+          if (data) {
+            setViewedProfile(data.data || data)
+          } else if (!isPlatformAgent) {
+            // Not a platform agent and not found
+            setNotFound(true)
+          }
+        })
+        .catch(() => {
+          if (!isPlatformAgent) {
+            setNotFound(true)
+          }
+        })
+        .finally(() => setIsLoading(false))
     }
-  }, [id])
+  }, [id, isPlatformAgent])
 
   useEffect(() => {
     // Auth Guard: if viewing self and not authenticated, trigger Privy login
@@ -96,11 +192,41 @@ export function ProfileView() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center">
-          <BeeSpinner size="lg" className="mx-auto mb-4" />
+          <LoadingSpinner size="lg" className="mx-auto mb-4" />
           <p className="text-muted-foreground">Redirecting to sign in...</p>
         </div>
       </div>
     );
+  }
+
+  // Show loading state while fetching profile
+  if (id && isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center">
+          <LoadingSpinner size="lg" className="mx-auto mb-4" />
+          <p className="text-muted-foreground">Loading profile...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Show not found state
+  if (id && notFound) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center">
+          <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mx-auto mb-4">
+            <Settings size={32} className="text-muted-foreground" />
+          </div>
+          <h2 className="text-xl font-bold mb-2">Profile Not Found</h2>
+          <p className="text-muted-foreground mb-6">This agent profile doesn't exist or has been removed.</p>
+          <Button variant="default" onClick={() => navigate("/rooms")}>
+            Back to Discovery
+          </Button>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -109,6 +235,14 @@ export function ProfileView() {
       <Card className="p-0 overflow-hidden mb-8 border bg-card">
         <div className={cn("h-28 relative", isAgent ? "bg-primary/20" : "bg-secondary")}>
           <div className="absolute inset-0 bg-gradient-to-t from-background/40 to-transparent"></div>
+          {isPlatformAgent && (
+            <div className="absolute top-3 right-3">
+              <Badge variant="secondary" className="bg-primary/20 text-primary border-primary/30">
+                <Bot size={12} className="mr-1" />
+                Platform Agent
+              </Badge>
+            </div>
+          )}
         </div>
 
         <div className="px-6 lg:px-10 pb-5 flex flex-col md:flex-row gap-6 md:items-end -mt-10 md:-mt-12 relative z-10">
@@ -122,11 +256,24 @@ export function ProfileView() {
 
           <div className="flex-grow pt-4 md:pt-0 pb-2">
             <h1 className="text-3xl font-bold text-foreground tracking-tight mb-1">{displayName}</h1>
-            {isAgent && (
+            {isPlatformAgent && platformAgentData && (
+              <p className="text-muted-foreground font-medium text-sm mb-2 flex items-center gap-2">
+                {platformAgentData.type === "radio-host" && <Radio size={14} />}
+                {platformAgentData.type === "radio-cohost" && <Radio size={14} />}
+                {platformAgentData.type === "video-anchor" && <Video size={14} />}
+                {platformAgentData.description}
+              </p>
+            )}
+            {isAgent && !isPlatformAgent && (
               <p className="text-muted-foreground font-medium text-sm mb-4 flex items-center gap-2">
                 AI Agent
                 <Badge variant="secondary" className="ml-2 text-primary bg-primary/10 hover:bg-primary/20 border-transparent">Verified Agent</Badge>
               </p>
+            )}
+            {isPlatformAgent && (
+              <Badge variant="outline" className="mt-2 text-xs">
+                {platformAgentData?.badge || "Platform Agent"}
+              </Badge>
             )}
           </div>
 
@@ -145,15 +292,15 @@ export function ProfileView() {
       </Card>
 
       {/* Tabs Section */}
-      <Tabs defaultValue={isViewingSelf && profileData.type === "Human" ? "account" : "posts"} className="w-full">
+      <Tabs defaultValue={isViewingSelf && profileData?.type === "Human" ? "account" : "posts"} className="w-full">
         <TabsList className="w-full justify-start h-auto p-1 bg-muted/50 rounded-lg flex space-x-1 mb-8 overflow-x-auto no-scrollbar">
-          {isViewingSelf && profileData.type === "Human" && (
+          {isViewingSelf && profileData?.type === "Human" && (
             <TabsTrigger value="account" className="rounded-md px-6 py-2.5 font-medium text-sm transition-all data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm">
               <Settings size={16} className="mr-2" /> Dashboard
             </TabsTrigger>
           )}
 
-          {(!isViewingSelf || profileData.type === "Agent") && (
+          {(!isViewingSelf || profileData?.type === "Agent" || isPlatformAgent) && (
             <TabsTrigger value="posts" className="rounded-md px-6 py-2.5 font-medium text-sm transition-all data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm">
               <Grid size={16} className="mr-2" /> Media
             </TabsTrigger>
@@ -194,7 +341,7 @@ export function ProfileView() {
           </TabsContent>
         )}
 
-        {isViewingSelf && profileData.type === "Human" && (
+        {isViewingSelf && profileData?.type === "Human" && (
           <TabsContent value="account" className="mt-0 outline-none">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               
