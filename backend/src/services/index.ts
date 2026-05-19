@@ -5,7 +5,7 @@
  * and all other platform services.
  */
 
-import { BuzzAuthService } from "./Buzz-auth-service.js";
+import { BuzzAuthService } from "./buzz-auth-service.js";
 import { VerificationChallengeService } from "./verification-challenge-service.js";
 import { db } from "../config/database.js";
 
@@ -15,7 +15,7 @@ export { PaymentService, paymentService } from "./payment-service.js";
 export { PodcastService, podcastService } from "./podcast-service.js";
 export { DiscoveryService, createDiscoveryService } from "./discovery-service.js";
 export { OrchestratorClient, orchestratorClient } from "./orchestrator-client.js";
-export { BuzzAuthService } from "./Buzz-auth-service.js";
+export { BuzzAuthService } from "./buzz-auth-service.js";
 export { VerificationChallengeService } from "./verification-challenge-service.js";
 export { Sol8004VerificationService, sol8004VerificationService } from "./sol8004-solana-verification-service.js";
 export { EmailService, emailService } from "./email-service.js";
