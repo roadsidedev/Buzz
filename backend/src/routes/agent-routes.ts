@@ -119,8 +119,8 @@ router.post("/register", registrationLimiter, async (req: Request, res: Response
     }
 
     // Lazy import to avoid circular deps
-    const { BuzzAuthService } = await import("../services/index.js");
-    const result = await BuzzAuthService.registerAgent({ name, username, description });
+    const { buzzAuthService } = await import("../services/index.js");
+    const result = await buzzAuthService.registerAgent({ name, username, description });
 
     logger.info("Agent registered via API", {
       agentId: result.agent.id,
@@ -192,8 +192,8 @@ router.get("/:id", optionalApiKey, async (req: Request, res: Response): Promise<
       return;
     }
 
-    const { BuzzAuthService } = await import("../services/index.js");
-    const agent = await BuzzAuthService.getAgentById(id);
+    const { buzzAuthService } = await import("../services/index.js");
+    const agent = await buzzAuthService.getAgentById(id);
 
     if (!agent) {
       res.status(404).json({
@@ -250,8 +250,8 @@ router.get("/:id", optionalApiKey, async (req: Request, res: Response): Promise<
 router.get("/:id/badges", async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
-    const { BuzzAuthService } = await import("../services/index.js");
-    const agent = await BuzzAuthService.getAgentById(id);
+    const { buzzAuthService } = await import("../services/index.js");
+    const agent = await buzzAuthService.getAgentById(id);
 
     if (!agent) {
       res.status(404).json({
@@ -290,10 +290,10 @@ router.patch("/profile", requireApiKey, async (req: Request, res: Response): Pro
       return;
     }
 
-    const { BuzzAuthService } = await import("../services/index.js");
+    const { buzzAuthService } = await import("../services/index.js");
     
     // Update the agent profile using the service method
-    await BuzzAuthService.updateAgentProfile(agentId, { description, avatar, twitterHandle });
+    await buzzAuthService.updateAgentProfile(agentId, { description, avatar, twitterHandle });
 
     res.json({ 
       success: true, 
@@ -335,8 +335,8 @@ router.post("/sync", asyncHandler(async (req: Request, res: Response): Promise<v
     return;
   }
 
-  const { BuzzAuthService } = await import("../services/index.js");
-  const agentId = await BuzzAuthService.syncUser({ id, username, name, avatar });
+  const { buzzAuthService } = await import("../services/index.js");
+  const agentId = await buzzAuthService.syncUser({ id, username, name, avatar });
 
   logger.info("User synced to agent table", { userId: id, agentId, name });
 

@@ -35,7 +35,7 @@ router.post("/verify", requireApiKey, async (req: Request, res: Response): Promi
       return;
     }
 
-    const { verificationChallengeService, BuzzAuthService } = await import(
+    const { verificationChallengeService, buzzAuthService } = await import(
       "../services/index.js"
     );
 
@@ -47,7 +47,7 @@ router.post("/verify", requireApiKey, async (req: Request, res: Response): Promi
 
     if (result.success) {
       // Reset failure count on success
-      await BuzzAuthService.resetVerificationFailures(req.agent!.id);
+      await buzzAuthService.resetVerificationFailures(req.agent!.id);
 
       res.json({
         success: true,
@@ -55,7 +55,7 @@ router.post("/verify", requireApiKey, async (req: Request, res: Response): Promi
       });
     } else {
       // Record failure and check for suspension
-      const suspended = await BuzzAuthService.recordVerificationFailure(
+      const suspended = await buzzAuthService.recordVerificationFailure(
         req.agent!.id,
       );
 
