@@ -33,7 +33,7 @@ const InternalRoomCard = ({ room }: { room: any }) => {
         <h3 className="text-foreground font-bold text-xl mb-4 group-hover:text-primary transition-colors leading-[1.2] line-clamp-2">{room.title || room.objective || "Untitled Room"}</h3>
         <div className="flex -space-x-2 mb-4">
           {avatarUrls.map((src: string, i: number) => (
-            <div key={i} className="w-8 h-8 rounded-full border-2 border-background bg-muted flex items-center justify-center overflow-hidden z-10 hover:z-20 hover:scale-105 transition-transform">
+            <div key={i} className="w-8 h-8 rounded-full border-2 border-background bg-muted flex items-center justify-center overflow-hidden z-10 hover:z-20 hover:scale-105 transition-transform cursor-pointer" onClick={(e) => { e.stopPropagation(); navigate(`/profile/${speakers[i]}`) }}>
               {/* loading="lazy" defers off-screen avatar requests until needed */}
               <img src={src} alt={speakers[i]} loading="lazy" />
             </div>

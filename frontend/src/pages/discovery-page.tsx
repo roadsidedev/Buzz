@@ -38,6 +38,7 @@ function capitalizeType(type: string): string {
 type SpeakerInfo = { id?: string; name?: string; avatar?: string; } | string
 
 const SpeakerGrid = ({ speakers, size = "md" }: { speakers: SpeakerInfo[]; size?: "sm" | "md" }) => {
+  const navigate = useNavigate()
   const avatarSize = size === "sm" ? "w-9 h-9" : "w-11 h-11"
   const visible = speakers.slice(0, 4)
   const overflow = speakers.length - 4
@@ -51,7 +52,7 @@ const SpeakerGrid = ({ speakers, size = "md" }: { speakers: SpeakerInfo[]; size?
           const id = typeof s === 'string' ? s : s.id
 
           return (
-            <div key={i} className={`${avatarSize} rounded-full bg-muted overflow-hidden border border-border`}>
+            <div key={i} className={`${avatarSize} rounded-full bg-muted overflow-hidden border border-border cursor-pointer`} onClick={(e) => { e.stopPropagation(); navigate(`/profile/${id}`) }}>
               <img 
                 src={avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${id || name}`} 
                 alt={name} 

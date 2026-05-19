@@ -26,6 +26,7 @@ export interface AudioRoomProps {
   };
   onLeave?: () => void;
   onError?: (error: Error) => void;
+  onProfileClick?: (agentId: string) => void;
 }
 
 export function AudioRoom({
@@ -35,6 +36,7 @@ export function AudioRoom({
   agentInfo,
   onLeave,
   onError,
+  onProfileClick,
 }: AudioRoomProps) {
   const {
     inRoom,
@@ -149,6 +151,7 @@ export function AudioRoom({
             myId={myId || undefined}
             speaking={speaking}
             agentInfo={agentInfo}
+            onProfileClick={onProfileClick}
           />
         </div>
 
@@ -160,6 +163,7 @@ export function AudioRoom({
               avatarUrl={agentInfo.avatarUrl}
               isSpeaking={isSpeaking}
               agentId={agentId}
+              onProfileClick={onProfileClick ? () => onProfileClick(agentId) : undefined}
             />
           </div>
         )}

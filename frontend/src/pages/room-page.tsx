@@ -319,11 +319,11 @@ export const RoomPage: React.FC = () => {
               <div className="flex items-center gap-4 overflow-x-auto pb-2">
                 {participants.map((p) => (
                   <div key={p.id} className="flex flex-col items-center gap-2 min-w-[80px]">
-                     <div className="relative">
-                       <Avatar className="w-16 h-16 border bg-muted ring-2 ring-background ring-offset-2 ring-offset-background">
-                         <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${p.id}`} alt={p.name} />
-                         <AvatarFallback>{p.name.charAt(0)}</AvatarFallback>
-                       </Avatar>
+                      <div className="relative">
+                        <Avatar className="w-16 h-16 border bg-muted ring-2 ring-background ring-offset-2 ring-offset-background cursor-pointer" onClick={() => navigate(`/profile/${p.id}`)}>
+                          <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${p.id}`} alt={p.name} />
+                          <AvatarFallback>{p.name.charAt(0)}</AvatarFallback>
+                        </Avatar>
                        {p.isLive && (
                          <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 bg-destructive text-destructive-foreground text-[10px] font-bold px-1.5 py-0.5 rounded-full ring-2 ring-background">
                            LIVE

@@ -13,6 +13,7 @@
  */
 
 import React from "react";
+import { useNavigate } from "react-router-dom";
 import { formatDistanceToNow } from "../../utils/date-format";
 import { Play, Users, Radio } from "lucide-react";
 
@@ -22,6 +23,7 @@ export interface RoomCardProps {
   type: string; // known types or custom slug
   hostName: string;
   hostAvatar?: string;
+  hostId?: string;
   listenerCount: number;
   isLive: boolean;
   createdAt: Date;
@@ -51,12 +53,14 @@ export const RoomCard: React.FC<RoomCardProps> = ({
   type,
   hostName,
   hostAvatar,
+  hostId,
   listenerCount,
   isLive,
   createdAt,
   description,
   onJoin,
 }) => {
+  const navigate = useNavigate()
   const createdTimeAgo = formatDistanceToNow(createdAt);
 
   return (
@@ -101,10 +105,13 @@ export const RoomCard: React.FC<RoomCardProps> = ({
             <img
               src={hostAvatar}
               alt={hostName}
-              className="h-8 w-8 rounded-full bg-gray-200"
+              className="h-8 w-8 rounded-full bg-gray-200 cursor-pointer"
+              onClick={(e) => { e.stopPropagation(); hostId && navigate(`/profile/${hostId}`) }}
             />
           ) : (
-            <div className="h-8 w-8 rounded-full border-2 border-black bg-accent-purple" />
+            <div className="h-8 w-8 rounded-full border-2 border-black bg-accent-purple cursor-pointer"
+              onClick={(e) => { e.stopPropagation(); hostId && navigate(`/profile/${hostId}`) }}
+            />
           )}
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium text-gray-900 truncate">

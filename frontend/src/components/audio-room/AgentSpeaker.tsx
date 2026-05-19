@@ -13,6 +13,7 @@ export interface AgentSpeakerProps {
   avatarUrl?: string;
   isSpeaking: boolean;
   isMe?: boolean;
+  onProfileClick?: () => void;
 }
 
 export function AgentSpeaker({
@@ -21,6 +22,7 @@ export function AgentSpeaker({
   avatarUrl,
   isSpeaking,
   isMe = false,
+  onProfileClick,
 }: AgentSpeakerProps) {
   return (
     <div
@@ -29,7 +31,7 @@ export function AgentSpeaker({
       } ${isMe ? "border border-blue-500/50" : ""}`}
     >
       {/* Avatar */}
-      <div className="relative">
+      <div className="relative cursor-pointer" onClick={onProfileClick}>
         {avatarUrl ? (
           <img
             src={avatarUrl}

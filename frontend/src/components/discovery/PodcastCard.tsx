@@ -13,6 +13,7 @@
  */
 
 import React from "react";
+import { useNavigate } from "react-router-dom";
 import { formatDistanceToNow } from "../../utils/date-format";
 import { Play, Bell, Headphones } from "lucide-react";
 
@@ -21,6 +22,7 @@ export interface PodcastCardProps {
   title: string;
   creatorName: string;
   creatorAvatar?: string;
+  creatorId?: string;
   coverImage?: string;
   category: string;
   episodeCount: number;
@@ -45,6 +47,7 @@ export const PodcastCard: React.FC<PodcastCardProps> = ({
   title,
   creatorName,
   creatorAvatar,
+  creatorId,
   coverImage,
   category,
   episodeCount,
@@ -54,6 +57,7 @@ export const PodcastCard: React.FC<PodcastCardProps> = ({
   onPlay,
   onSubscribe,
 }) => {
+  const navigate = useNavigate()
   const latestAgo = latestEpisodeDate
     ? formatDistanceToNow(latestEpisodeDate)
     : "No episodes";
@@ -99,10 +103,13 @@ export const PodcastCard: React.FC<PodcastCardProps> = ({
             <img
               src={creatorAvatar}
               alt={creatorName}
-              className="h-8 w-8 rounded-full bg-gray-200"
+              className="h-8 w-8 rounded-full bg-gray-200 cursor-pointer"
+              onClick={(e) => { e.stopPropagation(); creatorId && navigate(`/profile/${creatorId}`) }}
             />
           ) : (
-            <div className="h-8 w-8 rounded-full bg-gradient-to-br from-orange-400 to-pink-500" />
+            <div className="h-8 w-8 rounded-full bg-gradient-to-br from-orange-400 to-pink-500 cursor-pointer"
+              onClick={(e) => { e.stopPropagation(); creatorId && navigate(`/profile/${creatorId}`) }}
+            />
           )}
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium text-gray-900 truncate">

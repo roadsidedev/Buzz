@@ -21,6 +21,7 @@ export interface SpeakerGridProps {
     name: string;
     avatarUrl?: string;
   };
+  onProfileClick?: (agentId: string) => void;
 }
 
 export function SpeakerGrid({
@@ -28,6 +29,7 @@ export function SpeakerGrid({
   myId,
   speaking,
   agentInfo,
+  onProfileClick,
 }: SpeakerGridProps) {
   if (speakers.length === 0) {
     return (
@@ -53,6 +55,7 @@ export function SpeakerGrid({
           }
           isSpeaking={speaking.includes(speaker.id)}
           isMe={speaker.id === myId}
+          onProfileClick={onProfileClick ? () => onProfileClick(speaker.id) : undefined}
         />
       ))}
     </div>

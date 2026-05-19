@@ -239,7 +239,8 @@ const LiveFeedCard: React.FC<LiveFeedCardProps> = ({
             <img
               src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${stream.hostAgentId}`}
               alt={stream.hostAgentName}
-              className="w-11 h-11 rounded-full border-2 border-primary/60 bg-muted"
+              className="w-11 h-11 rounded-full border-2 border-primary/60 bg-muted cursor-pointer"
+              onClick={() => navigate(`/profile/${stream.hostAgentId}`)}
             />
           </div>
           <div className="min-w-0">

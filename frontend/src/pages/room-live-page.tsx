@@ -118,14 +118,16 @@ function HostTile({
   score?: number
   large?: boolean
 }) {
+  const navigate = useNavigate()
   const avatarClass = large ? "w-32 h-32 border-4" : "w-24 h-24 border-4"
   return (
     <div className="flex flex-col items-center gap-2">
       <div
         className={cn(
-          `${avatarClass} rounded-full border-background transition-all duration-300 overflow-hidden bg-muted`,
+          `${avatarClass} rounded-full border-background transition-all duration-300 overflow-hidden bg-muted cursor-pointer`,
           isSpeaking && "ring-4 ring-primary ring-offset-4 ring-offset-background shadow-2xl shadow-primary/30",
         )}
+        onClick={(e) => { e.stopPropagation(); navigate(`/profile/${participant.id}`) }}
       >
         <img
           src={participant.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${participant.id}`}
@@ -164,12 +166,14 @@ function SpeakerTile({
   compact?: boolean
   onProfileClick?: () => void
 }) {
+  const navigate = useNavigate()
   const sizeClass = compact ? "w-16 h-16" : "w-[84px] h-[84px]"
   const innerClass = compact ? "w-[56px] h-[56px]" : "w-[76px] h-[76px]"
 
   return (
-    <div className="flex flex-col items-center gap-2 cursor-pointer" onClick={onProfileClick}>
-      <div className={cn("relative rounded-full flex items-center justify-center transition-all duration-300", sizeClass, isSpeaking ? "bg-violet-500/20" : "")}>
+    <div className="flex flex-col items-center gap-2">
+      <div className={cn("relative rounded-full flex items-center justify-center transition-all duration-300 cursor-pointer", sizeClass, isSpeaking ? "bg-violet-500/20" : "")}
+        onClick={() => navigate(`/profile/${participant.id}`)}>
         {/* Ring */}
         {isSpeaking && (
           <div className="absolute inset-0 rounded-full border-2 border-violet-400 animate-pulse" />
@@ -784,7 +788,7 @@ export function RoomLivePage() {
         </div>
 
         <div className="mb-6 border-2 rounded-lg p-4 flex items-center gap-4">
-          <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${stream.hostAgentId}`} alt={stream.hostAgentName} className="w-12 h-12 rounded-full border-2 border-primary/30 bg-muted shrink-0" />
+          <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${stream.hostAgentId}`} alt={stream.hostAgentName} className="w-12 h-12 rounded-full border-2 border-primary/30 bg-muted shrink-0 cursor-pointer" onClick={() => navigate(`/profile/${stream.hostAgentId}`)} />
           <div className="min-w-0">
             <p className="font-bold text-foreground truncate">{stream.hostAgentName}</p>
             <p className="text-sm text-muted-foreground line-clamp-2 leading-snug mt-0.5">{stream.title}</p>
@@ -978,7 +982,6 @@ export function RoomLivePage() {
                         (safeSpeaking.length > 0 && idx < safeSpeaking.length)
                       }
                       score={agentScores[p.id]}
-                      onProfileClick={() => navigate(`/agent/${p.id}`)}
                     />
                   ))}
                 </div>
@@ -997,7 +1000,7 @@ export function RoomLivePage() {
                     <div
                       key={p.id}
                       className="flex flex-col items-center gap-2 group cursor-pointer"
-                      onClick={() => navigate(`/agent/${p.id}`)}
+                      onClick={() => navigate(`/profile/${p.id}`)}
                     >
                       <div className="relative">
                         <div className="w-14 h-14 rounded-[22px] overflow-hidden bg-muted border border-border/50 group-hover:border-primary/30 transition-all duration-300">
@@ -1096,7 +1099,7 @@ export function RoomLivePage() {
                 <div
                   key={p.id}
                   className="flex items-center gap-2 cursor-pointer hover:bg-muted/30 rounded-lg p-1 -m-1 transition-colors"
-                  onClick={() => navigate(`/agent/${p.id}`)}
+                  onClick={() => navigate(`/profile/${p.id}`)}
                 >
                   <img
                     src={p.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${p.id}`}
@@ -1290,7 +1293,6 @@ export function RoomLivePage() {
                 participant={p}
                 isSpeaking={safeSpeaking.includes(p.id) || (safeSpeaking.length > 0 && idx < safeSpeaking.length)}
                 score={agentScores[p.id]}
-                onProfileClick={() => navigate(`/agent/${p.id}`)}
               />
             ))}
           </div>
@@ -1312,7 +1314,7 @@ export function RoomLivePage() {
               <div
                 key={p.id}
                 className="flex flex-col items-center gap-1.5 w-[60px] cursor-pointer"
-                onClick={() => navigate(`/agent/${p.id}`)}
+                onClick={() => navigate(`/profile/${p.id}`)}
               >
                 <img
                   src={p.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${p.id}`}

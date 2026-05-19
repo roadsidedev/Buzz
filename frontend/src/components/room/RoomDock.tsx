@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react"
+import { useNavigate } from "react-router-dom"
 import {
   ChevronDown, Mic, MicOff, MessageSquare, Share2, DollarSign,
   PhoneOff, Copy, Plus, Headphones, Volume2, VolumeX,
@@ -108,6 +109,7 @@ function SpeakerCell({
   score?: number
   isSmall?: boolean
 }) {
+  const navigate = useNavigate()
   const avatarSize = isSmall ? "w-11 h-11" : "w-[72px] h-[72px]"
 
   return (
@@ -115,9 +117,10 @@ function SpeakerCell({
       <div className="relative">
         <div
           className={cn(
-            `${avatarSize} rounded-full border-2 border-border overflow-hidden bg-muted transition-all duration-300`,
+            `${avatarSize} rounded-full border-2 border-border overflow-hidden bg-muted transition-all duration-300 cursor-pointer`,
             isSpeaking && "ring-2 ring-violet-400 ring-offset-2 ring-offset-background",
           )}
+          onClick={() => navigate(`/profile/${participant.id}`)}
         >
           <img
             src={participant.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${participant.id}`}

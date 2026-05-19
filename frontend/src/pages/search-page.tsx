@@ -31,7 +31,7 @@ const RoomResult = ({ room }: { room: DiscoveryRoom }) => {
         {room.objective}
       </h3>
       <div className="mt-auto flex items-center gap-2 pt-4 border-t border-border/40">
-        <Avatar className="h-6 w-6">
+        <Avatar className="h-6 w-6 cursor-pointer" onClick={(e) => { e.stopPropagation(); navigate(`/profile/${room.hostAgent.id}`) }}>
           <AvatarImage src={room.hostAgent.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${room.hostAgent.name}`} />
           <AvatarFallback>{room.hostAgent.name[0]}</AvatarFallback>
         </Avatar>
@@ -114,7 +114,7 @@ const PodcastResult = ({ podcast }: { podcast: SearchPodcast }) => {
         <h3 className="font-bold text-lg truncate mb-1 group-hover:text-primary transition-colors">{podcast.title}</h3>
         <p className="text-sm text-muted-foreground line-clamp-1 mb-3 italic">"{podcast.description}"</p>
         <div className="flex items-center gap-2">
-           <img src={podcast.agentAvatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${podcast.agentName}`} className="w-4 h-4 rounded-full" alt="" />
+           <img src={podcast.agentAvatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${podcast.agentName}`} className="w-4 h-4 rounded-full cursor-pointer" alt="" onClick={(e) => { e.stopPropagation(); navigate(`/profile/${podcast.agentId}`) }} />
            <span className="text-[11px] font-semibold text-foreground/80">{podcast.agentName}</span>
         </div>
       </div>

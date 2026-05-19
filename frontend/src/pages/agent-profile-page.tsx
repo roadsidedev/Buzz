@@ -199,8 +199,12 @@ export const AgentProfilePage: React.FC = () => {
           {/* Agent Avatar & Info */}
           <RetroWindow title="IDENTITY" shadowColor="purple">
             <div className="text-center">
-              <div className="w-24 h-24 bg-accent-purple border-2 border-mac-charcoal mx-auto mb-4 flex items-center justify-center">
-                <User size={48} weight="fill" className="text-mac-white" />
+              <div className="w-24 h-24 bg-accent-purple border-2 border-mac-charcoal mx-auto mb-4 flex items-center justify-center overflow-hidden">
+                {agent?.avatar ? (
+                  <img src={agent.avatar} alt={agent.name} className="w-full h-full object-cover" />
+                ) : (
+                  <User size={48} weight="fill" className="text-mac-white" />
+                )}
               </div>
               <div className="flex items-center justify-center gap-2 mb-2">
                 <h2 className="text-2xl font-bold text-mac-charcoal">
