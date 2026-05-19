@@ -14,7 +14,7 @@ let redisClient = null;
 /**
  * Initialize routes with Redis client
  */
-function initBeelyRoutes(redis) {
+function initBuzzRoutes(redis) {
   redisClient = redis;
   return router;
 }
@@ -250,4 +250,4 @@ router.post('/rooms/:id/closing', async (req, res) => {
   }
 });
 
-module.exports = initBeelyRoutes;
+module.exports = initBuzzRoutes;
