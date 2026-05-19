@@ -287,8 +287,31 @@ class RadioRunner:
                     sleep_time = max(1.5, (duration_ms / 1000.0) + 1.5)
                     logger.info(f"Sleeping {sleep_time:.2f}s for audio playback + padding...")
                     time.sleep(sleep_time)
+                elif result.status in ("no_messages", "no_valid_messages"):
+                    # Orchestrator couldn't select a message — play the host's
+                    # dialogue directly so listeners still hear audio.
+                    logger.warning(
+                        "No message selected (status=%s) — playing host dialogue directly",
+                        result.status,
+                    )
+                    try:
+                        fallback_msg_id = f"fallback-{self._turn_count + 1}"
+                        duration_ms = self._bridge.play_audio(
+                            room_id=self._room_id,
+                            message_id=fallback_msg_id,
+                            text=turn.host_text,
+                            agent_id=self._host.id,
+                            api_key=self._host.api_key,
+                            agent_name=self._host.name,
+                        )
+                        sleep_time = max(1.5, (duration_ms / 1000.0) + 1.5)
+                        logger.info(f"Fallback audio: sleeping {sleep_time:.2f}s")
+                        time.sleep(sleep_time)
+                    except Exception as fallback_exc:
+                        logger.error("Fallback audio also failed: %s", fallback_exc)
+                        time.sleep(self._turn_interval)
                 else:
-                    logger.warning("No message selected, turning over quickly")
+                    logger.warning("No message selected (status=%s), turning over quickly", result.status)
                     time.sleep(self._turn_interval)
 
                 self._turn_count += 1

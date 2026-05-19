@@ -13,6 +13,7 @@ Used by: video_runner.py
 """
 
 import asyncio
+import json
 import logging
 import os
 import pathlib
@@ -179,5 +180,3 @@ class SceneEngine:
             sleep_for = max(0.0, self._frame_interval - elapsed)
             if sleep_for > 0:
                 await asyncio.sleep(sleep_for)
-
-import json  # noqa: E402 — used in update_ticker

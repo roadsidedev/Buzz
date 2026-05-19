@@ -107,6 +107,23 @@ class MediaMixer:
 
         await asyncio.sleep(0.5)
 
+        # Verify FFmpeg is actually running after startup
+        if self._ffmpeg_proc.returncode is not None:
+            stderr_data = ""
+            if self._ffmpeg_proc.stderr:
+                try:
+                    stderr_data = await asyncio.wait_for(
+                        self._ffmpeg_proc.stderr.read(), timeout=2.0
+                    )
+                    stderr_data = stderr_data.decode(errors="replace")
+                except Exception:
+                    pass
+            raise RuntimeError(
+                f"FFmpeg exited immediately with code {self._ffmpeg_proc.returncode}. "
+                f"Stderr: {stderr_data[:500]}"
+            )
+        logger.info("FFmpeg verified running — PID: %s", self._ffmpeg_proc.pid)
+
     async def stop(self) -> None:
         """Gracefully stop FFmpeg and clean up."""
         self._stop_event.set()
@@ -145,6 +162,13 @@ class MediaMixer:
             and self._ffmpeg_proc.returncode is None
             and not self._stop_event.is_set()
         )
+
+    @property
+    def ffmpeg_returncode(self) -> int | None:
+        """Return FFmpeg exit code if it has exited, None if still running."""
+        if self._ffmpeg_proc is None:
+            return None
+        return self._ffmpeg_proc.returncode
 
     # ── Audio Queue ──────────────────────────────────────────────────────────
 

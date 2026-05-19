@@ -25,6 +25,7 @@ import argparse
 import asyncio
 import logging
 import os
+import shutil
 import signal
 import sys
 import time
@@ -157,6 +158,21 @@ class VideoRunner:
         logger.info(f"  Max turns    : {self._max_turns or 'unlimited'}")
         logger.info("=" * 60)
 
+        # ── Dependency checks — fail fast if critical tools are missing ──────
+        if not shutil.which("ffmpeg"):
+            raise RuntimeError(
+                "ffmpeg not found on PATH. Install: https://ffmpeg.org/download.html"
+            )
+        logger.info("FFmpeg found: %s", shutil.which("ffmpeg"))
+
+        try:
+            from playwright.async_api import async_playwright
+            logger.info("Playwright module available")
+        except ImportError:
+            raise RuntimeError(
+                "Playwright not installed. Run: pip install playwright && playwright install chromium"
+            )
+
         # 0. Wait for backend
         logger.info("Waiting for backend health check...")
         self._bridge.wait_for_backend()
@@ -218,6 +234,13 @@ class VideoRunner:
                 # Check stream keeper health
                 if self._keeper.failed:
                     logger.critical("Stream keeper permanently failed — stopping.")
+                    self._running = False
+                    break
+
+                # Check FFmpeg process health
+                if not self._media_mixer.is_running:
+                    rc = self._media_mixer.ffmpeg_returncode
+                    logger.critical("FFmpeg process died (exit code %s) — stopping.", rc)
                     self._running = False
                     break
 

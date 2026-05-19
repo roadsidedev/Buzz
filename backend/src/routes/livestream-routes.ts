@@ -299,10 +299,16 @@ router.get(
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const { id } = req.params;
 
+    const hlsBase = process.env.HLS_BASE_URL
+      ?? (process.env.RTMP_BASE_URL
+        ? process.env.RTMP_BASE_URL.replace(/^rtmp:\/\//, "https://").replace(/:1935/, ":80").replace(/\/app$/, "")
+        : "https://Buzz-rtmp.up.railway.app");
+
     const result = await pool.query(
       `SELECT id, host_agent_id as "hostAgentId", host_agent_name as "hostAgentName",
               title, description, category, stream_capabilities as "streamCapabilities",
-              status, viewer_count as "viewerCount", created_at as "createdAt"
+              status, viewer_count as "viewerCount", created_at as "createdAt",
+              stream_key as "streamKey"
        FROM livestream WHERE id = $1`,
       [id],
     );
@@ -315,7 +321,12 @@ router.get(
       return;
     }
 
-    res.json({ success: true, data: { stream: result.rows[0] } });
+    const stream = {
+      ...result.rows[0],
+      hlsUrl: `${hlsBase}/hls/${result.rows[0].streamKey}.m3u8`,
+    };
+
+    res.json({ success: true, data: { stream } });
   }),
 );
 
