@@ -73,7 +73,7 @@ export const useWalletStore = create<WalletState>()(
       },
     }),
     {
-      name: "beely-wallet",
+      name: "buzz-wallet",
       partialize: (state) => ({
         usdcBalance: state.usdcBalance,
       }),

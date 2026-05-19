@@ -124,7 +124,7 @@ describe("Day 5: ERC-8004 & Jam Integration", () => {
       });
 
       // Act
-      const result = await jamService.createRoom("beely-room-123", roomConfig);
+      const result = await jamService.createRoom("Buzz-room-123", roomConfig);
 
       // Assert
       expect(result).toEqual({
@@ -135,7 +135,7 @@ describe("Day 5: ERC-8004 & Jam Integration", () => {
       });
 
       expect(jamService.createRoom).toHaveBeenCalledWith(
-        "beely-room-123",
+        "Buzz-room-123",
         expect.objectContaining(roomConfig)
       );
     });
@@ -155,7 +155,7 @@ describe("Day 5: ERC-8004 & Jam Integration", () => {
 
       // Act & Assert
       await expect(
-        jamService.createRoom("beely-room-123", roomConfig)
+        jamService.createRoom("Buzz-room-123", roomConfig)
       ).rejects.toThrow("Room title");
     });
   });

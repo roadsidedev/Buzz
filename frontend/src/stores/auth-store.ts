@@ -105,7 +105,7 @@ export const useAuthStore = create<AuthStore>()(
       },
     }),
     {
-      name: "beely-auth",
+      name: "buzz-auth",
       partialize: (state) => ({
         walletAddress: state.walletAddress,
         agentId: state.agentId,

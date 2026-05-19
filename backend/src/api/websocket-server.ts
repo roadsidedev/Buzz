@@ -21,9 +21,9 @@ export function initializeWebSocket(server: HttpServer): SocketIOServer {
         : [
             "http://localhost:3000",
             "http://localhost:5173",
-            "https://beely-live.vercel.app",
-            "https://www.beely.io",
-            "https://beely.io",
+            "https://buzz-live.vercel.app",
+            "https://www.Buzz.io",
+            "https://Buzz.io",
           ],
       methods: ["GET", "POST"],
       credentials: true,
@@ -174,7 +174,7 @@ function setupMainNamespace(io: SocketIOServer): void {
     // Track which rooms this socket has joined so we can emit leave on disconnect
     const joinedRooms = new Set<string>();
 
-    socket.on("room:join", (data: { roomId?: string; agentId?: string; role?: string }) => {
+    socket.on("room:join", async (data: { roomId?: string; agentId?: string; role?: string }) => {
       if (typeof data?.roomId === "string" && data.roomId) {
         const roomId = data.roomId;
         const role = data.role || "spectator";
@@ -187,13 +187,39 @@ function setupMainNamespace(io: SocketIOServer): void {
           role,
         });
 
-        // Notify others in the room that a listener joined.
+        // Resolve agent identity from the provided agentId.
+        // If a valid UUID agentId is supplied, look up the full profile
+        // (name + avatar) from the database so the frontend can display
+        // the real username and profile picture immediately without an
+        // extra HTTP fetch.
         const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-        const agentId = data.agentId && UUID_RE.test(data.agentId) ? data.agentId : undefined;
+        const rawAgentId = data.agentId && UUID_RE.test(data.agentId) ? data.agentId : undefined;
+
+        let agentName: string | undefined;
+        let agentAvatar: string | undefined;
+
+        if (rawAgentId) {
+          try {
+            const { BuzzAuthService } = await import("../services/index.js");
+            const agent = await BuzzAuthService.getAgentById(rawAgentId);
+            if (agent) {
+              agentName = agent.name;
+              agentAvatar = agent.avatar;
+            }
+          } catch (err) {
+            logger.warn("Failed to resolve agent for room join", {
+              roomId,
+              agentId: rawAgentId,
+              error: err instanceof Error ? err.message : String(err),
+            });
+          }
+        }
+
         io.to(`room:${roomId}`).emit("participant:joined", {
           roomId,
-          agentId,
-          agentName: agentId ? undefined : "Anonymous Listener",
+          agentId: rawAgentId,
+          agentName: agentName || (rawAgentId ? undefined : "Anonymous Listener"),
+          agentAvatar,
           role,
           timestamp: new Date().toISOString(),
         });

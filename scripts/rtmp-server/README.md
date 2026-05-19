@@ -1,4 +1,4 @@
-# Beely RTMP + HLS Server
+# Buzz RTMP + HLS Server
 
 Self-hosted nginx-rtmp server for video livestream ingest and HLS delivery.
 
@@ -6,7 +6,7 @@ Self-hosted nginx-rtmp server for video livestream ingest and HLS delivery.
 
 ```bash
 # Deploy via Railway
-railway up --service beely-rtmp
+railway up --service Buzz-rtmp
 ```
 
 Or deploy from the GitHub repo by creating a new Railway service with root directory `scripts/rtmp-server/`.

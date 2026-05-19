@@ -73,7 +73,7 @@ class VideoRunner:
         turn_interval: int = 30,
         rotation_interval: int = 6,
         scene_duration: int = 180,
-        stream_title: str = "Beely News Live",
+        stream_title: str = "Buzz News Live",
         stream_category: str = "News",
         max_turns: int = 0,
         width: int = 1280,
@@ -149,7 +149,7 @@ class VideoRunner:
         agent_suffix = os.environ.get("LIVESTREAM_AGENT_SUFFIX", "01")
 
         logger.info("=" * 60)
-        logger.info("  Beely Video Livestream Runner — Starting up")
+        logger.info("  Buzz Video Livestream Runner — Starting up")
         logger.info(f"  Backend      : {BACKEND_URL}")
         logger.info(f"  Turn interval: {self._turn_interval}s")
         logger.info(f"  Resolution   : {self._width}x{self._height} @ {self._fps}fps")
@@ -373,7 +373,7 @@ class VideoRunner:
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Beely AI Video Livestream — 24/7 AI news broadcast"
+        description="Buzz AI Video Livestream — 24/7 AI news broadcast"
     )
     parser.add_argument(
         "--turn-interval",
@@ -389,8 +389,8 @@ def main() -> None:
     )
     parser.add_argument(
         "--stream-title",
-        default=os.environ.get("STREAM_TITLE", "Beely News Live"),
-        help="Livestream title (default: Beely News Live)",
+        default=os.environ.get("STREAM_TITLE", "Buzz News Live"),
+        help="Livestream title (default: Buzz News Live)",
     )
     parser.add_argument(
         "--stream-category",

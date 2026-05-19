@@ -19,7 +19,7 @@ import { roomService } from "./room-service.js";
 
 export interface JamWebhookPayload {
   roomId: string; // Jam room ID
-  externalId?: string; // Beely room ID
+  externalId?: string; // Buzz room ID
   event: "room_started" | "room_ended" | "user_joined" | "user_left";
   timestamp: number;
   metadata?: Record<string, unknown>;
@@ -88,29 +88,29 @@ export class JamWebhookHandler {
     });
 
     // 3. ROUTE TO HANDLER
-    const beelyRoomId = externalId || roomId;
+    const buzzRoomId = externalId || roomId;
 
     try {
       switch (event) {
         case "room_started": {
-          await this._handleRoomStarted(beelyRoomId, roomId);
+          await this._handleRoomStarted(buzzRoomId, roomId);
           break;
         }
 
         case "room_ended": {
-          await this._handleRoomEnded(beelyRoomId, roomId);
+          await this._handleRoomEnded(buzzRoomId, roomId);
           break;
         }
 
         case "user_joined": {
           const userId = metadata?.userId as string | undefined;
-          await this._handleUserJoined(beelyRoomId, userId);
+          await this._handleUserJoined(buzzRoomId, userId);
           break;
         }
 
         case "user_left": {
           const userId = metadata?.userId as string | undefined;
-          await this._handleUserLeft(beelyRoomId, userId);
+          await this._handleUserLeft(buzzRoomId, userId);
           break;
         }
 
@@ -169,23 +169,23 @@ export class JamWebhookHandler {
    *
    * Audio room opened and accepting participants
    *
-   * @param beelyRoomId - Beely room ID
+   * @param buzzRoomId - Buzz room ID
    * @param jamRoomId - Jam room ID
    */
   private async _handleRoomStarted(
-    beelyRoomId: string,
+    buzzRoomId: string,
     jamRoomId: string,
   ): Promise<void> {
     logger.info("Jam room started", {
-      beelyRoomId,
+      buzzRoomId,
       jamRoomId,
     });
 
     // roomService is imported at module level
-    await roomService.updateRoomStatus(beelyRoomId, "live");
+    await roomService.updateRoomStatus(buzzRoomId, "live");
 
     logger.info("Room transitioned to live status", {
-      roomId: beelyRoomId,
+      roomId: buzzRoomId,
     });
   }
 
@@ -194,23 +194,23 @@ export class JamWebhookHandler {
    *
    * Audio room closed and recording archived
    *
-   * @param beelyRoomId - Beely room ID
+   * @param buzzRoomId - Buzz room ID
    * @param jamRoomId - Jam room ID
    */
   private async _handleRoomEnded(
-    beelyRoomId: string,
+    buzzRoomId: string,
     jamRoomId: string,
   ): Promise<void> {
     logger.info("Jam room ended", {
-      beelyRoomId,
+      buzzRoomId,
       jamRoomId,
     });
 
     // roomService is imported at module level
-    await roomService.closeRoom(beelyRoomId);
+    await roomService.closeRoom(buzzRoomId);
 
     logger.info("Room closed", {
-      roomId: beelyRoomId,
+      roomId: buzzRoomId,
     });
   }
 
@@ -219,30 +219,30 @@ export class JamWebhookHandler {
    *
    * Participant connected to audio room
    *
-   * @param beelyRoomId - Beely room ID
+   * @param buzzRoomId - Buzz room ID
    * @param userId - Participant ID (agent ID)
    */
   private async _handleUserJoined(
-    beelyRoomId: string,
+    buzzRoomId: string,
     userId: string | undefined,
   ): Promise<void> {
     if (!userId) {
       logger.warn("User joined event without userId", {
-        roomId: beelyRoomId,
+        roomId: buzzRoomId,
       });
       return;
     }
 
     logger.info("User joined Jam room", {
-      roomId: beelyRoomId,
+      roomId: buzzRoomId,
       agentId: userId,
     });
 
     // roomService is imported at module level
-    await roomService.addParticipant(beelyRoomId, userId);
+    await roomService.addParticipant(buzzRoomId, userId);
 
     logger.info("Participant added to room", {
-      roomId: beelyRoomId,
+      roomId: buzzRoomId,
       agentId: userId,
     });
   }
@@ -252,30 +252,30 @@ export class JamWebhookHandler {
    *
    * Participant disconnected from audio room
    *
-   * @param beelyRoomId - Beely room ID
+   * @param buzzRoomId - Buzz room ID
    * @param userId - Participant ID (agent ID)
    */
   private async _handleUserLeft(
-    beelyRoomId: string,
+    buzzRoomId: string,
     userId: string | undefined,
   ): Promise<void> {
     if (!userId) {
       logger.warn("User left event without userId", {
-        roomId: beelyRoomId,
+        roomId: buzzRoomId,
       });
       return;
     }
 
     logger.info("User left Jam room", {
-      roomId: beelyRoomId,
+      roomId: buzzRoomId,
       agentId: userId,
     });
 
     // roomService is imported at module level
-    await roomService.removeParticipant(beelyRoomId, userId);
+    await roomService.removeParticipant(buzzRoomId, userId);
 
     logger.info("Participant removed from room", {
-      roomId: beelyRoomId,
+      roomId: buzzRoomId,
       agentId: userId,
     });
   }

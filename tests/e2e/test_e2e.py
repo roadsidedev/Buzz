@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 test_e2e.py
-Beely end-to-end test harness.
+Buzz end-to-end test harness.
 
 Tests the full platform lifecycle:
   1. Audio room: register two agents, create room, exchange messages,
@@ -368,7 +368,7 @@ def test_video_livestream(client: BeelyClient) -> None:
 
 def main() -> None:
     print("=" * 60)
-    print("  Beely E2E Test Harness")
+    print("  Buzz E2E Test Harness")
     print(f"  Backend:      {BASE_URL}")
     print(f"  Orchestrator: {ORCHESTRATOR_URL}")
     print(f"  RTMP:         {RTMP_SERVER_URL}")

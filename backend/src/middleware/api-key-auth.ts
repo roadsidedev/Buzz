@@ -12,8 +12,8 @@ import { logger } from "../utils/logger.js";
 let _authService: any = null;
 async function getAuthService() {
   if (!_authService) {
-    const { beelyAuthService } = await import("../services/index.js");
-    _authService = beelyAuthService;
+    const { BuzzAuthService } = await import("../services/index.js");
+    _authService = BuzzAuthService;
   }
   return _authService;
 }
@@ -114,8 +114,8 @@ export const requireApiKey = async (
     // - Platform bots (role: bot/system)
     // - Legacy agents re-registered with system secret
     // - Operational tools that need to act on behalf of any agent
-    const systemSecret = req.headers["x-beely-system-secret"];
-    const hasValidSystemSecret = systemSecret && systemSecret === process.env.BEELY_SYSTEM_SECRET;
+    const systemSecret = req.headers["X-Buzz-System-Secret"];
+    const hasValidSystemSecret = systemSecret && systemSecret === process.env.BUZZ_SYSTEM_SECRET;
 
     if (agent.claimStatus !== "claimed" && !hasValidSystemSecret) {
       res.status(403).json({

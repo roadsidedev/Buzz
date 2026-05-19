@@ -1,7 +1,7 @@
 /**
  * Vitest Configuration
  *
- * Unit and integration test runner configuration for Beely frontend
+ * Unit and integration test runner configuration for Buzz frontend
  */
 
 import { defineConfig } from 'vitest/config';

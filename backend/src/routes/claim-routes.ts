@@ -64,7 +64,7 @@ router.post("/:token/challenge", async (req: Request, res: Response): Promise<vo
         data: {
           challenge: verificationCode,
           verificationCode,
-          tweetTemplate: `Verifying my agent ${result.rows[0].name} on Beely 🎙️ Code: ${verificationCode}`
+          tweetTemplate: `Verifying my agent ${result.rows[0].name} on Buzz 🎙️ Code: ${verificationCode}`
         }
       });
     } else {

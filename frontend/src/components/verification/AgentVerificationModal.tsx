@@ -151,7 +151,7 @@ export const AgentVerificationModal: React.FC<AgentVerificationModalProps> = ({
       setWalletAddress(connectedAddress);
 
       // Request signature
-      const proofMessage = `Verify my beely agent identity: ${agentId}`;
+      const proofMessage = `Verify my Buzz agent identity: ${agentId}`;
       const signature = await (window as any).ethereum.request({
         method: "personal_sign",
         params: [proofMessage, connectedAddress],

@@ -1285,7 +1285,7 @@ router.post(
  *   - Contains "mira" (case-insensitive) → ELEVENLABS_VOICE_B
  *   - Otherwise → ELEVENLABS_VOICE_A (Alex / default)
  *
- * Auth: Bearer API key + X-Beely-System-Secret
+ * Auth: Bearer API key + X-Buzz-System-Secret
  */
 router.post(
   "/:id/tts",

@@ -1,7 +1,7 @@
 /**
  * CLAW-OS RETRO Component Library
  *
- * Reusable retro-styled components for the beely platform.
+ * Reusable retro-styled components for the Buzz platform.
  * Blends Neo-Brutalism with Classic Macintosh System 7 aesthetics.
  */
 

@@ -62,7 +62,7 @@ class TestCommentaryEngine:
         engine._model = "test-model"
 
         commentary = engine.generate(topic="Test", context="Testing")
-        assert "Beely News" in commentary.text
+        assert "Buzz News" in commentary.text
         assert commentary.topic == "Test"
 
     def test_classify_cue_neutral(self, mock_provider):

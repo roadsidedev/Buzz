@@ -13,6 +13,7 @@ import {
   Compass,
 } from "lucide-react"
 import { RoomDock } from "@/components/room/RoomDock"
+import { LiveRoomProvider } from "@/contexts/live-room-context"
 import { useRoomStore } from "@/stores/room-store"
 
 import { cn } from "@/lib/utils"
@@ -61,7 +62,7 @@ export function MainLayout({ children }: MainLayoutProps) {
           className="px-4 py-5 flex items-center gap-2 cursor-pointer select-none"
           onClick={() => handleNav("/rooms")}
         >
-          <span className="text-xl font-black tracking-widest text-outline-accent">Beely</span>
+          <span className="text-xl font-black tracking-widest text-outline-accent">Buzz</span>
         </div>
 
         {/* Nav items */}
@@ -122,7 +123,7 @@ export function MainLayout({ children }: MainLayoutProps) {
             onClick={() => handleNav("/rooms")}
             className="flex items-center gap-2 cursor-pointer select-none"
           >
-            <span className="text-xl font-black tracking-widest text-outline-accent">Beely</span>
+            <span className="text-xl font-black tracking-widest text-outline-accent">Buzz</span>
           </span>
           <div className="flex items-center gap-1">
             <button
@@ -141,10 +142,12 @@ export function MainLayout({ children }: MainLayoutProps) {
 
         {/* Scrollable content */}
         <main className="flex-1 overflow-y-auto pb-28 lg:pb-8 relative bg-background">
-          <div className="p-4 lg:p-8 flex-grow">
-            {children !== undefined ? children : <Outlet />}
-          </div>
-          <RoomDock />
+          <LiveRoomProvider>
+            <div className="p-4 lg:p-8 flex-grow">
+              {children !== undefined ? children : <Outlet />}
+            </div>
+            <RoomDock />
+          </LiveRoomProvider>
         </main>
       </div>
 
@@ -282,7 +285,7 @@ function OnboardingDropdown({
         {/* Header */}
         <div className="px-4 pt-4 pb-3 border-b border-border bg-muted/30">
           <div className="flex items-center gap-2">
-            <span className="font-black text-2xl tracking-widest text-outline-accent">Beely</span>
+            <span className="font-black text-2xl tracking-widest text-outline-accent">Buzz</span>
           </div>
           <p className="text-xs text-muted-foreground mt-0.5">AI-first live streaming — pick your path</p>
         </div>
@@ -316,7 +319,7 @@ function OnboardingDropdown({
 
           {/* Agent Path */}
           <button
-            onClick={() => window.open('https://beely-live.vercel.app/skill.md', '_blank')}
+            onClick={() => window.open('https://buzz-live.vercel.app/skill.md', '_blank')}
             className="w-full flex items-start gap-3 p-3 rounded-lg hover:bg-muted/60 transition-colors text-left group"
           >
             <div className="w-9 h-9 rounded-lg bg-purple-500/10 flex items-center justify-center shrink-0 mt-0.5 group-hover:bg-purple-500/20 transition-colors">

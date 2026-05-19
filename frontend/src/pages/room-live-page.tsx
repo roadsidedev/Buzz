@@ -13,7 +13,7 @@ import { useAuthStore } from "@/stores/auth-store"
 import { useSocialStore } from "@/stores/social-store"
 import { usePrivy } from "@privy-io/react-auth"
 import { TipModal } from "@/components/retro/TipModal"
-import { useJamRoom } from "@/hooks/useJamRoom"
+import { useLiveRoom } from "@/contexts/live-room-context"
 import { useRoomHeartbeat } from "@/hooks/useRoomHeartbeat"
 import { cn } from "@/lib/utils"
 import {
@@ -208,7 +208,7 @@ export function RoomLivePage() {
   const streamId = params.id || ""
   const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:4000/api/v1"
 
-  const { authenticated } = useAuthStore()
+  const { authenticated, agentId } = useAuthStore()
   const { login } = usePrivy()
   const { isLiked, isSaved, toggleLike, toggleSave } = useSocialStore()
 
@@ -256,11 +256,18 @@ export function RoomLivePage() {
     }
   }, [])
 
-  const jamRoom = useJamRoom({
-    roomId: streamId,
-    pantryUrl: import.meta.env.VITE_PANTRY_URL,
-    autoJoin: !streamLoading && !!stream,
-  })
+  const {
+    jamInRoom,
+    jamSpeakers: liveJamSpeakers,
+    jamListeners: liveJamListeners,
+    jamSpeaking: liveJamSpeaking,
+    jamIsLoading: jamRoomLoading,
+    jamDisconnect,
+    jamToggleSoundMute,
+    enterRoom,
+    minimizeRoom: contextMinimizeRoom,
+    leaveRoom: contextLeaveRoom,
+  } = useLiveRoom()
 
   // ── Keep room alive with periodic heartbeats (any authenticated viewer) ─────
   useRoomHeartbeat(streamId, !!stream && authenticated)
@@ -453,14 +460,21 @@ export function RoomLivePage() {
       .catch(() => {})
   }, [streamId, stream, apiUrl])
 
-  // ── Join socket room for live events (tts:audio, participant changes, status) ─
-  // Join immediately on mount (not waiting for stream data) so the first
-  // tts:audio event is not missed.  The WebSocket service queues the join
-  // if the socket is not yet connected and flushes it on connect.
+  // Track whether the user minimized (instead of left), so the WebSocket
+  // subscription and Jam stay alive for the RoomDock background player.
+  const minimizingRef = useRef(false)
+
+  // ── Enter room via shared context (Jam + WebSocket) ─────────────────────────
+  // Uses the LiveRoomProvider's shared Jam instance so minimizing to the dock
+  // does not disconnect WebRTC audio — the same connection stays alive.
   useEffect(() => {
     if (!streamId) return
-    wsService.joinRoom(streamId, undefined, "spectator")
-    return () => wsService.leaveRoom(streamId)
+    enterRoom(streamId)
+    return () => {
+      if (!minimizingRef.current) {
+        contextLeaveRoom()
+      }
+    }
   }, [streamId])
 
   // ── Real-time participant lifecycle ─────────────────────────────────────────
@@ -468,18 +482,19 @@ export function RoomLivePage() {
     const unsubJoined = wsService.onParticipantJoined(async (data) => {
       if (data.roomId !== streamId) return
 
-      // Fetch real user profile data if agentId is available
+      // Use server-resolved info if available (avoids an extra HTTP fetch)
       let name = data.agentName || `Listener`
-      let avatar: string | null = null
+      let avatar: string | null = data.agentAvatar || null
 
-      if (data.agentId) {
+      // Fallback: fetch real user profile data from API if server didn't include it
+      if (data.agentId && !data.agentName) {
         try {
           const token = apiClient.getToken()
           const res = await axios.get(`${apiUrl}/agents/${data.agentId}`, token ? { headers: { Authorization: `Bearer ${token}` } } : undefined)
           const agent = res.data?.data?.agent || res.data?.data || null
           if (agent) {
-            name = agent.name || agent.display_name || data.agentName || name
-            avatar = agent.avatar || agent.avatar_url || null
+            name = agent.name || agent.display_name || name
+            avatar = agent.avatar || agent.avatar_url || avatar
           }
         } catch {
           // Use fallback name — profile fetch is non-critical
@@ -583,8 +598,8 @@ export function RoomLivePage() {
 
   // ── Stage participants ──────────────────────────────────────────────────────
   // Safely coerce jam-core arrays — they may arrive as non-arrays before WebRTC init
-  const safeSpeakers: string[] = Array.isArray(jamRoom.speakers) ? jamRoom.speakers : []
-  const safeSpeaking: string[] = Array.isArray(jamRoom.speaking) ? jamRoom.speaking : []
+  const safeSpeakers: string[] = Array.isArray(liveJamSpeakers) ? liveJamSpeakers : []
+  const safeSpeaking: string[] = Array.isArray(liveJamSpeaking) ? liveJamSpeaking : []
 
   const stageParticipants = React.useMemo<ParticipantInfo[]>(() => {
     if (participants.length > 0) {
@@ -605,7 +620,7 @@ export function RoomLivePage() {
     () => {
       const wsSpectators = participants.filter((p) => p.role === "spectator")
       // Jam-core listeners (from SFU/WebRTC peers) — deduplicate by ID
-      const jamListeners: string[] = Array.isArray(jamRoom.listeners) ? jamRoom.listeners : []
+      const jamListeners: string[] = Array.isArray(liveJamListeners) ? liveJamListeners : []
       const wsIds = new Set(wsSpectators.map(p => p.id))
       const combined = [
         ...wsSpectators,
@@ -615,7 +630,7 @@ export function RoomLivePage() {
       ]
       return combined
     },
-    [participants, jamRoom.listeners]
+    [participants, liveJamListeners]
   )
 
   // ── Sound Cues ──────────────────────────────────────────────────────────────
@@ -682,16 +697,22 @@ export function RoomLivePage() {
   }, [stream?.recordingEnabled, isRecording, uploadRecording, stopRecording])
 
   useEffect(() => {
-    if (jamRoom.inRoom && stream?.recordingEnabled && !isRecording) startRecording()
-  }, [jamRoom.inRoom, stream?.recordingEnabled, isRecording, startRecording])
+    if (jamInRoom && stream?.recordingEnabled && !isRecording) startRecording()
+  }, [jamInRoom, stream?.recordingEnabled, isRecording, startRecording])
 
   useEffect(() => () => stopRecording(), [stopRecording])
 
+  const handleMinimize = useCallback(() => {
+    minimizingRef.current = true
+    contextMinimizeRoom()
+    navigate("/rooms")
+  }, [contextMinimizeRoom, navigate])
+
   const handleLeave = useCallback(() => {
     stopRecording()
-    jamRoom.disconnect()
+    contextLeaveRoom()
     navigate(-1)
-  }, [stopRecording, jamRoom, navigate])
+  }, [stopRecording, contextLeaveRoom, navigate])
 
   // Mute/unmute the room audio output — always works regardless of Jam state.
   // Directly controls the HTML5 audio element and syncs Jam when connected.
@@ -701,12 +722,12 @@ export function RoomLivePage() {
       if (audioPlayerRef.current) {
         audioPlayerRef.current.muted = next
       }
-      if (jamRoom.inRoom) {
-        jamRoom.toggleSoundMute()
+      if (jamInRoom) {
+        jamToggleSoundMute()
       }
       return next
     })
-  }, [jamRoom.inRoom, jamRoom.toggleSoundMute])
+  }, [jamInRoom, jamToggleSoundMute])
 
   // ── Chat ────────────────────────────────────────────────────────────────────
   const sendMsg = (e: React.FormEvent) => {
@@ -935,7 +956,7 @@ export function RoomLivePage() {
               </button>
             )}
 
-            {jamRoom.isLoading ? (
+            {jamRoomLoading ? (
               <div className="flex flex-col items-center gap-3 py-16">
                 <BeeSpinner variant="primary" size="md" />
                 <p className="text-xs text-white/40 animate-pulse tracking-widest uppercase">Connecting…</p>
@@ -1008,6 +1029,17 @@ export function RoomLivePage() {
                 <span className="text-xs font-bold uppercase tracking-wide">Leave</span>
               </button>
 
+              {/* Minimize to background */}
+              <button
+                type="button"
+                onClick={handleMinimize}
+                className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors bg-muted hover:bg-muted/80 px-4 py-2 rounded-full"
+                aria-label="Minimize"
+              >
+                <ChevronDown size={16} />
+                <span className="text-xs font-bold uppercase tracking-wide">Minimize</span>
+              </button>
+
               {/* Speaker / audio-output mute — primary CTA for listeners */}
               <button
                 type="button"
@@ -1034,7 +1066,7 @@ export function RoomLivePage() {
                 <span className="text-xs font-bold uppercase tracking-wide">Tip</span>
               </button>
 
-              {!isRecording && !recordingUploading && stream?.recordingEnabled && jamRoom.inRoom && (
+              {!isRecording && !recordingUploading && stream?.recordingEnabled && jamInRoom && (
                 <button
                   type="button"
                   onClick={startRecording}
@@ -1240,7 +1272,7 @@ export function RoomLivePage() {
           style={{ background: "radial-gradient(ellipse at 50% 0%, rgba(108,92,231,0.22) 0%, transparent 65%)" }}
         />
 
-        {jamRoom.isLoading ? (
+        {jamRoomLoading ? (
           <div className="flex flex-col items-center gap-3 py-10">
             <BeeSpinner variant="primary" size="md" />
             <p className="text-xs text-muted-foreground/60 animate-pulse tracking-widest uppercase">Connecting…</p>
@@ -1307,7 +1339,7 @@ export function RoomLivePage() {
         {recordingUploading && (
           <span className="text-[11px] text-muted-foreground/60 uppercase tracking-widest">Saving…</span>
         )}
-        {!isRecording && !recordingUploading && stream?.recordingEnabled && jamRoom.inRoom && (
+        {!isRecording && !recordingUploading && stream?.recordingEnabled && jamInRoom && (
           <button
             type="button"
             onClick={startRecording}
@@ -1325,6 +1357,11 @@ export function RoomLivePage() {
           <button type="button" onClick={handleLeave} className="flex flex-col items-center gap-0.5 text-red-400 hover:text-red-300 transition-colors" aria-label="Leave">
             <PhoneOff size={20} />
             <span className="text-[9px] font-bold uppercase tracking-wide">Leave</span>
+          </button>
+          {/* Minimize to background */}
+          <button type="button" onClick={handleMinimize} className="flex flex-col items-center gap-0.5 text-muted-foreground hover:text-foreground/80 transition-colors" aria-label="Minimize">
+            <ChevronDown size={20} />
+            <span className="text-[9px] font-bold uppercase tracking-wide">Bg</span>
           </button>
           {/* Speaker mute — primary CTA on mobile */}
           <button

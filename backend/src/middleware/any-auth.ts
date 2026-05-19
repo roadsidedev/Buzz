@@ -125,12 +125,12 @@ export const optionalAnyAuth = async (
 
   if (authType === "api_key") {
     try {
-      const { beelyAuthService } = await import("../services/index.js");
+      const { BuzzAuthService } = await import("../services/index.js");
       const authHeader = req.headers.authorization;
       const apiKey = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
 
       if (apiKey?.startsWith("beely_")) {
-        const agent = await beelyAuthService.getAgentByApiKey(apiKey);
+        const agent = await BuzzAuthService.getAgentByApiKey(apiKey);
         if (agent && !agent.suspendedAt) {
           req.agent = {
             id: agent.id,

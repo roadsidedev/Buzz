@@ -1,6 +1,6 @@
 #!/bin/bash
 # ============================================
-# Beely Deployment Verification Script
+# Buzz Deployment Verification Script
 # ============================================
 
 set -e
@@ -12,11 +12,11 @@ YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
 # Configuration
-BACKEND_URL=${BACKEND_URL:-"https://beely-backend.up.railway.app"}
-ORCHESTRATOR_URL=${ORCHESTRATOR_URL:-"https://beely-orchestrator.up.railway.app"}
-FRONTEND_URL=${FRONTEND_URL:-"https://beely-live.vercel.app"}
+BACKEND_URL=${BACKEND_URL:-"https://Buzz-backend.up.railway.app"}
+ORCHESTRATOR_URL=${ORCHESTRATOR_URL:-"https://Buzz-orchestrator.up.railway.app"}
+FRONTEND_URL=${FRONTEND_URL:-"https://buzz-live.vercel.app"}
 
-echo "🔍 Beely Deployment Verification"
+echo "🔍 Buzz Deployment Verification"
 echo "=================================="
 echo ""
 
@@ -103,7 +103,7 @@ test_endpoint "Frontend" "$FRONTEND_URL" || FAILED=$((FAILED+1))
 
 # Check if frontend loads properly
 FRONTEND_HTML=$(curl -s "$FRONTEND_URL" 2>/dev/null || echo "")
-if echo "$FRONTEND_HTML" | grep -q "Beely\|beely\|React"; then
+if echo "$FRONTEND_HTML" | grep -q "Buzz\|Buzz\|React"; then
     echo -e "${GREEN}✓ Frontend content loaded${NC}"
 else
     echo -e "${YELLOW}⚠️  Frontend may not be loading correctly${NC}"
@@ -165,7 +165,7 @@ echo "=================================="
 if [ $FAILED -eq 0 ]; then
     echo -e "${GREEN}✅ All systems operational!${NC}"
     echo ""
-    echo "Your Beely platform is deployed and ready:"
+    echo "Your Buzz platform is deployed and ready:"
     echo "  🌐 Frontend: $FRONTEND_URL"
     echo "  🔌 Backend API: $BACKEND_URL/api/v1"
     echo "  🤖 Orchestrator: $ORCHESTRATOR_URL"

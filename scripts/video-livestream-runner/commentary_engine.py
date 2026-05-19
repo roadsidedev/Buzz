@@ -241,7 +241,7 @@ class CommentaryEngine:
         """v1: Direct prompt — no agent memory."""
         if not self._provider:
             return Commentary(
-                text=f"Welcome to Beely News. Today's topic: {topic}",
+                text=f"Welcome to Buzz News. Today's topic: {topic}",
                 topic=topic,
                 visual_cue="neutral",
             )
@@ -270,7 +270,7 @@ class CommentaryEngine:
             text = resp.content[0].text.strip()
         except Exception as exc:
             logger.error("LLM call failed: %s", exc)
-            text = f"Welcome back to Beely News. We're following {topic}."
+            text = f"Welcome back to Buzz News. We're following {topic}."
 
         cue = _classify_cue(self._provider, self._model, text)
         return Commentary(text=text, topic=topic, visual_cue=cue)

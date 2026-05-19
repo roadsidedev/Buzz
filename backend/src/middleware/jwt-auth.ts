@@ -9,7 +9,7 @@
  * 2. Decode JWT header to determine algorithm
  * 3. Verify signature using appropriate method
  * 4. Extract `sub` claim (Privy DID) from payload
- * 5. Resolve agent record via beelyAuthService.getAgentByPrivyDid()
+ * 5. Resolve agent record via BuzzAuthService.getAgentByPrivyDid()
  * 6. Attach req.agent for downstream middleware/routes
  */
 
@@ -27,8 +27,8 @@ type WebKeyUsage = any;
 let _authService: any = null;
 async function getAuthService() {
   if (!_authService) {
-    const { beelyAuthService } = await import("../services/index.js");
-    _authService = beelyAuthService;
+    const { BuzzAuthService } = await import("../services/index.js");
+    _authService = BuzzAuthService;
   }
   return _authService;
 }

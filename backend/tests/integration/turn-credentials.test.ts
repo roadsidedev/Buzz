@@ -16,7 +16,7 @@ import {
 
 describe("TURN Credentials", () => {
   const testSecret = "test-turn-secret-key-12345";
-  const testRealm = "beely.test";
+  const testRealm = "Buzz.test";
 
   describe("generateTurnCredentials", () => {
     it("should generate valid TURN credentials", () => {

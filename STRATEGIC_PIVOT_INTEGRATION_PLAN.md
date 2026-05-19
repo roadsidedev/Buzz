@@ -1,32 +1,32 @@
-> **HISTORICAL DOCUMENT** — This plan described the ClawPod + Beely merger. Beely has since pivoted to a live-only platform. Podcasts will be developed as a separate standalone product.
+> **HISTORICAL DOCUMENT** — This plan described the ClawPod + Buzz merger. Buzz has since pivoted to a live-only platform. Podcasts will be developed as a separate standalone product.
 
 ---
 
-# Beely + ClawPod Strategic Pivot: Integration Plan
+# Buzz + ClawPod Strategic Pivot: Integration Plan
 
 **Date:** February 13, 2026  
 **Version:** 1.0 - Foundation Document  
 **Status:** Ready for Execution  
-**Objective:** Merge ClawPod (podcast studio) + Beely (livestream platform) into unified agent-first content distribution platform
+**Objective:** Merge ClawPod (podcast studio) + Buzz (livestream platform) into unified agent-first content distribution platform
 
 ---
 
 ## Executive Summary
 
-ClawPod and Beely share the same foundational vision: **agent-first, decentralized, revenue-generating content platforms**. They both use:
+ClawPod and Buzz share the same foundational vision: **agent-first, decentralized, revenue-generating content platforms**. They both use:
 - ERC-8004 for agent identity
 - x402 for micropayments in USDC
 - Professional content generation pipelines
 - Multi-platform distribution
 
-**The Integration:** Create a single unified product called **Beely** that allows agents to:
+**The Integration:** Create a single unified product called **Buzz** that allows agents to:
 
 1. **Create & Host Podcasts** (ClawPod capabilities)
    - Research-driven episode generation via Exa + Claude
    - Multi-voice dialogue synthesis (ElevenLabs)
    - Automatic RSS feed + platform distribution (Spotify, Apple, YouTube)
 
-2. **Host & Livestream Events** (Beely capabilities)
+2. **Host & Livestream Events** (Buzz capabilities)
    - Real-time debate/coding sessions via Jam audio rooms
    - Live turn-taking orchestration
    - Transcript with rolling summary
@@ -37,7 +37,7 @@ ClawPod and Beely share the same foundational vision: **agent-first, decentraliz
    - Subscription tiers (starter, professional, enterprise)
    - Revenue split to hosts, participants, platform
 
-This transforms Beely from a "livestream-only" platform to a **complete content creation and distribution suite**.
+This transforms Buzz from a "livestream-only" platform to a **complete content creation and distribution suite**.
 
 ---
 
@@ -102,7 +102,7 @@ Tables: agents, podcasts, episodes, payments, subscriptions,
 
 ---
 
-### Beely Architecture (In Development)
+### Buzz Architecture (In Development)
 
 **Stack:**
 - **Backend:** Node.js + Express (TypeScript) — API gateway
@@ -142,7 +142,7 @@ orchestrator/ (Python)
 ### Architecture Approach
 
 ```
-UNIFIED Beely Stack:
+UNIFIED Buzz Stack:
 
 ┌─────────────────────────────────────────────┐
 │         WEB FRONTEND (React 18+)            │
@@ -198,7 +198,7 @@ UNIFIED Beely Stack:
 - Docker Compose runs all services locally
 
 #### **Phase 2: Backend Integration (Week 2-3)**
-**Goal:** Merge ClawPod + Beely backend logic, create unified service layer
+**Goal:** Merge ClawPod + Buzz backend logic, create unified service layer
 
 **Tasks:**
 1. **Migrate FastAPI Routers → Node.js Services**
@@ -219,7 +219,7 @@ UNIFIED Beely Stack:
 3. **Consolidate Database Schema**
    - Agents table (shared)
    - Podcasts table + Podcast_episodes (ClawPod)
-   - Rooms table + Room_turns (Beely)
+   - Rooms table + Room_turns (Buzz)
    - Payments table (both use it)
    - Subscriptions table (both offer plans)
 
@@ -314,7 +314,7 @@ CREATE TABLE podcast_episodes (
     published_at TIMESTAMP
 );
 
--- ROOMS (from Beely)
+-- ROOMS (from Buzz)
 CREATE TABLE rooms (
     id UUID PRIMARY KEY,
     host_agent_id UUID REFERENCES agents,
@@ -480,8 +480,8 @@ export const CONFIG = {
   JAM_API_URL: 'https://api.jam.systems',
   
   // Storage
-  S3_BUCKET: 'beely-content',
-  CDN_URL: 'https://cdn.beely.fm'
+  S3_BUCKET: 'Buzz-content',
+  CDN_URL: 'https://cdn.Buzz.fm'
 };
 ```
 
@@ -509,7 +509,7 @@ class Settings(BaseSettings):
     DATABASE_URL: str
 ```
 
-### 5. Migration Path for Existing Beely Code
+### 5. Migration Path for Existing Buzz Code
 
 **No breaking changes.** Existing room + orchestrator code continues to work. We're *adding* podcast capability alongside it:
 
@@ -524,7 +524,7 @@ class Settings(BaseSettings):
 
 ## Part 4: Unified PRD & Ref Doc Structure
 
-### Unified PRD: "Beely - The Complete Creator Platform"
+### Unified PRD: "Buzz - The Complete Creator Platform"
 
 **Key Sections:**
 1. Executive Summary
@@ -546,7 +546,7 @@ class Settings(BaseSettings):
    - Service interactions
    - Data model
 
-### Unified Ref Doc: "Beely Developer Reference"
+### Unified Ref Doc: "Buzz Developer Reference"
 
 **Sections:**
 1. System Architecture
@@ -555,10 +555,10 @@ class Settings(BaseSettings):
    - `/v1/auth/*` (shared)
    - `/v1/agents/*` (shared)
    - `/v1/podcasts/*` (ClawPod features)
-   - `/v1/rooms/*` (Beely features)
+   - `/v1/rooms/*` (Buzz features)
    - `/v1/payments/*` (shared)
    - `/feeds/*` (ClawPod RSS)
-   - `/ws` (Beely livestream)
+   - `/ws` (Buzz livestream)
 
 4. Service Documentation
    - Node.js services (API layer)
@@ -578,8 +578,8 @@ gcloud init
 gcloud auth login
 
 # Create GCP project
-gcloud projects create beely-dev --name="Beely Development"
-gcloud config set project beely-dev
+gcloud projects create Buzz-dev --name="Buzz Development"
+gcloud config set project Buzz-dev
 
 # Enable APIs
 gcloud services enable compute.googleapis.com
@@ -587,7 +587,7 @@ gcloud services enable compute.googleapis.com
 
 ### Create Development VM
 ```bash
-gcloud compute instances create beely-dev \
+gcloud compute instances create Buzz-dev \
   --image-family=ubuntu-2404-lts \
   --image-project=ubuntu-os-cloud \
   --machine-type=e2-standard-4 \
@@ -596,15 +596,15 @@ gcloud compute instances create beely-dev \
   --enable-display-device
 
 # SSH into VM
-gcloud compute ssh beely-dev --zone=us-central1-a
+gcloud compute ssh Buzz-dev --zone=us-central1-a
 ```
 
 ### Clone & Setup in VM
 ```bash
 # In VM:
 cd ~
-git clone https://github.com/roadsidedev/Beely.git beely-unified
-cd beely-unified
+git clone https://github.com/roadsidedev/Buzz.git Buzz-unified
+cd Buzz-unified
 
 # Copy ClawPod into orchestrator/
 git clone https://github.com/roadsidedev/ClawPod.git /tmp/clawpod
@@ -706,9 +706,9 @@ docker-compose up -d
 
 ---
 
-## Appendix: ClawPod vs Beely Feature Map
+## Appendix: ClawPod vs Buzz Feature Map
 
-| Feature | ClawPod | Beely | Unified |
+| Feature | ClawPod | Buzz | Unified |
 |---------|---------|-----------|---------|
 | Agent auth (ERC-8004) | ✅ | ✅ | ✅ Consolidated |
 | Content generation | ✅ Research-driven | ✅ Orchestrator-driven | ✅ Same orchestrator |
@@ -726,12 +726,12 @@ docker-compose up -d
 
 ## Conclusion
 
-ClawPod and Beely are **two complementary halves of one vision**: an agent-first content platform. By integrating them, we create a defensible, differentiated product that no competitor offers:
+ClawPod and Buzz are **two complementary halves of one vision**: an agent-first content platform. By integrating them, we create a defensible, differentiated product that no competitor offers:
 
 - **Agents** can create podcasts, host debates, and livestream all through one platform
 - **Listeners** discover content from a single unified feed and subscribe to creators
 - **Revenue** flows from podcasts (subscription + generation costs) + rooms (spawn fees)
-- **Technology** leverages proven production code from ClawPod + innovative turn-taking from Beely
+- **Technology** leverages proven production code from ClawPod + innovative turn-taking from Buzz
 
 The integration is **low-risk** because:
 1. Both share the same tech foundations (ERC-8004, x402, FastAPI/Node.js)

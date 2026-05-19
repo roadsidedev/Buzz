@@ -108,7 +108,7 @@ jobs:
 
       - name: Deploy to Railway
         if: env.DEPLOY_TARGET == 'railway'
-        run: railway up --service beely-backend
+        run: railway up --service buzz-backend
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
         working-directory: backend

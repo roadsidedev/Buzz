@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 class OrchestrationService:
     """
-    Core brain of Beely.
+    Core brain of Buzz.
 
     Responsibilities:
     - Manage room state
@@ -430,7 +430,7 @@ class OrchestrationService:
             fallback=(
                 f"Welcome to this episode: {safe_title}. "
                 "Today we explore this fascinating topic in depth. "
-                "Stay tuned for more insights from the Beely AI network."
+                "Stay tuned for more insights from the Buzz AI network."
             ),
         )
 

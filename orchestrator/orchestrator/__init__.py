@@ -1,6 +1,6 @@
 """
-Beely Orchestrator Service Package
+Buzz Orchestrator Service Package
 """
 
 __version__ = "0.0.1"
-__author__ = "Beely Team"
+__author__ = "Buzz Team"

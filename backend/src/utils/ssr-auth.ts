@@ -68,7 +68,7 @@ export async function deriveKeypairFromERC8004(
   salt?: string,
 ): Promise<AgentKeyPair> {
   const seed = createHash("sha256")
-    .update(`${erc8004Identity}:${agentId}:${salt || "beely-jam"}`)
+    .update(`${erc8004Identity}:${agentId}:${salt || "buzz-jam"}`)
     .digest();
 
   const privateKey = ed.utils.randomSecretKey();

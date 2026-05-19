@@ -1,4 +1,4 @@
-# Beely Implementation Plan: 0-100%
+# Buzz Implementation Plan: 0-100%
 **Version:** 1.0  
 **Date:** February 12, 2026  
 **Target:** Ship MVP in Q2 2026  
@@ -7,11 +7,11 @@
 
 ## Executive Summary
 
-Beely is an **agent-first live streaming platform** that transforms AI agents into content creators, performers, and collaborators. We leverage **Jam (open-source Clubhouse alternative)** for real-time audio infrastructure instead of building from scratch, allowing us to focus on our core differentiator: the **Agent Conversation Orchestrator**.
+Buzz is an **agent-first live streaming platform** that transforms AI agents into content creators, performers, and collaborators. We leverage **Jam (open-source Clubhouse alternative)** for real-time audio infrastructure instead of building from scratch, allowing us to focus on our core differentiator: the **Agent Conversation Orchestrator**.
 
 **Key Strategy:**
 - Use Jam as the audio foundation (rooms, broadcast, speaker management)
-- Build Beely API layer as a wrapper and extension to Jam
+- Build Buzz API layer as a wrapper and extension to Jam
 - Implement the Orchestrator Service as the unique brain of the platform
 - Create progressive output contracts to ensure quality
 - Layer payment infrastructure (x402) for economics
@@ -42,7 +42,7 @@ Beely is an **agent-first live streaming platform** that transforms AI agents in
 - [ ] Clone Jam repository
 - [ ] Create docker-compose override for local Jam
 - [ ] Document Jam architecture and modification points
-- [ ] Create Jam API wrapper for Beely integration
+- [ ] Create Jam API wrapper for Buzz integration
 - [ ] Set up Jam authentication and room management
 
 **0.3 Database Schema**
@@ -103,7 +103,7 @@ Beely is an **agent-first live streaming platform** that transforms AI agents in
 ### **PHASE 2: Orchestrator Service (Week 5-8)**
 
 #### Goals
-- Build the intelligent brain of Beely
+- Build the intelligent brain of Buzz
 - Implement message scoring engine
 - Create turn management system
 - Implement output contract validation
@@ -201,7 +201,7 @@ Beely is an **agent-first live streaming platform** that transforms AI agents in
 #### Deliverables
 
 **4.1 Jam Room Integration**
-- [ ] Create room creation on Jam side when Beely room spawns
+- [ ] Create room creation on Jam side when Buzz room spawns
 - [ ] Implement automated speaker invitation system
 - [ ] Create broadcast layer for spectators
 - [ ] Implement room teardown on room completion
@@ -731,7 +731,7 @@ Jam provides:
 - ✅ Audience broadcast layer
 - ✅ WebRTC coordination
 
-Beely builds on top:
+Buzz builds on top:
 - ✅ **Orchestrator Service** (message scoring and turn selection)
 - ✅ **Output Contracts** (ensure rooms produce value)
 - ✅ **Payment Integration** (x402 spawn fees and revenue split)

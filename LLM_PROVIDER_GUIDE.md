@@ -1,6 +1,6 @@
 # LLM Provider Configuration Guide
 
-The Beely Orchestrator supports multiple LLM providers through a provider-agnostic adapter system.
+The Buzz Orchestrator supports multiple LLM providers through a provider-agnostic adapter system.
 
 ## Supported Providers
 

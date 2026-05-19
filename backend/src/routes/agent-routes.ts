@@ -28,7 +28,7 @@ const RESERVED_USERNAMES = new Set([
   "admin", "administrator", "admins",
   "root", "superuser", "sudo",
   "system", "sys", "sysop",
-  "beely", "beely_admin", "beely_support", "beely_team",
+  "Buzz", "beely_admin", "beely_support", "beely_team",
   "support", "help", "helpdesk", "helpme",
   "api", "api_key", "apikey",
   "moderator", "mod", "mods",
@@ -119,8 +119,8 @@ router.post("/register", registrationLimiter, async (req: Request, res: Response
     }
 
     // Lazy import to avoid circular deps
-    const { beelyAuthService } = await import("../services/index.js");
-    const result = await beelyAuthService.registerAgent({ name, username, description });
+    const { BuzzAuthService } = await import("../services/index.js");
+    const result = await BuzzAuthService.registerAgent({ name, username, description });
 
     logger.info("Agent registered via API", {
       agentId: result.agent.id,
@@ -192,8 +192,8 @@ router.get("/:id", optionalApiKey, async (req: Request, res: Response): Promise<
       return;
     }
 
-    const { beelyAuthService } = await import("../services/index.js");
-    const agent = await beelyAuthService.getAgentById(id);
+    const { BuzzAuthService } = await import("../services/index.js");
+    const agent = await BuzzAuthService.getAgentById(id);
 
     if (!agent) {
       res.status(404).json({
@@ -250,8 +250,8 @@ router.get("/:id", optionalApiKey, async (req: Request, res: Response): Promise<
 router.get("/:id/badges", async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
-    const { beelyAuthService } = await import("../services/index.js");
-    const agent = await beelyAuthService.getAgentById(id);
+    const { BuzzAuthService } = await import("../services/index.js");
+    const agent = await BuzzAuthService.getAgentById(id);
 
     if (!agent) {
       res.status(404).json({
@@ -290,10 +290,10 @@ router.patch("/profile", requireApiKey, async (req: Request, res: Response): Pro
       return;
     }
 
-    const { beelyAuthService } = await import("../services/index.js");
+    const { BuzzAuthService } = await import("../services/index.js");
     
     // Update the agent profile using the service method
-    await beelyAuthService.updateAgentProfile(agentId, { description, avatar, twitterHandle });
+    await BuzzAuthService.updateAgentProfile(agentId, { description, avatar, twitterHandle });
 
     res.json({ 
       success: true, 
@@ -335,8 +335,8 @@ router.post("/sync", asyncHandler(async (req: Request, res: Response): Promise<v
     return;
   }
 
-  const { beelyAuthService } = await import("../services/index.js");
-  const agentId = await beelyAuthService.syncUser({ id, username, name, avatar });
+  const { BuzzAuthService } = await import("../services/index.js");
+  const agentId = await BuzzAuthService.syncUser({ id, username, name, avatar });
 
   logger.info("User synced to agent table", { userId: id, agentId, name });
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 livestream_bridge.py
-HTTP adapter between the video-livestream-runner and the Beely backend API.
+HTTP adapter between the video-livestream-runner and the Buzz backend API.
 
 Handles agent registration, livestream CRUD, heartbeat, and stream lifecycle.
 
@@ -46,13 +46,13 @@ class Livestream:
 
 class LivestreamBridge:
     """
-    HTTP adapter for the Beely backend livestream API.
+    HTTP adapter for the Buzz backend livestream API.
 
     Usage:
         bridge = LivestreamBridge()
         bridge.wait_for_backend()
         agent = bridge.register_or_reuse_agent("NewsAnchor", "video_anchor_01")
-        stream = bridge.create_livestream(agent, "Beely News Live", "News")
+        stream = bridge.create_livestream(agent, "Buzz News Live", "News")
     """
 
     def __init__(
@@ -201,7 +201,7 @@ class LivestreamBridge:
     def create_livestream(
         self,
         agent: RegisteredAgent,
-        title: str = "Beely News Live",
+        title: str = "Buzz News Live",
         category: str = "News",
         description: str = "",
     ) -> Livestream:

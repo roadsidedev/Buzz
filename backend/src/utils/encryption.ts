@@ -60,7 +60,7 @@ const CONFIG: EncryptionConfig = {
 function deriveKey(secret: string): Buffer {
   // Use PBKDF2 with SHA-256
   const iterations = 100000; // NIST recommends >=100k
-  const salt = "beely-encryption-salt"; // Constant salt (key derivation, not for random IV)
+  const salt = "buzz-encryption-salt"; // Constant salt (key derivation, not for random IV)
 
   return crypto.pbkdf2Sync(
     secret,

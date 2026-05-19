@@ -1,7 +1,7 @@
 {
-  "name": "beely-backend",
+  "name": "buzz-backend",
   "version": "0.0.1",
-  "description": "Beely API Gateway and Services",
+  "description": "Buzz API Gateway and Services",
   "type": "module",
   "scripts": {
     "dev": "node -r dotenv/config --import tsx src/server.ts",

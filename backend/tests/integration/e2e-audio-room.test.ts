@@ -125,7 +125,7 @@ describe("E2E: Audio Room Flow", () => {
     stunUrl: "stun:localhost:3478",
     turnUrl: "turn:localhost:3478",
     turnSecret: "test-secret",
-    turnRealm: "beely-live.vercel.app",
+    turnRealm: "buzz-live.vercel.app",
   };
 
   let service: JamServiceV2;
@@ -398,7 +398,7 @@ describe("Jam Service Factory E2E", () => {
       JAM_FALLBACK_ENABLED: "true",
       PANTRY_URL: "http://localhost:3003",
       COTURN_SECRET: "test-secret",
-      COTURN_REALM: "beely-live.vercel.app",
+      COTURN_REALM: "buzz-live.vercel.app",
       REDIS_URL: "redis://localhost:6379",
     };
   });

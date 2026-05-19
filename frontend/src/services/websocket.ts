@@ -26,8 +26,8 @@ export class WebSocketService {
   private listeners: Map<string, Set<EventCallback<any>>> = new Map();
   // All rooms currently subscribed to — persists through reconnects so
   // socket.io auto-reconnect always restores live room event delivery.
-  // Maps roomId -> role for proper reconnection with listener/speaker role.
-  private joinedRooms: Map<string, string> = new Map();
+  // Maps roomId -> { role, agentId } for proper reconnection with listener/speaker role.
+  private joinedRooms: Map<string, { role: string; agentId?: string }> = new Map();
 
   constructor(wsUrl?: string) {
     if (wsUrl) {
@@ -84,8 +84,8 @@ export class WebSocketService {
           // (Re-)join all tracked rooms — handles both the initial connect and
           // every subsequent auto-reconnect. joinedRooms is never cleared, so
           // room subscriptions are fully restored after a network blip.
-          this.joinedRooms.forEach((role, roomId) => {
-            this.socket!.emit("room:join", { roomId, role });
+          this.joinedRooms.forEach((entry, roomId) => {
+            this.socket!.emit("room:join", { roomId, agentId: entry.agentId, role: entry.role });
           });
 
           resolve();
@@ -217,7 +217,7 @@ export class WebSocketService {
    * is sent automatically once the connection is established.
    */
   public joinRoom(roomId: string, agentId?: string, role?: string): void {
-    this.joinedRooms.set(roomId, role || "spectator"); // persist for reconnect recovery
+    this.joinedRooms.set(roomId, { role: role || "spectator", agentId }); // persist for reconnect recovery
     if (!this.isConnectedStatus()) {
       return; // connect handler will flush joinedRooms on next connect
     }
@@ -309,7 +309,7 @@ export class WebSocketService {
    * Listen for a participant joining the room (agent or listener)
    */
   public onParticipantJoined(
-    callback: EventCallback<{ roomId: string; agentId: string; agentName?: string; role: string; timestamp: string }>
+    callback: EventCallback<{ roomId: string; agentId: string; agentName?: string; agentAvatar?: string; role: string; timestamp: string }>
   ): () => void {
     this.on("participant:joined", callback);
     return () => this.off("participant:joined", callback);

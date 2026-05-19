@@ -1,6 +1,6 @@
-# Beely Deployment Guide
+# Buzz Deployment Guide
 
-Production deployment guide for the Beely AI-first live streaming platform.
+Production deployment guide for the Buzz AI-first live streaming platform.
 
 ## Architecture Overview
 
@@ -80,7 +80,7 @@ npm install -g pgcli
 3. Choose:
    - **Region**: Select closest to your users (e.g., `us-east-1`)
    - **PostgreSQL Version**: 15 or 16
-   - **Project Name**: `beely-production`
+   - **Project Name**: `Buzz-production`
 4. Save the connection string:
    ```
    postgres://[user]:[password]@[host]/[database]?sslmode=require
@@ -110,14 +110,14 @@ Run the schema migration:
 ```sql
 -- Application user (limited permissions)
 CREATE USER beely_app WITH PASSWORD 'secure_random_password';
-GRANT CONNECT ON DATABASE beely TO beely_app;
+GRANT CONNECT ON DATABASE Buzz TO beely_app;
 GRANT USAGE ON SCHEMA public TO beely_app;
 GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO beely_app;
 GRANT USAGE ON ALL SEQUENCES IN SCHEMA public TO beely_app;
 
 -- Migration user (admin permissions)
 CREATE USER beely_migrator WITH PASSWORD 'another_secure_password';
-GRANT ALL PRIVILEGES ON DATABASE beely TO beely_migrator;
+GRANT ALL PRIVILEGES ON DATABASE Buzz TO beely_migrator;
 ```
 
 ## 2. Redis Setup (Upstash)
@@ -127,7 +127,7 @@ GRANT ALL PRIVILEGES ON DATABASE beely TO beely_migrator;
 1. Go to [Upstash Console](https://console.upstash.com)
 2. Click "Create Database"
 3. Choose:
-   - **Name**: `beely-redis`
+   - **Name**: `Buzz-redis`
    - **Region**: Same as Neon (e.g., `us-east-1`)
    - **Type**: Redis
 4. Save the connection details:
@@ -149,7 +149,7 @@ rediss://default:your-redis-password@your-db.upstash.io:6379
 2. Navigate to **R2 Object Storage**
 3. Click "Create bucket"
 4. Configure:
-   - **Bucket name**: `beely-audio-storage`
+   - **Bucket name**: `Buzz-audio-storage`
    - **Location**: Auto (or select region)
    - **Public access**: Disabled (use presigned URLs)
 
@@ -194,9 +194,9 @@ rediss://default:your-redis-password@your-db.upstash.io:6379
 # render.yaml configuration
 services:
   - type: web
-    name: beely-backend
+    name: Buzz-backend
     runtime: node
-    repo: https://github.com/your-org/beely
+    repo: https://github.com/your-org/Buzz
     branch: main
     buildCommand: cd backend && npm install && npm run build
     startCommand: cd backend && npm start
@@ -216,7 +216,7 @@ services:
       - key: R2_ENDPOINT
         sync: false
       - key: R2_BUCKET_NAME
-        value: beely-audio-storage
+        value: Buzz-audio-storage
     healthCheckPath: /health
     autoDeploy: true
 ```
@@ -231,8 +231,8 @@ services:
 | `R2_ACCESS_KEY_ID`     | Cloudflare R2 Access Key                   | Yes     |
 | `R2_SECRET_ACCESS_KEY` | Cloudflare R2 Secret                       | Yes     |
 | `R2_ENDPOINT`          | R2 S3 API endpoint                         | No      |
-| `R2_BUCKET_NAME`       | `beely-audio-storage`                     | No      |
-| `ORCHESTRATOR_URL`     | `https://beely-orchestrator.onrender.com` | No      |
+| `R2_BUCKET_NAME`       | `Buzz-audio-storage`                     | No      |
+| `ORCHESTRATOR_URL`     | `https://Buzz-orchestrator.onrender.com` | No      |
 | `ELEVENLABS_API_KEY`   | Your API key                               | Yes     |
 | `JAM_API_KEY`          | Your API key                               | Yes     |
 | `X402_MUNCHKIN_KEY`    | Your API key                               | Yes     |
@@ -249,7 +249,7 @@ npm install -g @railway/cli
 railway login
 
 # Initialize project
-railway init --name beely-backend
+railway init --name Buzz-backend
 
 # Deploy
 railway up
@@ -292,9 +292,9 @@ Or use Railway dashboard: https://railway.app/project/[project-id]/variables
 # render.yaml (add to existing)
 services:
   - type: web
-    name: beely-orchestrator
+    name: Buzz-orchestrator
     runtime: python
-    repo: https://github.com/your-org/beely
+    repo: https://github.com/your-org/Buzz
     branch: main
     buildCommand: cd orchestrator && pip install -r requirements.txt
     startCommand: cd orchestrator && uvicorn main:app --host 0.0.0.0 --port $PORT
@@ -366,9 +366,9 @@ vercel --prod
 In Vercel Dashboard → Project Settings → Environment Variables:
 
 ```bash
-VITE_API_URL=https://beely-backend.onrender.com
-VITE_WEBSOCKET_URL=wss://beely-backend.onrender.com
-VITE_ORCHESTRATOR_URL=https://beely-orchestrator.onrender.com
+VITE_API_URL=https://Buzz-backend.onrender.com
+VITE_WEBSOCKET_URL=wss://Buzz-backend.onrender.com
+VITE_ORCHESTRATOR_URL=https://Buzz-orchestrator.onrender.com
 ```
 
 Or via CLI:
@@ -443,18 +443,18 @@ REDIS_POOL_SIZE=10
 # Authentication
 JWT_SECRET=your-super-secret-jwt-key-min-32-chars
 JWT_EXPIRES_IN=7d
-JWT_ISSUER=beely-api
+JWT_ISSUER=Buzz-api
 
 # Cloudflare R2 (S3-compatible)
 R2_ACCESS_KEY_ID=your-r2-access-key
 R2_SECRET_ACCESS_KEY=your-r2-secret-key
 R2_ENDPOINT=https://your-account.r2.cloudflarestorage.com
-R2_BUCKET_NAME=beely-audio-storage
+R2_BUCKET_NAME=Buzz-audio-storage
 R2_REGION=auto
 R2_PUBLIC_URL=https://pub-your-account.r2.dev
 
 # Services
-ORCHESTRATOR_URL=https://beely-orchestrator.onrender.com
+ORCHESTRATOR_URL=https://Buzz-orchestrator.onrender.com
 ORCHESTRATOR_API_KEY=shared-secret-between-services
 
 # External APIs
@@ -473,7 +473,7 @@ LOG_LEVEL=info
 LOG_FORMAT=json
 
 # CORS
-CORS_ORIGIN=https://your-beely-frontend.vercel.app
+CORS_ORIGIN=https://your-Buzz-frontend.vercel.app
 CORS_CREDENTIALS=true
 
 # WebSocket
@@ -511,7 +511,7 @@ ELEVENLABS_API_KEY=your-elevenlabs-key
 ELEVENLABS_MODEL=eleven_multilingual_v2
 
 # Backend Integration
-BACKEND_URL=https://beely-backend.onrender.com
+BACKEND_URL=https://Buzz-backend.onrender.com
 BACKEND_API_KEY=shared-secret-between-services
 INTERNAL_API_KEY=your-internal-api-key
 
@@ -533,9 +533,9 @@ LOG_FORMAT=json
 
 ```bash
 # API Configuration
-VITE_API_URL=https://beely-backend.onrender.com/api/v1
-VITE_WEBSOCKET_URL=wss://beely-backend.onrender.com
-VITE_ORCHESTRATOR_URL=https://beely-orchestrator.onrender.com
+VITE_API_URL=https://Buzz-backend.onrender.com/api/v1
+VITE_WEBSOCKET_URL=wss://Buzz-backend.onrender.com
+VITE_ORCHESTRATOR_URL=https://Buzz-orchestrator.onrender.com
 
 # Feature Flags
 VITE_ENABLE_ANALYTICS=true
@@ -566,7 +566,7 @@ Add to `render.yaml`:
 ```yaml
 services:
   - type: web
-    name: beely-backend
+    name: Buzz-backend
     # ... other config
     buildCommand: |
       cd backend && npm install && npm run build
@@ -621,13 +621,13 @@ Test each service:
 
 ```bash
 # Backend health
-curl https://beely-backend.onrender.com/health
+curl https://Buzz-backend.onrender.com/health
 
 # Expected response:
 # {"status":"ok","timestamp":"2024-02-18T12:00:00.000Z","version":"1.0.0"}
 
 # Orchestrator health
-curl https://beely-orchestrator.onrender.com/health
+curl https://Buzz-orchestrator.onrender.com/health
 
 # Expected response:
 # {"status":"healthy","timestamp":"2024-02-18T12:00:00.000Z"}
@@ -652,14 +652,14 @@ redis-cli -u $REDIS_URL ping
 
 ```bash
 # Test R2 connectivity
-aws s3 ls s3://beely-audio-storage --endpoint-url=$R2_ENDPOINT
+aws s3 ls s3://Buzz-audio-storage --endpoint-url=$R2_ENDPOINT
 ```
 
 ### 9.5 End-to-End Test
 
 ```bash
 # Test full flow
-curl -X POST https://beely-backend.onrender.com/api/v1/rooms \
+curl -X POST https://Buzz-backend.onrender.com/api/v1/rooms \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer YOUR_JWT_TOKEN" \
   -d '{
@@ -708,26 +708,26 @@ Set up external monitoring with:
 
 Monitor these endpoints:
 
-- `https://beely-backend.onrender.com/health`
-- `https://beely-orchestrator.onrender.com/health`
-- `https://your-beely-frontend.vercel.app`
+- `https://Buzz-backend.onrender.com/health`
+- `https://Buzz-orchestrator.onrender.com/health`
+- `https://your-Buzz-frontend.vercel.app`
 
 ## 11. SSL & Custom Domains
 
 ### 11.1 Backend Custom Domain (Render)
 
 1. Go to Dashboard → Service Settings → Custom Domains
-2. Add your domain: `api.beely.io`
+2. Add your domain: `api.Buzz.io`
 3. Add DNS CNAME record:
    ```
-   CNAME api.beely.io → beely-backend.onrender.com
+   CNAME api.Buzz.io → Buzz-backend.onrender.com
    ```
 4. Render automatically provisions SSL certificate
 
 ### 11.2 Frontend Custom Domain (Vercel)
 
 1. Go to Project Settings → Domains
-2. Add your domain: `beely.io`
+2. Add your domain: `Buzz.io`
 3. Vercel provides DNS configuration
 4. Update nameservers or add DNS records as instructed
 
@@ -737,7 +737,7 @@ After setting custom domains, update CORS:
 
 ```bash
 # Backend environment variable
-CORS_ORIGIN=https://beely.io,https://www.beely.io
+CORS_ORIGIN=https://Buzz.io,https://www.Buzz.io
 ```
 
 ## 12. Backup & Disaster Recovery
@@ -752,7 +752,7 @@ Neon automatically creates daily backups. For additional safety:
 DATE=$(date +%Y%m%d_%H%M%S)
 pg_dump $DATABASE_URL > backup_$DATE.sql
 gzip backup_$DATE.sql
-aws s3 cp backup_$DATE.sql.gz s3://beely-backups/database/
+aws s3 cp backup_$DATE.sql.gz s3://Buzz-backups/database/
 ```
 
 ### 12.2 S3/R2 Backup
@@ -761,7 +761,7 @@ Enable versioning in R2:
 
 ```bash
 aws s3api put-bucket-versioning \
-  --bucket beely-audio-storage \
+  --bucket Buzz-audio-storage \
   --versioning-configuration Status=Enabled \
   --endpoint-url=$R2_ENDPOINT
 ```
@@ -976,13 +976,13 @@ Add these in GitHub → Settings → Secrets:
 
 ## Summary
 
-Your Beely platform is now deployed with:
+Your Buzz platform is now deployed with:
 
 | Component    | Service        | URL                                        |
 | ------------ | -------------- | ------------------------------------------ |
-| Frontend     | Vercel         | `https://beely-live.vercel.app`                |
-| Backend      | Render/Railway | `https://beely-backend.onrender.com`      |
-| Orchestrator | Render/Railway | `https://beely-orchestrator.onrender.com` |
+| Frontend     | Vercel         | `https://buzz-live.vercel.app`                |
+| Backend      | Render/Railway | `https://Buzz-backend.onrender.com`      |
+| Orchestrator | Render/Railway | `https://Buzz-orchestrator.onrender.com` |
 | Database     | Neon           | `postgresql://...neon.tech`                |
 | Cache        | Upstash        | `rediss://...upstash.io`                   |
 | Storage      | Cloudflare R2  | `https://...r2.cloudflarestorage.com`      |

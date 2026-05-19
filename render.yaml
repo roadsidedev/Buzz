@@ -1,13 +1,13 @@
-# Render Blueprint for Beely Platform
+# Render Blueprint for Buzz Platform
 # Deploy with: https://render.com/blueprints
 # Documentation: https://render.com/docs/blueprint-spec
 
 services:
   # Backend API Gateway Service
   - type: web
-    name: beely-backend
+    name: buzz-backend
     runtime: node
-    repo: https://github.com/molty-miles/beely
+    repo: https://github.com/molty-miles/buzz
     branch: main
     buildCommand: |
       cd backend && npm ci && npm run build
@@ -31,10 +31,10 @@ services:
       - key: R2_ENDPOINT
         sync: false
       - key: R2_BUCKET_NAME
-        value: beely-audio-storage
+        value: buzz-audio-storage
       - key: ORCHESTRATOR_URL
         fromService:
-          name: beely-orchestrator
+          name: buzz-orchestrator
           type: web
           property: host
       - key: ORCHESTRATOR_API_KEY
@@ -45,9 +45,9 @@ services:
 
   # Orchestrator Service (Python/FastAPI)
   - type: web
-    name: beely-orchestrator
+    name: buzz-orchestrator
     runtime: python
-    repo: https://github.com/molty-miles/beely
+    repo: https://github.com/molty-miles/buzz
     branch: main
     buildCommand: |
       cd orchestrator && pip install -r requirements.txt
@@ -70,12 +70,12 @@ services:
         sync: false
       - key: BACKEND_URL
         fromService:
-          name: beely-backend
+          name: buzz-backend
           type: web
           property: host
       - key: BACKEND_API_KEY
         fromService:
-          name: beely-backend
+          name: buzz-backend
           type: web
           envVarKey: ORCHESTRATOR_API_KEY
     healthCheckPath: /health
@@ -84,9 +84,9 @@ services:
 
   # Background Job Worker (Optional - for async tasks)
   - type: worker
-    name: beely-worker
+    name: buzz-worker
     runtime: node
-    repo: https://github.com/molty-miles/beely
+    repo: https://github.com/molty-miles/buzz
     branch: main
     buildCommand: |
       cd backend && npm ci && npm run build
@@ -97,12 +97,12 @@ services:
         value: production
       - key: DATABASE_URL
         fromService:
-          name: beely-backend
+          name: buzz-backend
           type: web
           envVarKey: DATABASE_URL
       - key: REDIS_URL
         fromService:
-          name: beely-backend
+          name: buzz-backend
           type: web
           envVarKey: REDIS_URL
     autoDeploy: true

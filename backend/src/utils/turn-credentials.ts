@@ -5,7 +5,7 @@
  * Uses HMAC-SHA1 with shared secret for credential generation.
  *
  * Flow:
- * 1. Client requests TURN credentials from Beely backend
+ * 1. Client requests TURN credentials from Buzz backend
  * 2. Backend generates time-limited credentials using COTURN_SECRET
  * 3. Client uses credentials to connect to TURN server
  * 4. TURN server validates credentials using same secret
@@ -46,7 +46,7 @@ export interface TurnServerConfig {
  */
 export function generateTurnCredentials(
   secret: string,
-  identifier: string = "beely-client",
+  identifier: string = "buzz-client",
   ttl: number = 86400,
 ): TurnCredentials {
   if (!secret) {
@@ -167,8 +167,8 @@ export function createIceServerConfig(options: {
     stunUrl,
     turnUrl,
     turnSecret,
-    turnRealm = "beely-live.vercel.app",
-    identifier = "beely-client",
+    turnRealm = "buzz-live.vercel.app",
+    identifier = "buzz-client",
     ttl = 86400,
   } = options;
 

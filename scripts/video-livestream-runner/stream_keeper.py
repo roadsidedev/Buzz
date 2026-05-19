@@ -67,7 +67,7 @@ class StreamKeeper:
         self._stream_id: str = ""
         self._rtmp_url: str = ""
         self._agent = None
-        self._title: str = "Beely News Live"
+        self._title: str = "Buzz News Live"
         self._category: str = "News"
 
         self._thread: Optional[threading.Thread] = None
@@ -102,7 +102,7 @@ class StreamKeeper:
         stream_id: str,
         rtmp_url: str,
         agent,
-        title: str = "Beely News Live",
+        title: str = "Buzz News Live",
         category: str = "News",
     ) -> None:
         with self._lock:

@@ -1,6 +1,6 @@
 """
 helpers.py
-Shared utilities for the Beely E2E test suite.
+Shared utilities for the Buzz E2E test suite.
 """
 
 import json
@@ -13,7 +13,7 @@ import httpx
 
 class BeelyClient:
     """
-    Thin HTTP client wrapper for the Beely API + Orchestrator.
+    Thin HTTP client wrapper for the Buzz API + Orchestrator.
 
     Usage:
         client = BeelyClient(

@@ -1,12 +1,12 @@
 {
   "version": 2,
-  "name": "beely-frontend",
+  "name": "buzz-frontend",
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "rewrites": [
     {
       "source": "/",
-      "has": [{ "type": "host", "value": "doc.beely-live.vercel.app" }],
+      "has": [{ "type": "host", "value": "doc.buzz-live.vercel.app" }],
       "destination": "/doc"
     },
     {

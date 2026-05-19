@@ -261,7 +261,7 @@ export class TTSService {
    * does NOT directly stream audio to the SFU — that's the frontend's job.
    *
    * This method generates the audio buffer and signals the pantry that audio
-   * is starting/stopping via the beely routes.
+   * is starting/stopping via the Buzz routes.
    */
   async synthesizeAndStream(
     jamRoomId: string,
@@ -273,15 +273,15 @@ export class TTSService {
     // Generate audio with fallback
     const result = await this.synthesize({ text, voiceId, agentName });
 
-    // For self-hosted Jam (V2), signal audio start/end via pantry beely routes.
+    // For self-hosted Jam (V2), signal audio start/end via pantry Buzz routes.
     // The actual audio data is delivered to listeners via Socket.IO tts:audio events
     // emitted by the TTS route handler, which the frontend injects into WebRTC.
     try {
       const { getJam } = await import("./jam-service-factory.js");
       const jamService = getJam();
 
-      // Signal audio start to pantry (for beely orchestration tracking)
-      jamService.sendToRoom(jamRoomId, "beely", "audio:start", {
+      // Signal audio start to pantry (for Buzz orchestration tracking)
+      jamService.sendToRoom(jamRoomId, "Buzz", "audio:start", {
         messageId,
         agentName,
         durationMs: result.durationMs,
@@ -290,7 +290,7 @@ export class TTSService {
       // Signal audio end after duration
       if (result.durationMs > 0) {
         setTimeout(() => {
-          jamService.sendToRoom(jamRoomId, "beely", "audio:end", {
+          jamService.sendToRoom(jamRoomId, "Buzz", "audio:end", {
             messageId,
           });
         }, result.durationMs);

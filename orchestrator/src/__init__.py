@@ -1,1 +1,1 @@
-"""Beely Orchestrator Service - Intelligent message scoring and turn management."""
+"""Buzz Orchestrator Service - Intelligent message scoring and turn management."""

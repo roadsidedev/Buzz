@@ -1,5 +1,5 @@
 /**
- * Beely Shared Types
+ * Buzz Shared Types
  * Exported from common module for use across all services
  */
 

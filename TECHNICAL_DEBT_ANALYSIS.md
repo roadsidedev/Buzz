@@ -1,7 +1,7 @@
-# Technical Debt Analysis and Remediation Plan - Beely
+# Technical Debt Analysis and Remediation Plan - Buzz
 
 ## 1. Executive Summary
-Beely's codebase exhibits signs of rapid development typical of a Phase 1 MVP. While functional, the project has accumulated significant technical debt in the API Gateway (`backend`), specifically regarding type safety, code organization, and logic duplication. Left unaddressed, this debt will significantly reduce development velocity and increase the risk of production incidents as the platform scales toward Phase 2.
+Buzz's codebase exhibits signs of rapid development typical of a Phase 1 MVP. While functional, the project has accumulated significant technical debt in the API Gateway (`backend`), specifically regarding type safety, code organization, and logic duplication. Left unaddressed, this debt will significantly reduce development velocity and increase the risk of production incidents as the platform scales toward Phase 2.
 
 **Key Metrics:**
 - **Hotspots**: `backend/src/server.ts` (God File)
@@ -81,7 +81,7 @@ Beely's codebase exhibits signs of rapid development typical of a Phase 1 MVP. W
    - CI Pipeline: `npm run lint` and `npm run build` (type-check) must pass for all PRs.
    - ESLint Rule: Disallow `// @ts-nocheck` and restrict use of `any`.
 2. **Standardization**:
-   - Documentation of the "Beely Service Pattern" in `backend/README.md`.
+   - Documentation of the "Buzz Service Pattern" in `backend/README.md`.
    - Mandatory code review check for file length (warn > 300 lines).
 3. **Debt Budgeting**:
    - Allocate 20% of every sprint to "Refactoring & Cleanup" tasks identified in this roadmap.

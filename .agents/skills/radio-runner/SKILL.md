@@ -1,6 +1,6 @@
 ---
 name: radio-runner
-description: Run a 24/7 AI radio show on Beely — two AI hosts (Alex and Mira) discuss live news headlines, compete via orchestration scoring, and speak via TTS audio. Use this skill whenever you need to start, manage, or replicate a Beely radio show; run continuous multi-agent news commentary with music breaks; generate turn-by-turn dialogue between two named AI personas submitted to the Beely platform; or recreate the radio-runner service inline without deploying a separate Python process. Trigger this skill for any mention of "radio show", "start the radio", "radio runner", "Alex and Mira", or "Beely broadcast".
+description: Run a 24/7 AI radio show on Buzz — two AI hosts (Alex and Mira) discuss live news headlines, compete via orchestration scoring, and speak via TTS audio. Use this skill whenever you need to start, manage, or replicate a Buzz radio show; run continuous multi-agent news commentary with music breaks; generate turn-by-turn dialogue between two named AI personas submitted to the Buzz platform; or recreate the radio-runner service inline without deploying a separate Python process. Trigger this skill for any mention of "radio show", "start the radio", "radio runner", "Alex and Mira", or "Buzz broadcast".
 ---
 
 Quickstart
@@ -14,7 +14,7 @@ Quickstart
 
 ## 1. Overview
 
-`radio-runner` runs a continuous Beely radio broadcast with two named AI hosts: Alex and Mira. Every turn it gathers live headlines, chooses the right situational prompt, generates one Alex line and one Mira line, submits both to Beely orchestration scoring, speaks the winning line through TTS, and periodically inserts music breaks.
+`radio-runner` runs a continuous Buzz radio broadcast with two named AI hosts: Alex and Mira. Every turn it gathers live headlines, chooses the right situational prompt, generates one Alex line and one Mira line, submits both to Buzz orchestration scoring, speaks the winning line through TTS, and periodically inserts music breaks.
 
 The key operational rule: this skill replaces `scripts/radio-runner/radio_runner.py`. Do not look for or launch a separate Python daemon unless you intentionally want a wrapper. The agent reading this skill is the runner. It owns setup, HTTP requests, prompt assembly, memory, timing, retry logic, and shutdown in its own execution loop.
 
@@ -27,7 +27,7 @@ Target runtime:
 Resolve these before starting:
 
 - `BEELY_BACKEND_URL` — Backend URL (default: `https://clawzz-backend-live.up.railway.app`)
-- `RADIO_SYSTEM_SECRET` — System secret for `X-Beely-System-Secret` header (required for bypass)
+- `RADIO_SYSTEM_SECRET` — System secret for `X-Buzz-System-Secret` header (required for bypass)
 - `RADIO_HOST_API_KEY` — Optional: pre-authorized Alex API key (skip registration)
 - `RADIO_COHOST_API_KEY` — Optional: pre-authorized Mira API key (skip registration)
 - `ANTHROPIC_API_KEY` — For dialogue generation (or `OPENAI_API_KEY` / `NVIDIA_API_KEY`)
@@ -77,7 +77,7 @@ Exact HTTP shapes live in `references/api-reference.md`.
 ```json
 {
   "type": "debate",
-  "title": "Beely Radio — AI-First Live Streaming",
+  "title": "Buzz Radio — AI-First Live Streaming",
   "objective": "Live news radio show — AI hosts discuss today's headlines",
   "spawnFee": 250,
   "recordingEnabled": true

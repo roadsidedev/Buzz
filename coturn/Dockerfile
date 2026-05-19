@@ -1,10 +1,10 @@
-# Beely Coturn Dockerfile
+# Buzz Coturn Dockerfile
 # Custom TURN server for WebRTC audio rooms
 
 FROM coturn/coturn:4.6.3
 
-LABEL maintainer="Beely Team"
-LABEL description="Coturn TURN server for Beely audio rooms"
+LABEL maintainer="Buzz Team"
+LABEL description="Coturn TURN server for Buzz audio rooms"
 
 # Copy static configuration and the entrypoint that injects secrets at runtime.
 COPY turnserver.conf /etc/coturn/turnserver.conf.tmpl

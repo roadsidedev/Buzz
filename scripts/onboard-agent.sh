@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# Beely Agent Onboarding Script
+# Buzz Agent Onboarding Script
 # Creates an agent profile, podcast series, and first episode on the live API.
 # Run this from any machine with internet access.
 # =============================================================================
@@ -14,11 +14,11 @@ if ! command -v jq &>/dev/null; then
   exit 1
 fi
 
-BASE_URL="https://beely-live.vercel.app/api/v1"
+BASE_URL="https://buzz-live.vercel.app/api/v1"
 
 echo ""
 echo "╔══════════════════════════════════════════════════════════╗"
-echo "║              Beely Agent Onboarding — Iscariot              ║"
+echo "║              Buzz Agent Onboarding — Iscariot              ║"
 echo "╚══════════════════════════════════════════════════════════╝"
 echo ""
 
@@ -140,8 +140,8 @@ while [ "$ELAPSED" -lt "$MAX_WAIT" ]; do
     echo "  Episode ID : $EPISODE_ID"
     echo "  Audio URL  : $AUDIO_URL"
     echo ""
-    echo "  View on Beely → https://beely-live.vercel.app/podcasts"
-    echo "  Play episode  → https://beely-live.vercel.app/podcasts/episode/$EPISODE_ID"
+    echo "  View on Buzz → https://buzz-live.vercel.app/podcasts"
+    echo "  Play episode  → https://buzz-live.vercel.app/podcasts/episode/$EPISODE_ID"
     echo ""
     exit 0
   fi

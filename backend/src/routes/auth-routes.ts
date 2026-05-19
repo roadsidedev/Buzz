@@ -24,8 +24,8 @@ const router = Router();
  */
 router.get("/me", requireApiKey, async (req: Request, res: Response): Promise<void> => {
   try {
-    const { beelyAuthService } = await import("../services/index.js");
-    const agent = await beelyAuthService.getAgentById(req.agent!.id);
+    const { BuzzAuthService } = await import("../services/index.js");
+    const agent = await BuzzAuthService.getAgentById(req.agent!.id);
 
     if (!agent) {
       res.status(404).json({
@@ -52,8 +52,8 @@ router.get("/me", requireApiKey, async (req: Request, res: Response): Promise<vo
  */
 router.get("/status", requireApiKey, async (req: Request, res: Response): Promise<void> => {
   try {
-    const { beelyAuthService } = await import("../services/index.js");
-    const status = await beelyAuthService.getClaimStatus(req.agent!.id);
+    const { BuzzAuthService } = await import("../services/index.js");
+    const status = await BuzzAuthService.getClaimStatus(req.agent!.id);
 
     res.json({ success: true, data: status });
   } catch (err: any) {
@@ -87,8 +87,8 @@ router.post("/claim", async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    const { beelyAuthService } = await import("../services/index.js");
-    const result = await beelyAuthService.startClaim(claim_token, email);
+    const { BuzzAuthService } = await import("../services/index.js");
+    const result = await BuzzAuthService.startClaim(claim_token, email);
 
     // Send verification email via SendGrid
     await emailService.sendVerificationEmail(email, result.agentName, result.emailToken);
@@ -134,8 +134,8 @@ router.post("/verify-email", async (req: Request, res: Response): Promise<void> 
       return;
     }
 
-    const { beelyAuthService } = await import("../services/index.js");
-    const result = await beelyAuthService.verifyEmail(token);
+    const { BuzzAuthService } = await import("../services/index.js");
+    const result = await BuzzAuthService.verifyEmail(token);
 
     res.json({
       success: true,
@@ -185,8 +185,8 @@ router.post("/verify-twitter", async (req: Request, res: Response): Promise<void
       return;
     }
 
-    const { beelyAuthService } = await import("../services/index.js");
-    await beelyAuthService.verifyTwitter(agent_id, twitter_handle);
+    const { BuzzAuthService } = await import("../services/index.js");
+    await BuzzAuthService.verifyTwitter(agent_id, twitter_handle);
 
     res.json({
       success: true,
@@ -225,8 +225,8 @@ router.post(
         return;
       }
 
-      const { beelyAuthService } = await import("../services/index.js");
-      const emailToken = await beelyAuthService.setupOwnerEmail(req.agent!.id, email);
+      const { BuzzAuthService } = await import("../services/index.js");
+      const emailToken = await BuzzAuthService.setupOwnerEmail(req.agent!.id, email);
 
       await emailService.sendVerificationEmail(email, req.agent!.name, emailToken);
 
@@ -267,8 +267,8 @@ router.post(
         return;
       }
 
-      const { beelyAuthService } = await import("../services/index.js");
-      const newKey = await beelyAuthService.rotateApiKey(req.agent!.id);
+      const { BuzzAuthService } = await import("../services/index.js");
+      const newKey = await BuzzAuthService.rotateApiKey(req.agent!.id);
 
       res.json({
         success: true,

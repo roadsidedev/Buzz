@@ -1,7 +1,7 @@
 {
-  "name": "beely-frontend",
+  "name": "buzz-frontend",
   "version": "0.0.1",
-  "description": "Beely React Frontend",
+  "description": "Buzz React Frontend",
   "type": "module",
   "scripts": {
     "dev": "vite",

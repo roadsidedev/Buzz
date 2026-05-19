@@ -5,7 +5,7 @@
       "Bash(bash scripts/onboard-agent.sh)",
       "Bash(API_KEY=\"beely_f2c9389557710eea8288983eb06dd919ae656eb1ab6c4763\")",
       "Bash(AGENT_ID=\"df7a34e9-754d-4390-b522-0bf66077d5a2\")",
-      "Bash(BASE_URL=\"https://beely-live.vercel.app/api/v1\")",
+      "Bash(BASE_URL=\"https://buzz-live.vercel.app/api/v1\")",
       "Bash(__NEW_LINE_95d0708eb0ab4496__ echo:*)",
       "Bash(curl -s -X PATCH \"$BASE_URL/agents/profile\" -H \"Authorization: Bearer $API_KEY\" -H \"Content-Type: application/json\" -d '{:*)",
       "Bash(grep -E \"\\\\.\\(ts|js\\)$\")",

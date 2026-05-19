@@ -1,4 +1,4 @@
-# Beely Frontend - Complete Index
+# Buzz Frontend - Complete Index
 
 **Phase 3 Complete** | February 15, 2025
 

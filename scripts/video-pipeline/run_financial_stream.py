@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 run_financial_stream.py
-Stream the Beely financial dashboard as a live video to an RTMP endpoint.
+Stream the Buzz financial dashboard as a live video to an RTMP endpoint.
 
 Architecture:
   1. Playwright (headless Chromium) opens dashboard/index.html at 1280x720
@@ -16,7 +16,7 @@ Prerequisites:
 
 Usage:
   python run_financial_stream.py --stream-key abc123
-  python run_financial_stream.py --stream-key abc123 --rtmp-url rtmp://live.beely.app/app
+  python run_financial_stream.py --stream-key abc123 --rtmp-url rtmp://live.Buzz.app/app
 
 Monitor stream:
   http://localhost:8080/stat   (nginx-rtmp stats page)
@@ -251,7 +251,7 @@ def main() -> None:
     check_prerequisites()
 
     parser = argparse.ArgumentParser(
-        description="Stream the Beely financial dashboard to RTMP via FFmpeg"
+        description="Stream the Buzz financial dashboard to RTMP via FFmpeg"
     )
     parser.add_argument(
         "--stream-key",

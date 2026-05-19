@@ -22,7 +22,7 @@ import time
 
 logger = logging.getLogger(__name__)
 
-TEMP_DIR = pathlib.Path(tempfile.gettempdir()) / "beely-livestream"
+TEMP_DIR = pathlib.Path(tempfile.gettempdir()) / "Buzz-livestream"
 
 
 class MediaMixer:

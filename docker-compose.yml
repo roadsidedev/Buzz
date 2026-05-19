@@ -6,7 +6,7 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    container_name: beely-frontend
+    container_name: buzz-frontend
     ports:
       - "3000:3000"
     environment:
@@ -40,7 +40,7 @@ services:
     build:
       context: .
       dockerfile: backend/Dockerfile
-    container_name: beely-backend
+    container_name: buzz-backend
     ports:
       - "4000:4000"
     environment:
@@ -71,7 +71,7 @@ services:
       # Coturn configuration
       - COTURN_SECRET=${COTURN_SECRET}
       - COTURN_EXTERNAL_IP=${COTURN_EXTERNAL_IP:-}
-      - COTURN_REALM=${COTURN_REALM:-beely-live.vercel.app}
+      - COTURN_REALM=${COTURN_REALM:-buzz-live.vercel.app}
     depends_on:
       postgres:
         condition: service_healthy
@@ -100,7 +100,7 @@ services:
     build:
       context: ./jam/pantry
       dockerfile: Dockerfile
-    container_name: beely-pantry
+    container_name: buzz-pantry
     ports:
       - "3003:3000"
     environment:
@@ -126,7 +126,7 @@ services:
     build:
       context: ./jam/pantry-sfu
       dockerfile: Dockerfile
-    container_name: beely-sfu
+    container_name: buzz-sfu
     environment:
       - JAM_SFU=true
       - JAM_SFU_EXTERNAL_IP=${COTURN_EXTERNAL_IP:-}
@@ -152,11 +152,11 @@ services:
     build:
       context: ./coturn
       dockerfile: Dockerfile
-    container_name: beely-coturn
+    container_name: buzz-coturn
     environment:
       - COTURN_SECRET=${COTURN_SECRET}
       - COTURN_EXTERNAL_IP=${COTURN_EXTERNAL_IP:-}
-      - COTURN_REALM=${COTURN_REALM:-beely-live.vercel.app}
+      - COTURN_REALM=${COTURN_REALM:-buzz-live.vercel.app}
     ports:
       - "3478:3478/udp"
       - "3478:3478/tcp"
@@ -175,7 +175,7 @@ services:
   # ============================================
   nginx-rtmp:
     image: alfg/nginx-rtmp
-    container_name: beely-rtmp
+    container_name: buzz-rtmp
     ports:
       - "1935:1935"   # RTMP ingest
       - "8080:80"     # HTTP stats page
@@ -190,7 +190,7 @@ services:
   # ============================================
   jam:
     image: ghcr.io/jam-systems/jam:latest
-    container_name: beely-jam-legacy
+    container_name: buzz-jam-legacy
     ports:
       - "3001:3000"
     environment:
@@ -212,18 +212,18 @@ services:
   # ============================================
   postgres:
     image: postgres:15-alpine
-    container_name: beely-postgres
+    container_name: buzz-postgres
     ports:
       - "5432:5432"
     environment:
-      - POSTGRES_USER=${POSTGRES_USER:-beely}
+      - POSTGRES_USER=${POSTGRES_USER:-buzz}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-      - POSTGRES_DB=${POSTGRES_DB:-beely}
+      - POSTGRES_DB=${POSTGRES_DB:-buzz}
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./migrations:/docker-entrypoint-initdb.d
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U beely"]
+      test: ["CMD-SHELL", "pg_isready -U buzz"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -236,7 +236,7 @@ services:
   # ============================================
   redis:
     image: redis:7-alpine
-    container_name: beely-redis
+    container_name: buzz-redis
     ports:
       - "6379:6379"
     command: redis-server --appendonly yes

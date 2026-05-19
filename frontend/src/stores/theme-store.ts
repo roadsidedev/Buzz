@@ -47,7 +47,7 @@ export const useThemeStore = create<ThemeState>()(
       },
     }),
     {
-      name: "beely-theme",
+      name: "buzz-theme",
     },
   ),
 );

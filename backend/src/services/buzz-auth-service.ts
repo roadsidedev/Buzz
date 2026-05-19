@@ -1,5 +1,5 @@
 /**
- * Beely Auth Service — Moltbook-style API-key authentication
+ * Buzz Auth Service — Moltbook-style API-key authentication
  *
  * Replaces SIWA auth. Registration requires only name + description.
  * Agents get an API key immediately. Human owners claim agents via
@@ -76,14 +76,14 @@ export interface ClaimStatusResult {
 // Service
 // ============================================
 
-export class BeelyAuthService {
+export class BuzzAuthService {
   private db: any;
   private baseUrl: string;
 
   constructor(db: any) {
     this.db = db;
     this.baseUrl =
-      process.env.BEELY_BASE_URL || "https://beely-live.vercel.app";
+      process.env.BUZZ_BASE_URL || "https://buzz-live.vercel.app";
   }
 
   // ==========================================
@@ -124,7 +124,7 @@ export class BeelyAuthService {
         existing.name?.toLowerCase().includes("radiohost");
 
       if (isBotRequest || isExistingBot) {
-        const systemSecret = process.env.BEELY_SYSTEM_SECRET;
+        const systemSecret = process.env.BUZZ_SYSTEM_SECRET;
         const isAuthorizedBot = systemSecret && input.system_secret === systemSecret;
 
         const needsKeyRotation = !existing.api_key || !existing.api_key.startsWith("beely_");
@@ -203,7 +203,7 @@ export class BeelyAuthService {
     const now = new Date();
 
     // Insert agent record
-    const systemSecret = process.env.BEELY_SYSTEM_SECRET;
+    const systemSecret = process.env.BUZZ_SYSTEM_SECRET;
     const isAuthorizedBot = systemSecret && input.system_secret === systemSecret;
 
     await this.db.query(
@@ -645,8 +645,8 @@ export class BeelyAuthService {
    * Uses the same deterministic UUID derivation as syncUser().
    */
   async getAgentByPrivyDid(privyDid: string): Promise<AgentProfile | null> {
-    const BEELY_NAMESPACE = "6ba7b810-9dad-11d1-80b4-00c04fd430c8";
-    const agentId = uuidv5(privyDid, BEELY_NAMESPACE);
+    const BUZZ_NAMESPACE = "6ba7b810-9dad-11d1-80b4-00c04fd430c8";
+    const agentId = uuidv5(privyDid, BUZZ_NAMESPACE);
 
     let result2;
     try {
@@ -696,8 +696,8 @@ export class BeelyAuthService {
     
     // Generate a deterministic UUID from the Privy DID to satisfy UUID constraints
     // Namespace: 6ba7b810-9dad-11d1-80b4-00c04fd430c8 (DNS namespace)
-    const BEELY_NAMESPACE = "6ba7b810-9dad-11d1-80b4-00c04fd430c8";
-    const agentId = uuidv5(privyDid, BEELY_NAMESPACE);
+    const BUZZ_NAMESPACE = "6ba7b810-9dad-11d1-80b4-00c04fd430c8";
+    const agentId = uuidv5(privyDid, BUZZ_NAMESPACE);
     
     const now = new Date();
 

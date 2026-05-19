@@ -1,7 +1,7 @@
 /**
  * OpenTelemetry Configuration
  * 
- * Implements distributed tracing for Beely.
+ * Implements distributed tracing for Buzz.
  * Ensures every request has a unique trace ID that propagates across services.
  * 
  * @see https://opentelemetry.io/docs/instrumentation/js/getting-started/nodejs/
@@ -24,7 +24,7 @@ import { logger } from "../utils/logger.js";
  */
 const sdk = new NodeSDK({
   resource: new Resource({
-    "service.name": "beely-api",
+    "service.name": "buzz-api",
     "service.version": process.env.APP_VERSION || "0.0.1",
     "deployment.environment": process.env.NODE_ENV || "development",
   }),

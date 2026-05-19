@@ -8,7 +8,7 @@ const body = JSON.stringify({ image: b64, mimeType: 'image/png' });
 
 // Via Vercel proxy (production path agents will use)
 const options = {
-  hostname: 'beely-live.vercel.app',
+  hostname: 'buzz-live.vercel.app',
   path: '/api/v1/podcasts/26f7ca4d-ebfa-4749-b53b-94604bb52ea7/cover',
   method: 'POST',
   headers: {

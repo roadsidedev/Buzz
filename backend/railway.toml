@@ -36,8 +36,8 @@ NODE_ENV = "production"
 # BASE_SEPOLIA_RPC = "https://sepolia.base.org"
 
 # SIWA Domain and URI
-# SIWA_DOMAIN = "api.beely.io"
-# SIWA_URI = "https://api.beely.io"
+# SIWA_DOMAIN = "api.Buzz.io"
+# SIWA_URI = "https://api.Buzz.io"
 
 # Feature flags - Set to false by default for MVP
 ENABLE_PAYMENTS = "false"
@@ -47,4 +47,4 @@ ENABLE_TTS = "false"
 # Required: DATABASE_URL, REDIS_URL, JWT_SECRET must be provided in Railway
 
 # RTMP server for video livestreams (deploy separately via scripts/rtmp-server/)
-# RTMP_BASE_URL = "rtmp://beely-rtmp.up.railway.app/app"
+# RTMP_BASE_URL = "rtmp://Buzz-rtmp.up.railway.app/app"

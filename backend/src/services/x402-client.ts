@@ -3,7 +3,7 @@
  * x402 SDK Client
  * @deprecated Needs refactoring to match updated types
  *
- * Implements the x402 payment protocol for Beely.
+ * Implements the x402 payment protocol for Buzz.
  * Supports both Base (EVM) and Solana chains via CDP facilitator.
  *
  * Security Model:
@@ -109,7 +109,7 @@ export class X402Client {
         headers: {
           Authorization: `Bearer ${this.apiKey}`,
           "Content-Type": "application/json",
-          "X-SDK-Version": "0.2.0-beely",
+          "X-SDK-Version": "0.2.0-buzz",
         },
         body: JSON.stringify({
           from: request.from,
@@ -119,7 +119,7 @@ export class X402Client {
           token: request.token || "USDC",
           metadata: {
             ...request.metadata,
-            platform: "beely",
+            platform: "Buzz",
           },
         }),
       });

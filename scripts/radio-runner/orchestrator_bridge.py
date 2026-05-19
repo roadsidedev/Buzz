@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 orchestrator_bridge.py
-Thin adapter between the radio-runner and the Beely API + Orchestrator.
+Thin adapter between the radio-runner and the Buzz API + Orchestrator.
 
 Handles agent registration, room lifecycle, message submission, and
 turn processing via HTTP.
@@ -57,7 +57,7 @@ class TurnResult:
 
 class OrchestratorBridge:
     """
-    HTTP adapter for the Beely backend API.
+    HTTP adapter for the Buzz backend API.
 
     Since the orchestrator is now part of the backend service, all requests
     go through a single base URL.
@@ -286,7 +286,7 @@ class OrchestratorBridge:
     def create_room(
         self,
         host: RegisteredAgent,
-        title: str = "Beely Radio Live",
+        title: str = "Buzz Radio Live",
         room_type: str = "debate",
         objective: str = "Live news discussion",
         spawn_fee: int = 250,
@@ -699,7 +699,7 @@ class OrchestratorBridge:
             "Authorization": f"Bearer {api_key}",
         }
         if self.system_secret:
-            headers["X-Beely-System-Secret"] = self.system_secret
+            headers["X-Buzz-System-Secret"] = self.system_secret
         return headers
 
     @staticmethod

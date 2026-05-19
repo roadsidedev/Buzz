@@ -55,12 +55,12 @@ class TestLivestreamBridge:
     def test_auth_headers_with_secret(self, bridge):
         headers = bridge._auth_headers("test-key")
         assert headers["Authorization"] == "Bearer test-key"
-        assert headers["X-Beely-System-Secret"] == "test-secret"
+        assert headers["X-Buzz-System-Secret"] == "test-secret"
 
     def test_auth_headers_without_secret(self):
         b = LivestreamBridge(backend_url="http://test.local")
         headers = b._auth_headers("test-key")
-        assert "X-Beely-System-Secret" not in headers
+        assert "X-Buzz-System-Secret" not in headers
         b.close()
 
     def test_assert_ok_passes(self, bridge):

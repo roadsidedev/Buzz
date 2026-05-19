@@ -14,7 +14,7 @@ const {roomAuthenticator, identityAuthenticator} = require('./auth');
 const {controller} = require('./routes/controller');
 const roomKeyRouter = require('./routes/roomKey');
 const liveRoomRouter = require('./routes/liveRoom');
-const initBeelyRoutes = require('./routes/beely');
+const initBeelyRoutes = require('./routes/Buzz');
 
 const app = express();
 
@@ -42,14 +42,14 @@ app.use('/api/v1/', controller('identities', identityAuthenticator));
 
 app.use('/api/v1/admin/', adminRouter);
 
-// Beely custom routes
+// Buzz custom routes
 // Initialize with Redis client if available
 if (process.env.REDIS_URL) {
   const Redis = require('ioredis');
   const redisClient = new Redis(process.env.REDIS_URL);
-  app.use('/api/v1/beely', initBeelyRoutes(redisClient));
+  app.use('/api/v1/Buzz', initBeelyRoutes(redisClient));
 } else {
-  app.use('/api/v1/beely', initBeelyRoutes(null));
+  app.use('/api/v1/Buzz', initBeelyRoutes(null));
 }
 
 module.exports = app;

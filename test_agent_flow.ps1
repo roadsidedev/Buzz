@@ -20,7 +20,7 @@ $regBody = @{
 } | ConvertTo-Json
 
 try {
-    $regRes = Invoke-RestMethod -Method Post -Uri "https://beely-live.vercel.app/api/v1/agents/register" -ContentType "application/json" -Body $regBody
+    $regRes = Invoke-RestMethod -Method Post -Uri "https://buzz-live.vercel.app/api/v1/agents/register" -ContentType "application/json" -Body $regBody
 
     $apiKey = $regRes.agent.api_key
     $agentId = $regRes.agent.id
@@ -35,14 +35,14 @@ try {
 
     Write-Host "`n--- Testing Livestream Creation ---"
     $liveBody = @{
-        title = "Testing Beely Livestream $(Get-Random)"
+        title = "Testing Buzz Livestream $(Get-Random)"
         description = "Automated test for livestream creation"
         category = "tech"
         streamCapabilities = @("video", "audio", "chat")
     } | ConvertTo-Json
 
     try {
-        $liveRes = Invoke-RestMethod -Method Post -Uri "https://beely-live.vercel.app/api/v1/livestreams/create" -Headers $headers -Body $liveBody
+        $liveRes = Invoke-RestMethod -Method Post -Uri "https://buzz-live.vercel.app/api/v1/livestreams/create" -Headers $headers -Body $liveBody
         Write-Host "Livestream Response:"
         $liveRes | ConvertTo-Json -Depth 5 | Write-Host
     } catch {
@@ -58,7 +58,7 @@ try {
     } | ConvertTo-Json
 
     try {
-        $roomRes = Invoke-RestMethod -Method Post -Uri "https://beely-live.vercel.app/api/v1/rooms/create" -Headers $headers -Body $roomBody
+        $roomRes = Invoke-RestMethod -Method Post -Uri "https://buzz-live.vercel.app/api/v1/rooms/create" -Headers $headers -Body $roomBody
         Write-Host "Room Response:"
         $roomRes | ConvertTo-Json -Depth 5 | Write-Host
     } catch {
@@ -73,7 +73,7 @@ try {
     } | ConvertTo-Json
 
     try {
-        $podRes = Invoke-RestMethod -Method Post -Uri "https://beely-live.vercel.app/api/v1/podcasts" -Headers $headers -Body $podBody
+        $podRes = Invoke-RestMethod -Method Post -Uri "https://buzz-live.vercel.app/api/v1/podcasts" -Headers $headers -Body $podBody
         Write-Host "Podcast Response:"
         $podRes | ConvertTo-Json -Depth 5 | Write-Host
         
@@ -89,7 +89,7 @@ try {
             } | ConvertTo-Json
             
             try {
-                $epRes = Invoke-RestMethod -Method Post -Uri "https://beely-live.vercel.app/api/v1/podcasts/$podId/episodes" -Headers $headers -Body $epBody
+                $epRes = Invoke-RestMethod -Method Post -Uri "https://buzz-live.vercel.app/api/v1/podcasts/$podId/episodes" -Headers $headers -Body $epBody
                 Write-Host "Episode Response:"
                 $epRes | ConvertTo-Json -Depth 5 | Write-Host
             } catch {

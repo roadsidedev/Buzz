@@ -41,11 +41,11 @@ describe("FeedPage Component - TikTok Style", () => {
     vi.clearAllMocks();
   });
 
-  it("should render feed page with beely logo", () => {
+  it("should render feed page with buzz logo", () => {
     renderWithRouter(<FeedPage />);
 
     // Use getAllByText since logo appears in multiple places
-    expect(screen.getAllByText(/beely/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/buzz/i).length).toBeGreaterThan(0);
   });
 
   it("should render navigation tabs", () => {

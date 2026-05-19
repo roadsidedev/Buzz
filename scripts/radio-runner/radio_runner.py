@@ -61,7 +61,7 @@ logger = logging.getLogger("radio_runner")
 
 # ── Configuration ────────────────────────────────────────────────────────────
 
-BACKEND_URL = os.environ.get("BEELY_BACKEND_URL", "https://clawzz-backend-live.up.railway.app")
+BACKEND_URL = os.environ.get("BUZZ_BACKEND_URL", "https://clawzz-backend-live.up.railway.app")
 # Orchestrator is now part of the backend — keep env var for backward compat but unused
 ORCHESTRATOR_URL = os.environ.get("ORCHESTRATOR_URL")
 NEWS_POLL_INTERVAL = int(os.environ.get("NEWS_POLL_INTERVAL_SECONDS", "180"))  # 3 min
@@ -155,7 +155,7 @@ class RadioRunner:
         agent_suffix = os.environ.get("RADIO_AGENT_SUFFIX", "01")
 
         logger.info("=" * 60)
-        logger.info("  Beely Radio Runner — Starting up")
+        logger.info("  Buzz Radio Runner — Starting up")
         logger.info(f"  Backend      : {BACKEND_URL}")
         logger.info(f"  Turn interval: {self._turn_interval}s")
         logger.info(f"  Break every  : {self._scheduler.break_interval} turns")
@@ -183,7 +183,7 @@ class RadioRunner:
         )
 
         # 3. Create initial room
-        title = "Beely Radio — AI-First Live Streaming"
+        title = "Buzz Radio — AI-First Live Streaming"
         objective = "Live news radio show — AI hosts discuss today's headlines"
         logger.info("Creating initial radio room...")
         self._room_id = self._bridge.create_room(
@@ -438,7 +438,7 @@ class RadioRunner:
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Beely AI Radio Show — 24/7 news radio with AI hosts"
+        description="Buzz AI Radio Show — 24/7 news radio with AI hosts"
     )
     parser.add_argument(
         "--turn-interval",

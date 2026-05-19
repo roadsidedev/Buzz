@@ -11,7 +11,7 @@ import AppWithErrorBoundary from "./App";
 import { logger } from "@/utils/logger";
 
 // Log app initialization
-logger.info("beely frontend starting up");
+logger.info("buzz frontend starting up");
 
 const root = ReactDOM.createRoot(document.getElementById("root")!);
 
@@ -21,4 +21,4 @@ root.render(
   </React.StrictMode>,
 );
 
-logger.info("beely frontend mounted");
+logger.info("buzz frontend mounted");

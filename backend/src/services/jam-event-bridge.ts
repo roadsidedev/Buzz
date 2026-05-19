@@ -1,13 +1,13 @@
 /**
  * Jam Event Bridge
  *
- * Redis-based event bridge for communication between Beely and Jam services.
+ * Redis-based event bridge for communication between Buzz and Jam services.
  * Replaces webhook-based events with real-time pub/sub.
  *
  * Event Flow:
  * 1. Pantry publishes events to 'jam:events' channel
- * 2. Beely backend subscribes and handles events
- * 3. Beely can publish to 'beely:room:events' for Pantry
+ * 2. Buzz backend subscribes and handles events
+ * 3. Buzz can publish to 'buzz:room:events' for Pantry
  */
 
 import Redis from "ioredis";
@@ -40,7 +40,7 @@ export interface JamEventBridgeConfig {
   redisUrl: string;
   channels?: {
     jamEvents?: string;
-    beelyEvents?: string;
+    buzzEvents?: string;
   };
 }
 
@@ -54,12 +54,12 @@ export class JamEventBridge {
   private subscriber: Redis;
   private handlers: Map<JamEventType, Set<JamEventHandler>> = new Map();
   private jamChannel: string;
-  private beelyChannel: string;
+  private buzzChannel: string;
   private isConnected: boolean = false;
 
   constructor(config: JamEventBridgeConfig) {
     this.jamChannel = config.channels?.jamEvents || "jam:events";
-    this.beelyChannel = config.channels?.beelyEvents || "beely:room:events";
+    this.buzzChannel = config.channels?.buzzEvents || "buzz:room:events";
 
     this.redis = new Redis(config.redisUrl);
     this.subscriber = new Redis(config.redisUrl);
@@ -168,14 +168,14 @@ export class JamEventBridge {
   }
 
   /**
-   * Publish event to Beely channel (for Pantry to consume)
+   * Publish event to Buzz channel (for Pantry to consume)
    */
   async publish(event: JamEvent): Promise<void> {
     try {
       const message = JSON.stringify(event);
-      await this.redis.publish(this.beelyChannel, message);
+      await this.redis.publish(this.buzzChannel, message);
 
-      logger.debug("Published event to Beely channel", {
+      logger.debug("Published event to Buzz channel", {
         type: event.type,
         roomId: event.roomId,
       });

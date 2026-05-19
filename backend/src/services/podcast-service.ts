@@ -9,7 +9,7 @@
  * - Subscription tracking
  * - Analytics aggregation
  *
- * Part of Phase 1: Strategic Pivot (ClawPod + Beely integration)
+ * Part of Phase 1: Strategic Pivot (ClawPod + Buzz integration)
  */
 
 import { Pool, QueryResult } from "pg";

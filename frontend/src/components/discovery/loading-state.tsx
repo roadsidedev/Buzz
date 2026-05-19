@@ -81,7 +81,7 @@ export const LoadingBar: React.FC = () => (
 
 /**
  * BeeSpinner Component
- * Animated flying bee loading indicator (Beely brand)
+ * Animated flying bee loading indicator (Buzz brand)
  */
 export interface BeeSpinnerProps {
   size?: "sm" | "md" | "lg";
@@ -126,7 +126,7 @@ export const LoadingOverlay: React.FC = () => (
   <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
     <div className="bg-white rounded-2xl p-8 flex flex-col items-center gap-3 shadow-xl">
       <BeeSpinner size="lg" />
-      <p className="text-center text-gray-600 font-medium">Beely is loading…</p>
+      <p className="text-center text-gray-600 font-medium">Buzz is loading…</p>
     </div>
   </div>
 );

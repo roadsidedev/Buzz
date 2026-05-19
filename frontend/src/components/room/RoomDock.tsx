@@ -6,7 +6,7 @@ import {
 import axios from "axios"
 import { cn } from "@/lib/utils"
 import { useRoomStore } from "@/stores/room-store"
-import { useJamRoom } from "@/hooks/useJamRoom"
+import { useLiveRoom } from "@/contexts/live-room-context"
 import { useAuthStore } from "@/stores/auth-store"
 import { usePrivy } from "@privy-io/react-auth"
 import { TipModal } from "@/components/retro/TipModal"
@@ -157,7 +157,7 @@ function SpeakerCell({
 // ── RoomDock ──────────────────────────────────────────────────────────────────
 
 export function RoomDock() {
-  const { activeRoomId, isExpanded, clearRoom, setExpanded } = useRoomStore()
+  const { activeRoomId, isExpanded, setExpanded } = useRoomStore()
   const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:4000/api/v1"
 
   const { authenticated } = useAuthStore()
@@ -181,11 +181,18 @@ export function RoomDock() {
   const recordingStartRef = useRef<Date | null>(null)
   const audioRef = useRef<HTMLAudioElement | null>(null)
 
-  const jamRoom = useJamRoom({
-    roomId: activeRoomId || "",
-    pantryUrl: import.meta.env.VITE_PANTRY_URL,
-    autoJoin: !streamLoading && !!stream && !!activeRoomId,
-  })
+  const {
+    jamInRoom,
+    jamSpeakers: dockJamSpeakers,
+    jamListeners: dockJamListeners,
+    jamSpeaking: dockJamSpeaking,
+    jamIsMuted,
+    jamIsSoundMuted,
+    jamIsLoading: jamLoading,
+    jamToggleMute,
+    jamToggleSoundMute,
+    leaveRoom: contextLeaveRoom,
+  } = useLiveRoom()
 
   // Reset on room change
   useEffect(() => {
@@ -207,13 +214,6 @@ export function RoomDock() {
     })
     return unsub
   }, [activeRoomId])
-
-  // Subscribe to socket room for TTS audio events
-  useEffect(() => {
-    if (!activeRoomId || !stream) return
-    wsService.joinRoom(activeRoomId)
-    return () => wsService.leaveRoom(activeRoomId)
-  }, [activeRoomId, stream])
 
   // Unlock persistent audio element on first user interaction (satisfies autoplay policy)
   useEffect(() => {
@@ -251,12 +251,12 @@ export function RoomDock() {
       } else {
         return
       }
-      audioRef.current.muted = jamRoom.isSoundMuted
+      audioRef.current.muted = jamIsSoundMuted
       audioRef.current.play().catch((e) => console.warn("[RoomDock] Audio play blocked:", e))
     }
     wsService.on("tts:audio", handleTtsAudio)
     return () => wsService.off("tts:audio", handleTtsAudio)
-  }, [activeRoomId, jamRoom.isSoundMuted])
+  }, [activeRoomId, jamIsSoundMuted])
 
   // Fetch room
   useEffect(() => {
@@ -295,9 +295,9 @@ export function RoomDock() {
   }, [activeRoomId, stream, apiUrl])
 
   // Safely coerce jam-core arrays — they may arrive as non-arrays before WebRTC init
-  const safeSpeakers: string[] = Array.isArray(jamRoom.speakers) ? jamRoom.speakers : []
-  const safeListeners: string[] = Array.isArray(jamRoom.listeners) ? jamRoom.listeners : []
-  const safeSpeaking: string[] = Array.isArray(jamRoom.speaking) ? jamRoom.speaking : []
+  const safeSpeakers: string[] = Array.isArray(dockJamSpeakers) ? dockJamSpeakers : []
+  const safeListeners: string[] = Array.isArray(dockJamListeners) ? dockJamListeners : []
+  const safeSpeaking: string[] = Array.isArray(dockJamSpeaking) ? dockJamSpeaking : []
 
   // Sound Cues
   const prevListenersCount = useRef(0)
@@ -371,16 +371,15 @@ export function RoomDock() {
   }, [stream?.recordingEnabled, isRecording, uploadRecording, stopRecording])
 
   useEffect(() => {
-    if (jamRoom.inRoom && stream?.recordingEnabled && !isRecording) startRecording()
-  }, [jamRoom.inRoom, stream?.recordingEnabled, isRecording, startRecording])
+    if (jamInRoom && stream?.recordingEnabled && !isRecording) startRecording()
+  }, [jamInRoom, stream?.recordingEnabled, isRecording, startRecording])
 
   useEffect(() => () => stopRecording(), [stopRecording])
 
   const handleLeave = useCallback(() => {
     stopRecording()
-    jamRoom.disconnect()
-    clearRoom()
-  }, [stopRecording, jamRoom, clearRoom])
+    contextLeaveRoom()
+  }, [stopRecording, contextLeaveRoom])
 
   const requireAuth = (fn: () => void) => {
     if (!authenticated) { login() } else { fn() }
@@ -416,15 +415,15 @@ export function RoomDock() {
         </div>
         <button
           type="button"
-          onClick={(e) => { e.stopPropagation(); if (jamRoom.inRoom) jamRoom.toggleMute() }}
+          onClick={(e) => { e.stopPropagation(); if (jamInRoom) jamToggleMute() }}
           className={cn(
             "w-9 h-9 rounded-full border flex items-center justify-center shrink-0 transition-all",
-            jamRoom.isMuted || !jamRoom.inRoom
+            jamIsMuted || !jamInRoom
               ? "border-white/20 text-white/30"
               : "border-violet-500 bg-violet-600/30 text-violet-300",
           )}
         >
-          {jamRoom.isMuted || !jamRoom.inRoom ? <MicOff size={16} /> : <Mic size={16} />}
+          {jamIsMuted || !jamInRoom ? <MicOff size={16} /> : <Mic size={16} />}
         </button>
 
         <button
@@ -511,7 +510,7 @@ export function RoomDock() {
             <p className="text-muted-foreground text-[11px] uppercase tracking-widest font-bold mb-4">
               On Stage
             </p>
-            {jamRoom.isLoading ? (
+            {jamLoading ? (
               <div className="flex items-center gap-3 py-8">
                 <BeeSpinner size="sm" variant="primary" />
                 <p className="text-xs text-muted-foreground uppercase tracking-widest">Connecting…</p>
@@ -576,20 +575,20 @@ export function RoomDock() {
           {/* Speaker / audio-output mute pill */}
           <button
             type="button"
-            onClick={jamRoom.inRoom ? jamRoom.toggleSoundMute : undefined}
+            onClick={jamInRoom ? jamToggleSoundMute : undefined}
             className={cn(
               "flex items-center gap-2 px-5 h-11 rounded-full border-2 font-bold text-sm transition-all duration-200",
-              !jamRoom.inRoom
+              !jamInRoom
                 ? "border-border text-muted-foreground cursor-default"
-                : jamRoom.isSoundMuted
+                : jamIsSoundMuted
                   ? "border-amber-500 bg-amber-500/15 text-amber-400 animate-pulse"
                   : "border-violet-500 bg-violet-600/20 text-violet-500",
             )}
-            aria-label={jamRoom.isSoundMuted ? "Unmute audio" : "Mute audio"}
+            aria-label={jamIsSoundMuted ? "Unmute audio" : "Mute audio"}
           >
-            {!jamRoom.inRoom || jamRoom.isSoundMuted ? <VolumeX size={18} /> : <Volume2 size={18} />}
+            {!jamInRoom || jamIsSoundMuted ? <VolumeX size={18} /> : <Volume2 size={18} />}
             <span className="text-[13px]">
-              {!jamRoom.inRoom ? "Connecting…" : jamRoom.isSoundMuted ? "Tap to hear" : "Live"}
+              {!jamInRoom ? "Connecting…" : jamIsSoundMuted ? "Tap to hear" : "Live"}
             </span>
           </button>
 

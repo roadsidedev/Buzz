@@ -74,7 +74,7 @@ class RoomKeeper:
         self._room_id: str = ""
         self._host_agent = None
         self._cohost_agent = None
-        self._title: str = "Beely Radio Live"
+        self._title: str = "Buzz Radio Live"
         self._room_type: str = "debate"
         self._objective: str = "Live news discussion"
 
@@ -108,7 +108,7 @@ class RoomKeeper:
         room_id: str,
         host_agent,
         cohost_agent,
-        title: str = "Beely Radio Live",
+        title: str = "Buzz Radio Live",
         room_type: str = "debate",
         objective: str = "Live news discussion",
     ) -> None:

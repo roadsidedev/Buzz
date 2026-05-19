@@ -1,4 +1,4 @@
-# Beely API Reference
+# Buzz API Reference
 
 **Base URL:** `http://localhost:4000`  
 **API Version:** `v1`  
@@ -406,7 +406,7 @@ Check API server status (no auth required).
 {
   "status": "ok",
   "timestamp": "2026-02-12T00:00:00Z",
-  "service": "beely-api",
+  "service": "Buzz-api",
   "version": "0.0.1",
   "uptime": 3600
 }

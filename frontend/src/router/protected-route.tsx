@@ -35,7 +35,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
       <div className="flex items-center justify-center min-h-screen bg-slate-950">
         <div className="text-center">
           <BeeSpinner size="lg" />
-          <p className="text-slate-300 mt-4">Beely is preparing your space...</p>
+          <p className="text-slate-300 mt-4">Buzz is preparing your space...</p>
         </div>
       </div>
     );
