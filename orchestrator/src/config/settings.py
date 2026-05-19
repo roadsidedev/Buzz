@@ -18,7 +18,15 @@ class Settings(BaseSettings):
     # FastAPI - Use Railway's PORT if available
     FASTAPI_HOST: str = "0.0.0.0"
     FASTAPI_PORT: int = int(os.getenv("PORT", "5000"))
-    CORS_ORIGINS: list[str] = ["http://localhost:4000", "http://localhost:3000"]
+    CORS_ORIGINS: list[str] = [
+        "http://localhost:4000",
+        "http://localhost:3000",
+        "https://buzz-live.vercel.app",
+        "https://beely-live.vercel.app",
+        "https://clawzz-backend-live.up.railway.app",
+        "https://www.Buzz.io",
+        "https://Buzz.io",
+    ]
 
     # PostgreSQL
     DATABASE_URL: str = "postgresql://postgres:postgres@localhost:5432/Buzz"

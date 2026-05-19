@@ -151,6 +151,7 @@ const allowedOrigins = process.env.CORS_ALLOWED_ORIGINS
       "http://localhost:3000",
       "http://localhost:5173",
       "https://buzz-live.vercel.app",
+      "https://beely-live.vercel.app",
       "https://www.Buzz.io",
       "https://Buzz.io",
     ];
