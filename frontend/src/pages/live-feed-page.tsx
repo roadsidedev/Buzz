@@ -103,13 +103,14 @@ const SkeletonCard: React.FC = () => (
 interface LiveFeedCardProps {
   stream: Stream
   viewerCount: number
+  navigate: ReturnType<typeof useNavigate>
   onOpenChat: () => void
   onOpenTip: () => void
   onOpenShare: () => void
 }
 
 const LiveFeedCard: React.FC<LiveFeedCardProps> = ({
-  stream, viewerCount, onOpenChat, onOpenTip, onOpenShare,
+  stream, viewerCount, navigate, onOpenChat, onOpenTip, onOpenShare,
 }) => {
   const { authenticated } = useAuthStore()
   const { login } = usePrivy()
@@ -529,6 +530,7 @@ export function LiveFeedPage() {
             <LiveFeedCard
               stream={stream}
               viewerCount={viewerCounts[stream.id] ?? stream.viewerCount}
+              navigate={navigate}
               onOpenChat={() => setActiveChatId(stream.id)}
               onOpenTip={() => { if (!authenticated) { login(); return }; openTip(stream) }}
               onOpenShare={() => setShareStreamId(stream.id)}
