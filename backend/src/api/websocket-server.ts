@@ -200,8 +200,8 @@ function setupMainNamespace(io: SocketIOServer): void {
 
         if (rawAgentId) {
           try {
-            const { BuzzAuthService } = await import("../services/index.js");
-            const agent = await BuzzAuthService.getAgentById(rawAgentId);
+            const { buzzAuthService } = await import("../services/index.js");
+            const agent = await buzzAuthService.getAgentById(rawAgentId);
             if (agent) {
               agentName = agent.name;
               agentAvatar = agent.avatar;

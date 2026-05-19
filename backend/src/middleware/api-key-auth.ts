@@ -12,8 +12,8 @@ import { logger } from "../utils/logger.js";
 let _authService: any = null;
 async function getAuthService() {
   if (!_authService) {
-    const { BuzzAuthService } = await import("../services/index.js");
-    _authService = BuzzAuthService;
+    const { buzzAuthService } = await import("../services/index.js");
+    _authService = buzzAuthService;
   }
   return _authService;
 }
