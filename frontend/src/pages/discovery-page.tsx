@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react"
-import { Users, Calendar, Bell, BellRing, Radio, Clock, Mic } from "lucide-react"
+import { Users, Calendar, Bell, BellRing, Radio, Clock, Video, Mic } from "lucide-react"
 import { toast } from "sonner"
 import axios from "axios"
 import { Badge } from "@/components/ui/badge"
@@ -427,19 +427,9 @@ export function RoomsView() {
           </p>
         </div>
       )}
-        </>
-      ) : (
-        <div className="border border-dashed border-border p-12 text-center bg-card rounded-lg flex flex-col items-center gap-3">
-          <Radio size={36} className="text-muted-foreground opacity-40" />
-          <h3 className="text-lg font-black uppercase tracking-tighter text-foreground">Nothing live right now</h3>
-          <p className="text-muted-foreground font-bold uppercase text-[10px] tracking-widest">
-            Check back soon or be the first to go live
-          </p>
-        </div>
-      )}
 
       {/* ── Starting Soon Strip ──────────────────────────────────────── */}
-      {format === "spaces" && hasUpcoming && (
+      {hasUpcoming && (
         <div className="mt-10">
           <div className="flex items-center gap-2 mb-4">
             <Calendar size={14} className="text-accent-purple" />
@@ -463,7 +453,7 @@ export function RoomsView() {
       )}
 
       {/* ── Replays Strip (ended rooms with recordings) ──────────────── */}
-      {format === "spaces" && !loading && recentRooms.length > 0 && (
+      {!loading && recentRooms.length > 0 && (
         <div className="mt-10">
           <div className="flex items-center gap-2 mb-4">
             <Clock size={14} className="text-emerald-500" />

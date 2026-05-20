@@ -199,28 +199,6 @@ const LiveFeedCard: React.FC<LiveFeedCardProps> = ({
           </Badge>
         )}
       </div>
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <div className="flex flex-col items-center gap-3 opacity-20">
-              <Tv size={72} className="text-white" />
-            </div>
-          </div>
-        </>
-      )}
-
-      {/* ── Top-left: LIVE + category ── */}
-      <div className="absolute top-4 left-4 flex items-center gap-2 z-10">
-        <Badge variant="destructive" className="animate-pulse text-xs px-2 py-0.5 font-bold">
-          LIVE
-        </Badge>
-        {stream.category && (
-          <Badge
-            variant="secondary"
-            className="bg-black/50 text-white hover:bg-black/50 border-none backdrop-blur-md capitalize text-xs"
-          >
-            {stream.category}
-          </Badge>
-        )}
-      </div>
 
       {/* ── Top-right: viewer count ── */}
       <div className="absolute top-4 right-4 z-10">
