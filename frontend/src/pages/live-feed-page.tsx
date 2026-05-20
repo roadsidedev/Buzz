@@ -98,22 +98,30 @@ const ActionButton: React.FC<ActionButtonProps> = ({ icon, label, onClick, activ
   </button>
 )
 
-// ─── Skeleton card shown while loading ──────────────────────────────────────
+// ─── Skeleton card shown while loading ─────────────────────────────────────
 
 const SkeletonCard: React.FC = () => (
   <div className="snap-start h-full w-full relative bg-black flex-shrink-0 overflow-hidden">
-    {/* Dark gradient background */}
+    {/* Dark gradient background simulating video */}
     <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-black to-gray-900" />
 
-    {/* Loading spinner in center */}
-    <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 z-10">
-      <BeeSpinner size="lg" variant="primary" />
-      <span className="text-white/40 font-bold uppercase text-[10px] tracking-widest animate-pulse">
-        Tuning into broadcast...
-      </span>
+    {/* Animated video placeholder */}
+    <div className="absolute inset-0 flex items-center justify-center">
+      <div className="w-32 h-32 rounded-full bg-white/5 animate-pulse" />
     </div>
 
-    {/* ── Right-side action stack (loading state) ── */}
+    {/* ── Top-left: LIVE badge placeholder ── */}
+    <div className="absolute top-4 left-4 flex items-center gap-2 z-10">
+      <div className="w-14 h-6 rounded-full bg-white/10 animate-pulse" />
+      <div className="w-16 h-6 rounded-full bg-white/5 animate-pulse" />
+    </div>
+
+    {/* ── Top-right: viewer count placeholder ── */}
+    <div className="absolute top-4 right-4 z-10">
+      <div className="w-16 h-6 rounded-full bg-white/10 animate-pulse" />
+    </div>
+
+    {/* ── Right-side action stack (TikTok-style) ── */}
     <div className="absolute right-4 bottom-28 z-10 flex flex-col items-center gap-4">
       <ActionButton icon={<Heart size={22} />} onClick={() => {}} />
       <ActionButton icon={<Plus size={22} />} onClick={() => {}} />
@@ -123,15 +131,15 @@ const SkeletonCard: React.FC = () => (
       <ActionButton icon={<Share2 size={22} />} onClick={() => {}} />
     </div>
 
-    {/* ─ Bottom overlay: placeholder host info ── */}
+    {/* ── Bottom overlay: host info placeholder ── */}
     <div className="absolute bottom-0 left-0 right-0 z-10 bg-gradient-to-t from-black/80 via-black/40 to-transparent pt-16 pb-5 px-4">
       <div className="flex items-end gap-3 pr-16">
         <div className="shrink-0">
-          <div className="w-11 h-11 rounded-full bg-muted/50 border-2 border-white/10 animate-pulse" />
+          <div className="w-11 h-11 rounded-full bg-white/10 animate-pulse" />
         </div>
-        <div className="min-w-0">
-          <div className="w-24 h-4 bg-white/10 rounded animate-pulse" />
-          <div className="w-40 h-3 bg-white/5 rounded mt-2 animate-pulse" />
+        <div className="min-w-0 space-y-2">
+          <div className="w-28 h-4 bg-white/10 rounded animate-pulse" />
+          <div className="w-44 h-3 bg-white/5 rounded animate-pulse" />
         </div>
       </div>
     </div>
@@ -438,18 +446,28 @@ export function LiveFeedPage() {
   const containerRef = useRef<HTMLDivElement>(null)
 
   // ── Fetch streams ────────────────────────────────────────────────────────
+  // Start with loading=true so skeleton shows immediately when tab is clicked
   useEffect(() => {
+    let mounted = true
     axios
       .get(`${apiUrl}/livestreams`)
       .then((res) => {
+        if (!mounted) return
         const data: Stream[] = res.data?.data?.streams || res.data?.data || []
         setStreams(data)
         const counts: Record<string, number> = {}
         data.forEach((s) => { counts[s.id] = s.viewerCount ?? 0 })
         setViewerCounts(counts)
       })
-      .catch(() => setStreams([]))
-      .finally(() => setLoading(false))
+      .catch(() => {
+        if (!mounted) return
+        setStreams([])
+      })
+      .finally(() => {
+        if (!mounted) return
+        setLoading(false)
+      })
+    return () => { mounted = false }
   }, [apiUrl])
 
   // ── Poll viewer counts every 30s ─────────────────────────────────────────
@@ -564,27 +582,23 @@ export function LiveFeedPage() {
             {/* Dark gradient background */}
             <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-black to-gray-900" />
 
-            {/* Animated pulse ring in center */}
-            <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 z-10">
-              <div className="relative">
-                <div className="w-20 h-20 rounded-full border-2 border-violet-500/30 flex items-center justify-center">
-                  <div className="w-14 h-14 rounded-full border-2 border-violet-500/50 animate-ping" />
-                </div>
-                <div className="absolute inset-0 w-20 h-20 rounded-full border-2 border-violet-500/20 animate-pulse" />
-              </div>
-              <div className="text-center">
-                <p className="text-white/80 font-bold text-lg">Streaming Starting Soon</p>
-                <p className="text-white/40 text-sm mt-1">Completed sessions (2+ min) will appear here</p>
-              </div>
-              {/* Animated dots */}
-              <div className="flex gap-2 mt-2">
-                <div className="w-2 h-2 rounded-full bg-violet-500 animate-bounce" style={{ animationDelay: "0ms" }} />
-                <div className="w-2 h-2 rounded-full bg-violet-500 animate-bounce" style={{ animationDelay: "150ms" }} />
-                <div className="w-2 h-2 rounded-full bg-violet-500 animate-bounce" style={{ animationDelay: "300ms" }} />
-              </div>
+            {/* Animated video placeholder */}
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="w-32 h-32 rounded-full bg-white/5 animate-pulse" />
             </div>
 
-            {/* ── Right-side action stack (disabled state) ─ */}
+            {/* ─ Top-left: Status badge placeholder ─ */}
+            <div className="absolute top-4 left-4 flex items-center gap-2 z-10">
+              <div className="w-14 h-6 rounded-full bg-white/10 animate-pulse" />
+              <div className="w-16 h-6 rounded-full bg-white/5 animate-pulse" />
+            </div>
+
+            {/* ─ Top-right: viewer count placeholder ─ */}
+            <div className="absolute top-4 right-4 z-10">
+              <div className="w-16 h-6 rounded-full bg-white/10 animate-pulse" />
+            </div>
+
+            {/* ─ Right-side action stack (TikTok-style) ─ */}
             <div className="absolute right-4 bottom-28 z-10 flex flex-col items-center gap-4">
               <ActionButton icon={<Heart size={22} />} onClick={() => {}} />
               <ActionButton icon={<Plus size={22} />} onClick={() => {}} />
@@ -594,15 +608,15 @@ export function LiveFeedPage() {
               <ActionButton icon={<Share2 size={22} />} onClick={() => {}} />
             </div>
 
-            {/* ── Bottom overlay: placeholder host info ── */}
+            {/* ─ Bottom overlay: host info placeholder ─ */}
             <div className="absolute bottom-0 left-0 right-0 z-10 bg-gradient-to-t from-black/80 via-black/40 to-transparent pt-16 pb-5 px-4">
               <div className="flex items-end gap-3 pr-16">
                 <div className="shrink-0">
-                  <div className="w-11 h-11 rounded-full bg-muted/50 border-2 border-white/10 animate-pulse" />
+                  <div className="w-11 h-11 rounded-full bg-white/10 animate-pulse" />
                 </div>
-                <div className="min-w-0">
-                  <div className="w-24 h-4 bg-white/10 rounded animate-pulse" />
-                  <div className="w-40 h-3 bg-white/5 rounded mt-2 animate-pulse" />
+                <div className="min-w-0 space-y-2">
+                  <div className="w-28 h-4 bg-white/10 rounded animate-pulse" />
+                  <div className="w-44 h-3 bg-white/5 rounded animate-pulse" />
                 </div>
               </div>
             </div>
@@ -628,7 +642,7 @@ export function LiveFeedPage() {
         ))}
       </div>
 
-      {/* ── Position indicator ── */}
+      {/* ─ Position indicator ── */}
       {streams.length > 1 && (
         <div className="absolute top-3 left-1/2 -translate-x-1/2 z-20 pointer-events-none">
           <div className="flex items-center gap-1.5 bg-black/40 backdrop-blur-sm px-2.5 py-1 rounded-full">
