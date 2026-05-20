@@ -26,7 +26,7 @@ import {
 import { apiClient } from "@/services/api"
 import wsService from "@/services/websocket"
 import { BeeSpinner } from "@/components/discovery/loading-state"
-import { HlsPlayer } from "@/components/livestream/HlsPlayer"
+import HlsPlayer from "@/components/livestream/HlsPlayer"
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
