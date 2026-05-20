@@ -98,7 +98,7 @@ const ActionButton: React.FC<ActionButtonProps> = ({ icon, label, onClick, activ
   </button>
 )
 
-// ─── Skeleton card shown while loading ─────────────────────────────────────
+// ─── Skeleton card shown while loading ────────────────────────────────────
 
 const SkeletonCard: React.FC = () => (
   <div className="snap-start h-full w-full relative bg-black flex-shrink-0 overflow-hidden">
@@ -125,7 +125,13 @@ const SkeletonCard: React.FC = () => (
     <div className="absolute right-4 bottom-28 z-10 flex flex-col items-center gap-4">
       <ActionButton icon={<Heart size={22} />} onClick={() => {}} />
       <ActionButton icon={<Plus size={22} />} onClick={() => {}} />
-      <ActionButton icon={<DollarSign size={22} />} onClick={() => {}} />
+      {/* Tip button — disabled in skeleton state */}
+      <div className="flex flex-col items-center gap-1 opacity-40 pointer-events-none">
+        <div className="w-11 h-11 rounded-full bg-black/40 backdrop-blur-sm border border-white/10 flex items-center justify-center">
+          <DollarSign size={22} className="text-white" />
+        </div>
+        <span className="text-white text-xs font-semibold drop-shadow-md opacity-0">—</span>
+      </div>
       <ActionButton icon={<MessageSquare size={22} />} onClick={() => {}} />
       <ActionButton icon={<Bookmark size={22} />} onClick={() => {}} />
       <ActionButton icon={<Share2 size={22} />} onClick={() => {}} />
@@ -602,13 +608,19 @@ export function LiveFeedPage() {
             <div className="absolute right-4 bottom-28 z-10 flex flex-col items-center gap-4">
               <ActionButton icon={<Heart size={22} />} onClick={() => {}} />
               <ActionButton icon={<Plus size={22} />} onClick={() => {}} />
-              <ActionButton icon={<DollarSign size={22} />} onClick={() => {}} />
+              {/* Tip button — disabled in empty state */}
+              <div className="flex flex-col items-center gap-1 opacity-40 pointer-events-none">
+                <div className="w-11 h-11 rounded-full bg-black/40 backdrop-blur-sm border border-white/10 flex items-center justify-center">
+                  <DollarSign size={22} className="text-white" />
+                </div>
+                <span className="text-white text-xs font-semibold drop-shadow-md opacity-0">—</span>
+              </div>
               <ActionButton icon={<MessageSquare size={22} />} onClick={() => {}} />
               <ActionButton icon={<Bookmark size={22} />} onClick={() => {}} />
               <ActionButton icon={<Share2 size={22} />} onClick={() => {}} />
             </div>
 
-            {/* ─ Bottom overlay: host info placeholder ─ */}
+            {/*  Bottom overlay: host info placeholder ─ */}
             <div className="absolute bottom-0 left-0 right-0 z-10 bg-gradient-to-t from-black/80 via-black/40 to-transparent pt-16 pb-5 px-4">
               <div className="flex items-end gap-3 pr-16">
                 <div className="shrink-0">
