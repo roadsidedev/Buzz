@@ -177,6 +177,8 @@ export function RoomDock() {
   const [agentScores, setAgentScores] = useState<Record<string, number>>({})
   const [isRecording, setIsRecording] = useState(false)
   const [recordingUploading, setRecordingUploading] = useState(false)
+  // Local sound-mute state — starts UNMUTED so listeners hear audio immediately
+  const [soundMuted, setSoundMuted] = useState(false)
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const chunksRef = useRef<BlobPart[]>([])
@@ -190,10 +192,8 @@ export function RoomDock() {
     jamListeners: dockJamListeners,
     jamSpeaking: dockJamSpeaking,
     jamIsMuted,
-    jamIsSoundMuted,
     jamIsLoading: jamLoading,
     jamToggleMute,
-    jamToggleSoundMute,
     leaveRoom: contextLeaveRoom,
   } = useLiveRoom()
 
@@ -219,10 +219,16 @@ export function RoomDock() {
   }, [activeRoomId])
 
   // Unlock persistent audio element on first user interaction (satisfies autoplay policy)
+  // Uses a silent WAV data URI to pre-warm — calling play() with no src always rejects.
   useEffect(() => {
+    const SILENT_WAV = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA='
     const unlock = () => {
       if (audioRef.current) {
-        audioRef.current.play().then(() => audioRef.current?.pause()).catch(() => {})
+        const player = audioRef.current
+        player.src = SILENT_WAV
+        player.play()
+          .then(() => { player.pause(); player.src = '' })
+          .catch(() => {})
       }
     }
     document.addEventListener("click", unlock, { once: true })
@@ -254,12 +260,12 @@ export function RoomDock() {
       } else {
         return
       }
-      audioRef.current.muted = jamIsSoundMuted
+      audioRef.current.muted = soundMuted
       audioRef.current.play().catch((e) => console.warn("[RoomDock] Audio play blocked:", e))
     }
     wsService.on("tts:audio", handleTtsAudio)
     return () => wsService.off("tts:audio", handleTtsAudio)
-  }, [activeRoomId, jamIsSoundMuted])
+  }, [activeRoomId, soundMuted])
 
   // Fetch room
   useEffect(() => {
@@ -418,15 +424,15 @@ export function RoomDock() {
         </div>
         <button
           type="button"
-          onClick={(e) => { e.stopPropagation(); if (jamInRoom) jamToggleMute() }}
+          onClick={(e) => { e.stopPropagation(); setSoundMuted((prev) => !prev) }}
           className={cn(
             "w-9 h-9 rounded-full border flex items-center justify-center shrink-0 transition-all",
-            jamIsMuted || !jamInRoom
-              ? "border-white/20 text-white/30"
+            soundMuted
+              ? "border-amber-500/50 bg-amber-500/10 text-amber-400"
               : "border-violet-500 bg-violet-600/30 text-violet-300",
           )}
         >
-          {jamIsMuted || !jamInRoom ? <MicOff size={16} /> : <Mic size={16} />}
+          {soundMuted ? <VolumeX size={16} /> : <Volume2 size={16} />}
         </button>
 
         <button
@@ -444,7 +450,7 @@ export function RoomDock() {
   return (
     <>
       {/* Hidden persistent audio element — reused for all TTS playback */}
-      <audio ref={audioRef} preload="none" style={{ display: "none" }} />
+      <audio ref={audioRef} preload="auto" style={{ display: "none" }} />
 
       <div
         className="fixed inset-0 z-40 flex flex-col animate-in slide-in-from-bottom duration-300 bg-background text-foreground"
@@ -578,20 +584,18 @@ export function RoomDock() {
           {/* Speaker / audio-output mute pill */}
           <button
             type="button"
-            onClick={jamInRoom ? jamToggleSoundMute : undefined}
+            onClick={() => setSoundMuted((prev) => !prev)}
             className={cn(
               "flex items-center gap-2 px-5 h-11 rounded-full border-2 font-bold text-sm transition-all duration-200",
-              !jamInRoom
-                ? "border-border text-muted-foreground cursor-default"
-                : jamIsSoundMuted
-                  ? "border-amber-500 bg-amber-500/15 text-amber-400 animate-pulse"
-                  : "border-violet-500 bg-violet-600/20 text-violet-500",
+              soundMuted
+                ? "border-amber-500 bg-amber-500/15 text-amber-400 animate-pulse"
+                : "border-violet-500 bg-violet-600/20 text-violet-500",
             )}
-            aria-label={jamIsSoundMuted ? "Unmute audio" : "Mute audio"}
+            aria-label={soundMuted ? "Unmute audio" : "Mute audio"}
           >
-            {!jamInRoom || jamIsSoundMuted ? <VolumeX size={18} /> : <Volume2 size={18} />}
+            {soundMuted ? <VolumeX size={18} /> : <Volume2 size={18} />}
             <span className="text-[13px]">
-              {!jamInRoom ? "Connecting…" : jamIsSoundMuted ? "Tap to hear" : "Live"}
+              {soundMuted ? "Tap to hear" : "Live"}
             </span>
           </button>
 

@@ -11,7 +11,7 @@ interface RoomStore {
 export const useRoomStore = create<RoomStore>((set) => ({
   activeRoomId: null,
   isExpanded: false,
-  setRoom: (id) => set({ activeRoomId: id, isExpanded: true }),
+  setRoom: (id) => set({ activeRoomId: id, isExpanded: false }),
   clearRoom: () => set({ activeRoomId: null, isExpanded: false }),
   setExpanded: (expanded) => set({ isExpanded: expanded }),
 }))

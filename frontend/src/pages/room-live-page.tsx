@@ -909,6 +909,10 @@ export function RoomLivePage() {
           </div>
 
           <div className="flex items-center gap-1 shrink-0">
+            <button type="button" onClick={handleMinimize} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-border/50 bg-muted/30 text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-all" aria-label="Minimize">
+              <ChevronDown size={14} />
+              <span className="text-[11px] font-bold uppercase tracking-wide">Minimize</span>
+            </button>
             <button type="button" onClick={() => setShareWizardOpen(true)} className="p-2 text-white/40 hover:text-white/80 transition-colors" aria-label="Share">
               <Share2 size={17} />
             </button>
@@ -1030,17 +1034,6 @@ export function RoomLivePage() {
               >
                 <PhoneOff size={16} />
                 <span className="text-xs font-bold uppercase tracking-wide">Leave</span>
-              </button>
-
-              {/* Minimize to background */}
-              <button
-                type="button"
-                onClick={handleMinimize}
-                className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors bg-muted hover:bg-muted/80 px-4 py-2 rounded-full"
-                aria-label="Minimize"
-              >
-                <ChevronDown size={16} />
-                <span className="text-xs font-bold uppercase tracking-wide">Minimize</span>
               </button>
 
               {/* Speaker / audio-output mute — primary CTA for listeners */}
@@ -1217,6 +1210,9 @@ export function RoomLivePage() {
         </div>
 
         <div className="flex items-center gap-1">
+          <button type="button" onClick={handleMinimize} className="p-2 text-white/50 hover:text-white/80 transition-colors" aria-label="Minimize to background">
+            <ChevronDown size={18} />
+          </button>
           <button type="button" onClick={handleLeave} className="p-2 text-xl leading-none" aria-label="Leave room">
             ✌🏿
           </button>
@@ -1359,11 +1355,6 @@ export function RoomLivePage() {
           <button type="button" onClick={handleLeave} className="flex flex-col items-center gap-0.5 text-red-400 hover:text-red-300 transition-colors" aria-label="Leave">
             <PhoneOff size={20} />
             <span className="text-[9px] font-bold uppercase tracking-wide">Leave</span>
-          </button>
-          {/* Minimize to background */}
-          <button type="button" onClick={handleMinimize} className="flex flex-col items-center gap-0.5 text-muted-foreground hover:text-foreground/80 transition-colors" aria-label="Minimize">
-            <ChevronDown size={20} />
-            <span className="text-[9px] font-bold uppercase tracking-wide">Bg</span>
           </button>
           {/* Speaker mute — primary CTA on mobile */}
           <button

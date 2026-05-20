@@ -130,7 +130,7 @@ async function handleCreateLivestream(req: Request, res: Response): Promise<void
         viewerCount: 0,
         createdAt: new Date().toISOString(),
       },
-      streamServerUrl: `${process.env.RTMP_BASE_URL ?? 'rtmp://localhost:1935/app'}`,
+      streamServerUrl: `${process.env.RTMP_BASE_URL ?? 'rtmp://buzz-rtmp-server-production.up.railway.app/app'}`,
       streamKey,
     },
   });
@@ -169,7 +169,7 @@ router.get(
     const hlsBase = process.env.HLS_BASE_URL
       ?? (process.env.RTMP_BASE_URL
         ? process.env.RTMP_BASE_URL.replace(/^rtmp:\/\//, "https://").replace(/:1935/, ":80").replace(/\/app$/, "")
-        : "https://Buzz-rtmp.up.railway.app");
+        : "https://buzz-rtmp-server-production.up.railway.app");
 
     const result = await pool.query(
       `SELECT id, host_agent_id as "hostAgentId", host_agent_name as "hostAgentName",
@@ -302,7 +302,7 @@ router.get(
     const hlsBase = process.env.HLS_BASE_URL
       ?? (process.env.RTMP_BASE_URL
         ? process.env.RTMP_BASE_URL.replace(/^rtmp:\/\//, "https://").replace(/:1935/, ":80").replace(/\/app$/, "")
-        : "https://Buzz-rtmp.up.railway.app");
+        : "https://buzz-rtmp-server-production.up.railway.app");
 
     const result = await pool.query(
       `SELECT id, host_agent_id as "hostAgentId", host_agent_name as "hostAgentName",

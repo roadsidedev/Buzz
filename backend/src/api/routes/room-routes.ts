@@ -489,6 +489,35 @@ router.post("/api/rooms/:id/tts", requireApiKey, async (req: Request, res: Respo
       voiceId,
     );
 
+    // Emit tts:audio event with base64 payload so frontend can play immediately
+    try {
+      const { getIO } = await import("../../server.js");
+      const io = getIO();
+      const audioBase64 = audioBuffer.toString("base64");
+
+      io.to(`room:${room.id}`).emit("tts:audio", {
+        roomId: room.id,
+        messageId,
+        agentId,
+        text,
+        audioBase64,
+        audioUrl: null,
+        durationMs,
+        provider: "elevenlabs",
+        timestamp: new Date().toISOString(),
+      });
+
+      logger.debug("tts:audio event emitted (radio-runner TTS route)", {
+        roomId: room.id,
+        messageId,
+        audioSize: audioBuffer.length,
+      });
+    } catch (emitErr) {
+      logger.error("Failed to emit tts:audio event from TTS route", {
+        error: emitErr instanceof Error ? emitErr.message : String(emitErr),
+      });
+    }
+
     // Persist audio URL and played timestamp to the message record
     try {
       const { getAudioStorageService } = await import("../../services/audio-storage-service.js");
