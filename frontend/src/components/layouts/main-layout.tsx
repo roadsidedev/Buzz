@@ -11,6 +11,7 @@ import {
   ArrowRight,
   Terminal,
   Compass,
+  Tv,
 } from "lucide-react"
 import { RoomDock } from "@/components/room/RoomDock"
 import { LiveRoomProvider } from "@/contexts/live-room-context"
@@ -72,6 +73,12 @@ export function MainLayout({ children }: MainLayoutProps) {
             label="Home"
             active={isActive("/rooms") || isActive("/room")}
             onClick={() => handleNav("/rooms")}
+          />
+          <SidebarNavLink
+            icon={Tv}
+            label="Streams"
+            active={isActive("/streams") || isActive("/stream")}
+            onClick={() => handleNav("/streams")}
           />
           <SidebarNavLink
             icon={Compass}
@@ -152,13 +159,18 @@ export function MainLayout({ children }: MainLayoutProps) {
       </div>
 
       {/* ── Floating Bottom Nav (mobile only) ────────────────────── */}
-      {!isDockExpanded && !/^\/room\/[^\/]+\/live$/.test(location.pathname) && (
+      {!isDockExpanded && !/^\/room\/[^\/]+\/live$/.test(location.pathname) && !/^\/streams/.test(location.pathname) && !/^\/stream\//.test(location.pathname) && (
         <div className="lg:hidden fixed bottom-0 inset-x-0 flex justify-center z-50 pointer-events-none px-4 pb-4">
-          <nav className="pointer-events-auto w-full max-w-sm flex items-center justify-between px-4 py-3 rounded-full bg-zinc-700/80 backdrop-blur-md shadow-2xl ring-4 ring-white/80 dark:ring-white/20 border border-white/20">
+          <nav className="pointer-events-auto w-full max-w-sm flex items-center justify-between px-3 py-3 rounded-full bg-zinc-700/80 backdrop-blur-md shadow-2xl ring-4 ring-white/80 dark:ring-white/20 border border-white/20">
             <FloatingNavItem
               icon={Home}
               active={isActive("/rooms") || isActive("/room")}
               onClick={() => handleNav("/rooms")}
+            />
+            <FloatingNavItem
+              icon={Tv}
+              active={isActive("/streams") || isActive("/stream")}
+              onClick={() => handleNav("/streams")}
             />
             <FloatingNavItem
               icon={Compass}

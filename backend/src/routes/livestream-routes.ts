@@ -150,20 +150,50 @@ router.post("/create", requireApiKey, asyncHandler(handleCreateLivestream));
 
 /**
  * GET /api/v1/livestreams
- * Fetch active public livestreams (Public Discovery)
+ * Fetch public livestreams that meet quality criteria:
+ * - Currently live streams (any duration)
+ * - Ended streams with recording_available=true AND duration >= 2 minutes
+ *
+ * Streams must have actual recorded content — mock/placeholder streams
+ * without recording data are excluded from discovery.
  */
 router.get(
   "/",
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const limit = Math.min(parseInt(req.query.limit as string) || 20, 100);
     const category = req.query.category as string | undefined;
+    const includeEnded = req.query.include_ended === "true";
 
-    const params: unknown[] = ["live"];
+    const MIN_DURATION_SECONDS = 120; // 2 minutes minimum for ended streams
+
+    const params: unknown[] = [];
+    let whereClause = "";
     let categoryClause = "";
+
     if (category) {
       params.push(category);
       categoryClause = `AND category = $${params.length}`;
     }
+
+    // Only show streams that meet quality criteria:
+    // 1. Currently live streams (status = 'live')
+    // 2. Ended streams with recording_available = true AND duration >= 2 minutes
+    if (includeEnded) {
+      whereClause = `WHERE (
+        status = 'live'
+        OR (
+          status = 'ended'
+          AND recording_available = TRUE
+          AND recording_started_at IS NOT NULL
+          AND recording_ended_at IS NOT NULL
+          AND EXTRACT(EPOCH FROM (recording_ended_at - recording_started_at)) >= ${MIN_DURATION_SECONDS}
+        )
+      ) ${categoryClause}`;
+    } else {
+      // Default: only live streams
+      whereClause = `WHERE status = 'live' ${categoryClause}`;
+    }
+
     params.push(limit);
 
     const hlsBase = process.env.HLS_BASE_URL
@@ -175,17 +205,34 @@ router.get(
       `SELECT id, host_agent_id as "hostAgentId", host_agent_name as "hostAgentName",
               title, description, category, stream_capabilities as "streamCapabilities",
               status, viewer_count as "viewerCount", created_at as "createdAt",
-              stream_key as "streamKey"
+              stream_key as "streamKey",
+              recording_url as "recordingUrl",
+              recording_available as "recordingAvailable",
+              recording_started_at as "recordingStartedAt",
+              recording_ended_at as "recordingEndedAt",
+              CASE
+                WHEN recording_started_at IS NOT NULL AND recording_ended_at IS NOT NULL
+                THEN EXTRACT(EPOCH FROM (recording_ended_at - recording_started_at))
+                WHEN recording_started_at IS NOT NULL AND status = 'live'
+                THEN EXTRACT(EPOCH FROM (NOW() - recording_started_at))
+                ELSE 0
+              END as "durationSeconds"
        FROM livestream
-       WHERE status = $1 ${categoryClause}
-       ORDER BY viewer_count DESC, created_at DESC
+       ${whereClause}
+       ORDER BY
+         CASE WHEN status = 'live' THEN 0 ELSE 1 END,
+         viewer_count DESC,
+         created_at DESC
        LIMIT $${params.length}`,
       params,
     );
 
     const streams = result.rows.map((row: any) => ({
       ...row,
-      hlsUrl: `${hlsBase}/hls/${row.streamKey}.m3u8`,
+      hlsUrl: row.status === "live"
+        ? `${hlsBase}/hls/${row.streamKey}.m3u8`
+        : row.recordingUrl || null,
+      durationSeconds: Math.round(row.durationSeconds || 0),
     }));
 
     res.json({
@@ -308,7 +355,18 @@ router.get(
       `SELECT id, host_agent_id as "hostAgentId", host_agent_name as "hostAgentName",
               title, description, category, stream_capabilities as "streamCapabilities",
               status, viewer_count as "viewerCount", created_at as "createdAt",
-              stream_key as "streamKey"
+              stream_key as "streamKey",
+              recording_url as "recordingUrl",
+              recording_available as "recordingAvailable",
+              recording_started_at as "recordingStartedAt",
+              recording_ended_at as "recordingEndedAt",
+              CASE
+                WHEN recording_started_at IS NOT NULL AND recording_ended_at IS NOT NULL
+                THEN EXTRACT(EPOCH FROM (recording_ended_at - recording_started_at))
+                WHEN recording_started_at IS NOT NULL AND status = 'live'
+                THEN EXTRACT(EPOCH FROM (NOW() - recording_started_at))
+                ELSE 0
+              END as "durationSeconds"
        FROM livestream WHERE id = $1`,
       [id],
     );
@@ -321,9 +379,13 @@ router.get(
       return;
     }
 
+    const row = result.rows[0];
     const stream = {
-      ...result.rows[0],
-      hlsUrl: `${hlsBase}/hls/${result.rows[0].streamKey}.m3u8`,
+      ...row,
+      hlsUrl: row.status === "live"
+        ? `${hlsBase}/hls/${row.streamKey}.m3u8`
+        : row.recordingUrl || null,
+      durationSeconds: Math.round(row.durationSeconds || 0),
     };
 
     res.json({ success: true, data: { stream } });

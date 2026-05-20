@@ -24,6 +24,16 @@ import {
 
 import HlsPlayer from "@/components/livestream/HlsPlayer"
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function formatDuration(seconds: number): string {
+  const hrs = Math.floor(seconds / 3600)
+  const mins = Math.floor((seconds % 3600) / 60)
+  const secs = Math.floor(seconds % 60)
+  if (hrs > 0) return `${hrs}:${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`
+  return `${mins}:${String(secs).padStart(2, "0")}`
+}
+
 interface Stream {
   id: string
   title: string
@@ -37,6 +47,9 @@ interface Stream {
   status: string
   hlsUrl?: string
   streamKey?: string
+  durationSeconds?: number
+  recordingAvailable?: boolean
+  recordingUrl?: string
 }
 
 interface ChatMessage {
@@ -125,6 +138,11 @@ const LiveFeedCard: React.FC<LiveFeedCardProps> = ({
     ? `${(viewerCount / 1000).toFixed(1)}K`
     : String(viewerCount)
 
+  const isLive = stream.status === "live"
+  const durationDisplay = stream.durationSeconds
+    ? formatDuration(stream.durationSeconds)
+    : null
+
   return (
     <div className="snap-start h-full w-full relative bg-black flex-shrink-0 overflow-hidden">
       {/* Video player */}
@@ -133,7 +151,7 @@ const LiveFeedCard: React.FC<LiveFeedCardProps> = ({
           src={stream.hlsUrl}
           className="absolute inset-0 w-full h-full object-cover"
           autoPlay
-          muted
+          muted={!isLive}
         />
       ) : (
         <>
@@ -148,6 +166,39 @@ const LiveFeedCard: React.FC<LiveFeedCardProps> = ({
               }}
             />
           </div>
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <div className="flex flex-col items-center gap-3 opacity-20">
+              <Tv size={72} className="text-white" />
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* ── Top-left: Status badge + category ── */}
+      <div className="absolute top-4 left-4 flex items-center gap-2 z-10">
+        {isLive ? (
+          <Badge variant="destructive" className="animate-pulse text-xs px-2 py-0.5 font-bold">
+            LIVE
+          </Badge>
+        ) : (
+          <Badge variant="secondary" className="bg-black/60 text-white/80 border-none backdrop-blur-md text-xs font-bold">
+            ENDED
+          </Badge>
+        )}
+        {durationDisplay && !isLive && (
+          <Badge variant="secondary" className="bg-black/50 text-white/70 hover:bg-black/50 border-none backdrop-blur-md text-xs">
+            {durationDisplay}
+          </Badge>
+        )}
+        {stream.category && (
+          <Badge
+            variant="secondary"
+            className="bg-black/50 text-white hover:bg-black/50 border-none backdrop-blur-md capitalize text-xs"
+          >
+            {stream.category}
+          </Badge>
+        )}
+      </div>
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
             <div className="flex flex-col items-center gap-3 opacity-20">
               <Tv size={72} className="text-white" />
@@ -384,7 +435,7 @@ export function LiveFeedPage() {
   // ── Fetch streams ────────────────────────────────────────────────────────
   useEffect(() => {
     axios
-      .get(`${apiUrl}/livestreams`)
+      .get(`${apiUrl}/livestreams?include_ended=true`)
       .then((res) => {
         const data: Stream[] = res.data?.data?.streams || res.data?.data || []
         setStreams(data)
@@ -400,7 +451,7 @@ export function LiveFeedPage() {
   useEffect(() => {
     if (streams.length === 0) return
     const timer = setInterval(() => {
-      axios.get(`${apiUrl}/livestreams`).then((res) => {
+      axios.get(`${apiUrl}/livestreams?include_ended=true`).then((res) => {
         const data: Stream[] = res.data?.data?.streams || res.data?.data || []
         const counts: Record<string, number> = {}
         data.forEach((s) => { counts[s.id] = s.viewerCount ?? 0 })
@@ -487,11 +538,11 @@ export function LiveFeedPage() {
   const activeStream = activeChatId ? streams.find((s) => s.id === activeChatId) : null
 
   return (
-    <div className="relative h-full animate-in fade-in duration-500">
-      {/* ── Scroll-snap feed ── */}
+    <div className="relative h-full w-full animate-in fade-in duration-500 flex flex-col">
+      {/* ─ Scroll-snap feed ── */}
       <div
         ref={containerRef}
-        className="h-[calc(100vh-120px)] overflow-y-scroll snap-y snap-mandatory scrollbar-hide"
+        className="flex-1 overflow-y-scroll snap-y snap-mandatory scrollbar-hide"
         style={{ scrollBehavior: "smooth" }}
       >
         {/* Loading skeletons */}
@@ -507,15 +558,15 @@ export function LiveFeedPage() {
           <div className="snap-start h-full w-full flex flex-col items-center justify-center gap-5 bg-black">
             <div className="text-center space-y-3">
               <Tv size={56} className="text-white/20 mx-auto" />
-              <p className="text-white/50 font-semibold text-lg tracking-wide">No live streams right now</p>
-              <p className="text-white/30 text-sm">Check back soon or browse audio rooms</p>
+              <p className="text-white/50 font-semibold text-lg tracking-wide">No streams available</p>
+              <p className="text-white/30 text-sm">Only completed sessions (2+ minutes) are shown here</p>
             </div>
             <Button
               variant="outline"
               className="bg-white/10 border-white/20 text-white hover:bg-white/20"
               onClick={() => navigate("/rooms")}
             >
-              Browse Rooms
+              Browse Audio Rooms
             </Button>
           </div>
         )}
@@ -525,7 +576,7 @@ export function LiveFeedPage() {
           <div
             key={stream.id}
             ref={(el) => { slideRefs.current[idx] = el }}
-            className="snap-start h-[calc(100vh-120px)] min-h-[500px] w-full flex-shrink-0"
+            className="snap-start h-full w-full flex-shrink-0"
           >
             <LiveFeedCard
               stream={stream}

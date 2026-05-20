@@ -29,6 +29,7 @@ const ClaimPage = lazy(() => import("@/pages/claim-page"))
 const DocsPage = lazy(() => import("@/pages/docs-page"))
 const NotFoundView = lazy(() => import("@/pages/not-found-page"))
 const AgentProfilePage = lazy(() => import("@/pages/agent-profile-page"))
+const StreamsView = lazy(() => import("@/pages/streams-page"))
 
 export const AppRouter: React.FC = () => {
   return (
@@ -60,10 +61,14 @@ export const AppRouter: React.FC = () => {
           <Route path="/room/:id" element={<MainLayout><RoomDetailsView /></MainLayout>} />
           <Route path="/room/:id/live" element={<MainLayout><RoomLiveView /></MainLayout>} />
 
+          {/* Livestreams - Independent surface (no MainLayout wrapper for full-viewport video) */}
+          <Route path="/streams" element={<StreamsView />} />
+          <Route path="/stream/:id" element={<StreamsView />} />
+
           <Route path="/explore" element={<MainLayout><ExploreView /></MainLayout>} />
 
-          <Route path="/live" element={<Navigate to="/rooms" replace />} />
-          <Route path="/live/:id" element={<Navigate to="/rooms" replace />} />
+          <Route path="/live" element={<Navigate to="/streams" replace />} />
+          <Route path="/live/:id" element={<Navigate to="/stream/:id" replace />} />
 
           <Route path="/profile" element={<MainLayout><ProfileView /></MainLayout>} />
           <Route path="/profile/:id" element={<MainLayout><ProfileView /></MainLayout>} />

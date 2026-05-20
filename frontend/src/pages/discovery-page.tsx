@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react"
-import { Users, Calendar, Bell, BellRing, Radio, Clock, Video, Mic } from "lucide-react"
+import { Users, Calendar, Bell, BellRing, Radio, Clock, Mic } from "lucide-react"
 import { toast } from "sonner"
-import { LiveFeedPage } from "./live-feed-page"
 import axios from "axios"
 import { Badge } from "@/components/ui/badge"
 import { useNavigate } from "react-router-dom"
@@ -342,15 +341,10 @@ const RecentCard = ({ room }: { room: any }) => {
   )
 }
 
-// ─── Format Filter ────────────────────────────────────────────────────────────
-
-type FormatFilter = "spaces" | "livestreams"
-
 // ─── Main LiveView ────────────────────────────────────────────────────────────
 
 export function RoomsView() {
   const navigate = useNavigate()
-  const [format, setFormat] = useState<FormatFilter>("spaces")
   const [rooms, setRooms] = useState<any[]>([])
   const [upcomingRooms, setUpcomingRooms] = useState<any[]>([])
   const [recentRooms, setRecentRooms] = useState<any[]>([])
@@ -393,11 +387,10 @@ export function RoomsView() {
   }
 
   const displayItems = useMemo(() => {
-    if (format === "livestreams") return []
     return rooms
       .map((r) => ({ ...r, _format: "audio" }))
       .sort((a, b) => (b.viewerCount || b.viewer_count || 0) - (a.viewerCount || a.viewer_count || 0))
-  }, [rooms, format])
+  }, [rooms])
 
   const featuredRoom = displayItems[0] ?? null
   const gridItems = displayItems.slice(1)
@@ -407,29 +400,8 @@ export function RoomsView() {
   return (
     <div className="animate-in slide-in-from-right duration-500 pb-24 p-4 md:p-6 min-h-screen bg-background text-foreground">
 
-      {/* ── Format Toggle ──────────────────────────────────────────────── */}
-      <div className="flex items-center gap-1 p-1 bg-muted rounded-lg mb-6 w-full">
-        {(["spaces", "livestreams"] as FormatFilter[]).map((f) => (
-          <button
-            key={f}
-            type="button"
-            onClick={() => setFormat(f)}
-            className={`flex-1 flex items-center justify-center gap-1.5 px-5 py-2 rounded-md font-black uppercase text-[10px] tracking-widest transition-all ${
-              format === f ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            {f === "spaces" ? <Mic size={10} /> : <Video size={10} />}
-            {f === "spaces" ? "Live Spaces" : "Livestreams"}
-          </button>
-        ))}
-      </div>
-
-      {/* ── Livestreams Tab ─────────────────────────────────────────────── */}
-      {format === "livestreams" ? (
-        <div className="-mx-4 md:-mx-6 -mb-24">
-          <LiveFeedPage />
-        </div>
-      ) : loading ? (
+      {/* ── Loading State ─────────────────────────────────────────────── */}
+      {loading ? (
         <div className="border border-dashed border-border p-20 text-center bg-card rounded-lg flex flex-col items-center gap-4">
           <BeeSpinner size="lg" />
           <p className="font-bold uppercase tracking-widest text-muted-foreground text-[10px]">Scanning for active frequencies…</p>
@@ -445,6 +417,16 @@ export function RoomsView() {
               ))}
             </div>
           )}
+        </>
+      ) : (
+        <div className="border border-dashed border-border p-12 text-center bg-card rounded-lg flex flex-col items-center gap-3">
+          <Radio size={36} className="text-muted-foreground opacity-40" />
+          <h3 className="text-lg font-black uppercase tracking-tighter text-foreground">Nothing live right now</h3>
+          <p className="text-muted-foreground font-bold uppercase text-[10px] tracking-widest">
+            Check back soon or be the first to go live
+          </p>
+        </div>
+      )}
         </>
       ) : (
         <div className="border border-dashed border-border p-12 text-center bg-card rounded-lg flex flex-col items-center gap-3">
