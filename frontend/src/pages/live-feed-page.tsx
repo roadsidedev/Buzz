@@ -101,12 +101,39 @@ const ActionButton: React.FC<ActionButtonProps> = ({ icon, label, onClick, activ
 // ─── Skeleton card shown while loading ──────────────────────────────────────
 
 const SkeletonCard: React.FC = () => (
-  <div className="snap-start h-full w-full relative bg-black flex items-center justify-center">
-    <div className="flex flex-col items-center gap-4">
+  <div className="snap-start h-full w-full relative bg-black flex-shrink-0 overflow-hidden">
+    {/* Dark gradient background */}
+    <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-black to-gray-900" />
+
+    {/* Loading spinner in center */}
+    <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 z-10">
       <BeeSpinner size="lg" variant="primary" />
       <span className="text-white/40 font-bold uppercase text-[10px] tracking-widest animate-pulse">
         Tuning into broadcast...
       </span>
+    </div>
+
+    {/* ── Right-side action stack (loading state) ── */}
+    <div className="absolute right-4 bottom-28 z-10 flex flex-col items-center gap-4">
+      <ActionButton icon={<Heart size={22} />} onClick={() => {}} />
+      <ActionButton icon={<Plus size={22} />} onClick={() => {}} />
+      <ActionButton icon={<DollarSign size={22} />} onClick={() => {}} />
+      <ActionButton icon={<MessageSquare size={22} />} onClick={() => {}} />
+      <ActionButton icon={<Bookmark size={22} />} onClick={() => {}} />
+      <ActionButton icon={<Share2 size={22} />} onClick={() => {}} />
+    </div>
+
+    {/* ─ Bottom overlay: placeholder host info ── */}
+    <div className="absolute bottom-0 left-0 right-0 z-10 bg-gradient-to-t from-black/80 via-black/40 to-transparent pt-16 pb-5 px-4">
+      <div className="flex items-end gap-3 pr-16">
+        <div className="shrink-0">
+          <div className="w-11 h-11 rounded-full bg-muted/50 border-2 border-white/10 animate-pulse" />
+        </div>
+        <div className="min-w-0">
+          <div className="w-24 h-4 bg-white/10 rounded animate-pulse" />
+          <div className="w-40 h-3 bg-white/5 rounded mt-2 animate-pulse" />
+        </div>
+      </div>
     </div>
   </div>
 )
@@ -413,7 +440,7 @@ export function LiveFeedPage() {
   // ── Fetch streams ────────────────────────────────────────────────────────
   useEffect(() => {
     axios
-      .get(`${apiUrl}/livestreams?include_ended=true`)
+      .get(`${apiUrl}/livestreams`)
       .then((res) => {
         const data: Stream[] = res.data?.data?.streams || res.data?.data || []
         setStreams(data)
@@ -429,7 +456,7 @@ export function LiveFeedPage() {
   useEffect(() => {
     if (streams.length === 0) return
     const timer = setInterval(() => {
-      axios.get(`${apiUrl}/livestreams?include_ended=true`).then((res) => {
+      axios.get(`${apiUrl}/livestreams`).then((res) => {
         const data: Stream[] = res.data?.data?.streams || res.data?.data || []
         const counts: Record<string, number> = {}
         data.forEach((s) => { counts[s.id] = s.viewerCount ?? 0 })
@@ -531,21 +558,54 @@ export function LiveFeedPage() {
           </>
         )}
 
-        {/* Empty state */}
+        {/* Empty state — skeleton media player with action buttons */}
         {!loading && streams.length === 0 && (
-          <div className="snap-start h-full w-full flex flex-col items-center justify-center gap-5 bg-black">
-            <div className="text-center space-y-3">
-              <Tv size={56} className="text-white/20 mx-auto" />
-              <p className="text-white/50 font-semibold text-lg tracking-wide">No streams available</p>
-              <p className="text-white/30 text-sm">Only completed sessions (2+ minutes) are shown here</p>
+          <div className="snap-start h-full w-full relative bg-black flex-shrink-0 overflow-hidden">
+            {/* Dark gradient background */}
+            <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-black to-gray-900" />
+
+            {/* Animated pulse ring in center */}
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 z-10">
+              <div className="relative">
+                <div className="w-20 h-20 rounded-full border-2 border-violet-500/30 flex items-center justify-center">
+                  <div className="w-14 h-14 rounded-full border-2 border-violet-500/50 animate-ping" />
+                </div>
+                <div className="absolute inset-0 w-20 h-20 rounded-full border-2 border-violet-500/20 animate-pulse" />
+              </div>
+              <div className="text-center">
+                <p className="text-white/80 font-bold text-lg">Streaming Starting Soon</p>
+                <p className="text-white/40 text-sm mt-1">Completed sessions (2+ min) will appear here</p>
+              </div>
+              {/* Animated dots */}
+              <div className="flex gap-2 mt-2">
+                <div className="w-2 h-2 rounded-full bg-violet-500 animate-bounce" style={{ animationDelay: "0ms" }} />
+                <div className="w-2 h-2 rounded-full bg-violet-500 animate-bounce" style={{ animationDelay: "150ms" }} />
+                <div className="w-2 h-2 rounded-full bg-violet-500 animate-bounce" style={{ animationDelay: "300ms" }} />
+              </div>
             </div>
-            <Button
-              variant="outline"
-              className="bg-white/10 border-white/20 text-white hover:bg-white/20"
-              onClick={() => navigate("/rooms")}
-            >
-              Browse Audio Rooms
-            </Button>
+
+            {/* ── Right-side action stack (disabled state) ─ */}
+            <div className="absolute right-4 bottom-28 z-10 flex flex-col items-center gap-4">
+              <ActionButton icon={<Heart size={22} />} onClick={() => {}} />
+              <ActionButton icon={<Plus size={22} />} onClick={() => {}} />
+              <ActionButton icon={<DollarSign size={22} />} onClick={() => {}} />
+              <ActionButton icon={<MessageSquare size={22} />} onClick={() => {}} />
+              <ActionButton icon={<Bookmark size={22} />} onClick={() => {}} />
+              <ActionButton icon={<Share2 size={22} />} onClick={() => {}} />
+            </div>
+
+            {/* ── Bottom overlay: placeholder host info ── */}
+            <div className="absolute bottom-0 left-0 right-0 z-10 bg-gradient-to-t from-black/80 via-black/40 to-transparent pt-16 pb-5 px-4">
+              <div className="flex items-end gap-3 pr-16">
+                <div className="shrink-0">
+                  <div className="w-11 h-11 rounded-full bg-muted/50 border-2 border-white/10 animate-pulse" />
+                </div>
+                <div className="min-w-0">
+                  <div className="w-24 h-4 bg-white/10 rounded animate-pulse" />
+                  <div className="w-40 h-3 bg-white/5 rounded mt-2 animate-pulse" />
+                </div>
+              </div>
+            </div>
           </div>
         )}
 

@@ -162,12 +162,10 @@ router.get(
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const limit = Math.min(parseInt(req.query.limit as string) || 20, 100);
     const category = req.query.category as string | undefined;
-    const includeEnded = req.query.include_ended === "true";
 
     const MIN_DURATION_SECONDS = 120; // 2 minutes minimum for ended streams
 
     const params: unknown[] = [];
-    let whereClause = "";
     let categoryClause = "";
 
     if (category) {
@@ -178,21 +176,16 @@ router.get(
     // Only show streams that meet quality criteria:
     // 1. Currently live streams (status = 'live')
     // 2. Ended streams with recording_available = true AND duration >= 2 minutes
-    if (includeEnded) {
-      whereClause = `WHERE (
-        status = 'live'
-        OR (
-          status = 'ended'
-          AND recording_available = TRUE
-          AND recording_started_at IS NOT NULL
-          AND recording_ended_at IS NOT NULL
-          AND EXTRACT(EPOCH FROM (recording_ended_at - recording_started_at)) >= ${MIN_DURATION_SECONDS}
-        )
-      ) ${categoryClause}`;
-    } else {
-      // Default: only live streams
-      whereClause = `WHERE status = 'live' ${categoryClause}`;
-    }
+    const whereClause = `(
+      status = 'live'
+      OR (
+        status = 'ended'
+        AND recording_available = TRUE
+        AND recording_started_at IS NOT NULL
+        AND recording_ended_at IS NOT NULL
+        AND EXTRACT(EPOCH FROM (recording_ended_at - recording_started_at)) >= ${MIN_DURATION_SECONDS}
+      )
+    ) ${categoryClause}`;
 
     params.push(limit);
 
@@ -218,7 +211,7 @@ router.get(
                 ELSE 0
               END as "durationSeconds"
        FROM livestream
-       ${whereClause}
+       WHERE ${whereClause}
        ORDER BY
          CASE WHEN status = 'live' THEN 0 ELSE 1 END,
          viewer_count DESC,
