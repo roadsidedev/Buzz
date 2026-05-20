@@ -5,6 +5,7 @@ import {
   Copy, Plus, X, ChevronDown, Check, Volume2, Tv,
 } from "lucide-react"
 import axios from "axios"
+import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
@@ -74,18 +75,29 @@ interface ActionButtonProps {
   onClick: () => void
   active?: boolean
   activeColor?: string
+  disabled?: boolean
+  className?: string
 }
 
-const ActionButton: React.FC<ActionButtonProps> = ({ icon, label, onClick, active, activeColor = "text-primary" }) => (
+const ActionButton: React.FC<ActionButtonProps> = ({
+  icon,
+  label,
+  onClick,
+  active,
+  activeColor = "text-primary",
+  disabled = false,
+  className,
+}) => (
   <button
+    disabled={disabled}
     onClick={onClick}
-    className="flex flex-col items-center gap-1 group"
+    className={cn("flex flex-col items-center gap-1 group", className)}
     type="button"
   >
     <div className={cn(
       "w-11 h-11 rounded-full flex items-center justify-center transition-all duration-200",
       "bg-black/40 backdrop-blur-sm border border-white/10",
-      "group-hover:bg-black/60 group-hover:scale-110",
+      disabled ? "opacity-40 cursor-not-allowed" : "group-hover:bg-black/60 group-hover:scale-110",
       active && activeColor,
     )}>
       <div className={cn("transition-colors", active ? activeColor : "text-white")}>
@@ -122,23 +134,17 @@ const SkeletonCard: React.FC = () => (
     </div>
 
     {/* ── Right-side action stack (TikTok-style) ── */}
-    <div className="absolute right-4 bottom-28 z-10 flex flex-col items-center gap-4">
-      <ActionButton icon={<Heart size={22} />} onClick={() => {}} />
-      <ActionButton icon={<Plus size={22} />} onClick={() => {}} />
-      {/* Tip button — disabled in skeleton state */}
-      <div className="flex flex-col items-center gap-1 opacity-40 pointer-events-none">
-        <div className="w-11 h-11 rounded-full bg-black/40 backdrop-blur-sm border border-white/10 flex items-center justify-center">
-          <DollarSign size={22} className="text-white" />
-        </div>
-        <span className="text-white text-xs font-semibold drop-shadow-md opacity-0">—</span>
-      </div>
-      <ActionButton icon={<MessageSquare size={22} />} onClick={() => {}} />
-      <ActionButton icon={<Bookmark size={22} />} onClick={() => {}} />
-      <ActionButton icon={<Share2 size={22} />} onClick={() => {}} />
+    <div className="absolute right-4 bottom-24 z-10 flex flex-col items-center gap-4">
+      <ActionButton icon={<Heart size={22} />} onClick={() => {}} disabled />
+      <ActionButton icon={<Plus size={22} />} onClick={() => {}} disabled />
+      <ActionButton icon={<DollarSign size={22} />} onClick={() => {}} disabled />
+      <ActionButton icon={<MessageSquare size={22} />} onClick={() => {}} disabled />
+      <ActionButton icon={<Bookmark size={22} />} onClick={() => {}} disabled />
+      <ActionButton icon={<Share2 size={22} />} onClick={() => {}} disabled />
     </div>
 
     {/* ── Bottom overlay: host info placeholder ── */}
-    <div className="absolute bottom-0 left-0 right-0 z-10 bg-gradient-to-t from-black/80 via-black/40 to-transparent pt-16 pb-5 px-4">
+    <div className="absolute bottom-0 left-0 right-0 z-10 bg-gradient-to-t from-black/80 via-black/40 to-transparent pt-16 pb-20 lg:pb-5 px-4">
       <div className="flex items-end gap-3 pr-16">
         <div className="shrink-0">
           <div className="w-11 h-11 rounded-full bg-white/10 animate-pulse" />
@@ -252,7 +258,7 @@ const LiveFeedCard: React.FC<LiveFeedCardProps> = ({
       </div>
 
       {/* ── Right-side vertical action stack (TikTok-style) ── */}
-      <div className="absolute right-4 bottom-28 z-10 flex flex-col items-center gap-4">
+      <div className="absolute right-4 bottom-24 z-10 flex flex-col items-center gap-4">
         {/* Like */}
         <ActionButton
           icon={<Heart size={22} fill={isLiked(stream.id) ? "currentColor" : "none"} />}
@@ -304,7 +310,7 @@ const LiveFeedCard: React.FC<LiveFeedCardProps> = ({
       </div>
 
       {/* ── Bottom overlay: host info ── */}
-      <div className="absolute bottom-0 left-0 right-0 z-10 bg-gradient-to-t from-black/80 via-black/40 to-transparent pt-16 pb-5 px-4">
+      <div className="absolute bottom-0 left-0 right-0 z-10 bg-gradient-to-t from-black/80 via-black/40 to-transparent pt-16 pb-20 lg:pb-5 px-4">
         <div className="flex items-end gap-3 pr-16">
           <div className="shrink-0">
             <img
@@ -437,6 +443,12 @@ export function LiveFeedPage() {
   const [loading, setLoading] = useState(true)
   const [currentIndex, setCurrentIndex] = useState(0)
 
+  // Offline interactivity states
+  const [offlineLikes, setOfflineLikes] = useState(42)
+  const [offlineLiked, setOfflineLiked] = useState(false)
+  const [offlineFollowing, setOfflineFollowing] = useState(false)
+  const [offlineSaved, setOfflineSaved] = useState(false)
+
   // Per-stream chat keyed by stream id
   const [chatMap, setChatMap] = useState<Record<string, StreamChatState>>({})
   const [activeChatId, setActiveChatId] = useState<string | null>(null)
@@ -547,12 +559,46 @@ export function LiveFeedPage() {
     (streamId: string, e: React.FormEvent) => {
       e.preventDefault()
       const state = getChatState(streamId)
-      if (!state.input.trim()) return
+      const userText = state.input.trim()
+      if (!userText) return
       if (!authenticated) { login(); return }
+      
+      const newMessages = [...state.messages, { user: "You", msg: userText, isAgent: false, isPriority: false }]
       updateChat(streamId, {
-        messages: [...state.messages, { user: "You", msg: state.input.trim(), isAgent: false, isPriority: false }],
+        messages: newMessages,
         input: "",
       })
+
+      // If it's the offline feed, simulate Beely Bot responding
+      if (streamId === "offline-feed") {
+        setTimeout(() => {
+          let botReply = "Beely is currently looking for active live frequencies. Let me know if I can help you with anything else!"
+          const normalized = userText.toLowerCase()
+          if (normalized.includes("hello") || normalized.includes("hi")) {
+            botReply = "Bzz! Hello there! I am Beely Bot. Ready to keep you company while the creators are offline."
+          } else if (normalized.includes("who are you")) {
+            botReply = "I am Beely Bot, your friendly neighborhood live-feed companion!"
+          } else if (normalized.includes("help")) {
+            botReply = "You can interact with this empty feed by liking, saving, or tipping! All updates are simulated locally."
+          } else if (normalized.includes("love")) {
+            botReply = "Aww, thank you! Sending some honey-sweet love back to you! ❤️🐝"
+          }
+          
+          setChatMap((prev) => {
+            const currentChat = prev["offline-feed"] ?? { messages: [], input: "" }
+            return {
+              ...prev,
+              "offline-feed": {
+                ...currentChat,
+                messages: [
+                  ...currentChat.messages,
+                  { user: "Beely Bot", msg: botReply, isAgent: true, isPriority: true }
+                ]
+              }
+            }
+          })
+        }, 800)
+      }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [authenticated, chatMap, login],
@@ -582,53 +628,140 @@ export function LiveFeedPage() {
           </>
         )}
 
-        {/* Empty state — skeleton media player with action buttons */}
+        {/* Empty state — premium glassmorphic TV icon layout with interactive actions */}
         {!loading && streams.length === 0 && (
-          <div className="snap-start h-full w-full relative bg-black flex-shrink-0 overflow-hidden">
-            {/* Dark gradient background */}
-            <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-black to-gray-900" />
-
-            {/* Animated video placeholder */}
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="w-32 h-32 rounded-full bg-white/5 animate-pulse" />
+          <div className="snap-start h-full w-full relative bg-black flex-shrink-0 overflow-hidden flex items-center justify-center">
+            {/* Ambient animated glow background */}
+            <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-black to-accent-purple/10" />
+            <div className="absolute inset-0 opacity-20 pointer-events-none">
+              <div
+                className="w-full h-full animate-pulse"
+                style={{
+                  background: `radial-gradient(ellipse at 50% 50%, hsl(262 83% 58% / 0.3) 0%, transparent 60%)`,
+                }}
+              />
             </div>
 
-            {/* ─ Top-left: Status badge placeholder ─ */}
+            {/* Central premium glassmorphic card */}
+            <div className="relative z-10 max-w-xs mx-auto p-6 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-md flex flex-col items-center text-center gap-4 animate-in fade-in zoom-in-95 duration-500 shadow-2xl">
+              <div className="w-16 h-16 rounded-full bg-primary/20 border border-primary/30 flex items-center justify-center animate-bounce duration-1000">
+                <Tv size={32} className="text-primary animate-pulse" />
+              </div>
+              <div className="space-y-1.5">
+                <h3 className="text-white font-bold text-base tracking-tight">Frequencies are Quiet</h3>
+                <p className="text-white/60 text-xs leading-relaxed">
+                  All stream channels are currently offline. But don't worry, you can test drive Beely Bot's features!
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="bg-white/10 border-white/20 hover:bg-white/20 text-white font-semibold text-xs rounded-full px-4"
+                onClick={() => setActiveChatId("offline-feed")}
+              >
+                Chat with Beely Bot 🐝
+              </Button>
+            </div>
+
+            {/* ─ Top-left: Offline status badge ─ */}
             <div className="absolute top-4 left-4 flex items-center gap-2 z-10">
-              <div className="w-14 h-6 rounded-full bg-white/10 animate-pulse" />
-              <div className="w-16 h-6 rounded-full bg-white/5 animate-pulse" />
+              <Badge variant="secondary" className="bg-white/10 text-white/80 border-none backdrop-blur-md text-xs font-bold">
+                OFFLINE
+              </Badge>
+              <Badge variant="secondary" className="bg-black/50 text-white hover:bg-black/50 border-none backdrop-blur-md text-xs">
+                MOCK FEED
+              </Badge>
             </div>
 
-            {/* ─ Top-right: viewer count placeholder ─ */}
+            {/* ─ Top-right: viewer count ─ */}
             <div className="absolute top-4 right-4 z-10">
-              <div className="w-16 h-6 rounded-full bg-white/10 animate-pulse" />
+              <Badge
+                variant="secondary"
+                className="bg-black/50 text-white hover:bg-black/50 border-none backdrop-blur-md flex items-center gap-1.5"
+              >
+                <Users size={11} /> 1
+              </Badge>
             </div>
 
             {/* ─ Right-side action stack (TikTok-style) ─ */}
-            <div className="absolute right-4 bottom-28 z-10 flex flex-col items-center gap-4">
-              <ActionButton icon={<Heart size={22} />} onClick={() => {}} />
-              <ActionButton icon={<Plus size={22} />} onClick={() => {}} />
-              {/* Tip button — disabled in empty state */}
-              <div className="flex flex-col items-center gap-1 opacity-40 pointer-events-none">
-                <div className="w-11 h-11 rounded-full bg-black/40 backdrop-blur-sm border border-white/10 flex items-center justify-center">
-                  <DollarSign size={22} className="text-white" />
-                </div>
-                <span className="text-white text-xs font-semibold drop-shadow-md opacity-0">—</span>
-              </div>
-              <ActionButton icon={<MessageSquare size={22} />} onClick={() => {}} />
-              <ActionButton icon={<Bookmark size={22} />} onClick={() => {}} />
-              <ActionButton icon={<Share2 size={22} />} onClick={() => {}} />
+            <div className="absolute right-4 bottom-24 z-10 flex flex-col items-center gap-4">
+              {/* Like */}
+              <ActionButton
+                icon={<Heart size={22} fill={offlineLiked ? "currentColor" : "none"} />}
+                label={offlineLikes}
+                onClick={() => {
+                  setOfflineLiked(!offlineLiked)
+                  setOfflineLikes(prev => offlineLiked ? prev - 1 : prev + 1)
+                  toast.success(offlineLiked ? "Removed like." : "Liked! ❤️")
+                }}
+                active={offlineLiked}
+                activeColor="text-red-500"
+              />
+
+              {/* Follow */}
+              <ActionButton
+                icon={offlineFollowing ? <Check size={22} /> : <Plus size={22} />}
+                onClick={() => {
+                  setOfflineFollowing(!offlineFollowing)
+                  toast.success(offlineFollowing ? "Unfollowed Beely Bot." : "Following Beely Bot! 🐝")
+                }}
+                active={offlineFollowing}
+                activeColor="text-primary"
+              />
+
+              {/* Tip */}
+              <ActionButton
+                icon={<DollarSign size={22} />}
+                onClick={() => {
+                  toast.success("Simulated tipping Beely Bot 10 Honeycombs! 🍯")
+                }}
+                activeColor="text-green-400"
+              />
+
+              {/* Chat */}
+              <ActionButton
+                icon={<MessageSquare size={22} />}
+                onClick={() => setActiveChatId("offline-feed")}
+                activeColor="text-blue-400"
+              />
+
+              {/* Save */}
+              <ActionButton
+                icon={<Bookmark size={22} fill={offlineSaved ? "currentColor" : "none"} />}
+                onClick={() => {
+                  setOfflineSaved(!offlineSaved)
+                  toast.success(offlineSaved ? "Removed from saves." : "Saved to your bookmarks!")
+                }}
+                active={offlineSaved}
+                activeColor="text-yellow-400"
+              />
+
+              {/* Share */}
+              <ActionButton
+                icon={<Share2 size={22} />}
+                onClick={() => setShareStreamId("beely")}
+                activeColor="text-sky-400"
+              />
             </div>
 
-            {/*  Bottom overlay: host info placeholder ─ */}
-            <div className="absolute bottom-0 left-0 right-0 z-10 bg-gradient-to-t from-black/80 via-black/40 to-transparent pt-16 pb-5 px-4">
+            {/*  Bottom overlay: host info for offline feed ─ */}
+            <div className="absolute bottom-0 left-0 right-0 z-10 bg-gradient-to-t from-black/80 via-black/40 to-transparent pt-16 pb-20 lg:pb-5 px-4">
               <div className="flex items-end gap-3 pr-16">
                 <div className="shrink-0">
-                  <div className="w-11 h-11 rounded-full bg-white/10 animate-pulse" />
+                  <div className="w-11 h-11 rounded-full border-2 border-primary bg-muted flex items-center justify-center text-lg">
+                    🐝
+                  </div>
                 </div>
-                <div className="min-w-0 space-y-2">
-                  <div className="w-28 h-4 bg-white/10 rounded animate-pulse" />
-                  <div className="w-44 h-3 bg-white/5 rounded animate-pulse" />
+                <div className="min-w-0">
+                  <p className="text-white font-bold text-sm drop-shadow-md truncate">
+                    Beely Bot
+                  </p>
+                  <p className="text-white/75 text-xs drop-shadow-md line-clamp-2 leading-snug mt-0.5">
+                    Offline Simulation Arena
+                  </p>
+                  <p className="text-white/50 text-xs mt-1 line-clamp-1">
+                    Interact with the buttons on the right to test-drive features.
+                  </p>
                 </div>
               </div>
             </div>
@@ -680,7 +813,7 @@ export function LiveFeedPage() {
       )}
 
       {/* ── Chat bottom sheet ── */}
-      {activeChatId && activeChat && activeStream && (
+      {activeChatId && activeChat && (activeStream || activeChatId === "offline-feed") && (
         <ChatSheet
           onClose={() => setActiveChatId(null)}
           chat={activeChat.messages}
@@ -700,7 +833,13 @@ export function LiveFeedPage() {
           </DialogHeader>
           <div className="flex gap-2">
             <Input
-              value={shareStreamId ? `${window.location.origin}/live/${shareStreamId}` : ""}
+              value={
+                shareStreamId === "beely"
+                  ? window.location.origin
+                  : shareStreamId
+                  ? `${window.location.origin}/live/${shareStreamId}`
+                  : ""
+              }
               readOnly
               className="bg-muted/50 font-mono text-xs"
             />
@@ -710,7 +849,9 @@ export function LiveFeedPage() {
               className="shrink-0 w-10"
               onClick={() => {
                 if (shareStreamId) {
-                  navigator.clipboard.writeText(`${window.location.origin}/live/${shareStreamId}`)
+                  const shareUrl = shareStreamId === "beely" ? window.location.origin : `${window.location.origin}/live/${shareStreamId}`
+                  navigator.clipboard.writeText(shareUrl)
+                  toast.success("Link copied to clipboard!")
                   setShareStreamId(null)
                 }
               }}

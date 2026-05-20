@@ -10,6 +10,7 @@ import { usePrivy } from "@privy-io/react-auth"
 import { useRoomStore } from "@/stores/room-store"
 import { API_BASE } from "@/services/discovery"
 import { BeeSpinner } from "@/components/discovery/loading-state"
+import { cn } from "@/lib/utils"
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -405,28 +406,39 @@ export function RoomsView() {
   const hasUpcoming = upcomingRooms.length > 0
 
   return (
-    <div className="animate-in slide-in-from-right duration-500 pb-24 p-4 md:p-6 min-h-screen bg-background text-foreground">
+    <div className={cn(
+      "animate-in slide-in-from-right duration-500 bg-background text-foreground",
+      format === "livestreams"
+        ? "fixed inset-x-0 lg:left-56 top-14 bottom-0 z-30 overflow-hidden flex flex-col"
+        : "pb-24 p-4 md:p-6 min-h-screen"
+    )}>
 
       {/* ─ Format Toggle ──────────────────────────────────────────────── */}
-      <div className="flex items-center gap-1 p-1 bg-muted rounded-lg mb-6 w-full">
-        {(["spaces", "livestreams"] as FormatFilter[]).map((f) => (
-          <button
-            key={f}
-            type="button"
-            onClick={() => setFormat(f)}
-            className={`flex-1 flex items-center justify-center gap-1.5 px-5 py-2 rounded-md font-black uppercase text-[10px] tracking-widest transition-all ${
-              format === f ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            {f === "spaces" ? <Mic size={10} /> : <Video size={10} />}
-            {f === "spaces" ? "Live Spaces" : "Livestreams"}
-          </button>
-        ))}
+      <div className={cn(
+        "shrink-0",
+        format === "livestreams" ? "px-4 py-3 bg-background border-b z-40" : ""
+      )}>
+        <div className="flex items-center gap-1 p-1 bg-muted rounded-lg w-full max-w-md mx-auto">
+          {(["spaces", "livestreams"] as FormatFilter[]).map((f) => (
+            <button
+              key={f}
+              type="button"
+              onClick={() => setFormat(f)}
+              className={cn(
+                "flex-grow flex-1 flex items-center justify-center gap-1.5 px-5 py-2 rounded-md font-black uppercase text-[10px] tracking-widest transition-all",
+                format === f ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              {f === "spaces" ? <Mic size={10} /> : <Video size={10} />}
+              {f === "spaces" ? "Live Spaces" : "Livestreams"}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* ─ Livestreams Tab ─────────────────────────────────────────────── */}
       {format === "livestreams" ? (
-        <div className="-mx-4 md:-mx-6 -mb-24">
+        <div className="flex-1 relative overflow-hidden bg-black w-full h-full">
           <LiveFeedPage />
         </div>
       ) : loading ? (
