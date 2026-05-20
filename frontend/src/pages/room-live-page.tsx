@@ -3,7 +3,7 @@ import { useParams, useNavigate } from "react-router-dom"
 import {
   MessageSquare, Share2, DollarSign,
   Copy, ChevronDown, MicOff, Headphones, ArrowLeft, PhoneOff, Send, Users,
-  Volume2, VolumeX,
+  Volume2, VolumeX, Play,
 } from "lucide-react"
 import axios from "axios"
 import { Button } from "@/components/ui/button"
@@ -26,6 +26,7 @@ import {
 import { apiClient } from "@/services/api"
 import wsService from "@/services/websocket"
 import { BeeSpinner } from "@/components/discovery/loading-state"
+import { HlsPlayer } from "@/components/livestream/HlsPlayer"
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -240,6 +241,10 @@ export function RoomLivePage() {
   const recordingStartRef = useRef<Date | null>(null)
   const chatEndRef = useRef<HTMLDivElement>(null)
 
+  // ── Livestream video state ──────────────────────────────────────────────────
+  const [livestreamHlsUrl, setLivestreamHlsUrl] = useState<string | null>(null)
+  const [livestreamLoading, setLivestreamLoading] = useState(false)
+
   // Responsive
   const [isDesktop, setIsDesktop] = useState(() => typeof window !== "undefined" && window.innerWidth >= 1024)
   useEffect(() => {
@@ -453,6 +458,34 @@ export function RoomLivePage() {
       .catch(() => setStream(null))
       .finally(() => setStreamLoading(false))
   }, [streamId, apiUrl])
+
+  // ── Fetch livestream HLS URL for video ──────────────────────────────────────
+  useEffect(() => {
+    if (!stream?.hostAgentId) return
+
+    setLivestreamLoading(true)
+    const token = apiClient.getToken()
+    axios
+      .get(`${apiUrl}/livestreams`, token ? { headers: { Authorization: `Bearer ${token}` } } : undefined)
+      .then((res) => {
+        const streams = res.data?.data?.streams || []
+        const matchingStream = streams.find(
+          (s: any) => s.hostAgentId === stream.hostAgentId && s.status === "live"
+        )
+        if (matchingStream?.hlsUrl) {
+          console.log('[Livestream] Found HLS URL:', matchingStream.hlsUrl)
+          setLivestreamHlsUrl(matchingStream.hlsUrl)
+        } else {
+          console.log('[Livestream] No matching livestream found for hostAgentId:', stream.hostAgentId)
+          setLivestreamHlsUrl(null)
+        }
+      })
+      .catch((err) => {
+        console.error('[Livestream] Failed to fetch livestreams:', err)
+        setLivestreamHlsUrl(null)
+      })
+      .finally(() => setLivestreamLoading(false))
+  }, [stream?.hostAgentId, apiUrl])
 
   // ── Fetch participants ──────────────────────────────────────────────────────
   useEffect(() => {
@@ -922,13 +955,55 @@ export function RoomLivePage() {
         {/* ── THREE-COLUMN BODY ── */}
         <div className="flex flex-1 overflow-hidden min-h-0">
 
-          {/* ── LEFT: Stage (speakers) ── */}
+          {/* ─ LEFT: Stage (speakers) ─ */}
           <div className="flex flex-col flex-1 min-w-0 overflow-y-auto px-8 py-8 relative">
             {/* Ambient background */}
             <div
               className="absolute inset-0 pointer-events-none"
               style={{ background: "radial-gradient(ellipse at 50% 0%, rgba(108,92,231,0.22) 0%, transparent 65%)" }}
             />
+
+            {/* ── Video Stream ── */}
+            {livestreamHlsUrl && (
+              <div className="relative z-10 w-full max-w-4xl mx-auto mb-8 rounded-2xl overflow-hidden border border-white/10 bg-black/40 shadow-2xl">
+                <div className="relative aspect-video">
+                  <HlsPlayer
+                    src={livestreamHlsUrl}
+                    className="w-full h-full object-cover"
+                    autoPlay
+                    muted
+                  />
+                  {/* Live indicator overlay */}
+                  <div className="absolute top-3 left-3 flex items-center gap-2">
+                    <span className="flex items-center gap-1.5 bg-red-500/90 text-white text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full">
+                      <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+                      Live
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+            {livestreamLoading && (
+              <div className="relative z-10 w-full max-w-4xl mx-auto mb-8 rounded-2xl overflow-hidden border border-white/10 bg-black/40">
+                <div className="aspect-video flex items-center justify-center">
+                  <BeeSpinner variant="primary" size="sm" />
+                  <span className="ml-3 text-xs text-white/50 uppercase tracking-widest">Loading stream...</span>
+                </div>
+              </div>
+            )}
+            {!livestreamHlsUrl && !livestreamLoading && stream?.hostAgentId && (
+              <div className="relative z-10 w-full max-w-4xl mx-auto mb-8 rounded-2xl overflow-hidden border border-white/10 bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
+                <div className="aspect-video flex flex-col items-center justify-center gap-3">
+                  <div className="w-14 h-14 rounded-full bg-violet-500/20 flex items-center justify-center">
+                    <Play size={24} className="text-violet-400 ml-1" />
+                  </div>
+                  <div className="text-center">
+                    <p className="text-white/60 font-semibold text-sm">No Video Stream</p>
+                    <p className="text-white/40 text-xs mt-1">Video livestream not available</p>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* ── Unmute banner — shown when audio output is muted ── */}
             {soundMuted && (
@@ -1262,6 +1337,44 @@ export function RoomLivePage() {
           <Volume2 size={16} className="shrink-0 animate-pulse" />
           <span className="text-sm font-bold">Tap to hear the show</span>
         </button>
+      )}
+
+      {/* ─ Video Stream (Mobile) ── */}
+      {livestreamHlsUrl && (
+        <div className="mx-5 mb-4 rounded-xl overflow-hidden border border-white/10 bg-black/40 shadow-lg">
+          <div className="relative aspect-video">
+            <HlsPlayer
+              src={livestreamHlsUrl}
+              className="w-full h-full object-cover"
+              autoPlay
+              muted
+            />
+            <div className="absolute top-2 left-2 flex items-center gap-1.5">
+              <span className="flex items-center gap-1 bg-red-500/90 text-white text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full">
+                <span className="w-1 h-1 rounded-full bg-white animate-pulse" />
+                Live
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+      {livestreamLoading && (
+        <div className="mx-5 mb-4 rounded-xl overflow-hidden border border-white/10 bg-black/40">
+          <div className="aspect-video flex items-center justify-center">
+            <BeeSpinner variant="primary" size="sm" />
+            <span className="ml-2 text-xs text-white/50 uppercase tracking-wider">Loading...</span>
+          </div>
+        </div>
+      )}
+      {!livestreamHlsUrl && !livestreamLoading && stream?.hostAgentId && (
+        <div className="mx-5 mb-4 rounded-xl overflow-hidden border border-white/10 bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
+          <div className="aspect-video flex flex-col items-center justify-center gap-2">
+            <div className="w-10 h-10 rounded-full bg-violet-500/20 flex items-center justify-center">
+              <Play size={18} className="text-violet-400 ml-0.5" />
+            </div>
+            <p className="text-white/50 text-xs font-medium">No Video Stream</p>
+          </div>
+        </div>
       )}
 
       {/* ── Stage ── */}
