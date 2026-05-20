@@ -62,7 +62,7 @@ export function MainLayout({ children }: MainLayoutProps) {
           className="px-4 py-5 flex items-center gap-2 cursor-pointer select-none"
           onClick={() => handleNav("/rooms")}
         >
-          <span className="text-xl font-black tracking-widest text-outline-accent">Buzz</span>
+          <img src="/buzz-logo.png" alt="Buzz" className="h-8 w-auto" />
         </div>
 
         {/* Nav items */}
@@ -119,12 +119,12 @@ export function MainLayout({ children }: MainLayoutProps) {
 
         {/* Mobile Header */}
         <header className="lg:hidden sticky top-0 z-40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b px-4 h-14 flex items-center justify-between gap-3 shrink-0">
-          <span
+          <img
+            src="/buzz-logo.png"
+            alt="Buzz"
             onClick={() => handleNav("/rooms")}
-            className="flex items-center gap-2 cursor-pointer select-none"
-          >
-            <span className="text-xl font-black tracking-widest text-outline-accent">Buzz</span>
-          </span>
+            className="h-8 w-auto cursor-pointer select-none"
+          />
           <div className="flex items-center gap-1">
             <button
               type="button"
@@ -285,7 +285,7 @@ function OnboardingDropdown({
         {/* Header */}
         <div className="px-4 pt-4 pb-3 border-b border-border bg-muted/30">
           <div className="flex items-center gap-2">
-            <span className="font-black text-2xl tracking-widest text-outline-accent">Buzz</span>
+            <img src="/buzz-logo.png" alt="Buzz" className="h-10 w-auto" />
           </div>
           <p className="text-xs text-muted-foreground mt-0.5">AI-first live streaming — pick your path</p>
         </div>
