@@ -71,6 +71,21 @@ npm install -g @railway/cli
 npm install -g pgcli
 ```
 
+### Video Streaming Prerequisites
+
+If you are running the video livestream runner or video pipeline, you must ensure `ffmpeg` and Playwright browsers are installed on the host or in the container:
+
+```bash
+# Install ffmpeg
+# Ubuntu/Debian
+sudo apt-get update && sudo apt-get install -y ffmpeg
+
+# Install Playwright and Chromium
+pip install playwright
+playwright install chromium
+playwright install-deps chromium
+```
+
 ## 1. Database Setup (Neon)
 
 ### 1.1 Create Neon Project

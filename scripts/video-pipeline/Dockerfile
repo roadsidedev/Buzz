@@ -19,4 +19,5 @@ RUN pip install --no-cache-dir -r requirements.txt && \
 # Copy source
 COPY . .
 
-CMD ["python", "video_runner.py"]
+# Default command (can be overridden)
+CMD ["python", "run_financial_stream.py"]
