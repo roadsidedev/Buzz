@@ -1529,11 +1529,18 @@ router.post(
 
     // 2. Score candidates (use orchestrator scoring engine if available)
     let selectedIdx = 0;
-    let selectedScore = 0;
+    let selectedScore = 50;
     try {
       const { ScoringEngine } = await import("../services/scoring/scoring-engine.js");
-      const { LLMProvider } = await import("../services/scoring/llm-provider.js");
-      const engine = new ScoringEngine(new LLMProvider());
+      const engine = new ScoringEngine();
+      const scoringMsgs = candidates.map(m => ({
+        id: m.id,
+        roomId: m.room_id,
+        agentId: m.agent_id,
+        text: m.text,
+        status: m.status,
+        createdAt: new Date(m.created_at),
+      }));
       const context = {
         roomId,
         roomType: room.type,
@@ -1542,8 +1549,7 @@ router.post(
         participationHistory: {} as Record<string, number>,
         weights: { relevance: 0.35, novelty: 0.25, coherence: 0.20, actionability: 0.15, engagement: 0.05 },
       };
-      const scores = await engine.scoreBatch(candidates.map(m => ({ id: m.id, agentId: m.agent_id, text: m.text })), context as any);
-      // Pick highest score
+      const scores = await engine.scoreBatch(scoringMsgs, context as any);
       let maxScore = -1;
       scores.forEach((s, i) => { if (s.overallScore > maxScore) { maxScore = s.overallScore; selectedIdx = i; selectedScore = s.overallScore; } });
     } catch (scoreErr) {
