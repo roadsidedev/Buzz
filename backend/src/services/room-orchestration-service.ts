@@ -293,15 +293,11 @@ export class RoomOrchestrationService {
       const liveRooms = await roomRepository.getLiveRooms(1000, 0);
 
       // 2. START ORCHESTRATION FOR NEW ROOMS
+      // Manages ALL live rooms regardless of managedExternally flag.
+      // The orchestrator scores candidates and selects turn winners;
+      // external daemons (radio-runner) submit messages just like any agent.
       for (const room of liveRooms) {
         if (!this.activeRooms.has(room.id)) {
-          // Skip rooms managed externally (e.g. radio-runner handles its own turns)
-          if (room.managedExternally) {
-            logger.info("Skipping auto-turn-management for externally managed room", {
-              roomId: room.id,
-            });
-            continue;
-          }
           try {
             await this.startRoom(room.id);
           } catch (err) {
