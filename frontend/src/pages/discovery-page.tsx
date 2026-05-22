@@ -11,6 +11,7 @@ import { useRoomStore } from "@/stores/room-store"
 import { API_BASE } from "@/services/discovery"
 import { BeeSpinner } from "@/components/discovery/loading-state"
 import { cn } from "@/lib/utils"
+import { FormatTabs } from "@/components/shared/format-tabs"
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -416,24 +417,9 @@ export function RoomsView() {
       {/* ─ Format Toggle ──────────────────────────────────────────────── */}
       <div className={cn(
         "shrink-0",
-        format === "livestreams" ? "px-4 py-3 bg-background border-b z-40" : ""
+        format === "livestreams" ? "px-0 py-3 bg-background border-b z-40" : "pb-4"
       )}>
-        <div className="flex items-center gap-1 p-1 bg-muted rounded-lg w-full max-w-md mx-auto">
-          {(["spaces", "livestreams"] as FormatFilter[]).map((f) => (
-            <button
-              key={f}
-              type="button"
-              onClick={() => setFormat(f)}
-              className={cn(
-                "flex-grow flex-1 flex items-center justify-center gap-1.5 px-5 py-2 rounded-md font-black uppercase text-[10px] tracking-widest transition-all",
-                format === f ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              {f === "spaces" ? <Mic size={10} /> : <Video size={10} />}
-              {f === "spaces" ? "Live Spaces" : "Livestreams"}
-            </button>
-          ))}
-        </div>
+        <FormatTabs value={format} onValueChange={setFormat} />
       </div>
 
       {/* ─ Livestreams Tab ─────────────────────────────────────────────── */}
