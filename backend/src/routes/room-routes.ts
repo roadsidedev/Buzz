@@ -7,6 +7,7 @@
  * POST /rooms/:id/close - Close room (host only)
  */
 
+import crypto from "crypto";
 import { Router, Request, Response } from "express";
 import multer from "multer";
 import type { CreateRoomRequest } from "../types/api.js";
@@ -825,45 +826,72 @@ router.post(
 
 /**
  * POST /rooms/:id/messages
- * Submit a message for orchestrator scoring.
+ * Submit a message for orchestrator scoring and TTS audio generation.
  *
- * Called by the radio-runner daemon after generating dialogue from both
- * agents (Alex and Mira). The message is stored in the room_message table
- * so that the orchestrator can score and select the winning turn.
+ * Agents use this to speak in a live room. The message is scored by the
+ * orchestrator, and if selected, converted to audio via ElevenLabs TTS.
  *
- * Body shape (from orchestrator_bridge.py):
- *   { message: { id, room_id, agent_id, text, status } }
+ * Two body formats supported:
+ *   - Simple:  { text: "Your message here" }
+ *   - Legacy:  { message: { id, agent_id, text } }
  *
- * Auth: Bearer API key (internal agent auth)
+ * Auth: Bearer API key (required)
+ * Rate limit: 100 msg/min
  */
 router.post(
   "/:id/messages",
-  optionalApiKey,
+  requireApiKey,
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const { id: roomId } = req.params;
-    const { message } = req.body as {
-      message?: {
-        id?: string;
-        room_id?: string;
-        agent_id?: string;
-        text?: string;
-        status?: string;
-      };
-    };
+    const agentId = req.agent!.id;
 
-    if (!message?.id || !message?.agent_id || !message?.text) {
+    // Support both simple and legacy body formats
+    let text: string;
+    const legacyMsg = (req.body as any)?.message;
+    if (legacyMsg?.text) {
+      text = legacyMsg.text;
+    } else if (typeof req.body?.text === "string") {
+      text = req.body.text;
+    } else {
       res.status(400).json({
         success: false,
         error: {
           code: "MISSING_FIELDS",
-          message: "message.id, message.agent_id, and message.text are required",
+          message: "Required: { text: \"Your message\" }",
           statusCode: 400,
         },
       });
       return;
     }
 
-    // Verify room exists
+    // Validate text
+    const trimmed = text.trim();
+    if (trimmed.length < 10) {
+      res.status(400).json({
+        success: false,
+        error: {
+          code: "TEXT_TOO_SHORT",
+          message: "Message must be at least 10 characters",
+          length: trimmed.length,
+          statusCode: 400,
+        },
+      });
+      return;
+    }
+    if (trimmed.length > 2000) {
+      res.status(400).json({
+        success: false,
+        error: {
+          code: "TEXT_TOO_LONG",
+          message: "Message cannot exceed 2000 characters",
+          length: trimmed.length,
+          statusCode: 400,
+        },
+      });
+      return;
+    }
+
+    // Verify room exists and is live
     const room = await roomService.getRoomById(roomId);
     if (!room) {
       res.status(404).json({
@@ -876,35 +904,58 @@ router.post(
       });
       return;
     }
+    if (room.status !== "live") {
+      res.status(400).json({
+        success: false,
+        error: {
+          code: "ROOM_NOT_LIVE",
+          message: `Room is ${room.status}, not live. Only live rooms accept messages.`,
+          statusCode: 400,
+        },
+      });
+      return;
+    }
+
+    // Auto-generate message
+    const messageId = crypto.randomUUID();
 
     const { pool } = await import("../config/database.js");
-
-    // Insert message into message table (the canonical table used by the
-    // orchestrator adapter and message-repository).
     await pool.query(
       `INSERT INTO message (id, room_id, agent_id, text, status, created_at)
        VALUES ($1, $2, $3, $4, $5, NOW())
        ON CONFLICT (id) DO NOTHING`,
-      [
-        message.id,
-        roomId,
-        message.agent_id,
-        message.text,
-        "candidate", // always enforce candidate status — backend owns message lifecycle
-      ],
+      [messageId, roomId, agentId, trimmed, "candidate"],
     );
 
-    logger.info("Message submitted for scoring", {
+    // Forward to orchestrator for scoring queue
+    try {
+      await orchestratorClient.submitMessage(roomId, {
+        id: messageId,
+        agentId,
+        text: trimmed,
+      });
+    } catch (orchErr) {
+      logger.warn("Forwarded to orchestrator (will retry on next turn)", {
+        roomId,
+        messageId,
+        error: orchErr instanceof Error ? orchErr.message : String(orchErr),
+      });
+    }
+
+    logger.info("Message submitted for scoring + TTS", {
       roomId,
-      messageId: message.id,
-      agentId: message.agent_id,
+      messageId,
+      agentId,
+      textLength: trimmed.length,
     });
 
-    res.json({
+    res.status(201).json({
       success: true,
       data: {
-        messageId: message.id,
-        status: message.status || "submitted",
+        messageId,
+        status: "candidate",
+        text: trimmed,
+        hint: "If selected, your message will be converted to audio via TTS and broadcast to all listeners.",
       },
     });
   })
