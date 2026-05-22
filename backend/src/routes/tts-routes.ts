@@ -53,6 +53,7 @@ router.post(
       const tts = getTTSService();
 
       if (!tts.isEnabled()) {
+        logger.warn("TTS disabled — ELEVENLABS_API_KEY and GOOGLE_TTS_API_KEY both missing");
         res.status(200).json({
           success: true,
           audioBytes: null,
@@ -84,14 +85,18 @@ router.post(
       });
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : String(err);
-      logger.error("TTS synthesize endpoint failed", { error: errorMsg });
-      res.status(500).json({
-        success: false,
-        error: {
-          code: "TTS_FAILED",
-          message: errorMsg,
-          statusCode: 500,
-        },
+      logger.error("TTS synthesize endpoint failed", {
+        error: errorMsg,
+        textLength: (req.body as any)?.text?.length,
+        agentName: (req.body as any)?.agentName,
+      });
+      // Return gracefully — video-runner handles null audioBytes
+      res.status(200).json({
+        success: true,
+        audioBytes: null,
+        durationMs: 0,
+        provider: "none",
+        error: errorMsg,
       });
     }
   },

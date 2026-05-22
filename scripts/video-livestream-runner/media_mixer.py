@@ -267,6 +267,7 @@ class MediaMixer:
             "-f", "image2pipe",
             "-vcodec", "png",
             "-framerate", str(self._fps),
+            "-video_size", f"{self._width}x{self._height}",
             "-i", "pipe:0",
             # Audio input: FIFO pipe for dynamic TTS injection
             "-f", "mp3",
