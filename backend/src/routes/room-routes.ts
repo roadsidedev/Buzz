@@ -1513,11 +1513,12 @@ router.post(
     // is unavailable, so we drive the turn loop against PostgreSQL directly.
     const { pool: db } = await import("../config/database.js");
 
-    // 1. Fetch candidate messages from DB
+    // 1. Fetch unscored candidate and queued messages from DB
+    //    (queued = scored in a prior turn but never selected)
     const candidates = (await db.query(
       `SELECT id, room_id, agent_id, text, status, created_at, score
        FROM message
-       WHERE room_id = $1 AND status = 'candidate'
+       WHERE room_id = $1 AND status IN ('candidate', 'queued')
        ORDER BY created_at ASC LIMIT 5`,
       [roomId],
     )).rows;
@@ -1561,13 +1562,19 @@ router.post(
     const winner = candidates[selectedIdx];
     const turnNumber = (room.turnCount || 0) + 1;
 
-    // 3. Mark winner as SELECTED, others as QUEUED
+    // 3. Mark winner as SELECTED, leave others as CANDIDATE for future turns
+    await db.query(
+      `UPDATE message SET status = 'selected', score = $1, selected_at = NOW() WHERE id = $2`,
+      [selectedScore, winner.id],
+    );
+    // Score non-winners with a slight penalty so turn selector has signal
     for (let i = 0; i < candidates.length; i++) {
-      const status = i === selectedIdx ? "selected" : "queued";
-      await db.query(
-        `UPDATE message SET status = $1, score = $2, selected_at = NOW() WHERE id = $3`,
-        [status, i === selectedIdx ? selectedScore : Math.max(0, selectedScore - 10), candidates[i].id],
-      );
+      if (i !== selectedIdx) {
+        await db.query(
+          `UPDATE message SET score = $1 WHERE id = $2 AND score IS NULL`,
+          [Math.max(0, selectedScore - 10), candidates[i].id],
+        );
+      }
     }
 
     // 4. Update room turn count
