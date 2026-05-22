@@ -440,7 +440,7 @@ export class TurnManagementService {
 
     // 6. SYNTHESIZE AUDIO & STREAM TO JAM
     const mockScore = { score: result.score || 0 };
-    await this._synthesizeAndStream(room, winningMessage, mockScore as any);
+    await this.synthesizeAndStream(room, winningMessage, mockScore as any);
   }
 
   /**
@@ -450,7 +450,7 @@ export class TurnManagementService {
    * @param message - Winning message to synthesize
    * @param winner - Score result
    */
-  private async _synthesizeAndStream(
+  public async synthesizeAndStream(
     room: Room,
     message: RoomMessage,
     winner: { score: number },

@@ -1475,6 +1475,81 @@ router.post(
 );
 
 /**
+ * POST /rooms/:id/process-turn
+ * Trigger a single turn processing cycle for the room.
+ *
+ * Used by external cron/worker services to drive the orchestration loop
+ * when the backend is deployed on serverless platforms (Vercel) where
+ * setInterval-based turn management is not available.
+ *
+ * This endpoint:
+ * 1. Fetches candidate messages from the queue
+ * 2. Calls the orchestrator to score and select a winner
+ * 3. If a winner is selected, triggers TTS synthesis and audio streaming
+ *
+ * Body: none (optional: { force: true } to skip empty queue checks)
+ * Auth: Bearer API key (host only)
+ */
+router.post(
+  "/:id/process-turn",
+  requireApiKey,
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const { id: roomId } = req.params;
+    const agentId = req.agent!.id;
+
+    // Verify room is live
+    const room = await roomService.getRoomById(roomId);
+    if (!room) {
+      res.status(404).json({ success: false, error: { code: "ROOM_NOT_FOUND", message: `Room ${roomId} not found`, statusCode: 404 } });
+      return;
+    }
+    if (room.status !== "live") {
+      res.status(400).json({ success: false, error: { code: "ROOM_NOT_LIVE", message: `Room is ${room.status}`, statusCode: 400 } });
+      return;
+    }
+
+    // Process one turn via orchestrator
+    const result = await orchestratorClient.processTurn(roomId);
+
+    if (result.status !== "success" || !result.selected_message_id) {
+      res.json({ success: true, data: { processed: false, reason: "No message selected", status: result.status, error: result.error } });
+      return;
+    }
+
+    // Fetch the winning message
+    const { messageRepository } = await import("../repositories/message-repository.js");
+    const winningMessage = await messageRepository.getById(result.selected_message_id);
+    if (!winningMessage) {
+      res.json({ success: true, data: { processed: false, reason: "Winning message not found in DB", messageId: result.selected_message_id } });
+      return;
+    }
+
+    // Update room turn count
+    await roomRepository.updateTurn(roomId, result.turn_number || (room.turnCount || 0) + 1);
+
+    // Trigger TTS synthesis and streaming
+    const { turnManagementService } = await import("../services/turn-management-service.js");
+    await turnManagementService.synthesizeAndStream(room, winningMessage, { score: result.score || 0 });
+
+    logger.info("Turn processed via external trigger", {
+      roomId, turnNumber: result.turn_number, messageId: result.selected_message_id, agentId: result.selected_agent_id, score: result.score,
+    });
+
+    res.json({
+      success: true,
+      data: {
+        processed: true,
+        turnNumber: result.turn_number,
+        messageId: result.selected_message_id,
+        agentId: result.selected_agent_id,
+        score: result.score,
+        text: winningMessage.text,
+      },
+    });
+  })
+);
+
+/**
  * POST /rooms/:id/redirect
  * Notify all Socket.IO clients connected to this room that it has been
  * superseded by a new room (e.g. after a radio-runner room respawn).
