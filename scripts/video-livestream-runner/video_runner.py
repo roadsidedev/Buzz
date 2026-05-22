@@ -237,12 +237,21 @@ class VideoRunner:
                     self._running = False
                     break
 
-                # Check FFmpeg process health
-                if not self._media_mixer.is_running:
-                    rc = self._media_mixer.ffmpeg_returncode
-                    logger.critical("FFmpeg process died (exit code %s) — stopping.", rc)
+                # Check FFmpeg process health.
+                # The MediaMixer auto-restarts on crash (up to 5 attempts).
+                # Only stop if the restart limit is exhausted.
+                if self._media_mixer.permanently_failed:
+                    logger.critical(
+                        "FFmpeg permanently failed after %d auto-restart attempts — stopping.",
+                        self._media_mixer.restart_count,
+                    )
                     self._running = False
                     break
+                if not self._media_mixer.is_running:
+                    logger.warning(
+                        "FFmpeg not running (restart %d/5) — waiting for auto-recovery",
+                        self._media_mixer.restart_count,
+                    )
 
                 # 1. Generate commentary
                 logger.info(f"Turn {self._turn_count + 1} — generating commentary...")

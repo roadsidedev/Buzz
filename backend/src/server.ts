@@ -352,6 +352,12 @@ app.use(`/api/${apiVersion}/discover`, discoveryRoutes);
 app.use(`/api/${apiVersion}/livestreams`, livestreamRoutes);
 
 /**
+ * TTS routes (standalone synthesize endpoint for video-runner, radio-runner)
+ */
+import ttsRoutes from "./routes/tts-routes.js";
+app.use(`/api/${apiVersion}/tts`, ttsRoutes);
+
+/**
  * Claim routes
  */
 app.use(`/api/${apiVersion}/claim`, claimRoutes);

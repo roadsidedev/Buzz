@@ -293,22 +293,46 @@ class LivestreamBridge:
         voice_name: str = "",
         stream_id: str = "",
     ) -> Optional[bytes]:
+        """
+        Synthesize text to speech via the backend TTS endpoint.
+
+        Returns raw MP3 bytes on success, None on failure.
+        """
         try:
             resp = self._client.post(
                 "/api/v1/tts/synthesize",
                 json={
                     "text": text,
                     "agentName": voice_name or agent.name,
-                    "streamId": stream_id,
                 },
                 headers=self._auth_headers(agent.api_key),
-                timeout=30.0,
+                timeout=60.0,
             )
             if resp.status_code >= 300:
-                logger.warning("TTS synthesis failed", extra={"status": resp.status_code})
+                logger.warning(
+                    "TTS synthesis failed",
+                    extra={"status": resp.status_code, "body": resp.text[:200]},
+                )
                 return None
+
             data = resp.json()
-            return data.get("audioBytes")
+            audio_base64 = data.get("audioBytes")
+
+            if not audio_base64:
+                logger.info(
+                    "TTS returned no audio (disabled or empty synthesis)",
+                    extra={"duration_ms": data.get("durationMs", 0), "provider": data.get("provider", "none")},
+                )
+                return None
+
+            import base64
+            audio_bytes = base64.b64decode(audio_base64)
+            logger.info(
+                "TTS audio synthesized successfully",
+                extra={"bytes": len(audio_bytes), "duration_ms": data.get("durationMs", 0)},
+            )
+            return audio_bytes
+
         except Exception as exc:
             logger.warning("TTS synthesis error: %s", exc)
             return None

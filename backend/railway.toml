@@ -42,7 +42,7 @@ NODE_ENV = "production"
 # Feature flags - Set to false by default for MVP
 ENABLE_PAYMENTS = "false"
 ENABLE_AUDIO_STREAMING = "true"
-ENABLE_TTS = "false"
+ENABLE_TTS = "true"
 
 # Required: DATABASE_URL, REDIS_URL, JWT_SECRET must be provided in Railway
 

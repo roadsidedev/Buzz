@@ -615,7 +615,34 @@ class OrchestratorBridge:
         )
         self._assert_ok(resp, "play_audio")
         data = resp.json()
-        return data.get("durationMs", 0)
+        duration_ms = data.get("durationMs", 0)
+
+        # Diagnostic logging for TTS pipeline health
+        if duration_ms == 0:
+            logger.warning(
+                "TTS returned 0 duration — audio will NOT be heard by listeners. "
+                "Check: (1) ENABLE_TTS=true in backend env, "
+                "(2) ELEVENLABS_API_KEY is set, "
+                "(3) ElevenLabs API quota not exhausted",
+                extra={
+                    "room_id": room_id[:8],
+                    "agent_name": agent_name,
+                    "text_length": len(text),
+                    "response": {k: v for k, v in data.items() if k != "audioBase64"},
+                },
+            )
+        else:
+            logger.info(
+                "TTS audio synthesized",
+                extra={
+                    "room_id": room_id[:8],
+                    "agent_name": agent_name,
+                    "duration_ms": duration_ms,
+                    "text_length": len(text),
+                },
+            )
+
+        return duration_ms
 
     # ── Room Events (for music breaks, etc.) ─────────────────────────────────
 
