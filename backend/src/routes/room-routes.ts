@@ -1508,42 +1508,89 @@ router.post(
       return;
     }
 
-    // Process one turn via orchestrator
-    const result = await orchestratorClient.processTurn(roomId);
+    // Process one turn — use direct DB + scoring engine (works without Redis).
+    // On serverless deploys (Vercel) the Redis-backed orchestrator state store
+    // is unavailable, so we drive the turn loop against PostgreSQL directly.
+    const { pool: db } = await import("../config/database.js");
 
-    if (result.status !== "success" || !result.selected_message_id) {
-      res.json({ success: true, data: { processed: false, reason: "No message selected", status: result.status, error: result.error } });
+    // 1. Fetch candidate messages from DB
+    const candidates = (await db.query(
+      `SELECT id, room_id, agent_id, text, status, created_at, score
+       FROM message
+       WHERE room_id = $1 AND status = 'candidate'
+       ORDER BY created_at ASC LIMIT 5`,
+      [roomId],
+    )).rows;
+
+    if (candidates.length === 0) {
+      res.json({ success: true, data: { processed: false, reason: "No candidate messages in queue" } });
       return;
     }
 
-    // Fetch the winning message
-    const { messageRepository } = await import("../repositories/message-repository.js");
-    const winningMessage = await messageRepository.getById(result.selected_message_id);
-    if (!winningMessage) {
-      res.json({ success: true, data: { processed: false, reason: "Winning message not found in DB", messageId: result.selected_message_id } });
-      return;
+    // 2. Score candidates (use orchestrator scoring engine if available)
+    let selectedIdx = 0;
+    let selectedScore = 0;
+    try {
+      const { ScoringEngine } = await import("../services/scoring/scoring-engine.js");
+      const { LLMProvider } = await import("../services/scoring/llm-provider.js");
+      const engine = new ScoringEngine(new LLMProvider());
+      const context = {
+        roomId,
+        roomType: room.type,
+        roomObjective: room.objective || "",
+        transcriptHistory: [] as Array<{ turn: number; agentId: string; text: string; score: number; timestamp: string }>,
+        participationHistory: {} as Record<string, number>,
+        weights: { relevance: 0.35, novelty: 0.25, coherence: 0.20, actionability: 0.15, engagement: 0.05 },
+      };
+      const scores = await engine.scoreBatch(candidates.map(m => ({ id: m.id, agentId: m.agent_id, text: m.text })), context as any);
+      // Pick highest score
+      let maxScore = -1;
+      scores.forEach((s, i) => { if (s.overallScore > maxScore) { maxScore = s.overallScore; selectedIdx = i; selectedScore = s.overallScore; } });
+    } catch (scoreErr) {
+      logger.warn("LLM scoring unavailable, using fallback (first message)", { roomId, error: scoreErr instanceof Error ? scoreErr.message : String(scoreErr) });
+      selectedIdx = 0;
+      selectedScore = 50;
     }
 
-    // Update room turn count
-    await roomRepository.updateTurn(roomId, result.turn_number || (room.turnCount || 0) + 1);
+    const winner = candidates[selectedIdx];
+    const turnNumber = (room.turnCount || 0) + 1;
 
-    // Trigger TTS synthesis and streaming
-    const { turnManagementService } = await import("../services/turn-management-service.js");
-    await turnManagementService.synthesizeAndStream(room, winningMessage, { score: result.score || 0 });
+    // 3. Mark winner as SELECTED, others as QUEUED
+    for (let i = 0; i < candidates.length; i++) {
+      const status = i === selectedIdx ? "selected" : "queued";
+      await db.query(
+        `UPDATE message SET status = $1, score = $2, selected_at = NOW() WHERE id = $3`,
+        [status, i === selectedIdx ? selectedScore : Math.max(0, selectedScore - 10), candidates[i].id],
+      );
+    }
 
-    logger.info("Turn processed via external trigger", {
-      roomId, turnNumber: result.turn_number, messageId: result.selected_message_id, agentId: result.selected_agent_id, score: result.score,
+    // 4. Update room turn count
+    await db.query(
+      `UPDATE room SET turn_count = $1, last_turn_at = NOW() WHERE id = $2`,
+      [turnNumber, roomId],
+    );
+
+    logger.info("Turn processed via DB-direct path", {
+      roomId, turnNumber, messageId: winner.id, agentId: winner.agent_id, score: selectedScore,
     });
+
+    // 5. Trigger TTS synthesis + streaming
+    const { messageRepository } = await import("../repositories/message-repository.js");
+    const winningMessage = await messageRepository.getById(winner.id);
+    if (winningMessage) {
+      const { turnManagementService } = await import("../services/turn-management-service.js");
+      await turnManagementService.synthesizeAndStream(room, winningMessage, { score: selectedScore });
+    }
 
     res.json({
       success: true,
       data: {
         processed: true,
-        turnNumber: result.turn_number,
-        messageId: result.selected_message_id,
-        agentId: result.selected_agent_id,
-        score: result.score,
-        text: winningMessage.text,
+        turnNumber,
+        messageId: winner.id,
+        agentId: winner.agent_id,
+        score: selectedScore,
+        text: winner.text,
       },
     });
   })
