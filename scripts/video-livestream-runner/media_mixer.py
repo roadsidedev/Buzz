@@ -204,26 +204,49 @@ class MediaMixer:
     # ── Pre-flight RTMP Smoke Test ──────────────────────────────────────────
 
     async def _preflight_rtmp_test(self, rtmp_url: str) -> None:
-        """Verify the RTMP server is reachable via TCP connect + publish test."""
-        # TCP connectivity check
+        """Verify the RTMP server is reachable via DNS + TCP + publish test."""
         import re
         import socket as sock_mod
+        import subprocess as sp_mod
 
         match = re.match(r"rtmp://([^:/]+)(?::(\d+))?/", rtmp_url)
-        if match:
-            host = match.group(1)
-            port = int(match.group(2) or 1935)
-            try:
-                with sock_mod.create_connection((host, port), timeout=5.0):
-                    logger.info("RTMP pre-flight: %s:%s reachable", host, port)
-            except Exception as exc:
-                logger.warning("RTMP pre-flight: %s:%s unreachable (%s)", host, port, exc)
+        if not match:
+            logger.warning("RTMP pre-flight: could not parse URL: %s", rtmp_url)
+            return
+        host = match.group(1)
+        port = int(match.group(2) or 1935)
 
-        # Short publish test (1s color bars + tone)
+        # ── DNS resolution check ──────────────────────────────────────────
+        try:
+            addrs = sock_mod.getaddrinfo(host, port, sock_mod.AF_UNSPEC, sock_mod.SOCK_STREAM)
+            ips = set(addr[4][0] for addr in addrs)
+            logger.info("RTMP pre-flight: DNS resolves %s -> %s", host, ips)
+        except Exception as exc:
+            logger.warning("RTMP pre-flight: DNS FAILED for %s — %s", host, exc)
+
+        # ── TCP connectivity check ────────────────────────────────────────
+        try:
+            with sock_mod.create_connection((host, port), timeout=5.0):
+                logger.info("RTMP pre-flight: TCP %s:%s reachable", host, port)
+        except Exception as exc:
+            logger.warning("RTMP pre-flight: TCP %s:%s unreachable (%s)", host, port, exc)
+
+        # ── HTTP health check on RTMP server port 80 ──────────────────────
+        try:
+            import httpx
+            resp = httpx.get(f"https://{host}/health", timeout=5.0)
+            if resp.status_code < 500:
+                logger.info("RTMP pre-flight: HTTP health on port 80 OK (status %s)", resp.status_code)
+            else:
+                logger.warning("RTMP pre-flight: HTTP health returned %s", resp.status_code)
+        except Exception as exc:
+            logger.warning("RTMP pre-flight: HTTP health check failed (%s)", exc)
+
+        # ── Short publish test (1s color bars + tone) ─────────────────────
         test_cmd = [
             "ffmpeg", "-y",
             "-f", "lavfi", "-i", "testsrc=size=320x240:rate=5:d=1",
-            "-f", "lavfi", "-i", "sine=frequency=440:sample_rate=22050:d=1",
+            "-f", "lavfi", "-i", "anullsrc=r=22050:cl=mono:d=1",
             "-vcodec", "libx264", "-preset", "ultrafast", "-b:v", "200k",
             "-acodec", "aac", "-b:a", "32k", "-ar", "22050",
             "-f", "flv", rtmp_url,
@@ -239,6 +262,24 @@ class MediaMixer:
                 logger.info("RTMP pre-flight publish test PASSED")
             else:
                 logger.warning("RTMP pre-flight publish test returned code %s", rc)
+                # On failure, also try with explicit port 1935 and without stream key
+                alt_url = f"rtmp://{host}:{port}/app"
+                logger.info("RTMP pre-flight: retrying with base URL %s", alt_url)
+                try:
+                    proc2 = await asyncio.create_subprocess_exec(
+                        *["ffmpeg", "-y",
+                          "-f", "lavfi", "-i", "testsrc=size=320x240:rate=5:d=1",
+                          "-f", "lavfi", "-i", "anullsrc=r=22050:cl=mono:d=1",
+                          "-vcodec", "libx264", "-preset", "ultrafast", "-b:v", "200k",
+                          "-acodec", "aac", "-b:a", "32k", "-ar", "22050",
+                          "-f", "flv", alt_url],
+                        stdout=asyncio.subprocess.DEVNULL,
+                        stderr=asyncio.subprocess.DEVNULL,
+                    )
+                    rc2 = await asyncio.wait_for(proc2.wait(), timeout=10.0)
+                    logger.info("RTMP pre-flight alt test returned code %s", rc2)
+                except Exception as exc2:
+                    logger.warning("RTMP pre-flight alt test also failed: %s", exc2)
         except asyncio.TimeoutError:
             logger.warning("RTMP pre-flight publish test timed out (non-fatal)")
         except Exception as exc:
@@ -262,12 +303,15 @@ class MediaMixer:
         return [
             "ffmpeg",
             "-loglevel", "warning",
-            "-re",
+            "-nostdin",
             # Video input: PNG frames via stdin
             "-f", "image2pipe",
             "-vcodec", "png",
             "-framerate", str(self._fps),
             "-video_size", f"{self._width}x{self._height}",
+            "-pix_fmt", "rgba",
+            "-probesize", "1000000",
+            "-analyzeduration", "2000000",
             "-i", "pipe:0",
             # Audio input: FIFO pipe for dynamic TTS injection
             "-f", "mp3",
