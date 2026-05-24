@@ -27,7 +27,9 @@ import os
 import signal
 import sys
 import time
+import uuid
 from collections import deque
+from datetime import datetime, timezone
 from typing import Callable, Optional
 
 from dotenv import load_dotenv
@@ -35,12 +37,26 @@ from dotenv import load_dotenv
 # Load .env from script directory
 load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
 
+from audience_manager import AudienceManager, JoinEvent, TipEvent
 from dialogue_engine import DialogueEngine, DialogueTurn
-from event_listener import EventQueue, WebhookServer
+from editorial_pipeline import (
+    EditorialContext, TransformedItem, transform_to_radio_copy,
+    transform_crypto_data, filter_news_items, check_crypto_surge,
+)
+from event_listener import EventQueue, RadioEvent, WebhookServer
+from memory_manager import PersistentMemory, SessionMemory, Callback
 from music_scheduler import MusicScheduler
 from news_poller import NewsPoller
 from orchestrator_bridge import OrchestratorBridge, RegisteredAgent
+from radio_physics import (
+    BroadcastState, BroadcastStateManager, TimeBlock,
+    SegmentID, get_current_block, get_current_segment, get_next_segment,
+    get_segment_duration, get_segment_turns, get_turn_cadence,
+    enforce_turn_anatomy, check_energy_reset, mark_energy_reset,
+    require_energy_reset, get_transition_pattern, TRANSITION_PATTERNS,
+)
 from room_keeper import RoomKeeper
+from special_events import SpecialEventDetector, SpecialEvent
 
 # ── Logging ──────────────────────────────────────────────────────────────────
 
@@ -82,7 +98,7 @@ class RadioRunner:
         turn_interval: int = 25,
         break_interval: int = 8,
         break_duration: int = 120,
-        room_type: str = "debate",
+        room_type: str = "radio-show",
         max_turns: int = 0,
     ) -> None:
         self._turn_interval = turn_interval
@@ -92,19 +108,31 @@ class RadioRunner:
         self._turn_count = 0
         self._history: deque[DialogueTurn] = deque(maxlen=10)
 
+        # ── New systems ──────────────────────────────────────────────────────
+        self._state_manager = BroadcastStateManager()
+        self._persistent_memory = PersistentMemory()
+        self._session_memory: Optional[SessionMemory] = None
+        self._audience_manager = AudienceManager()
+        self._event_detector = SpecialEventDetector()
+        self._editorial_context = EditorialContext()
+        self._current_segment: SegmentID = SegmentID.COLD_OPEN
+        self._segment_turns: list[tuple[str, str]] = []
+        self._current_turn_idx: int = 0
+        self._last_audio_time: float = 0.0
+
         # ── Initialize modules ───────────────────────────────────────────────
         self._poller = NewsPoller()
         self._engine = DialogueEngine()
         self._bridge = OrchestratorBridge(
             backend_url=BACKEND_URL,
-            orchestrator_url=ORCHESTRATOR_URL,  # None = use backend_url
+            orchestrator_url=ORCHESTRATOR_URL,
         )
         self._scheduler = MusicScheduler(
             break_interval=break_interval,
             break_duration=break_duration,
         )
 
-        # ── Event handling (Phase 2) ─────────────────────────────────────────
+        # ── Event handling ───────────────────────────────────────────────────
         self._event_queue = EventQueue()
         self._webhook_server = WebhookServer(
             port=int(os.environ.get("WEBHOOK_PORT", "8080")),
@@ -215,6 +243,17 @@ class RadioRunner:
             objective=objective,
         )
 
+        # 7. Initialize session memory
+        self._session_memory = SessionMemory(
+            session_id=str(uuid.uuid4()),
+            room_id=self._room_id,
+            started_at=time.time(),
+        )
+
+        # 8. Transition to LIVE state
+        self._state_manager.transition_to(BroadcastState.LIVE)
+        mark_energy_reset(self._room_id)
+
         logger.info(f"Radio show ready — Room: {self._room_id[:8]}...")
         logger.info(f"Open in browser: {BACKEND_URL}/room/{self._room_id}/live")
 
@@ -224,9 +263,22 @@ class RadioRunner:
     # ── Main Loop ────────────────────────────────────────────────────────────
 
     def _main_loop(self) -> None:
-        """Core turn loop: poll news, generate dialogue, score, repeat."""
+        """Core broadcast loop: state machine, segments, editorial pipeline."""
         while self._running:
             try:
+                # ── State Machine Checks ──────────────────────────────────
+                if self._state_manager.should_enter_night_mode():
+                    self._state_manager.transition_to(BroadcastState.NIGHT_MODE)
+                elif self._state_manager.should_exit_night_mode():
+                    self._state_manager.transition_to(BroadcastState.LIVE)
+
+                # Check silence timeout
+                if self._state_manager.is_silence_timeout():
+                    logger.warning("Silence timeout — entering RECOVERY")
+                    self._state_manager.transition_to(BroadcastState.RECOVERY)
+                    self._run_recovery_segment()
+                    self._state_manager.transition_to(BroadcastState.LIVE)
+
                 # Check if room keeper permanently failed
                 if self._keeper.failed:
                     logger.critical("Room keeper permanently failed — halting radio show.")
@@ -238,27 +290,90 @@ class RadioRunner:
                 if current_room and current_room != self._room_id:
                     logger.info(f"Room changed by keeper: {self._room_id[:8]} → {current_room[:8]}")
                     self._room_id = current_room
+                    if self._session_memory:
+                        self._session_memory.room_id = current_room
 
-                # 1. Poll news (cached — only refresh every NEWS_POLL_INTERVAL)
+                # ── Editorial Pipeline ─────────────────────────────────────
                 self._refresh_headlines()
+                self._refresh_editorial_context()
 
-                # Check for high-priority injected events
+                # ── Check Special Events ───────────────────────────────────
                 injected_events = self._event_queue.pop_all()
-                if injected_events:
-                    logger.info(f"Processing {len(injected_events)} injected events (e.g. BREAKING NEWS)!")
+                special_events = self._check_special_events(injected_events)
 
-                # 2. Generate dialogue
-                logger.info(f"Turn {self._turn_count + 1} — generating dialogue...")
+                if special_events:
+                    for event in special_events:
+                        if event.event_type == "BREAKING_NEWS":
+                            self._state_manager.transition_to(BroadcastState.BREAKING)
+                            self._handle_breaking_news(event)
+                            self._state_manager.transition_to(BroadcastState.LIVE)
+                        elif event.event_type == "CRYPTO_SURGE":
+                            self._handle_crypto_surge(event)
+
+                # ── Segment System ─────────────────────────────────────────
+                seg_id, _ = get_current_segment()
+                block = get_current_block()
+
+                # Check if segment changed
+                if seg_id != self._current_segment:
+                    self._state_manager.transition_to(BroadcastState.TRANSITION)
+                    prev_seg = self._current_segment
+                    self._current_segment = seg_id
+                    self._current_turn_idx = 0
+                    self._segment_turns = get_segment_turns(seg_id, block)
+
+                    # Check energy reset requirement
+                    if require_energy_reset(prev_seg, seg_id):
+                        self._run_micro_banter()
+
+                    # Transition pattern
+                    transition = get_transition_pattern(prev_seg, seg_id)
+                    self._run_transition(prev_seg, seg_id, transition)
+
+                    self._state_manager.transition_to(BroadcastState.LIVE)
+                    logger.info("Segment: %s → %s (%s)", prev_seg.value, seg_id.value, block.value)
+
+                # ── Process Turn ───────────────────────────────────────────
+                if self._current_turn_idx >= len(self._segment_turns):
+                    # Segment over
+                    if self._session_memory:
+                        self._session_memory.segments_aired.append(seg_id.value)
+                    self._current_turn_idx = 0
+                    time.sleep(get_turn_cadence(block))
+                    continue
+
+                turn_spec = self._segment_turns[self._current_turn_idx]
+                agent_key, persona_name = turn_spec
+                total_turns = len(self._segment_turns)
+
+                logger.info(
+                    f"Turn {self._turn_count + 1} — [{agent_key}] {seg_id.value} "
+                    f"(turn {self._current_turn_idx + 1}/{total_turns})"
+                )
+
+                # Generate dialogue with full context
                 turn = self._engine.generate_turn(
+                    editorial=self._editorial_context,
                     headlines=self._cached_headlines,
                     history=list(self._history)[-5:],
                     events=injected_events,
+                    segment_id=seg_id,
+                    turn_number=self._current_turn_idx + 1,
+                    total_turns=total_turns,
+                    agent_key=agent_key,
+                    session_memory=self._session_memory,
                 )
 
                 logger.info(f"  ALEX: {turn.host_text[:80]}...")
                 logger.info(f"  MIRA: {turn.cohost_text[:80]}...")
 
-                # 3. Submit to orchestrator and process turn
+                # ── Energy Reset Check ─────────────────────────────────────
+                if check_energy_reset(self._room_id):
+                    logger.info("4-minute energy reset triggered — injecting micro-banter")
+                    self._run_micro_banter()
+                    mark_energy_reset(self._room_id)
+
+                # ── Submit & Process Turn ──────────────────────────────────
                 result = self._bridge.submit_and_process(
                     room_id=self._room_id,
                     host_agent_id=self._host.id,
@@ -268,58 +383,23 @@ class RadioRunner:
                     host_api_key=self._host.api_key,
                 )
 
-                # 4. Handle results & pacing
+                # ── Audio Synthesis ────────────────────────────────────────
                 if result.selected_message_id:
-                    winner_text = turn.host_text if result.selected_agent_id == self._host.id else turn.cohost_text
-                    winner_name = self._host.name if result.selected_agent_id == self._host.id else self._cohost.name
-                    
-                    logger.info("Triggering audio synthesis...")
-                    duration_ms = self._bridge.play_audio(
-                        room_id=self._room_id,
-                        message_id=result.selected_message_id,
-                        text=winner_text,
-                        agent_id=result.selected_agent_id,
-                        api_key=self._host.api_key,
-                        agent_name=winner_name
-                    )
-                    
-                    # Sleep dynamically based on speech duration + 1.5s natural pause
-                    sleep_time = max(1.5, (duration_ms / 1000.0) + 1.5)
-                    logger.info(f"Sleeping {sleep_time:.2f}s for audio playback + padding...")
-                    time.sleep(sleep_time)
+                    self._play_turn_audio(result, turn)
                 elif result.status in ("no_messages", "no_valid_messages"):
-                    # Orchestrator couldn't select a message — play the host's
-                    # dialogue directly so listeners still hear audio.
-                    logger.warning(
-                        "No message selected (status=%s) — playing host dialogue directly",
-                        result.status,
-                    )
-                    try:
-                        fallback_msg_id = f"fallback-{self._turn_count + 1}"
-                        duration_ms = self._bridge.play_audio(
-                            room_id=self._room_id,
-                            message_id=fallback_msg_id,
-                            text=turn.host_text,
-                            agent_id=self._host.id,
-                            api_key=self._host.api_key,
-                            agent_name=self._host.name,
-                        )
-                        sleep_time = max(1.5, (duration_ms / 1000.0) + 1.5)
-                        logger.info(f"Fallback audio: sleeping {sleep_time:.2f}s")
-                        time.sleep(sleep_time)
-                    except Exception as fallback_exc:
-                        logger.error("Fallback audio also failed: %s", fallback_exc)
-                        time.sleep(self._turn_interval)
+                    self._play_fallback_audio(turn)
                 else:
-                    logger.warning("No message selected (status=%s), turning over quickly", result.status)
+                    logger.warning("No message selected (status=%s)", result.status)
                     time.sleep(self._turn_interval)
 
                 self._turn_count += 1
+                self._current_turn_idx += 1
                 self._history.append(turn)
                 self._scheduler.record_turn()
-                # Mark headlines as seen only after a successful turn
-                self._commit_headlines()
-                self._commit_headlines = lambda: None  # prevent double-commit
+
+                # Mark news items as aired
+                if turn.topic and turn.topic not in ("BREAKING NEWS", "post_music_break", "slow_news"):
+                    self._commit_headlines()
 
                 logger.info(
                     f"  Turn {self._turn_count} result: "
@@ -327,23 +407,23 @@ class RadioRunner:
                     f"topic=\"{turn.topic[:40]}\""
                 )
 
-                # 4. Check for music break
+                # ── Music Break Check ──────────────────────────────────────
                 if self._scheduler.should_inject():
                     self._inject_music_break()
 
-                # 5. Check max turns
+                # ── Max Turns Check ────────────────────────────────────────
                 if self._max_turns and self._turn_count >= self._max_turns:
                     logger.info(f"Max turns ({self._max_turns}) reached — stopping.")
                     self._running = False
                     break
 
-                # 6. Wait for next turn
-                logger.debug(f"Sleeping {self._turn_interval}s until next turn...")
-                self._interruptible_sleep(self._turn_interval)
+                # ── Turn Cadence ───────────────────────────────────────────
+                cadence = get_turn_cadence(block)
+                logger.debug(f"Sleeping {cadence}s until next turn...")
+                self._interruptible_sleep(cadence)
 
             except Exception as exc:
                 logger.error(f"Turn loop error: {exc}", exc_info=True)
-                # Don't crash — wait and retry
                 self._interruptible_sleep(5)
 
     # ── Music Break ──────────────────────────────────────────────────────────
@@ -375,6 +455,219 @@ class RadioRunner:
             "POST_MUSIC_BREAK",
             priority=5,
             payload={"break_number": music_break.break_number},
+        )
+
+    # ── Audio Playback Helpers ──────────────────────────────────────────────
+
+    def _play_turn_audio(self, result, turn: DialogueTurn) -> None:
+        """Play the winning message's audio."""
+        if result.selected_agent_id == self._host.id:
+            winner_text = turn.host_text
+            winner_name = self._host.name
+        else:
+            winner_text = turn.cohost_text
+            winner_name = self._cohost.name
+
+        logger.info("Triggering audio synthesis...")
+        try:
+            duration_ms = self._bridge.play_audio(
+                room_id=self._room_id,
+                message_id=result.selected_message_id,
+                text=winner_text,
+                agent_id=result.selected_agent_id,
+                api_key=self._host.api_key,
+                agent_name=winner_name,
+            )
+            sleep_time = max(2.0, (duration_ms / 1000.0) + 1.5)
+            logger.info(f"Sleeping {sleep_time:.2f}s for audio playback...")
+            time.sleep(sleep_time)
+        except Exception as audio_exc:
+            logger.error("Audio playback error: %s", audio_exc)
+            time.sleep(self._turn_interval)
+
+    def _play_fallback_audio(self, turn: DialogueTurn) -> None:
+        """Play host dialogue directly as fallback."""
+        logger.warning("Playing host dialogue directly as fallback")
+        try:
+            fallback_id = f"fallback-{self._turn_count + 1}"
+            duration_ms = self._bridge.play_audio(
+                room_id=self._room_id,
+                message_id=fallback_id,
+                text=turn.host_text,
+                agent_id=self._host.id,
+                api_key=self._host.api_key,
+                agent_name=self._host.name,
+            )
+            sleep_time = max(2.0, (duration_ms / 1000.0) + 1.5)
+            logger.info(f"Fallback audio: sleeping {sleep_time:.2f}s")
+            time.sleep(sleep_time)
+        except Exception as exc:
+            logger.error("Fallback audio failed: %s", exc)
+            time.sleep(self._turn_interval)
+
+    # ── Segment & Transition Helpers ─────────────────────────────────────────
+
+    def _run_transition(
+        self, prev_seg: SegmentID, next_seg: SegmentID, pattern: str
+    ) -> None:
+        """Execute a transition between segments."""
+        transition_data = TRANSITION_PATTERNS.get(pattern, TRANSITION_PATTERNS["pivot"])
+        dur_lo, dur_hi = transition_data["duration"]
+        duration = (dur_lo + dur_hi) // 2
+
+        logger.info("Transition: %s → %s (pattern=%s, %.1fs)", prev_seg.value, next_seg.value, pattern, duration)
+
+        # Generate brief transition dialogue
+        if self._host and self._cohost:
+            alex_line = transition_data.get("alex", "")
+            mira_line = transition_data.get("mira", "")
+            if alex_line:
+                try:
+                    self._bridge.submit_and_process(
+                        room_id=self._room_id,
+                        host_agent_id=self._host.id,
+                        host_text=alex_line,
+                        cohost_agent_id=self._cohost.id,
+                        cohost_text=mira_line or "Let's do it.",
+                        host_api_key=self._host.api_key,
+                    )
+                except Exception:
+                    pass
+            self._interruptible_sleep(duration)
+
+    def _run_micro_banter(self) -> None:
+        """60-second unscheduled banter to reset energy."""
+        logger.info("Running micro-banter (energy reset)")
+        if not (self._host and self._cohost):
+            return
+        try:
+            self._bridge.submit_and_process(
+                room_id=self._room_id,
+                host_agent_id=self._host.id,
+                host_text="Let's come up for air for a second. What are we thinking about?",
+                cohost_agent_id=self._cohost.id,
+                cohost_text="Yeah, let's reset. I've got a thought on that actually—",
+                host_api_key=self._host.api_key,
+            )
+        except Exception as exc:
+            logger.warning("Micro-banter failed: %s", exc)
+        self._interruptible_sleep(10)
+
+    def _run_recovery_segment(self) -> None:
+        """Dead air recovery sequence."""
+        logger.warning("Running dead air recovery")
+        if not (self._host and self._cohost):
+            return
+        try:
+            self._bridge.submit_and_process(
+                room_id=self._room_id,
+                host_agent_id=self._host.id,
+                host_text="Alright — we had a moment there. We're back. Tech was being difficult.",
+                cohost_agent_id=self._cohost.id,
+                cohost_text="I did nothing. Continue.",
+                host_api_key=self._host.api_key,
+            )
+        except Exception as exc:
+            logger.warning("Recovery segment failed: %s", exc)
+
+    # ── Special Event Handlers ──────────────────────────────────────────────
+
+    def _check_special_events(
+        self, injected_events: list,
+    ) -> list[SpecialEvent]:
+        """Check all data feeds for special events."""
+        events = []
+
+        # Breaking news from event queue
+        for event in injected_events:
+            if event.event_type == "BREAKING_NEWS":
+                events.append(SpecialEvent(
+                    event_type="BREAKING_NEWS",
+                    payload=event.payload,
+                ))
+
+        # Crypto surge
+        if self._editorial_context.crypto:
+            surge = self._event_detector.check_crypto_surge(self._editorial_context.crypto)
+            if surge:
+                events.append(surge)
+
+        # High audience
+        if self._audience_manager.participant_count > 10:
+            high_aud = self._event_detector.check_high_audience(self._audience_manager.participant_count)
+            if high_aud:
+                events.append(high_aud)
+
+        return events
+
+    def _handle_breaking_news(self, event: SpecialEvent) -> None:
+        """Handle a breaking news event."""
+        headline = event.payload.get("headline", "Breaking story")
+        logger.info("=== BREAKING NEWS: %s ===", headline)
+
+        if not (self._host and self._cohost):
+            return
+
+        # Generate breaking news turns
+        turn = self._engine.generate_turn(
+            headlines=self._cached_headlines,
+            events=[RadioEvent(priority=0, event_type="BREAKING_NEWS", payload=event.payload)],
+            segment_id=SegmentID.BREAKING,
+        )
+
+        # Submit and process
+        result = self._bridge.submit_and_process(
+            room_id=self._room_id,
+            host_agent_id=self._host.id,
+            host_text=turn.host_text,
+            cohost_agent_id=self._cohost.id,
+            cohost_text=turn.cohost_text,
+            host_api_key=self._host.api_key,
+        )
+
+        if result.selected_message_id:
+            self._play_turn_audio(result, turn)
+
+        logger.info("Breaking news segment complete")
+
+    def _handle_crypto_surge(self, event: SpecialEvent) -> None:
+        """Handle a crypto surge event (>10% move)."""
+        coin = event.payload.get("coin", "unknown")
+        change = event.payload.get("change_24h", 0)
+        logger.info("=== CRYPTO SURGE: %s moved %.1f%% ===", coin, change)
+
+        if self._cohost:
+            # Mira's corner would go into crypto surge mode
+            self._event_queue.push(
+                "CRYPTO_SURGE", priority=2,
+                payload={"coin": coin, "change": change},
+            )
+
+    # ── Editorial Pipeline ──────────────────────────────────────────────────
+
+    def _refresh_editorial_context(self) -> None:
+        """Refresh the editorial context from cached data."""
+        block = get_current_block()
+        self._editorial_context.block = block.value
+        self._editorial_context.hour = datetime.now(timezone.utc).hour
+
+        # Transform headlines into editorial items
+        if self._cached_headlines:
+            items = []
+            for hl in self._cached_headlines[:10]:
+                transformed = transform_to_radio_copy(
+                    raw_title=getattr(hl, 'title', str(hl)),
+                    raw_description=getattr(hl, 'summary', ''),
+                    source=getattr(hl, 'source', ''),
+                    published_at=getattr(hl, 'published_at', None),
+                )
+                items.append(transformed)
+            self._editorial_context.news = filter_news_items(items)
+
+        # Update audience context
+        self._editorial_context.participant_count = self._audience_manager.participant_count
+        self._editorial_context.known_participants = (
+            self._audience_manager.get_known_listeners_summary()
         )
 
     # ── News Polling ─────────────────────────────────────────────────────────
@@ -431,16 +724,21 @@ class RadioRunner:
     # ── Teardown ─────────────────────────────────────────────────────────────
 
     def _teardown(self) -> None:
-        """Clean shutdown: stop keeper, flush agent memory, close connections."""
+        """Clean shutdown: stop keeper, flush memory, close connections."""
         logger.info("Radio runner shutting down...")
         self._webhook_server.stop()
         self._keeper.stop()
 
-        # Flush agent long-term memory to disk on clean shutdown
+        # Flush agent long-term memory to disk
         self._engine.alex.flush_memory()
         self._engine.mira.flush_memory()
 
-        # Close the room gracefully (if we still have a host)
+        # Persist session memory
+        if self._persistent_memory:
+            self._persistent_memory.increment_sessions()
+            self._persistent_memory.save()
+
+        # Close the room gracefully
         if self._room_id and self._host:
             try:
                 self._bridge.close_room(self._room_id, self._host)
@@ -454,6 +752,7 @@ class RadioRunner:
         logger.info(f"  Radio show ended after {self._turn_count} turns")
         logger.info(f"  Music breaks: {self._scheduler.break_count}")
         logger.info(f"  Room respawns: {self._keeper.respawn_count}")
+        logger.info(f"  Total sessions: {self._persistent_memory.total_sessions}")
         logger.info("=" * 60)
 
 
