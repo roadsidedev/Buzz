@@ -18,6 +18,36 @@ import { paymentService } from "../services/payment-service.js";
 const router = Router();
 
 /**
+ * Helper: build the HLS base URL from env vars with sensible fallback.
+ * Prefers HLS_BASE_URL, then derives from RTMP_BASE_URL, then warns.
+ */
+function getHlsBaseUrl(): string {
+  const hlsBase = process.env.HLS_BASE_URL;
+  if (hlsBase) return hlsBase.replace(/\/+$/, "");
+
+  const rtmpBase = process.env.RTMP_BASE_URL;
+  if (rtmpBase) {
+    // Convert rtmp://host:port/app -> https://host[:port]
+    let base = rtmpBase
+      .replace(/^rtmp:\/\//, "https://")
+      .replace(/\/app\/?$/, "")
+      .replace(/\/live\/?$/, "")
+      .replace(/:1935\/?$/, "");
+    // If RTMP was on a non-standard port, it stays in the URL — log a warning
+    if (/:\d+$/.test(base)) {
+      logger.warn(`RTMP_BASE_URL has non-default port — HLS URL may be incorrect. Set HLS_BASE_URL explicitly.`, {
+        rtmpBase,
+        derivedHls: base,
+      });
+    }
+    return base;
+  }
+
+  logger.error("Neither HLS_BASE_URL nor RTMP_BASE_URL is set — video streaming will not work");
+  return "https://buzz-rtmp-server-production.up.railway.app";
+}
+
+/**
  * Shared handler for creating a new livestream.
  * Used by both POST / and POST /create.
  */
@@ -130,7 +160,7 @@ async function handleCreateLivestream(req: Request, res: Response): Promise<void
         viewerCount: 0,
         createdAt: new Date().toISOString(),
       },
-      streamServerUrl: `${process.env.RTMP_BASE_URL ?? 'rtmp://buzz-rtmp-server-production.up.railway.app/app'}`,
+      streamServerUrl: process.env.RTMP_BASE_URL || `${getHlsBaseUrl().replace(/^https:\/\//, "rtmp://")}/app`,
       streamKey,
     },
   });
@@ -174,10 +204,10 @@ router.get(
     }
 
     // Only show streams that meet quality criteria:
-    // 1. Currently live streams (status = 'live')
+    // 1. Currently live streams with recent heartbeat (status = 'live' AND seen within 90s)
     // 2. Ended streams with recording_available = true AND duration >= 2 minutes
     const whereClause = `(
-      status = 'live'
+      (status = 'live' AND last_seen_at > NOW() - INTERVAL '90 seconds')
       OR (
         status = 'ended'
         AND recording_available = TRUE
@@ -189,10 +219,7 @@ router.get(
 
     params.push(limit);
 
-    const hlsBase = process.env.HLS_BASE_URL
-      ?? (process.env.RTMP_BASE_URL
-        ? process.env.RTMP_BASE_URL.replace(/^rtmp:\/\//, "https://").replace(/:1935/, ":80").replace(/\/app$/, "")
-        : "https://buzz-rtmp-server-production.up.railway.app");
+    const hlsBase = getHlsBaseUrl();
 
     const result = await pool.query(
       `SELECT id, host_agent_id as "hostAgentId", host_agent_name as "hostAgentName",
@@ -339,10 +366,7 @@ router.get(
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const { id } = req.params;
 
-    const hlsBase = process.env.HLS_BASE_URL
-      ?? (process.env.RTMP_BASE_URL
-        ? process.env.RTMP_BASE_URL.replace(/^rtmp:\/\//, "https://").replace(/:1935/, ":80").replace(/\/app$/, "")
-        : "https://buzz-rtmp-server-production.up.railway.app");
+    const hlsBase = getHlsBaseUrl();
 
     const result = await pool.query(
       `SELECT id, host_agent_id as "hostAgentId", host_agent_name as "hostAgentName",
@@ -413,6 +437,97 @@ router.post(
     }
 
     res.json({ success: true, data: { message: "Heartbeat recorded" } });
+  }),
+);
+
+/**
+ * POST /api/v1/livestreams/auth-publish
+ * Called by nginx-rtmp `on_publish` directive when a client attempts to publish.
+ * Validates the stream_key (passed as `name` in the RTMP URL path).
+ *
+ * Returns 200 to allow publish, anything else denies it.
+ */
+router.post(
+  "/auth-publish",
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    // nginx-rtmp sends these fields in the POST body (urlencoded)
+    const streamKey = (req.body?.name as string) || (req.query?.name as string);
+    const appName = (req.body?.app as string) || (req.query?.app as string);
+    const clientAddr = (req.body?.addr as string) || (req.query?.addr as string) || "unknown";
+
+    if (!streamKey) {
+      logger.warn("RTMP publish attempt with missing stream key", { clientAddr });
+      res.status(403).send("Forbidden");
+      return;
+    }
+
+    // Optional but recommended: only allow the "app" application we configured in nginx
+    if (appName && appName !== "app") {
+      logger.warn("RTMP publish denied: wrong application name", { appName, clientAddr });
+      res.status(403).send("Forbidden");
+      return;
+    }
+
+    try {
+      const result = await pool.query<{ id: string; status: string; host_agent_id: string }>(
+        `SELECT id, status, host_agent_id FROM livestream WHERE stream_key = $1 LIMIT 1`,
+        [streamKey],
+      );
+
+      const stream = result.rows[0];
+
+      if (!stream || stream.status !== "live") {
+        logger.warn("RTMP publish denied: invalid or inactive stream key", {
+          streamKey: streamKey.substring(0, 8) + "...",
+          clientAddr,
+        });
+        res.status(403).send("Forbidden");
+        return;
+      }
+
+      // Touch last_seen_at so the stream becomes immediately visible in discovery
+      await pool.query(
+        `UPDATE livestream SET last_seen_at = NOW() WHERE id = $1`,
+        [stream.id],
+      );
+
+      logger.info("RTMP publish authorized", {
+        streamId: stream.id,
+        hostAgentId: stream.host_agent_id,
+        clientAddr,
+      });
+
+      res.status(200).send("OK");
+    } catch (err) {
+      logger.error("Error during RTMP publish auth", {
+        error: err instanceof Error ? err.message : String(err),
+        clientAddr,
+      });
+      res.status(500).send("Error");
+    }
+  }),
+);
+
+/**
+ * POST /api/v1/livestreams/auth-publish-done
+ * Called by nginx-rtmp when a publisher disconnects.
+ * We mark the stream as ended (the stale reconciler will also catch it).
+ */
+router.post(
+  "/auth-publish-done",
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const streamKey = (req.body?.name as string) || (req.query?.name as string);
+
+    if (streamKey) {
+      await pool.query(
+        `UPDATE livestream
+         SET status = 'ended', updated_at = NOW()
+         WHERE stream_key = $1 AND status = 'live'`,
+        [streamKey],
+      );
+    }
+
+    res.status(200).send("OK");
   }),
 );
 

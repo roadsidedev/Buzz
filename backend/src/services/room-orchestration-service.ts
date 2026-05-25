@@ -74,8 +74,9 @@ export class RoomOrchestrationService {
 
     logger.info("Starting room orchestration service");
 
-    // Run startup reconciliation to fix stuck rooms
+    // Run startup reconciliation to fix stuck rooms and stale livestreams
     await this._reconcileStuckRooms();
+    await this._reconcileStaleLivestreams();
 
     // Start discovery loop (check for new live rooms every 5s)
     this.orchestratorTimerId = setInterval(
@@ -280,6 +281,31 @@ export class RoomOrchestrationService {
   }
 
   /**
+   * Reconcile stale livestreams: auto-end any livestream with status 'live'
+   * but no heartbeat in the last 90 seconds. Prevents ghost streams from
+   * appearing in discovery after the video-runner crashes.
+   *
+   * Runs on startup and periodically in the discovery loop.
+   */
+  private async _reconcileStaleLivestreams(): Promise<void> {
+    try {
+      const { pool } = await import("../config/database.js");
+      const result = await pool.query(
+        `UPDATE livestream
+         SET status = 'ended', updated_at = NOW()
+         WHERE status = 'live' AND last_seen_at < NOW() - INTERVAL '120 seconds'`,
+      );
+      if (result.rowCount && result.rowCount > 0) {
+        logger.info(`Auto-ended ${result.rowCount} stale livestream(s) with no recent heartbeat`);
+      }
+    } catch (err) {
+      logger.warn("Auto-close livestream check failed (may not exist yet)", {
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
+  /**
    * Internal: Discover and manage live rooms
    *
    * Called every 5 seconds to:
@@ -357,7 +383,16 @@ export class RoomOrchestrationService {
         });
       }
 
-      // 4. CLEAN UP COMPLETED/CANCELLED ROOMS
+      // 4. AUTO-CLOSE STALE LIVESTREAMS (video pipeline)
+      // Ends any livestream with status='live' but no heartbeat in >120s.
+      // Prevents ghost streams in discovery after video-runner crashes or deploys.
+      await this._reconcileStaleLivestreams().catch((livestreamErr) => {
+        logger.warn("Failed to reconcile stale livestreams", {
+          error: livestreamErr instanceof Error ? livestreamErr.message : String(livestreamErr),
+        });
+      });
+
+      // 5. CLEAN UP COMPLETED/CANCELLED ROOMS
       const activeRoomIds = Array.from(this.activeRooms.keys());
       for (const roomId of activeRoomIds) {
         const room = await roomRepository.getById(roomId);

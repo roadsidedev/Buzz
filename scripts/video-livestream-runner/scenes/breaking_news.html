@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=1280" />
+<title>Buzz — Breaking News</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    width: 1280px; height: 720px; overflow: hidden;
+    background: linear-gradient(180deg, #0a0000 0%, #1a0505 30%, #0a0000 100%);
+    color: #f0e0e0;
+    font-family: 'Segoe UI', 'Inter', system-ui, sans-serif;
+    display: flex; flex-direction: column;
+  }
+
+  .breaking-banner {
+    height: 36px; background: #cc0000;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px; font-weight: 800; color: #fff;
+    text-transform: uppercase; letter-spacing: 5px;
+    animation: flash 2s ease-in-out infinite;
+  }
+  @keyframes flash { 0%,100% { opacity: 1; } 50% { opacity: 0.85; } }
+
+  .top-bar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 24px; height: 40px;
+    background: rgba(0,0,0,0.4); border-bottom: 1px solid rgba(255,0,0,0.2);
+  }
+  .brand { font-size: 16px; font-weight: 800; letter-spacing: 3px; color: #ff4444; }
+  .clock { font-size: 11px; color: #775555; }
+
+  .main-area {
+    flex: 1; display: flex; flex-direction: column;
+    justify-content: center; align-items: center;
+    padding: 30px 80px;
+  }
+
+  .breaking-label {
+    font-size: 12px; color: #ff4444; text-transform: uppercase;
+    letter-spacing: 5px; margin-bottom: 12px;
+    animation: pulse-text 2s ease-in-out infinite;
+  }
+  @keyframes pulse-text { 0%,100% { opacity: 0.7; } 50% { opacity: 1; } }
+
+  .topic-headline {
+    font-size: 44px; font-weight: 700; line-height: 1.2;
+    text-align: center; color: #ff6666;
+    text-shadow: 0 0 40px rgba(255,68,68,0.15);
+    max-width: 1100px;
+  }
+
+  .commentary-text {
+    font-size: 20px; line-height: 1.5; color: #ccaaaa;
+    text-align: center; margin-top: 20px; max-width: 1000px;
+    transition: opacity 0.4s ease;
+  }
+
+  .speaker-label {
+    font-size: 12px; color: #ff4444; margin-top: 12px;
+    text-transform: uppercase; letter-spacing: 2px;
+  }
+
+  .red-ticker {
+    height: 34px; background: #800000; overflow: hidden;
+    display: flex; align-items: center;
+  }
+  .ticker-track {
+    display: flex; gap: 40px; white-space: nowrap;
+    animation: ticker-scroll 15s linear infinite;
+    font-size: 13px; color: #ffaaaa; padding-left: 20px; font-weight: 600;
+  }
+  @keyframes ticker-scroll {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(-50%); }
+  }
+  .ticker-item { display: inline-flex; gap: 6px; }
+  .ticker-sep { color: #ff4444; }
+
+  .footer {
+    height: 26px; display: flex; align-items: center; justify-content: center;
+    background: rgba(0,0,0,0.3);
+    font-size: 10px; color: #663333; letter-spacing: 2px;
+  }
+
+  .red-ambient {
+    position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+    background: radial-gradient(ellipse at center, rgba(255,0,0,0.03) 0%, transparent 70%);
+    pointer-events: none;
+  }
+</style>
+</head>
+<body>
+<div class="breaking-banner">BREAKING NEWS</div>
+<div class="top-bar">
+  <div class="brand">Buzz</div>
+  <span class="clock" id="clock"></span>
+</div>
+
+<div class="main-area">
+  <div class="red-ambient"></div>
+  <div class="breaking-label">BREAKING ALERT</div>
+  <div class="topic-headline" id="headline">Breaking News</div>
+  <div class="commentary-text" id="commentary">We are following this developing story.</div>
+  <div class="speaker-label" id="speakerLabel">ZARA</div>
+</div>
+
+<div class="red-ticker" id="ticker">
+  <div class="ticker-track" id="tickerTrack">
+    <span class="ticker-item">BREAKING: Developing story <span class="ticker-sep">◆</span></span>
+  </div>
+</div>
+
+<div class="footer">BUZZ NEWS — BREAKING NEWS COVERAGE</div>
+
+<script>
+  function updateContent(headline, commentary, visualCue, speaker) {
+    document.getElementById('headline').textContent = headline || 'Breaking News';
+    var c = document.getElementById('commentary');
+    c.textContent = commentary || 'We are following this developing story.';
+    c.style.opacity = '0';
+    setTimeout(function() { c.style.opacity = '1'; }, 50);
+    if (speaker) document.getElementById('speakerLabel').textContent = speaker.toUpperCase();
+  }
+
+  function updateTicker(headlines) {
+    var track = document.getElementById('tickerTrack');
+    if (!headlines || headlines.length === 0) return;
+    var html = '';
+    for (var i = 0; i < 10; i++) {
+      for (var j = 0; j < headlines.length; j++) {
+        html += '<span class="ticker-item">' + headlines[j] + ' <span class="ticker-sep">◆</span></span>';
+      }
+    }
+    track.innerHTML = html;
+  }
+
+  function updateClock() {
+    document.getElementById('clock').textContent = new Date().toUTCString();
+  }
+  updateClock(); setInterval(updateClock, 1000);
+</script>
+</body>
+</html>

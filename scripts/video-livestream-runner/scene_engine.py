@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
 scene_engine.py
-Playwright-based headless browser that renders HTML scenes and captures
-them as PNG frames for the FFmpeg media pipeline.
+Enterprise-grade Playwright-based headless browser scene renderer.
 
-Manages a live HTML page that can be dynamically updated via JavaScript
-injection, then screenshotted at configurable FPS.
+Supports dynamic scene switching, lower thirds, ticker updates,
+topic cards, and multi-scene template library (news_desk, market_board,
+chill_lounge, debate_split, music_break, breaking_news).
 
 Architecture placement: scripts/video-livestream-runner/
 Depends on: playwright (pip), scenes/*.html
@@ -18,22 +18,40 @@ import logging
 import os
 import pathlib
 import time
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 
 SCENE_DIR = pathlib.Path(__file__).parent / "scenes"
 FRAME_QUEUE_MAX = 10
 
+SCENE_TEMPLATES = {
+    "news_desk": "news_desk.html",
+    "market_board": "market_board.html",
+    "chill_lounge": "chill_lounge.html",
+    "debate_split": "debate_split.html",
+    "music_break": "music_break.html",
+    "breaking_news": "breaking_news.html",
+    "live_news": "news_desk.html",
+    "data_card": "data_card.html",
+    "break_card": "break_card.html",
+}
+
 
 class SceneEngine:
     """
     Renders HTML scene templates via Playwright and captures PNG frames.
 
+    Supports dynamic scene switching, overlay injection, and
+    multi-ticker/breaking-banner/lower-third control.
+
     Usage:
         engine = SceneEngine(width=1280, height=720, fps=15)
-        await engine.start("live_news")
-        await engine.update_topic("Bitcoin hits $100K", "Great news!", "positive")
-        # ... MediaMixer reads from engine.frame_queue ...
+        await engine.start("news_desk")
+        await engine.update_topic("Headline", "Commentary", "neutral", "Zara")
+        await engine.update_ticker(["Headline 1", "Headline 2"])
+        await engine.show_lower_third("Title", "Subtitle")
+        await engine.switch_scene("market_board")
         await engine.stop()
     """
 
@@ -52,26 +70,28 @@ class SceneEngine:
         self._page = None
         self._capture_task: Optional[asyncio.Task] = None
         self._running = False
+        self._current_scene: str = ""
 
-        # Frame queue — consumed by MediaMixer
         self.frame_queue: asyncio.Queue = asyncio.Queue(maxsize=FRAME_QUEUE_MAX)
         self._stop_event = asyncio.Event()
 
     # ── Lifecycle ────────────────────────────────────────────────────────────
 
-    async def start(self, scene_name: str = "live_news") -> None:
-        """
-        Launch headless Chromium and open the scene HTML file.
-        """
+    async def start(self, scene_name: str = "news_desk") -> None:
         from playwright.async_api import async_playwright
 
-        scene_path = SCENE_DIR / f"{scene_name}.html"
+        scene_file = SCENE_TEMPLATES.get(scene_name, "news_desk.html")
+        scene_path = SCENE_DIR / scene_file
+
         if not scene_path.exists():
-            logger.warning("Scene '%s' not found, falling back to live_news", scene_name)
-            scene_path = SCENE_DIR / "live_news.html"
+            logger.warning("Scene '%s' not found, falling back to news_desk", scene_name)
+            scene_path = SCENE_DIR / "news_desk.html"
 
         url = scene_path.as_uri()
-        logger.info("SceneEngine starting — %s at %dx%d %dfps", url, self._width, self._height, self._fps)
+        logger.info(
+            "SceneEngine starting — %s (%s) at %dx%d %dfps",
+            scene_name, scene_file, self._width, self._height, self._fps,
+        )
 
         pw = await async_playwright().start()
         self._browser = await pw.chromium.launch(headless=True)
@@ -80,16 +100,15 @@ class SceneEngine:
             device_scale_factor=1,
         )
         self._page = await context.new_page()
-
         await self._page.goto(url, wait_until="networkidle", timeout=15000)
-        logger.info("Scene page loaded")
+        logger.info("Scene page loaded: %s", scene_name)
 
+        self._current_scene = scene_name
         self._running = True
         self._stop_event.clear()
         self._capture_task = asyncio.create_task(self._capture_loop())
 
     async def stop(self) -> None:
-        """Stop capture loop and close browser."""
         self._running = False
         self._stop_event.set()
         if self._capture_task:
@@ -104,52 +123,149 @@ class SceneEngine:
 
     # ── Scene Updates ────────────────────────────────────────────────────────
 
-    async def update_topic(self, headline: str, commentary: str, visual_cue: str) -> None:
-        """
-        Update the live scene with new content via JS injection.
-
-        The scene HTML exposes window.updateContent(headline, commentary, cue)
-        for dynamic updates.
-        """
+    async def update_topic(
+        self,
+        headline: str,
+        commentary: str,
+        visual_cue: str = "neutral",
+        speaker: Optional[str] = None,
+    ) -> None:
         if not self._page:
             return
-        cue = visual_cue or "neutral"
         escaped_headline = headline.replace("'", "\\'")
         escaped_commentary = commentary.replace("'", "\\'")
-        js = f"window.updateContent('{escaped_headline}', '{escaped_commentary}', '{cue}')"
+        escaped_speaker = (speaker or "").replace("'", "\\'")
+        cue = visual_cue or "neutral"
+
+        js = (
+            f"window.updateContent("
+            f"'{escaped_headline}', '{escaped_commentary}', '{cue}', '{escaped_speaker}')"
+        )
         try:
             await self._page.evaluate(js)
-            logger.debug("Scene updated — topic='%s' cue=%s", headline[:40], cue)
         except Exception as exc:
             logger.warning("Scene update failed: %s", exc)
 
     async def update_ticker(self, headlines: list[str]) -> None:
-        """Update the scrolling news ticker with fresh headlines."""
         if not self._page or not headlines:
             return
-        js_headlines = json.dumps(headlines)
         try:
+            js_headlines = json.dumps(headlines)
             await self._page.evaluate(f"window.updateTicker({js_headlines})")
         except Exception as exc:
             logger.warning("Ticker update failed: %s", exc)
 
+    async def show_lower_third(self, title: str, sub: str) -> None:
+        if not self._page:
+            return
+        escaped_title = title.replace("'", "\\'")
+        escaped_sub = sub.replace("'", "\\'")
+        try:
+            await self._page.evaluate(
+                f"window.showLowerThird('{escaped_title}', '{escaped_sub}')"
+            )
+        except Exception as exc:
+            logger.warning("Lower third failed: %s", exc)
+
+    async def hide_lower_third(self) -> None:
+        if not self._page:
+            return
+        try:
+            await self._page.evaluate("window.hideLowerThird()")
+        except Exception:
+            pass
+
+    async def show_topic_card(self, body: str) -> None:
+        if not self._page:
+            return
+        escaped = body.replace("'", "\\'")
+        try:
+            await self._page.evaluate(f"window.showTopicCard('{escaped}')")
+        except Exception as exc:
+            logger.warning("Topic card failed: %s", exc)
+
+    async def hide_topic_card(self) -> None:
+        if not self._page:
+            return
+        try:
+            await self._page.evaluate("window.hideTopicCard()")
+        except Exception:
+            pass
+
+    async def set_block(self, block: str) -> None:
+        if not self._page:
+            return
+        try:
+            await self._page.evaluate(f"window.setBlock('{block}')")
+        except Exception:
+            pass
+
+    async def update_market_prices(self, prices: dict) -> None:
+        if not self._page:
+            return
+        try:
+            await self._page.evaluate(f"window.updateMarketPrices({json.dumps(prices)})")
+        except Exception as exc:
+            logger.warning("Market prices update failed: %s", exc)
+
+    async def update_debate(self, zara_text: str, dex_text: str, topic: str) -> None:
+        if not self._page:
+            return
+        escaped_zara = zara_text.replace("'", "\\'")
+        escaped_dex = dex_text.replace("'", "\\'")
+        escaped_topic = topic.replace("'", "\\'")
+        try:
+            await self._page.evaluate(
+                f"window.updateDebate('{escaped_zara}', '{escaped_dex}', '{escaped_topic}')"
+            )
+        except Exception as exc:
+            logger.warning("Debate update failed: %s", exc)
+
+    async def show_community_comment(self, comment: str) -> None:
+        if not self._page:
+            return
+        escaped = comment.replace("'", "\\'")
+        try:
+            await self._page.evaluate(f"window.showCommunityComment('{escaped}')")
+        except Exception:
+            pass
+
+    async def update_music_timer(self, seconds: int) -> None:
+        if not self._page:
+            return
+        try:
+            await self._page.evaluate(f"window.updateTimer({seconds})")
+        except Exception:
+            pass
+
     async def switch_scene(self, scene_name: str) -> None:
-        """Hot-swap to a different scene template."""
-        scene_path = SCENE_DIR / f"{scene_name}.html"
+        scene_file = SCENE_TEMPLATES.get(scene_name)
+        if not scene_file:
+            logger.warning("Unknown scene '%s'", scene_name)
+            return
+        scene_path = SCENE_DIR / scene_file
         if not scene_path.exists():
-            logger.warning("Cannot switch to scene '%s' — not found", scene_name)
+            logger.warning("Scene '%s' file not found", scene_file)
             return
         if self._page:
             try:
-                await self._page.goto(scene_path.as_uri(), wait_until="networkidle", timeout=10000)
+                await self._page.goto(
+                    scene_path.as_uri(),
+                    wait_until="networkidle",
+                    timeout=10000,
+                )
+                self._current_scene = scene_name
                 logger.info("Switched to scene: %s", scene_name)
             except Exception as exc:
                 logger.warning("Scene switch failed: %s", exc)
 
+    @property
+    def current_scene(self) -> str:
+        return self._current_scene
+
     # ── Capture Loop ─────────────────────────────────────────────────────────
 
     async def _capture_loop(self) -> None:
-        """Continuously screenshot the page at the configured FPS."""
         frame_count = 0
         last_stat = time.monotonic()
 
@@ -158,7 +274,10 @@ class SceneEngine:
             try:
                 png_bytes = await self._page.screenshot(
                     type="png",
-                    clip={"x": 0, "y": 0, "width": self._width, "height": self._height},
+                    clip={
+                        "x": 0, "y": 0,
+                        "width": self._width, "height": self._height,
+                    },
                 )
                 if not self.frame_queue.full():
                     await self.frame_queue.put(png_bytes)
@@ -167,8 +286,9 @@ class SceneEngine:
                 now = time.monotonic()
                 if now - last_stat >= 10:
                     logger.debug(
-                        "Capture: %d frames  queue: %d/%d",
-                        frame_count, self.frame_queue.qsize(), FRAME_QUEUE_MAX,
+                        "Capture: %d frames  queue: %d/%d  scene: %s",
+                        frame_count, self.frame_queue.qsize(),
+                        FRAME_QUEUE_MAX, self._current_scene,
                     )
                     frame_count = 0
                     last_stat = now

@@ -9,7 +9,7 @@ from livestream_bridge import LivestreamBridge, RegisteredAgent
 
 @pytest.fixture
 def bridge():
-    b = LivestreamBridge(backend_url="http://test.local", system_secret="test-secret")
+    b = LivestreamBridge(backend_url="http://test.local")
     yield b
     b.close()
 
@@ -55,7 +55,7 @@ class TestLivestreamBridge:
     def test_auth_headers_with_secret(self, bridge):
         headers = bridge._auth_headers("test-key")
         assert headers["Authorization"] == "Bearer test-key"
-        assert headers["X-Buzz-System-Secret"] == "test-secret"
+        assert "Content-Type" in headers
 
     def test_auth_headers_without_secret(self):
         b = LivestreamBridge(backend_url="http://test.local")

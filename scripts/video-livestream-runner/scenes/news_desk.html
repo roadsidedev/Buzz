@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=1280" />
+<title>Buzz — News Desk</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    width: 1280px; height: 720px; overflow: hidden;
+    background: linear-gradient(160deg, #0a0a1a 0%, #0d1025 40%, #0a0a1a 100%);
+    color: #e8e8f0;
+    font-family: 'Segoe UI', 'Inter', system-ui, sans-serif;
+    display: flex; flex-direction: column;
+  }
+  .top-bar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 24px; height: 44px;
+    background: linear-gradient(90deg, rgba(0,255,136,0.06) 0%, rgba(0,0,0,0.4) 100%);
+    border-bottom: 1px solid rgba(0,255,136,0.12);
+  }
+  .brand { font-size: 18px; font-weight: 800; letter-spacing: 3px; color: #00ff88; text-transform: uppercase; }
+  .live-group { display: flex; align-items: center; gap: 12px; }
+  .live-badge {
+    display: flex; align-items: center; gap: 6px;
+    background: rgba(255,40,40,0.12); border: 1px solid rgba(255,40,40,0.35);
+    border-radius: 3px; padding: 2px 8px; font-size: 11px; font-weight: 700;
+    color: #ff4444; text-transform: uppercase; letter-spacing: 1px;
+  }
+  .live-dot { width: 7px; height: 7px; border-radius: 50%; background: #ff4444; animation: pulse 1.5s ease-in-out infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.25; } }
+  .clock { font-size: 11px; color: #5555aa; font-variant-numeric: tabular-nums; }
+  .block-badge {
+    font-size: 10px; color: #00ff88; text-transform: uppercase;
+    letter-spacing: 2px; border: 1px solid rgba(0,255,136,0.2);
+    padding: 2px 8px; border-radius: 3px;
+  }
+  .main-area {
+    flex: 1; display: flex; flex-direction: column;
+    justify-content: center; align-items: center;
+    padding: 36px 64px; position: relative;
+  }
+  .topic-label {
+    font-size: 12px; color: #6666bb; text-transform: uppercase;
+    letter-spacing: 4px; margin-bottom: 10px;
+  }
+  .topic-headline {
+    font-size: 40px; font-weight: 700; line-height: 1.2;
+    text-align: center; max-width: 1100px;
+    transition: all 0.5s ease;
+  }
+  .topic-headline.breaking { color: #ff4444; text-shadow: 0 0 30px rgba(255,68,68,0.2); }
+  .topic-headline.positive { color: #00ff88; }
+  .topic-headline.negative { color: #ff6644; }
+  .topic-headline.neutral { color: #e8e8f0; }
+  .commentary-area {
+    width: 100%; margin-top: 20px;
+    min-height: 72px; display: flex; align-items: center; justify-content: center;
+  }
+  .commentary-text {
+    font-size: 20px; line-height: 1.5; color: #b0b0d0;
+    text-align: center; max-width: 1000px;
+    transition: opacity 0.4s ease;
+  }
+  .speaker-label {
+    font-size: 11px; color: #00ff88; text-transform: uppercase;
+    letter-spacing: 2px; margin-top: 8px;
+  }
+  #lowerThird {
+    position: absolute; bottom: 56px; left: 24px;
+    background: rgba(0,0,0,0.75); border-left: 3px solid #00ff88;
+    padding: 8px 16px; min-width: 200px;
+    opacity: 0; transition: opacity 0.3s ease;
+  }
+  #lowerThird.visible { opacity: 1; }
+  #lowerThird .lt-title { font-size: 16px; font-weight: 700; color: #fff; }
+  #lowerThird .lt-sub { font-size: 12px; color: #8888bb; margin-top: 2px; }
+  #topicCard {
+    position: absolute; right: 20px; top: 60px;
+    width: 280px; background: rgba(0,0,0,0.6);
+    border: 1px solid rgba(255,255,255,0.06); border-radius: 6px;
+    padding: 14px; opacity: 0; transition: opacity 0.4s ease;
+  }
+  #topicCard.visible { opacity: 1; }
+  #topicCard .tc-title { font-size: 13px; color: #8888cc; margin-bottom: 6px; }
+  #topicCard .tc-body { font-size: 14px; color: #ccccee; line-height: 1.4; }
+  .bottom-ticker {
+    height: 36px; background: rgba(0,0,0,0.5);
+    border-top: 1px solid rgba(255,255,255,0.05);
+    overflow: hidden; display: flex; align-items: center;
+  }
+  .ticker-track {
+    display: flex; gap: 50px; white-space: nowrap;
+    animation: ticker-scroll 25s linear infinite;
+    font-size: 13px; color: #5555aa; padding-left: 20px;
+  }
+  @keyframes ticker-scroll {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(-50%); }
+  }
+  .ticker-item { display: inline-flex; gap: 6px; }
+  .ticker-sep { color: #00ff88; }
+  .footer-bar {
+    height: 28px; display: flex; align-items: center; justify-content: space-between;
+    padding: 0 24px; background: rgba(0,0,0,0.25);
+    font-size: 10px; color: #333366; border-top: 1px solid rgba(255,255,255,0.03);
+  }
+  .breaking-overlay {
+    display: none; position: absolute; top: 0; left: 0; right: 0;
+    height: 32px; background: #cc2222;
+    align-items: center; justify-content: center;
+    font-size: 14px; font-weight: 800; color: #fff;
+    text-transform: uppercase; letter-spacing: 4px;
+  }
+  .breaking-overlay.active { display: flex; }
+  #debug { display: none; }
+</style>
+</head>
+<body>
+<div class="top-bar">
+  <div class="brand">Buzz</div>
+  <div style="display:flex;align-items:center;gap:12px">
+    <span class="block-badge" id="blockBadge">LIVE</span>
+    <div class="live-badge"><span class="live-dot"></span> LIVE</div>
+    <span class="clock" id="clock"></span>
+  </div>
+</div>
+
+<div class="breaking-overlay" id="breakingOverlay">BREAKING NEWS</div>
+
+<div class="main-area">
+  <div class="topic-container">
+    <div class="topic-label">TOP STORY</div>
+    <div class="topic-headline neutral" id="headline">Welcome to Buzz News</div>
+  </div>
+  <div class="commentary-area">
+    <div class="commentary-text" id="commentary">AI-powered live news coverage, streaming 24/7.</div>
+  </div>
+  <div class="speaker-label" id="speakerLabel"></div>
+</div>
+
+<div id="lowerThird">
+  <div class="lt-title" id="ltTitle"></div>
+  <div class="lt-sub" id="ltSub"></div>
+</div>
+
+<div id="topicCard">
+  <div class="tc-title">CONTEXT</div>
+  <div class="tc-body" id="tcBody"></div>
+</div>
+
+<div class="bottom-ticker" id="ticker">
+  <div class="ticker-track" id="tickerTrack">
+    <span class="ticker-item">Buzz News 24/7 <span class="ticker-sep">◆</span></span>
+  </div>
+</div>
+
+<div class="footer-bar">
+  <span>BUZZ NEWS NETWORK</span>
+  <span id="timeBlock"></span>
+  <span>ALWAYS ON. ALWAYS LIVE.</span>
+</div>
+
+<script>
+  function updateContent(headline, commentary, visualCue, speaker) {
+    var h = document.getElementById('headline');
+    var c = document.getElementById('commentary');
+    var s = document.getElementById('speakerLabel');
+    var bo = document.getElementById('breakingOverlay');
+    h.textContent = headline;
+    c.textContent = commentary;
+    h.className = 'topic-headline ' + (visualCue || 'neutral');
+    c.style.opacity = '0';
+    setTimeout(function() { c.style.opacity = '1'; }, 50);
+    if (speaker) { s.textContent = speaker; }
+    if (visualCue === 'breaking') { bo.classList.add('active'); }
+    else { bo.classList.remove('active'); }
+  }
+
+  function updateTicker(headlines) {
+    var track = document.getElementById('tickerTrack');
+    if (!headlines || headlines.length === 0) return;
+    var html = '';
+    for (var i = 0; i < 8; i++) {
+      for (var j = 0; j < headlines.length; j++) {
+        html += '<span class="ticker-item">' + headlines[j] + ' <span class="ticker-sep">◆</span></span>';
+      }
+    }
+    track.innerHTML = html;
+  }
+
+  function showLowerThird(title, sub) {
+    var lt = document.getElementById('lowerThird');
+    document.getElementById('ltTitle').textContent = title;
+    document.getElementById('ltSub').textContent = sub;
+    lt.classList.add('visible');
+  }
+
+  function hideLowerThird() {
+    document.getElementById('lowerThird').classList.remove('visible');
+  }
+
+  function showTopicCard(body) {
+    var tc = document.getElementById('topicCard');
+    document.getElementById('tcBody').textContent = body;
+    tc.classList.add('visible');
+  }
+
+  function hideTopicCard() {
+    document.getElementById('topicCard').classList.remove('visible');
+  }
+
+  function setBlock(block) {
+    document.getElementById('blockBadge').textContent = block.toUpperCase();
+    document.getElementById('timeBlock').textContent = block.toUpperCase() + ' BLOCK';
+  }
+
+  function updateClock() {
+    var now = new Date();
+    document.getElementById('clock').textContent = now.toUTCString();
+  }
+  updateClock();
+  setInterval(updateClock, 1000);
+</script>
+</body>
+</html>

@@ -7,6 +7,7 @@ interface HlsPlayerProps {
   className?: string
   autoPlay?: boolean
   muted?: boolean
+  onReconnect?: () => void
 }
 
 const HlsPlayer: React.FC<HlsPlayerProps> = ({
@@ -26,7 +27,7 @@ const HlsPlayer: React.FC<HlsPlayerProps> = ({
   const RECONNECT_DELAY_MS = 3000
 
   const attemptReconnect = useCallback(() => {
-    if (!src) return
+    if (!src && !onReconnect) return
 
     setIsReconnecting(true)
     setError(null)
@@ -37,9 +38,13 @@ const HlsPlayer: React.FC<HlsPlayerProps> = ({
 
     reconnectTimeoutRef.current = setTimeout(() => {
       setIsReconnecting(false)
-      initPlayer()
+      if (onReconnect) {
+        onReconnect()
+      } else {
+        initPlayer()
+      }
     }, RECONNECT_DELAY_MS)
-  }, [src])
+  }, [src, onReconnect, initPlayer])
 
   const initPlayer = useCallback(() => {
     const video = videoRef.current

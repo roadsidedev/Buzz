@@ -5,7 +5,7 @@ dockerfilePath = "backend/Dockerfile"
 [deploy]
 # The Dockerfile CMD already sets the start command, but we override to be explicit
 # tsx handles the transformed path aliases from tsc-alias
-startCommand = "node --import tsx backend/dist/backend/src/server.js"
+startCommand = "node --import tsx backend/dist/src/server.js"
 # Completely disable healthcheck
 healthcheck = false
 restartPolicyType = "ON_FAILURE"
@@ -47,4 +47,6 @@ ENABLE_TTS = "true"
 # Required: DATABASE_URL, REDIS_URL, JWT_SECRET must be provided in Railway
 
 # RTMP server for video livestreams (deploy separately via scripts/rtmp-server/)
-# RTMP_BASE_URL = "rtmp://Buzz-rtmp.up.railway.app/app"
+# Requires the RTMP server Railway URL. Example:
+# RTMP_BASE_URL = "rtmp://beely-rtmp.up.railway.app/app"
+# HLS_BASE_URL = "https://beely-rtmp.up.railway.app"

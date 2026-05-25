@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=1280" />
+<title>Buzz — Debate Split</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    width: 1280px; height: 720px; overflow: hidden;
+    background: #080810;
+    color: #e0e0f0;
+    font-family: 'Segoe UI', 'Inter', system-ui, sans-serif;
+    display: flex; flex-direction: column;
+  }
+  .top-bar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 24px; height: 40px;
+    background: rgba(0,0,0,0.4); border-bottom: 1px solid rgba(255,255,255,0.06);
+  }
+  .brand { font-size: 16px; font-weight: 800; letter-spacing: 3px; color: #ff8844; }
+  .debate-label { font-size: 11px; color: #ff8844; letter-spacing: 3px; text-transform: uppercase; }
+
+  .main-area {
+    flex: 1; display: flex;
+  }
+
+  .side {
+    flex: 1; display: flex; flex-direction: column;
+    justify-content: center; align-items: center;
+    padding: 24px 32px;
+    border-right: 1px solid rgba(255,255,255,0.04);
+  }
+  .side:last-child { border-right: none; }
+
+  .side-label {
+    font-size: 14px; font-weight: 700; letter-spacing: 2px;
+    margin-bottom: 16px; text-transform: uppercase;
+  }
+  .side-label.zara { color: #4488ff; }
+  .side-label.dex { color: #ff8844; }
+
+  .side-commentary {
+    font-size: 17px; line-height: 1.5; text-align: center;
+    padding: 0 16px; color: #b0b0d0;
+    transition: opacity 0.3s ease;
+  }
+  .side-empty {
+    font-size: 14px; color: #444466; font-style: italic;
+  }
+
+  .topic-bar {
+    display: flex; align-items: center; justify-content: center;
+    height: 36px; background: rgba(255,136,68,0.06);
+    border-top: 1px solid rgba(255,136,68,0.1);
+    border-bottom: 1px solid rgba(255,136,68,0.1);
+    font-size: 13px; color: #ff8844; letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+
+  .footer {
+    height: 26px; display: flex; align-items: center; justify-content: center;
+    background: rgba(0,0,0,0.2);
+    font-size: 10px; color: #333366;
+  }
+
+  .vs-divider {
+    position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+    font-size: 24px; font-weight: 800; color: rgba(255,255,255,0.06);
+    letter-spacing: 8px;
+  }
+</style>
+</head>
+<body>
+<div class="top-bar">
+  <div class="brand">Buzz</div>
+  <span class="debate-label">DEBATE</span>
+  <span style="font-size:11px;color:#555588" id="clock"></span>
+</div>
+
+<div class="topic-bar" id="topicBar">DEBATE TOPIC</div>
+
+<div class="main-area">
+  <div class="side">
+    <div class="side-label zara">ZARA</div>
+    <div class="side-commentary" id="zaraText">Awaiting Zara's take...</div>
+  </div>
+  <div class="side">
+    <div class="side-label dex">DEX</div>
+    <div class="side-commentary" id="dexText">Awaiting Dex's response...</div>
+  </div>
+</div>
+
+<div class="footer">BUZZ NEWS — COMMENTARY</div>
+
+<script>
+  function updateContent(headline, commentary, visualCue, speaker) {
+    document.getElementById('topicBar').textContent = (headline || 'DEBATE').toUpperCase();
+    if (speaker && speaker.toLowerCase() === 'zara') {
+      document.getElementById('zaraText').textContent = commentary;
+    } else if (speaker && speaker.toLowerCase() === 'dex') {
+      document.getElementById('dexText').textContent = commentary;
+    } else {
+      document.getElementById('zaraText').textContent = commentary;
+    }
+  }
+
+  function updateDebate(zaraText, dexText, topic) {
+    if (zaraText) document.getElementById('zaraText').textContent = zaraText;
+    if (dexText) document.getElementById('dexText').textContent = dexText;
+    if (topic) document.getElementById('topicBar').textContent = topic.toUpperCase();
+  }
+
+  function updateTicker() {}
+
+  function updateClock() {
+    document.getElementById('clock').textContent = new Date().toUTCString();
+  }
+  updateClock(); setInterval(updateClock, 1000);
+</script>
+</body>
+</html>

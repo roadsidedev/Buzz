@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=1280" />
+<title>Buzz — Chill Lounge</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    width: 1280px; height: 720px; overflow: hidden;
+    background: linear-gradient(135deg, #1a0a1a 0%, #0d0d20 50%, #1a0a1a 100%);
+    color: #e0d0e0;
+    font-family: 'Segoe UI', 'Inter', system-ui, sans-serif;
+    display: flex; flex-direction: column;
+  }
+  .top-bar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 24px; height: 44px;
+    background: rgba(0,0,0,0.3); border-bottom: 1px solid rgba(200,100,255,0.08);
+  }
+  .brand { font-size: 18px; font-weight: 800; letter-spacing: 3px; color: #cc66ff; }
+  .vibe-badge {
+    font-size: 11px; color: #cc66ff; letter-spacing: 2px;
+    border: 1px solid rgba(200,100,255,0.2); padding: 2px 10px; border-radius: 12px;
+  }
+  .clock { font-size: 11px; color: #555588; }
+
+  .main-area {
+    flex: 1; display: flex; flex-direction: column;
+    justify-content: center; align-items: center;
+    padding: 40px 80px;
+  }
+  .vibe-icon {
+    font-size: 48px; margin-bottom: 16px; opacity: 0.6;
+  }
+  .topic-headline {
+    font-size: 32px; font-weight: 600; text-align: center;
+    color: #d0b0e0; max-width: 900px; line-height: 1.3;
+    transition: all 0.5s ease;
+  }
+  .commentary-text {
+    font-size: 20px; line-height: 1.5; color: #a0a0c0;
+    text-align: center; margin-top: 20px; max-width: 900px;
+    transition: opacity 0.4s ease;
+  }
+  .speaker-label {
+    font-size: 12px; color: #cc66ff; margin-top: 12px;
+    font-style: italic;
+  }
+  .ambient-bar {
+    position: absolute; bottom: 36px; left: 0; right: 0;
+    height: 2px; background: linear-gradient(90deg, transparent, #cc66ff, transparent);
+    opacity: 0.3;
+  }
+  .footer {
+    height: 28px; display: flex; align-items: center; justify-content: center;
+    background: rgba(0,0,0,0.2);
+    font-size: 10px; color: #333355; letter-spacing: 2px;
+  }
+</style>
+</head>
+<body>
+<div class="top-bar">
+  <div class="brand">Buzz</div>
+  <span class="vibe-badge">CHILL LOUNGE</span>
+  <span class="clock" id="clock"></span>
+</div>
+
+<div class="main-area">
+  <div class="vibe-icon">✦</div>
+  <div class="topic-headline" id="headline">Setting the vibe</div>
+  <div class="commentary-text" id="commentary">Pulling up a seat and getting into it.</div>
+  <div class="speaker-label" id="speakerLabel"></div>
+</div>
+
+<div class="ambient-bar"></div>
+
+<div class="footer">BUZZ NEWS — BANTER & CULTURE</div>
+
+<script>
+  function updateContent(headline, commentary, visualCue, speaker) {
+    document.getElementById('headline').textContent = headline;
+    var c = document.getElementById('commentary');
+    c.textContent = commentary;
+    c.style.opacity = '0';
+    setTimeout(function() { c.style.opacity = '1'; }, 50);
+    if (speaker) document.getElementById('speakerLabel').textContent = speaker;
+  }
+  function updateTicker() {}
+  function updateClock() { document.getElementById('clock').textContent = new Date().toUTCString(); }
+  updateClock(); setInterval(updateClock, 1000);
+</script>
+</body>
+</html>

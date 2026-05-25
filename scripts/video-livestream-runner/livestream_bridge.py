@@ -218,6 +218,9 @@ class LivestreamBridge:
         self._assert_ok(resp, "create_livestream")
         data = resp.json()["data"]
         stream = data["stream"]
+
+        # IMPORTANT: streamKey is a secret. It is used both as the RTMP path suffix
+        # and for publish authorization via the backend's /auth-publish endpoint.
         livestream = Livestream(
             id=stream["id"],
             stream_key=data["streamKey"],
@@ -282,6 +285,16 @@ class LivestreamBridge:
             return False
 
     def build_rtmp_url(self, livestream: Livestream) -> str:
+        """
+        Construct the full RTMP ingest URL that the video runner should publish to.
+
+        Format: {streamServerUrl}/{streamKey}
+        Example: rtmp://buzz-rtmp-server.../app/abc123def456...
+
+        This URL (including the secret streamKey) is sent to nginx-rtmp.
+        The backend's /auth-publish endpoint validates the streamKey before
+        allowing the publish. Keep the streamKey secret.
+        """
         return f"{livestream.stream_server_url.rstrip('/')}/{livestream.stream_key}"
 
     # ── Audio Synthesis ──────────────────────────────────────────────────────
