@@ -33,6 +33,6 @@
       "@orchestrator/*": ["./orchestrator/src/*"]
     }
   },
-  "include": ["src/**/*", "common/**/*", "backend/**/*", "frontend/**/*", "orchestrator/**/*"],
+  "include": ["src/**/*", "common/**/*"],
   "exclude": ["node_modules", "dist", "build", "**/*.test.ts"]
 }
