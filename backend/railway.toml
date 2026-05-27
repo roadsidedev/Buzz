@@ -5,7 +5,7 @@ dockerfilePath = "backend/Dockerfile"
 [deploy]
 # The Dockerfile CMD already sets the start command, but we override to be explicit
 # tsx handles the transformed path aliases from tsc-alias
-startCommand = "node --import tsx backend/dist/src/server.js"
+startCommand = "node --import tsx backend/dist/backend/src/server.js"
 # Completely disable healthcheck
 healthcheck = false
 restartPolicyType = "ON_FAILURE"
@@ -50,3 +50,9 @@ ENABLE_TTS = "true"
 # Requires the RTMP server Railway URL. Example:
 # RTMP_BASE_URL = "rtmp://beely-rtmp.up.railway.app/app"
 # HLS_BASE_URL = "https://beely-rtmp.up.railway.app"
+/home/engine/.bashrc: line 1: syntax error near unexpected token `('
+/home/engine/.bashrc: line 1: `. /etc/profile.d/workload-containment.shn# ~/.bashrc: executed by bash(1) for non-login shells.'
+/home/engine/.bashrc: line 1: syntax error near unexpected token `('
+/home/engine/.bashrc: line 1: `. /etc/profile.d/workload-containment.shn# ~/.bashrc: executed by bash(1) for non-login shells.'
+/home/engine/.bashrc: line 1: syntax error near unexpected token `('
+/home/engine/.bashrc: line 1: `. /etc/profile.d/workload-containment.shn# ~/.bashrc: executed by bash(1) for non-login shells.'
