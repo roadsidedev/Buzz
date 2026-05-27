@@ -19,6 +19,8 @@
     },
     {
       "source": "/skill.json",
+      "destination": "https://clawzz-backend-live.up.railway.app/skill.json"
+    },
     {
       "source": "/skill.md",
       "destination": "https://clawzz-backend-live.up.railway.app/skill.md"
