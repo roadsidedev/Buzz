@@ -58,6 +58,9 @@ class Commentary:
     visual_cue: str  # "neutral", "positive", "negative", "breaking"
 
 
+_MAX_RATE_LIMIT_RETRIES: int = int(os.environ.get("LLM_RATE_LIMIT_MAX_RETRIES", "5"))
+
+
 def _build_openai_compat_provider(provider_name: str, api_key: str, base_url: str) -> Any:
     import httpx
 
@@ -69,26 +72,47 @@ def _build_openai_compat_provider(provider_name: str, api_key: str, base_url: st
             self.client = httpx.Client(timeout=120.0)
 
         def messages_create(self, model: str, max_tokens: int, system: str, messages: list):
-            resp = self.client.post(
-                self.url,
-                headers={"Authorization": f"Bearer {self.key}", "Content-Type": "application/json"},
-                json={
-                    "model": model,
-                    "messages": [{"role": "system", "content": system}] + messages,
-                    "max_tokens": max_tokens,
-                    "temperature": 0.7,
-                },
-            )
-            if resp.status_code == 429:
-                wait = min(int(resp.headers.get("Retry-After", 5)), 30)
-                logger.warning("[%s] Rate limited, retrying in %ds", self.name, wait)
-                time.sleep(wait)
-                return self.messages_create(model, max_tokens, system, messages)
-            resp.raise_for_status()
-            data = resp.json()
-            TextObj = type("TextObj", (), {"text": data["choices"][0]["message"]["content"]})
-            ContentObj = type("ContentObj", (), {"content": [TextObj]})
-            return ContentObj()
+            last_exc: Optional[Exception] = None
+            for attempt in range(_MAX_RATE_LIMIT_RETRIES + 1):
+                try:
+                    resp = self.client.post(
+                        self.url,
+                        headers={"Authorization": f"Bearer {self.key}", "Content-Type": "application/json"},
+                        json={
+                            "model": model,
+                            "messages": [{"role": "system", "content": system}] + messages,
+                            "max_tokens": max_tokens,
+                            "temperature": 0.7,
+                        },
+                    )
+                    if resp.status_code == 429:
+                        retry_after = int(resp.headers.get("Retry-After", 5))
+                        # Exponential backoff: base wait * 2^attempt, capped at 60s
+                        wait = min(retry_after * (2 ** attempt), 60)
+                        logger.warning(
+                            "[%s] Rate limited (attempt %d/%d), backing off %ds",
+                            self.name, attempt + 1, _MAX_RATE_LIMIT_RETRIES + 1, wait,
+                        )
+                        if attempt < _MAX_RATE_LIMIT_RETRIES:
+                            time.sleep(wait)
+                            continue
+                        # Exhausted retries — raise to trigger caller's fallback
+                        raise RuntimeError(
+                            f"[{self.name}] Rate limited after {_MAX_RATE_LIMIT_RETRIES + 1} attempts"
+                        )
+                    resp.raise_for_status()
+                    data = resp.json()
+                    TextObj = type("TextObj", (), {"text": data["choices"][0]["message"]["content"]})
+                    ContentObj = type("ContentObj", (), {"content": [TextObj]})
+                    return ContentObj()
+                except (httpx.TimeoutException, httpx.ConnectError, httpx.ReadError) as exc:
+                    last_exc = exc
+                    wait = min(2 ** attempt, 30)
+                    logger.warning("[%s] Request error (attempt %d/%d): %s", self.name, attempt + 1, _MAX_RATE_LIMIT_RETRIES + 1, exc)
+                    if attempt < _MAX_RATE_LIMIT_RETRIES:
+                        time.sleep(wait)
+                        continue
+            raise last_exc or RuntimeError(f"[{self.name}] All retries exhausted")
 
     return OpenAICompatProvider(provider_name, api_key, base_url)
 
@@ -290,7 +314,11 @@ class CommentaryEngine:
             self._anchor.load_skill("skill_news_update.md")
             intent = f"Report on: {topic}. Context: {context}"
 
-        text = self._anchor.think_and_act(intent)
+        try:
+            text = self._anchor.think_and_act(intent)
+        except Exception as exc:
+            logger.error("v2 LLM call failed: %s", exc)
+            text = f"Welcome back to Buzz News. We're following {topic}."
         cue = _classify_cue(self._provider, self._model, text)
 
         if not incoming_event:

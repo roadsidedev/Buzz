@@ -362,9 +362,11 @@ class LivestreamBridge:
             audio_base64 = data.get("audioBytes")
 
             if not audio_base64:
-                logger.info(
-                    "TTS returned no audio (disabled or empty synthesis)",
-                    extra={"duration_ms": data.get("durationMs", 0), "provider": data.get("provider", "none")},
+                logger.warning(
+                    "TTS returned no audio (disabled or empty synthesis). text_length=%d agent=%s provider=%s",
+                    len(text) if text else 0,
+                    agent.name,
+                    data.get("provider", "none"),
                 )
                 return None
 

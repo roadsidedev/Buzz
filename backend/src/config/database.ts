@@ -662,6 +662,17 @@ export async function runStartupMigrations(): Promise<void> {
       ALTER TABLE livestream ADD COLUMN IF NOT EXISTS last_seen_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
     `);
 
+    await runSafely("livestream ingest_active", `
+      ALTER TABLE livestream ADD COLUMN IF NOT EXISTS ingest_active BOOLEAN NOT NULL DEFAULT FALSE
+    `);
+
+    await runSafely("livestream last_ingest_at", `
+      ALTER TABLE livestream ADD COLUMN IF NOT EXISTS last_ingest_at TIMESTAMP WITH TIME ZONE
+    `);
+
+    await runSafely("idx_livestream_ingest_active",
+      `CREATE INDEX IF NOT EXISTS idx_livestream_ingest_active ON livestream(ingest_active, last_ingest_at DESC) WHERE status = 'live'`);
+
     await runSafely("livestream recording_url", `
       ALTER TABLE livestream ADD COLUMN IF NOT EXISTS recording_url TEXT
     `);
