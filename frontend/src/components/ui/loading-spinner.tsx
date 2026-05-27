@@ -15,16 +15,23 @@ export interface LoadingSpinnerProps {
 }
 
 const sizeMap: Record<string, string> = {
-  sm: "w-4 h-4 border-2",
-  md: "w-8 h-8 border-3",
-  lg: "w-12 h-12 border-4",
+  sm: "w-16 h-1",
+  md: "w-24 h-1.5",
+  lg: "w-32 h-2",
 }
 
 const variantMap: Record<string, string> = {
-  default: "border-muted-foreground/20 border-t-foreground",
-  primary: "border-primary/20 border-t-primary",
-  secondary: "border-secondary/20 border-t-secondary-foreground",
-  white: "border-white/20 border-t-white",
+  default: "bg-muted-foreground/20",
+  primary: "bg-primary/20",
+  secondary: "bg-secondary/20",
+  white: "bg-white/20",
+}
+
+const barVariantMap: Record<string, string> = {
+  default: "bg-foreground",
+  primary: "bg-primary",
+  secondary: "bg-secondary-foreground",
+  white: "bg-white",
 }
 
 export function LoadingSpinner({
@@ -35,16 +42,32 @@ export function LoadingSpinner({
   return (
     <div
       className={cn(
-        "animate-spin rounded-full",
+        "relative overflow-hidden rounded-full",
         sizeMap[size],
         variantMap[variant],
         className
       )}
       role="status"
       aria-label="Loading"
-    />
+    >
+      <div
+        className={cn(
+          "absolute top-0 left-0 h-full rounded-full animate-[loading-bar_1.2s_ease-in-out_infinite]",
+          barVariantMap[variant]
+        )}
+        style={{ width: "40%" }}
+      />
+    </div>
   )
 }
+
+<style>{`
+  @keyframes loading-bar {
+    0% { left: -40%; }
+    50% { left: 60%; }
+    100% { left: -40%; }
+  }
+`}</style>
 
 /**
  * LoadingDots Component

@@ -6,6 +6,20 @@
 import React from "react";
 import { cn } from "@/lib/utils";
 
+// Inject loading bar animation once
+if (typeof document !== "undefined" && !document.getElementById("loading-bar-keyframes")) {
+  const style = document.createElement("style");
+  style.id = "loading-bar-keyframes";
+  style.textContent = `
+    @keyframes loading-bar {
+      0% { left: -40%; }
+      50% { left: 60%; }
+      100% { left: -40%; }
+    }
+  `;
+  document.head.appendChild(style);
+}
+
 interface LoadingStateProps {
   count?: number;
 }
@@ -81,7 +95,7 @@ export const LoadingBar: React.FC = () => (
 
 /**
  * BeeSpinner Component
- * Animated flying bee loading indicator (Buzz brand)
+ * Horizontal loading bar indicator (replaces previous bee animation)
  */
 export interface BeeSpinnerProps {
   size?: "sm" | "md" | "lg";
@@ -89,28 +103,51 @@ export interface BeeSpinnerProps {
   className?: string;
 }
 
+const barSizeMap: Record<string, string> = {
+  sm: "w-16 h-1",
+  md: "w-24 h-1.5",
+  lg: "w-32 h-2",
+};
+
+const barColorMap: Record<string, string> = {
+  primary: "bg-primary",
+  secondary: "bg-secondary",
+  accent: "bg-accent",
+  white: "bg-white",
+};
+
+const trackColorMap: Record<string, string> = {
+  primary: "bg-primary/20",
+  secondary: "bg-secondary/20",
+  accent: "bg-accent/20",
+  white: "bg-white/20",
+};
+
 export function BeeSpinner({
   size = "md",
   variant = "primary",
   className,
 }: BeeSpinnerProps) {
-  const sizeClasses: Record<string, string> = { sm: "text-2xl", md: "text-4xl", lg: "text-6xl" };
-  const variantClasses: Record<string, string> = {
-    primary: "text-primary",
-    secondary: "text-secondary",
-    accent: "text-accent",
-    white: "text-white",
-  };
+  const v = variant in barColorMap ? variant : "primary";
 
   return (
-    <div className={cn("flex items-center justify-center pointer-events-none select-none", className)}>
-      <span
-        className={cn("animate-bee-fly", sizeClasses[size], variantClasses[variant] || variantClasses.primary)}
-        role="status"
-        aria-label="Loading"
-      >
-        🐝
-      </span>
+    <div
+      className={cn(
+        "relative overflow-hidden rounded-full",
+        barSizeMap[size],
+        trackColorMap[v],
+        className
+      )}
+      role="status"
+      aria-label="Loading"
+    >
+      <div
+        className={cn(
+          "absolute top-0 left-0 h-full rounded-full animate-[loading-bar_1.2s_ease-in-out_infinite]",
+          barColorMap[v]
+        )}
+        style={{ width: "40%" }}
+      />
     </div>
   );
 }
