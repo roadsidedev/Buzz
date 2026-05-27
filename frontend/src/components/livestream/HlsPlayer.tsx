@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState, useCallback } from "react"
+import React, { useRef, useEffect, useState } from "react"
 import Hls from "hls.js"
 
 interface HlsPlayerProps {
@@ -16,41 +16,25 @@ const HlsPlayer: React.FC<HlsPlayerProps> = ({
   className = "",
   autoPlay = true,
   muted = true,
+  onReconnect,
 }) => {
   const videoRef = useRef<HTMLVideoElement>(null)
   const hlsRef = useRef<Hls | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [isReconnecting, setIsReconnecting] = useState(false)
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const onReconnectRef = useRef(onReconnect)
+  onReconnectRef.current = onReconnect
 
   const MAX_RECONNECT_ATTEMPTS = 5
   const RECONNECT_DELAY_MS = 3000
 
-  const attemptReconnect = useCallback(() => {
-    if (!src && !onReconnect) return
+  const attemptReconnectRef = useRef<() => void>(() => {})
 
-    setIsReconnecting(true)
-    setError(null)
-
-    if (reconnectTimeoutRef.current) {
-      clearTimeout(reconnectTimeoutRef.current)
-    }
-
-    reconnectTimeoutRef.current = setTimeout(() => {
-      setIsReconnecting(false)
-      if (onReconnect) {
-        onReconnect()
-      } else {
-        initPlayer()
-      }
-    }, RECONNECT_DELAY_MS)
-  }, [src, onReconnect, initPlayer])
-
-  const initPlayer = useCallback(() => {
+  const initPlayer = () => {
     const video = videoRef.current
     if (!video || !src) return
 
-    // Clean up previous instance
     if (hlsRef.current) {
       hlsRef.current.destroy()
       hlsRef.current = null
@@ -72,9 +56,7 @@ const HlsPlayer: React.FC<HlsPlayerProps> = ({
       hlsRef.current = hls
 
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
-        video.play().catch(() => {
-          // Autoplay blocked — user interaction required
-        })
+        video.play().catch(() => {})
       })
 
       hls.on(Hls.Events.ERROR, (_event, data) => {
@@ -93,7 +75,7 @@ const HlsPlayer: React.FC<HlsPlayerProps> = ({
               console.error("[HlsPlayer] Fatal error:", data.details)
               setError("Stream error")
               hls.destroy()
-              attemptReconnect()
+              attemptReconnectRef.current()
               break
           }
         }
@@ -102,16 +84,35 @@ const HlsPlayer: React.FC<HlsPlayerProps> = ({
       hls.loadSource(src)
       hls.attachMedia(video)
     } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
-      // Native HLS support (Safari)
       video.src = src
       video.addEventListener("error", () => {
         setError("Stream unavailable")
-        attemptReconnect()
+        attemptReconnectRef.current()
       })
     } else {
       setError("HLS not supported in this browser")
     }
-  }, [src, attemptReconnect])
+  }
+
+  attemptReconnectRef.current = () => {
+    if (!src && !onReconnectRef.current) return
+
+    setIsReconnecting(true)
+    setError(null)
+
+    if (reconnectTimeoutRef.current) {
+      clearTimeout(reconnectTimeoutRef.current)
+    }
+
+    reconnectTimeoutRef.current = setTimeout(() => {
+      setIsReconnecting(false)
+      if (onReconnectRef.current) {
+        onReconnectRef.current()
+      } else {
+        initPlayer()
+      }
+    }, RECONNECT_DELAY_MS)
+  }
 
   useEffect(() => {
     initPlayer()
@@ -125,7 +126,7 @@ const HlsPlayer: React.FC<HlsPlayerProps> = ({
         hlsRef.current = null
       }
     }
-  }, [initPlayer])
+  }, [])
 
   // Show static image fallback when stream is unavailable
   if (error && !isReconnecting) {
@@ -148,7 +149,7 @@ const HlsPlayer: React.FC<HlsPlayerProps> = ({
             <p className="text-white/50 text-sm mt-1">{error}</p>
           </div>
           <button
-            onClick={attemptReconnect}
+            onClick={() => attemptReconnectRef.current()}
             className="mt-2 px-6 py-2.5 bg-violet-600 hover:bg-violet-500 text-white font-medium rounded-full transition-colors text-sm"
           >
             Reconnect
