@@ -255,6 +255,12 @@ class VideoRunner:
             frame_queue=self._scene_engine.frame_queue,
         )
 
+        # Confirm to the backend that ingest has started.
+        # This sets ingest_active = TRUE on the backend, which gates
+        # whether the stream appears in discovery. No ingest = no show.
+        if self._anchor:
+            self._bridge.confirm_ingest_started(self._stream_id, self._anchor)
+
         if self._anchor:
             self._bridge.send_heartbeat(self._stream_id, self._anchor)
 

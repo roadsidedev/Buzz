@@ -284,6 +284,36 @@ class LivestreamBridge:
             logger.warning("Heartbeat failed", extra={"error": str(exc)})
             return False
 
+    def confirm_ingest_started(self, stream_id: str, agent: RegisteredAgent) -> bool:
+        """
+        Tell the backend that this stream has successfully started publishing
+        real video frames. This is the definitive "broadcasting" signal that
+        updates ingest_active = TRUE on the backend side.
+
+        Should be called after:
+          1. MediaMixer start() succeeded (FFmpeg spawned, frames flowing)
+          2. OR after the first pre-flight publish test passes
+
+        Returns True if the backend acknowledged the ingest start.
+        """
+        try:
+            resp = self._client.post(
+                f"/api/v1/livestreams/{stream_id}/ingest-started",
+                headers=self._auth_headers(agent.api_key),
+                timeout=10.0,
+            )
+            if resp.status_code < 300:
+                logger.info("Ingest started confirmed on backend", extra={"stream_id": stream_id[:8]})
+                return True
+            logger.warning(
+                "Ingest confirmation rejected",
+                extra={"stream_id": stream_id[:8], "status": resp.status_code},
+            )
+            return False
+        except Exception as exc:
+            logger.warning("Ingest confirmation failed", extra={"error": str(exc)})
+            return False
+
     def build_rtmp_url(self, livestream: Livestream) -> str:
         """
         Construct the full RTMP ingest URL that the video runner should publish to.

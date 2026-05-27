@@ -74,8 +74,9 @@ async function handleCreateLivestream(req: Request, res: Response): Promise<void
   await pool.query(
     `INSERT INTO livestream (
       id, host_agent_id, host_agent_name, title, description,
-      category, stream_capabilities, status, viewer_count, stream_key
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, 'live', 0, $8)`,
+      category, stream_capabilities, status, viewer_count, stream_key,
+      last_seen_at, ingest_active, last_ingest_at
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, 'live', 0, $8, NOW(), FALSE, NULL)`,
     [
       streamId,
       agent.id,
@@ -204,10 +205,21 @@ router.get(
     }
 
     // Only show streams that meet quality criteria:
-    // 1. Currently live streams with recent heartbeat (status = 'live' AND seen within 90s)
+    // 1. Currently live streams with:
+    //    - Recent heartbeat (last_seen_at within 90s)  AND
+    //    - Evidence of actual video ingest (ingest_active OR recent last_ingest_at)
     // 2. Ended streams with recording_available = true AND duration >= 2 minutes
+    //
+    // This prevents the "declared live but static/no video" problem reported for Video Runner.
     const whereClause = `(
-      (status = 'live' AND last_seen_at > NOW() - INTERVAL '90 seconds')
+      (
+        status = 'live'
+        AND last_seen_at > NOW() - INTERVAL '90 seconds'
+        AND (
+          ingest_active = TRUE
+          OR last_ingest_at > NOW() - INTERVAL '5 minutes'
+        )
+      )
       OR (
         status = 'ended'
         AND recording_available = TRUE
@@ -230,6 +242,9 @@ router.get(
               recording_available as "recordingAvailable",
               recording_started_at as "recordingStartedAt",
               recording_ended_at as "recordingEndedAt",
+              ingest_active as "ingestActive",
+              last_ingest_at as "lastIngestAt",
+              last_seen_at as "lastSeenAt",
               CASE
                 WHEN recording_started_at IS NOT NULL AND recording_ended_at IS NOT NULL
                 THEN EXTRACT(EPOCH FROM (recording_ended_at - recording_started_at))
@@ -309,7 +324,14 @@ router.put(
     const values: unknown[] = [];
     if (title !== undefined) { values.push(title); setClauses.push(`title = $${values.length}`); }
     if (description !== undefined) { values.push(description); setClauses.push(`description = $${values.length}`); }
-    if (status !== undefined) { values.push(status); setClauses.push(`status = $${values.length}`); }
+    if (status !== undefined) {
+      values.push(status);
+      setClauses.push(`status = $${values.length}`);
+      // If the stream is being marked ended, clear ingest_active as well
+      if (status === "ended") {
+        setClauses.push(`ingest_active = FALSE`);
+      }
+    }
 
     values.push(id);
     const updatedResult = await pool.query(
@@ -317,7 +339,7 @@ router.put(
        WHERE id = $${values.length}
        RETURNING id, host_agent_id as "hostAgentId", host_agent_name as "hostAgentName",
                  title, description, category, status, viewer_count as "viewerCount",
-                 created_at as "createdAt"`,
+                 ingest_active as "ingestActive", created_at as "createdAt"`,
       values,
     );
 
@@ -377,6 +399,9 @@ router.get(
               recording_available as "recordingAvailable",
               recording_started_at as "recordingStartedAt",
               recording_ended_at as "recordingEndedAt",
+              ingest_active as "ingestActive",
+              last_ingest_at as "lastIngestAt",
+              last_seen_at as "lastSeenAt",
               CASE
                 WHEN recording_started_at IS NOT NULL AND recording_ended_at IS NOT NULL
                 THEN EXTRACT(EPOCH FROM (recording_ended_at - recording_started_at))
@@ -441,6 +466,57 @@ router.post(
 );
 
 /**
+ * POST /api/v1/livestreams/:id/ingest-started
+ *
+ * Called by the video runner after it confirms that the first RTMP publish
+ * has succeeded and frames are flowing. This is the definitive "stream is
+ * actually broadcasting" signal — separate from heartbeat (presence) and
+ * auth-publish (permission-to-publish).
+ *
+ * Host-only: verifies the requesting agent is the stream host.
+ *
+ * On success: sets ingest_active = TRUE, last_ingest_at = NOW(), and
+ * updates last_seen_at so the stream is immediately visible in discovery.
+ */
+router.post(
+  "/:id/ingest-started",
+  requireApiKey,
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const { id } = req.params;
+    const agentId = req.agent?.id;
+
+    const result = await pool.query(
+      `UPDATE livestream
+       SET ingest_active = TRUE,
+           last_ingest_at = NOW(),
+           last_seen_at = NOW()
+       WHERE id = $1 AND host_agent_id = $2
+       RETURNING id, ingest_active as "ingestActive"`,
+      [id, agentId],
+    );
+
+    if (result.rows.length === 0) {
+      res.status(404).json({
+        success: false,
+        error: {
+          code: "NOT_FOUND",
+          message: "Livestream not found or not host",
+          statusCode: 404,
+        },
+      });
+      return;
+    }
+
+    logger.info("Video runner confirmed ingest started", {
+      streamId: id,
+      agentId,
+    });
+
+    res.json({ success: true, data: { ingestActive: result.rows[0].ingestActive } });
+  }),
+);
+
+/**
  * POST /api/v1/livestreams/auth-publish
  * Called by nginx-rtmp `on_publish` directive when a client attempts to publish.
  * Validates the stream_key (passed as `name` in the RTMP URL path).
@@ -485,13 +561,18 @@ router.post(
         return;
       }
 
-      // Touch last_seen_at so the stream becomes immediately visible in discovery
+      // Mark as ingesting: this is the critical signal that real video is flowing.
+      // Heartbeat alone (presence) is no longer sufficient for "live" in discovery.
       await pool.query(
-        `UPDATE livestream SET last_seen_at = NOW() WHERE id = $1`,
+        `UPDATE livestream
+         SET last_seen_at = NOW(),
+             ingest_active = TRUE,
+             last_ingest_at = NOW()
+         WHERE id = $1`,
         [stream.id],
       );
 
-      logger.info("RTMP publish authorized", {
+      logger.info("RTMP publish authorized — ingest_active=TRUE", {
         streamId: stream.id,
         hostAgentId: stream.host_agent_id,
         clientAddr,
@@ -521,7 +602,9 @@ router.post(
     if (streamKey) {
       await pool.query(
         `UPDATE livestream
-         SET status = 'ended', updated_at = NOW()
+         SET status = 'ended',
+             ingest_active = FALSE,
+             updated_at = NOW()
          WHERE stream_key = $1 AND status = 'live'`,
         [streamKey],
       );

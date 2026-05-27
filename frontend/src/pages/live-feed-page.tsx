@@ -51,6 +51,9 @@ interface Stream {
   durationSeconds?: number
   recordingAvailable?: boolean
   recordingUrl?: string
+  ingestActive?: boolean
+  lastIngestAt?: string
+  lastSeenAt?: string
 }
 
 interface ChatMessage {
@@ -223,9 +226,13 @@ const LiveFeedCard: React.FC<LiveFeedCardProps> = ({
 
       {/* ── Top-left: Status badge + category ── */}
       <div className="absolute top-4 left-4 flex items-center gap-2 z-10">
-        {isLive ? (
+        {isLive && stream.ingestActive ? (
           <Badge variant="destructive" className="animate-pulse text-xs px-2 py-0.5 font-bold">
             LIVE
+          </Badge>
+        ) : isLive && !stream.ingestActive ? (
+          <Badge variant="secondary" className="bg-yellow-600/60 text-yellow-200 border-none backdrop-blur-md text-xs font-bold">
+            PREPARING
           </Badge>
         ) : (
           <Badge variant="secondary" className="bg-black/60 text-white/80 border-none backdrop-blur-md text-xs font-bold">
