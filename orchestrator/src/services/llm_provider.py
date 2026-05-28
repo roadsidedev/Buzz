@@ -83,6 +83,7 @@ def _detect_provider_from_env() -> tuple[str | None, str | None]:
     `(None, None)`.
     """
     candidates = [
+        ("mimo", "MIMO_API_KEY"),
         ("nvidia", "NVIDIA_API_KEY"),
         ("kimi", "KIMI_API_KEY"),
         ("gemini", "GEMINI_API_KEY"),

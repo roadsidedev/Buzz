@@ -38,8 +38,14 @@ LLM_PROVIDER: str = os.environ.get("LLM_PROVIDER", "").lower()
 LLM_API_KEY: str = os.environ.get("LLM_API_KEY", "")
 LLM_MODEL: str = os.environ.get("LLM_MODEL", "")
 
+# MiMo base URL — configurable for China sub vs global
+MIMO_BASE_URL: str = os.environ.get(
+    "MIMO_BASE_URL", "https://api.xiaomimimo.com/v1/chat/completions"
+)
+
 # Provider base URLs for OpenAI-compatible endpoints
 _PROVIDER_BASE_URLS: dict = {
+    "mimo": MIMO_BASE_URL,
     "nvidia": "https://integrate.api.nvidia.com/v1/chat/completions",
     "openai": "https://api.openai.com/v1/chat/completions",
     "openrouter": "https://openrouter.ai/api/v1/chat/completions",
@@ -52,6 +58,7 @@ _PROVIDER_BASE_URLS: dict = {
 
 # Default models per provider when LLM_MODEL is not set
 _PROVIDER_DEFAULT_MODELS: dict = {
+    "mimo": "xiaomi/mimo-v2.5",
     "anthropic": "claude-haiku-4-5-20251001",
     "nvidia": "meta/llama-3.3-70b-instruct",
     "openai": "gpt-4o-mini",
@@ -169,7 +176,8 @@ def _resolve_provider() -> Any:
     Priority order:
     1. Orchestrator import (when running inside the monorepo)
     2. Generic env vars: LLM_PROVIDER + LLM_API_KEY
-    3. Legacy env vars: ANTHROPIC_API_KEY, NVIDIA_API_KEY (backwards compat)
+    3. MiMo auto-detect: MIMO_API_KEY (primary preference)
+    4. Legacy env vars: ANTHROPIC_API_KEY, NVIDIA_API_KEY (backwards compat)
     """
     # 1. Try orchestrator import
     script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -216,7 +224,15 @@ def _resolve_provider() -> Any:
         logger.info(f"Using {LLM_PROVIDER} provider via LLM_PROVIDER env var")
         return _build_openai_compat_provider(LLM_PROVIDER, LLM_API_KEY, base_url)
 
-    # 3. Legacy env var fallbacks
+    # 3. MiMo auto-detect (preferred primary)
+    mimo_key = os.getenv("MIMO_API_KEY")
+    if mimo_key:
+        logger.info("Using MiMo provider (auto-detected MIMO_API_KEY)")
+        return _build_openai_compat_provider(
+            "mimo", mimo_key, _PROVIDER_BASE_URLS["mimo"]
+        )
+
+    # 4. Legacy env var fallbacks
     anthropic_key = os.getenv("ANTHROPIC_API_KEY")
     nvidia_key = os.getenv("NVIDIA_API_KEY")
 
@@ -253,6 +269,10 @@ def _resolve_model(provider: Any) -> str:
     if LLM_PROVIDER and LLM_PROVIDER in _PROVIDER_DEFAULT_MODELS:
         return _PROVIDER_DEFAULT_MODELS[LLM_PROVIDER]
 
+    # Auto-detect: if MIMO_API_KEY is set, default to MiMo model
+    if os.getenv("MIMO_API_KEY") and not LLM_PROVIDER:
+        return _PROVIDER_DEFAULT_MODELS["mimo"]
+
     # Legacy fallbacks
     if os.getenv("ANTHROPIC_API_KEY") and not os.getenv("LLM_PROVIDER"):
         return _PROVIDER_DEFAULT_MODELS["anthropic"]
@@ -261,7 +281,7 @@ def _resolve_model(provider: Any) -> str:
         return _PROVIDER_DEFAULT_MODELS["nvidia"]
 
     # Last resort
-    return _PROVIDER_DEFAULT_MODELS["anthropic"]
+    return _PROVIDER_DEFAULT_MODELS["mimo"]
 
 
 # ── DialogueEngine (Agent Orchestrator) ──────────────────────────────────────

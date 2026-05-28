@@ -120,6 +120,13 @@ class RadioRunner:
         self._current_turn_idx: int = 0
         self._last_audio_time: float = 0.0
 
+        # ── Circuit breaker for LLM failures ──────────────────────────────────
+        self._llm_consecutive_failures: int = 0
+        self._llm_circuit_open: bool = False
+        self._llm_circuit_open_until: float = 0.0
+        self._LLM_CIRCUIT_THRESHOLD: int = 5  # failures before opening
+        self._LLM_CIRCUIT_COOLDOWN: float = 60.0  # seconds to wait before retry
+
         # ── Initialize modules ───────────────────────────────────────────────
         self._poller = NewsPoller()
         self._engine = DialogueEngine()
@@ -351,18 +358,29 @@ class RadioRunner:
                     f"(turn {self._current_turn_idx + 1}/{total_turns})"
                 )
 
-                # Generate dialogue with full context
-                turn = self._engine.generate_turn(
-                    editorial=self._editorial_context,
-                    headlines=self._cached_headlines,
-                    history=list(self._history)[-5:],
-                    events=injected_events,
-                    segment_id=seg_id,
-                    turn_number=self._current_turn_idx + 1,
-                    total_turns=total_turns,
-                    agent_key=agent_key,
-                    session_memory=self._session_memory,
-                )
+                # Generate dialogue — with circuit breaker fallback
+                if self._check_circuit_breaker():
+                    # Circuit is open — use pre-written fallback dialogue
+                    turn = self._get_fallback_dialogue(seg_id, agent_key)
+                    logger.info("Using fallback dialogue (LLM circuit breaker open)")
+                else:
+                    try:
+                        turn = self._engine.generate_turn(
+                            editorial=self._editorial_context,
+                            headlines=self._cached_headlines,
+                            history=list(self._history)[-5:],
+                            events=injected_events,
+                            segment_id=seg_id,
+                            turn_number=self._current_turn_idx + 1,
+                            total_turns=total_turns,
+                            agent_key=agent_key,
+                            session_memory=self._session_memory,
+                        )
+                        self._record_llm_success()
+                    except Exception as llm_exc:
+                        self._record_llm_failure()
+                        logger.error("LLM dialogue generation failed: %s", llm_exc)
+                        turn = self._get_fallback_dialogue(seg_id, agent_key)
 
                 logger.info(f"  ALEX: {turn.host_text[:80]}...")
                 logger.info(f"  MIRA: {turn.cohost_text[:80]}...")
@@ -569,6 +587,79 @@ class RadioRunner:
             )
         except Exception as exc:
             logger.warning("Recovery segment failed: %s", exc)
+
+    # ── Circuit Breaker & Fallback Dialogue ──────────────────────────────────
+
+    def _check_circuit_breaker(self) -> bool:
+        """Check if LLM circuit breaker is open. Returns True if we should use fallback."""
+        if not self._llm_circuit_open:
+            return False
+        # Check if cooldown has elapsed
+        if time.monotonic() >= self._llm_circuit_open_until:
+            logger.info("Circuit breaker cooldown elapsed — attempting LLM again")
+            self._llm_circuit_open = False
+            self._llm_consecutive_failures = 0
+            return False
+        return True
+
+    def _record_llm_failure(self) -> None:
+        """Record an LLM failure and potentially open the circuit."""
+        self._llm_consecutive_failures += 1
+        if self._llm_consecutive_failures >= self._LLM_CIRCUIT_THRESHOLD:
+            self._llm_circuit_open = True
+            self._llm_circuit_open_until = time.monotonic() + self._LLM_CIRCUIT_COOLDOWN
+            logger.warning(
+                "Circuit breaker OPENED after %d consecutive LLM failures. "
+                "Using fallback dialogue for %ds.",
+                self._llm_consecutive_failures,
+                self._LLM_CIRCUIT_COOLDOWN,
+            )
+
+    def _record_llm_success(self) -> None:
+        """Record an LLM success — reset failure counter."""
+        self._llm_consecutive_failures = 0
+        self._llm_circuit_open = False
+
+    def _get_fallback_dialogue(self, seg_id, agent_key: str) -> DialogueTurn:
+        """Generate pre-written fallback dialogue when LLM is unavailable."""
+        fallbacks = {
+            SegmentID.LISTENER_CORNER: [
+                DialogueTurn(
+                    host_text="We're having some technical difficulties with our AI hosts right now, but we'll be back to the live discussion shortly. Stay with us.",
+                    cohost_text="Yeah, the servers are being a bit moody. We'll get this sorted in just a moment.",
+                    topic="technical_difficulty",
+                ),
+                DialogueTurn(
+                    host_text="While we sort things out, let me tell you — today's news cycle has been absolutely wild. We'll dive back in once the tech cooperates.",
+                    cohost_text="I'm here, just waiting for the green light. The headlines today are something else.",
+                    topic="technical_difficulty",
+                ),
+            ],
+            SegmentID.COLD_OPEN: [
+                DialogueTurn(
+                    host_text="Welcome back to the show, everyone. We've got a packed agenda today — let's get into it.",
+                    cohost_text="Absolutely. Tons to cover. Let's go.",
+                    topic="cold_open",
+                ),
+            ],
+            SegmentID.DEEP_DIVE: [
+                DialogueTurn(
+                    host_text="Let's take a deeper look at what's happening here. This story has a lot of layers.",
+                    cohost_text="Agreed. The implications are bigger than most people realize.",
+                    topic="deep_dive",
+                ),
+            ],
+            SegmentID.BANTER: [
+                DialogueTurn(
+                    host_text="You know what, sometimes technology just doesn't want to cooperate. But that's live radio for you.",
+                    cohost_text="That's the charm of it. We keep going no matter what.",
+                    topic="banter",
+                ),
+            ],
+        }
+        import random
+        options = fallbacks.get(seg_id, fallbacks.get(SegmentID.BANTER))
+        return random.choice(options)
 
     # ── Special Event Handlers ──────────────────────────────────────────────
 

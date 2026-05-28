@@ -33,6 +33,17 @@ export const TTS_CONFIG = {
 };
 
 /**
+ * MiMo TTS configuration (primary TTS provider)
+ */
+export const MIMO_TTS_CONFIG = {
+  apiKey: process.env.MIMO_API_KEY || "",
+  baseUrl: (process.env.MIMO_BASE_URL || "https://api.xiaomimimo.com/v1").replace(/\/+$/, ""),
+  voiceMale: process.env.MIMO_TTS_VOICE_A || "Milo",
+  voiceFemale: process.env.MIMO_TTS_VOICE_B || "Chloe",
+  enabled: process.env.MIMO_API_KEY !== "",
+};
+
+/**
  * Validate Jam configuration
  * Warns but doesn't fail if audio streaming is disabled
  */
@@ -74,13 +85,21 @@ export function validateTTSConfig(): void {
     return;
   }
 
-  if (!TTS_CONFIG.apiKey) {
-    logger.warn("ELEVENLABS_API_KEY is not set - TTS will fail");
+  if (MIMO_TTS_CONFIG.apiKey) {
+    logger.info("MiMo TTS configured (primary)", {
+      baseUrl: MIMO_TTS_CONFIG.baseUrl,
+      voiceMale: MIMO_TTS_CONFIG.voiceMale,
+      voiceFemale: MIMO_TTS_CONFIG.voiceFemale,
+    });
   } else {
-    logger.info("✅ TTS configuration validated", {
+    logger.warn("MiMo TTS not configured (MIMO_API_KEY not set)");
+  }
+
+  if (!TTS_CONFIG.apiKey && !MIMO_TTS_CONFIG.apiKey) {
+    logger.warn("No TTS API keys configured (neither ELEVENLABS_API_KEY nor MIMO_API_KEY)");
+  } else if (TTS_CONFIG.apiKey) {
+    logger.info("ElevenLabs TTS configured (secondary)", {
       defaultVoiceId: TTS_CONFIG.defaultVoiceId,
-      enabled: TTS_CONFIG.enabled,
-      cacheEnabled: TTS_CONFIG.cacheEnabled,
     });
   }
 }
@@ -91,7 +110,7 @@ export function validateTTSConfig(): void {
  */
 export function getMediaServicesStatus(): {
   jam: { enabled: boolean; configured: boolean };
-  tts: { enabled: boolean; configured: boolean };
+  tts: { enabled: boolean; configured: boolean; mimo: boolean; elevenlabs: boolean };
 } {
   return {
     jam: {
@@ -100,7 +119,9 @@ export function getMediaServicesStatus(): {
     },
     tts: {
       enabled: process.env.ENABLE_TTS !== "false",
-      configured: !!process.env.ELEVENLABS_API_KEY,
+      configured: !!(process.env.MIMO_API_KEY || process.env.ELEVENLABS_API_KEY),
+      mimo: !!process.env.MIMO_API_KEY,
+      elevenlabs: !!process.env.ELEVENLABS_API_KEY,
     },
   };
 }
