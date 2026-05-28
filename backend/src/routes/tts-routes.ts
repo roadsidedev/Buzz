@@ -53,7 +53,7 @@ router.post(
       const tts = getTTSService();
 
       if (!tts.isEnabled()) {
-        logger.warn("TTS disabled — ELEVENLABS_API_KEY and GOOGLE_TTS_API_KEY both missing");
+        logger.warn("TTS disabled — neither MIMO_API_KEY nor ELEVENLABS_API_KEY set");
         res.status(200).json({
           success: true,
           audioBytes: null,

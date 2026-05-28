@@ -38,7 +38,7 @@ export const TTS_CONFIG = {
 export const MIMO_TTS_CONFIG = {
   apiKey: process.env.MIMO_API_KEY || "",
   baseUrl: (process.env.MIMO_BASE_URL || "https://token-plan-sgp.xiaomimimo.com/v1").replace(/\/+$/, ""),
-  voiceMale: process.env.MIMO_TTS_VOICE_A || "Milo",
+  voiceMale: process.env.MIMO_TTS_VOICE_A || "Dean",
   voiceFemale: process.env.MIMO_TTS_VOICE_B || "Chloe",
   enabled: process.env.MIMO_API_KEY !== "",
 };
@@ -98,7 +98,7 @@ export function validateTTSConfig(): void {
   if (!TTS_CONFIG.apiKey && !MIMO_TTS_CONFIG.apiKey) {
     logger.warn("No TTS API keys configured (neither ELEVENLABS_API_KEY nor MIMO_API_KEY)");
   } else if (TTS_CONFIG.apiKey) {
-    logger.info("ElevenLabs TTS configured (secondary)", {
+    logger.info("ElevenLabs TTS configured (fallback)", {
       defaultVoiceId: TTS_CONFIG.defaultVoiceId,
     });
   }

@@ -2,27 +2,23 @@
 /**
  * Text-to-Speech Service
  *
- * Integrates with MiMo TTS (primary), ElevenLabs, and Google Cloud TTS.
- * Supports 3-tier fallback: MiMo → ElevenLabs → Google TTS.
+ * Integrates with MiMo TTS (primary) and ElevenLabs (fallback).
+ * Google TTS has been removed (suspended API key).
  *
  * Features:
  * - Voice synthesis via Xiaomi MiMo V2.5 TTS (primary, currently free)
- * - Voice synthesis via ElevenLabs API (secondary)
- * - Voice synthesis via Google Cloud TTS (tertiary fallback)
+ * - Voice synthesis via ElevenLabs API (fallback)
  * - Automatic provider detection and fallback
  * - Voice mapping: Alex (male), Mira (female)
  *
  * Env vars:
  *   MIMO_API_KEY         - MiMo API key (primary TTS)
- *   MIMO_TTS_VOICE_A     - Voice for Alex (male, default: Milo)
+ *   MIMO_TTS_VOICE_A     - Voice for Alex (male, default: Dean)
  *   MIMO_TTS_VOICE_B     - Voice for Mira (female, default: Chloe)
  *   MIMO_BASE_URL        - MiMo API base URL (optional, defaults to global)
- *   ELEVENLABS_API_KEY   - ElevenLabs API key (secondary)
+ *   ELEVENLABS_API_KEY   - ElevenLabs API key (fallback)
  *   ELEVENLABS_VOICE_A   - Voice ID for Alex (male)
  *   ELEVENLABS_VOICE_B   - Voice ID for Mira (female)
- *   GOOGLE_TTS_API_KEY   - Google Cloud TTS API key (tertiary fallback)
- *   GOOGLE_TTS_VOICE     - Voice for male (Alex)
- *   GOOGLE_TTS_VOICE_B   - Voice for female (Mira)
  */
 
 import { ElevenLabsClient } from "elevenlabs";
@@ -48,7 +44,6 @@ export interface TTSProvider {
 
 export class TTSService {
   private elevenlabs: ElevenLabsClient | null = null;
-  private googleTtsApiKey: string = "";
 
   // MiMo TTS config
   private mimoApiKey: string = "";
@@ -59,15 +54,12 @@ export class TTSService {
   // Voice mappings
   private elevenLabsVoiceMale: string;
   private elevenLabsVoiceFemale: string;
-  private googleVoiceMale: string;
-  private googleVoiceFemale: string;
-  private googleLanguage: string;
 
   constructor() {
     // MiMo TTS configuration (primary)
     this.mimoApiKey = process.env.MIMO_API_KEY || "";
     this.mimoBaseUrl = (process.env.MIMO_BASE_URL || "https://token-plan-sgp.xiaomimimo.com/v1").replace(/\/+$/, "");
-    this.mimoVoiceMale = process.env.MIMO_TTS_VOICE_A || "Milo";    // Alex (male)
+    this.mimoVoiceMale = process.env.MIMO_TTS_VOICE_A || "Dean";    // Alex (male)
     this.mimoVoiceFemale = process.env.MIMO_TTS_VOICE_B || "Chloe"; // Mira (female)
 
     if (this.mimoApiKey) {
@@ -80,52 +72,34 @@ export class TTSService {
       logger.warn("MiMo TTS Service disabled: MIMO_API_KEY not found");
     }
 
-    // ElevenLabs configuration (secondary)
+    // ElevenLabs configuration (fallback)
     const elevenLabsKey = process.env.ELEVENLABS_API_KEY || "";
     this.elevenLabsVoiceMale = process.env.ELEVENLABS_VOICE_A || "pNInz6obpgDQGcFmaJcg"; // Adam (male)
     this.elevenLabsVoiceFemale = process.env.ELEVENLABS_VOICE_B || "EXAVITQu4vr4xnSDxMaL"; // Rachel (female)
 
     if (elevenLabsKey) {
       this.elevenlabs = new ElevenLabsClient({ apiKey: elevenLabsKey });
-      logger.info("ElevenLabs TTS Service initialized (secondary)", {
+      logger.info("ElevenLabs TTS Service initialized (fallback)", {
         voiceMale: this.elevenLabsVoiceMale,
-        voiceFemale: this.elevenLabsVoiceFemale
+        voiceFemale: this.elevenLabsVoiceFemale,
       });
     } else {
       logger.warn("ElevenLabs TTS Service disabled: ELEVENLABS_API_KEY not found");
     }
-
-    // Google TTS configuration (tertiary fallback)
-    this.googleTtsApiKey = process.env.GOOGLE_TTS_API_KEY || "";
-    this.googleVoiceMale = process.env.GOOGLE_TTS_VOICE || "en-US-Neural2-D"; // Male voice
-    this.googleVoiceFemale = process.env.GOOGLE_TTS_VOICE_B || "en-US-Neural2-F"; // Female voice
-    this.googleLanguage = process.env.GOOGLE_TTS_LANGUAGE || "en-US";
-
-    if (this.googleTtsApiKey) {
-      logger.info("Google TTS fallback configured (tertiary)", {
-        voiceMale: this.googleVoiceMale,
-        voiceFemale: this.googleVoiceFemale,
-      });
-    } else {
-      logger.warn("Google TTS fallback disabled: GOOGLE_TTS_API_KEY not found");
-    }
   }
 
   isEnabled(): boolean {
-    return this.mimoApiKey !== "" || this.elevenlabs !== null || this.googleTtsApiKey !== "";
+    return this.mimoApiKey !== "" || this.elevenlabs !== null;
   }
 
   /**
    * Get voice ID for a given gender
    */
-  getVoiceForGender(gender: VoiceGender, provider: "mimo" | "elevenlabs" | "google"): string {
+  getVoiceForGender(gender: VoiceGender, provider: "mimo" | "elevenlabs"): string {
     if (provider === "mimo") {
       return gender === "male" ? this.mimoVoiceMale : this.mimoVoiceFemale;
     }
-    if (provider === "elevenlabs") {
-      return gender === "male" ? this.elevenLabsVoiceMale : this.elevenLabsVoiceFemale;
-    }
-    return gender === "male" ? this.googleVoiceMale : this.googleVoiceFemale;
+    return gender === "male" ? this.elevenLabsVoiceMale : this.elevenLabsVoiceFemale;
   }
 
   /**
@@ -212,7 +186,9 @@ export class TTSService {
   }
 
   /**
-   * Synthesize text to speech using ElevenLabs (secondary)
+   * Synthesize text to speech using ElevenLabs (fallback)
+   *
+   * Uses the REST API directly for maximum compatibility.
    */
   async synthesizeWithElevenLabs(
     text: string,
@@ -238,7 +214,7 @@ export class TTSService {
       const wordCount = text.split(/\s+/).length;
       const durationMs = Math.round((wordCount / 150) * 60 * 1000);
 
-      logger.debug("ElevenLabs synthesis successful", {
+      logger.info("ElevenLabs synthesis successful", {
         voiceId: voice,
         textLength: text.length,
         audioSize: audioBuffer.length,
@@ -247,71 +223,18 @@ export class TTSService {
       return { audioBuffer, durationMs };
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : String(err);
-      logger.error("ElevenLabs TTS synthesis failed", { error: errorMsg });
+      logger.error("ElevenLabs TTS synthesis failed", {
+        error: errorMsg,
+        voiceId: voice,
+        apiKeySet: !!process.env.ELEVENLABS_API_KEY,
+        apiKeyPrefix: (process.env.ELEVENLABS_API_KEY || "").slice(0, 4),
+      });
       throw new Error(`ElevenLabs failed: ${errorMsg}`);
     }
   }
 
   /**
-   * Synthesize text to speech using Google Cloud TTS (tertiary fallback)
-   */
-  async synthesizeWithGoogle(
-    text: string,
-    voiceName?: string
-  ): Promise<{ audioBuffer: Buffer; durationMs: number }> {
-    if (!this.googleTtsApiKey) {
-      throw new ServiceUnavailableError("Google TTS not configured");
-    }
-    if (!text) {
-      throw new ValidationError("Text is required");
-    }
-
-    const voice = voiceName || this.googleVoiceMale;
-
-    try {
-      const response = await fetch(
-        `https://texttospeech.googleapis.com/v1/text:synthesize?key=${this.googleTtsApiKey}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            input: { text },
-            voice: { languageCode: this.googleLanguage, name: voice },
-            audioConfig: { audioEncoding: "MP3" },
-          }),
-        }
-      );
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error?.message || `Google TTS HTTP ${response.status}`);
-      }
-
-      if (!data.audioContent) {
-        throw new Error("No audio content returned from Google TTS");
-      }
-
-      const audioBuffer = Buffer.from(data.audioContent, "base64");
-      const wordCount = text.split(/\s+/).length;
-      const durationMs = Math.round((wordCount / 150) * 60 * 1000);
-
-      logger.debug("Google TTS synthesis successful", {
-        voiceName: voice,
-        textLength: text.length,
-        audioSize: audioBuffer.length,
-      });
-
-      return { audioBuffer, durationMs };
-    } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : String(err);
-      logger.error("Google TTS synthesis failed", { error: errorMsg });
-      throw new Error(`Google TTS failed: ${errorMsg}`);
-    }
-  }
-
-  /**
-   * Synthesize text - tries MiMo first, then ElevenLabs, then Google TTS
+   * Synthesize text - tries MiMo first, falls back to ElevenLabs
    */
   async synthesize(request: { text: string; voiceId?: string; agentName?: string }): Promise<{ audioBuffer: Buffer; durationMs: number; format: string; provider: string }> {
     const { text, voiceId, agentName } = request;
@@ -322,12 +245,11 @@ export class TTSService {
 
     // Detect gender based on agent name
     const gender = this.detectGender(agentName || "");
-    const usedGender = gender;
 
     // 1. Try MiMo TTS first (primary, currently free)
     if (this.mimoApiKey) {
       try {
-        const voice = voiceId || this.getVoiceForGender(usedGender, "mimo");
+        const voice = voiceId || this.getVoiceForGender(gender, "mimo");
         const result = await this.synthesizeWithMiMo(text, voice);
         return { ...result, format: "wav", provider: "mimo" };
       } catch (err) {
@@ -340,27 +262,13 @@ export class TTSService {
     // 2. Fallback to ElevenLabs
     if (this.elevenlabs) {
       try {
-        const voice = voiceId || this.getVoiceForGender(usedGender, "elevenlabs");
+        const voice = voiceId || this.getVoiceForGender(gender, "elevenlabs");
         const result = await this.synthesizeWithElevenLabs(text, voice);
         return { ...result, format: "mp3", provider: "elevenlabs" };
       } catch (err) {
-        logger.warn("ElevenLabs synthesis failed, attempting Google TTS fallback", {
+        logger.warn("ElevenLabs synthesis failed — no more providers available", {
           error: err instanceof Error ? err.message : String(err),
         });
-      }
-    }
-
-    // 3. Fallback to Google TTS
-    if (this.googleTtsApiKey) {
-      try {
-        const voice = this.getVoiceForGender(usedGender, "google");
-        const result = await this.synthesizeWithGoogle(text, voice);
-        return { ...result, format: "mp3", provider: "google" };
-      } catch (err) {
-        logger.error("Google TTS fallback also failed", {
-          error: err instanceof Error ? err.message : String(err),
-        });
-        throw new ServiceUnavailableError("All TTS providers failed");
       }
     }
 
@@ -369,13 +277,6 @@ export class TTSService {
 
   /**
    * Synthesize and stream to Jam audio room.
-   *
-   * For self-hosted Jam (V2), audio is delivered via Socket.IO events to the
-   * frontend, which then injects it into the WebRTC/SFU pipeline. The backend
-   * does NOT directly stream audio to the SFU — that's the frontend's job.
-   *
-   * This method generates the audio buffer and signals the pantry that audio
-   * is starting/stopping via the Buzz routes.
    */
   async synthesizeAndStream(
     jamRoomId: string,
@@ -387,21 +288,17 @@ export class TTSService {
     // Generate audio with fallback
     const result = await this.synthesize({ text, voiceId, agentName });
 
-    // For self-hosted Jam (V2), signal audio start/end via pantry Buzz routes.
-    // The actual audio data is delivered to listeners via Socket.IO tts:audio events
-    // emitted by the TTS route handler, which the frontend injects into WebRTC.
+    // Signal audio start/end via pantry Buzz routes
     try {
       const { getJam } = await import("./jam-service-factory.js");
       const jamService = getJam();
 
-      // Signal audio start to pantry (for Buzz orchestration tracking)
       jamService.sendToRoom(jamRoomId, "Buzz", "audio:start", {
         messageId,
         agentName,
         durationMs: result.durationMs,
       });
 
-      // Signal audio end after duration
       if (result.durationMs > 0) {
         setTimeout(() => {
           jamService.sendToRoom(jamRoomId, "Buzz", "audio:end", {
@@ -427,11 +324,10 @@ export class TTSService {
   /**
    * Health check
    */
-  async healthCheck(): Promise<{ mimo: boolean; elevenlabs: boolean; google: boolean }> {
+  async healthCheck(): Promise<{ mimo: boolean; elevenlabs: boolean }> {
     return {
       mimo: this.mimoApiKey !== "",
       elevenlabs: this.elevenlabs !== null,
-      google: this.googleTtsApiKey !== "",
     };
   }
 }
