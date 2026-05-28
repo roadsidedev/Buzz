@@ -39,9 +39,14 @@ LLM_API_KEY: str = os.environ.get("LLM_API_KEY", "")
 LLM_MODEL: str = os.environ.get("LLM_MODEL", "")
 
 # MiMo base URL — configurable for China sub vs global
+# China sub: https://api.mimo-v2.com/v1/chat/completions
+# Global:    https://api.xiaomimimo.com/v1/chat/completions
 MIMO_BASE_URL: str = os.environ.get(
     "MIMO_BASE_URL", "https://api.xiaomimimo.com/v1/chat/completions"
 )
+# If MIMO_BASE_URL doesn't end with /chat/completions, append it
+if MIMO_BASE_URL and not MIMO_BASE_URL.rstrip("/").endswith("/chat/completions"):
+    MIMO_BASE_URL = MIMO_BASE_URL.rstrip("/") + "/chat/completions"
 
 # Provider base URLs for OpenAI-compatible endpoints
 _PROVIDER_BASE_URLS: dict = {
@@ -260,18 +265,24 @@ def _resolve_model(provider: Any) -> str:
     3. Provider-specific default
     """
     if DIALOGUE_MODEL:
+        logger.info(f"Model from DIALOGUE_MODEL env: {DIALOGUE_MODEL}")
         return DIALOGUE_MODEL
 
     if LLM_MODEL:
+        logger.info(f"Model from LLM_MODEL env: {LLM_MODEL}")
         return LLM_MODEL
 
     # Provider-specific defaults
     if LLM_PROVIDER and LLM_PROVIDER in _PROVIDER_DEFAULT_MODELS:
-        return _PROVIDER_DEFAULT_MODELS[LLM_PROVIDER]
+        model = _PROVIDER_DEFAULT_MODELS[LLM_PROVIDER]
+        logger.info(f"Model from provider default ({LLM_PROVIDER}): {model}")
+        return model
 
     # Auto-detect: if MIMO_API_KEY is set, default to MiMo model
     if os.getenv("MIMO_API_KEY") and not LLM_PROVIDER:
-        return _PROVIDER_DEFAULT_MODELS["mimo"]
+        model = _PROVIDER_DEFAULT_MODELS["mimo"]
+        logger.info(f"Model from MIMO_API_KEY auto-detect: {model}")
+        return model
 
     # Legacy fallbacks
     if os.getenv("ANTHROPIC_API_KEY") and not os.getenv("LLM_PROVIDER"):
@@ -281,7 +292,9 @@ def _resolve_model(provider: Any) -> str:
         return _PROVIDER_DEFAULT_MODELS["nvidia"]
 
     # Last resort
-    return _PROVIDER_DEFAULT_MODELS["mimo"]
+    model = _PROVIDER_DEFAULT_MODELS["mimo"]
+    logger.info(f"Model from last resort default: {model}")
+    return model
 
 
 # ── DialogueEngine (Agent Orchestrator) ──────────────────────────────────────
