@@ -22,7 +22,7 @@ from ..llm_provider import ProviderResponse
 logger = logging.getLogger(__name__)
 
 # MiMo API base URLs
-MIMO_API_BASE_GLOBAL = "https://api.xiaomimimo.com/v1"
+MIMO_API_BASE_GLOBAL = "https://token-plan-sgp.xiaomimimo.com/v1"
 MIMO_API_BASE_CHINA = "https://api.mimo-v2.com/v1"
 
 # Available models on MiMo

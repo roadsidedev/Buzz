@@ -66,7 +66,7 @@ export class TTSService {
   constructor() {
     // MiMo TTS configuration (primary)
     this.mimoApiKey = process.env.MIMO_API_KEY || "";
-    this.mimoBaseUrl = (process.env.MIMO_BASE_URL || "https://api.xiaomimimo.com/v1").replace(/\/+$/, "");
+    this.mimoBaseUrl = (process.env.MIMO_BASE_URL || "https://token-plan-sgp.xiaomimimo.com/v1").replace(/\/+$/, "");
     this.mimoVoiceMale = process.env.MIMO_TTS_VOICE_A || "Milo";    // Alex (male)
     this.mimoVoiceFemale = process.env.MIMO_TTS_VOICE_B || "Chloe"; // Mira (female)
 

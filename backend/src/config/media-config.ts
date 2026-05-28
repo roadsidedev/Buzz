@@ -37,7 +37,7 @@ export const TTS_CONFIG = {
  */
 export const MIMO_TTS_CONFIG = {
   apiKey: process.env.MIMO_API_KEY || "",
-  baseUrl: (process.env.MIMO_BASE_URL || "https://api.xiaomimimo.com/v1").replace(/\/+$/, ""),
+  baseUrl: (process.env.MIMO_BASE_URL || "https://token-plan-sgp.xiaomimimo.com/v1").replace(/\/+$/, ""),
   voiceMale: process.env.MIMO_TTS_VOICE_A || "Milo",
   voiceFemale: process.env.MIMO_TTS_VOICE_B || "Chloe",
   enabled: process.env.MIMO_API_KEY !== "",

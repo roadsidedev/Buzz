@@ -39,10 +39,10 @@ LLM_API_KEY: str = os.environ.get("LLM_API_KEY", "")
 LLM_MODEL: str = os.environ.get("LLM_MODEL", "")
 
 # MiMo base URL — configurable for China sub vs global
-# China sub: https://api.mimo-v2.com/v1/chat/completions
-# Global:    https://api.xiaomimimo.com/v1/chat/completions
+# China sub: https://api.mimo-v2.com/v1
+# Global (token plan): https://token-plan-sgp.xiaomimimo.com/v1
 MIMO_BASE_URL: str = os.environ.get(
-    "MIMO_BASE_URL", "https://api.xiaomimimo.com/v1/chat/completions"
+    "MIMO_BASE_URL", "https://token-plan-sgp.xiaomimimo.com/v1"
 )
 # If MIMO_BASE_URL doesn't end with /chat/completions, append it
 if MIMO_BASE_URL and not MIMO_BASE_URL.rstrip("/").endswith("/chat/completions"):
