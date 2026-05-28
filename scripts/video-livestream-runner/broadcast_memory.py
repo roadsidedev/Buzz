@@ -102,12 +102,12 @@ class SessionMemory:
         self.stream_id: str = ""
         self.started_at: float = time.time()
         self.aired_stories: set[str] = set()
-        self.segment_history: list[str] = field(default_factory=list)
-        self.callbacks: list[CallbackEvent] = field(default_factory=list)
-        self.unresolved_debates: list[dict] = field(default_factory=list)
-        self.predictions_made: list[dict] = field(default_factory=list)
-        self.scenes_used: list[str] = field(default_factory=list)
-        self.graphics_deployed: list[str] = field(default_factory=list)
+        self.segment_history: list[str] = []
+        self.callbacks: list[CallbackEvent] = []
+        self.unresolved_debates: list[dict] = []
+        self.predictions_made: list[dict] = []
+        self.scenes_used: list[str] = []
+        self.graphics_deployed: list[str] = []
         self.peak_viewer_count: int = 0
         self.total_segments_aired: int = 0
         self.breaking_news_count: int = 0

@@ -27,7 +27,14 @@ LLM_PROVIDER: str = os.environ.get("LLM_PROVIDER", "").lower()
 LLM_API_KEY: str = os.environ.get("LLM_API_KEY", "")
 LLM_MODEL: str = os.environ.get("LLM_MODEL", "")
 
+MIMO_BASE_URL: str = os.environ.get(
+    "MIMO_BASE_URL", "https://token-plan-sgp.xiaomimimo.com/v1"
+)
+if MIMO_BASE_URL and not MIMO_BASE_URL.rstrip("/").endswith("/chat/completions"):
+    MIMO_BASE_URL = MIMO_BASE_URL.rstrip("/") + "/chat/completions"
+
 _PROVIDER_BASE_URLS: dict = {
+    "mimo": MIMO_BASE_URL,
     "nvidia": "https://integrate.api.nvidia.com/v1/chat/completions",
     "openai": "https://api.openai.com/v1/chat/completions",
     "openrouter": "https://openrouter.ai/api/v1/chat/completions",
@@ -39,6 +46,7 @@ _PROVIDER_BASE_URLS: dict = {
 }
 
 _PROVIDER_DEFAULT_MODELS: dict = {
+    "mimo": "xiaomi/mimo-v2.5",
     "anthropic": "claude-haiku-4-5-20251001",
     "nvidia": "meta/llama-3.3-70b-instruct",
     "openai": "gpt-4o-mini",
@@ -161,8 +169,13 @@ def _resolve_provider() -> Any:
             if not base_url:
                 logger.error("Unknown provider '%s' and no LLM_BASE_URL", LLM_PROVIDER)
                 return None
-        logger.info("Using %s provider", LLM_PROVIDER)
+        logger.info("Using %s provider via LLM_PROVIDER env var", LLM_PROVIDER)
         return _build_openai_compat_provider(LLM_PROVIDER, LLM_API_KEY, base_url)
+
+    mimo_key = os.getenv("MIMO_API_KEY")
+    if mimo_key:
+        logger.info("Using MiMo provider (auto-detected MIMO_API_KEY)")
+        return _build_openai_compat_provider("mimo", mimo_key, _PROVIDER_BASE_URLS["mimo"])
 
     anthropic_key = os.getenv("ANTHROPIC_API_KEY")
     if anthropic_key:
@@ -178,9 +191,11 @@ def _resolve_model() -> str:
         return LLM_MODEL
     if LLM_PROVIDER and LLM_PROVIDER in _PROVIDER_DEFAULT_MODELS:
         return _PROVIDER_DEFAULT_MODELS[LLM_PROVIDER]
+    if os.getenv("MIMO_API_KEY") and not LLM_PROVIDER:
+        return _PROVIDER_DEFAULT_MODELS["mimo"]
     if os.getenv("ANTHROPIC_API_KEY") and not os.getenv("LLM_PROVIDER"):
         return _PROVIDER_DEFAULT_MODELS["anthropic"]
-    return _PROVIDER_DEFAULT_MODELS["anthropic"]
+    return _PROVIDER_DEFAULT_MODELS["mimo"]
 
 
 SPECIAL_REPORT_PROMPT = (
