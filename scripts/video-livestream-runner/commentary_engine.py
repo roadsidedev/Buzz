@@ -35,6 +35,7 @@ if MIMO_BASE_URL and not MIMO_BASE_URL.rstrip("/").endswith("/chat/completions")
 
 _PROVIDER_BASE_URLS: dict = {
     "mimo": MIMO_BASE_URL,
+    "opengateway": "https://opengateway.gitlawb.com/v1/chat/completions",
     "nvidia": "https://integrate.api.nvidia.com/v1/chat/completions",
     "openai": "https://api.openai.com/v1/chat/completions",
     "openrouter": "https://openrouter.ai/api/v1/chat/completions",
@@ -46,16 +47,17 @@ _PROVIDER_BASE_URLS: dict = {
 }
 
 _PROVIDER_DEFAULT_MODELS: dict = {
-    "mimo": "xiaomi/mimo-v2.5",
-    "anthropic": "claude-haiku-4-5-20251001",
-    "nvidia": "meta/llama-3.3-70b-instruct",
-    "openai": "gpt-4o-mini",
-    "openrouter": "openai/gpt-4o-mini",
-    "groq": "llama-3.3-70b-versatile",
-    "together": "meta-llama/Llama-3-70b-chat-hf",
-    "mistral": "mistral-small-latest",
-    "deepseek": "deepseek-chat",
-    "gemini": "gemini-2.0-flash",
+    "mimo": "",
+    "opengateway": "",
+    "anthropic": "",
+    "nvidia": "",
+    "openai": "",
+    "openrouter": "",
+    "groq": "",
+    "together": "",
+    "mistral": "",
+    "deepseek": "",
+    "gemini": "",
 }
 
 
@@ -192,10 +194,13 @@ def _resolve_model() -> str:
     if LLM_PROVIDER and LLM_PROVIDER in _PROVIDER_DEFAULT_MODELS:
         return _PROVIDER_DEFAULT_MODELS[LLM_PROVIDER]
     if os.getenv("MIMO_API_KEY") and not LLM_PROVIDER:
-        return _PROVIDER_DEFAULT_MODELS["mimo"]
+        return ""
     if os.getenv("ANTHROPIC_API_KEY") and not os.getenv("LLM_PROVIDER"):
-        return _PROVIDER_DEFAULT_MODELS["anthropic"]
-    return _PROVIDER_DEFAULT_MODELS["mimo"]
+        return ""
+    logger.error(
+        "No model configured. Set LLM_MODEL env var (e.g. nvidia/nemotron-3-nano-30b-a3b)"
+    )
+    return ""
 
 
 SPECIAL_REPORT_PROMPT = (

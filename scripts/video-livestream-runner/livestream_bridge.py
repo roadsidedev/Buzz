@@ -321,11 +321,17 @@ class LivestreamBridge:
         Format: {streamServerUrl}/{streamKey}
         Example: rtmp://buzz-rtmp-server.../app/abc123def456...
 
-        This URL (including the secret streamKey) is sent to nginx-rtmp.
-        The backend's /auth-publish endpoint validates the streamKey before
-        allowing the publish. Keep the streamKey secret.
+        If RTMP_INGEST_URL env var is set, it overrides streamServerUrl.
+        This is needed for Railway internal networking — public proxy
+        only handles HTTP/HTTPS, not raw RTMP TCP on port 1935.
         """
-        return f"{livestream.stream_server_url.rstrip('/')}/{livestream.stream_key}"
+        ingest_base = os.environ.get("RTMP_INGEST_URL", "").strip()
+        if ingest_base:
+            base = ingest_base.rstrip("/")
+            logger.info("Using RTMP_INGEST_URL override: %s", base)
+        else:
+            base = livestream.stream_server_url.strip().rstrip("/")
+        return f"{base}/{livestream.stream_key}"
 
     # ── Audio Synthesis ──────────────────────────────────────────────────────
 

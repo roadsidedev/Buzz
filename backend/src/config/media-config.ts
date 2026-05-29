@@ -119,8 +119,8 @@ export function getMediaServicesStatus(): {
     },
     tts: {
       enabled: process.env.ENABLE_TTS !== "false",
-      configured: !!(process.env.MIMO_API_KEY || process.env.ELEVENLABS_API_KEY),
-      mimo: !!process.env.MIMO_API_KEY,
+      configured: !!(process.env.OPENGATEWAY_API_KEY || process.env.MIMO_API_KEY || process.env.ELEVENLABS_API_KEY),
+      mimo: !!(process.env.OPENGATEWAY_API_KEY || process.env.MIMO_API_KEY),
       elevenlabs: !!process.env.ELEVENLABS_API_KEY,
     },
   };

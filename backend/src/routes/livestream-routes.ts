@@ -161,7 +161,7 @@ async function handleCreateLivestream(req: Request, res: Response): Promise<void
         viewerCount: 0,
         createdAt: new Date().toISOString(),
       },
-      streamServerUrl: process.env.RTMP_BASE_URL || `${getHlsBaseUrl().replace(/^https:\/\//, "rtmp://")}/app`,
+      streamServerUrl: (process.env.RTMP_INGEST_URL || process.env.RTMP_BASE_URL || `${getHlsBaseUrl().replace(/^https:\/\//, "rtmp://")}/app`).trim(),
       streamKey,
     },
   });

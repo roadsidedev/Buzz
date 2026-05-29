@@ -120,36 +120,12 @@ class MediaMixer:
             raise RuntimeError("ffmpeg not found on PATH.")
 
         self._frame_queue = frame_queue
-        self._rtmp_url = rtmp_url
-        self._stop_event.clear()
-        self._ffmpeg_dead.clear()
-        self._restart_count = 0
-
-        # Pre-flight: validate RTMP server is reachable
-        await self._preflight_rtmp_test(rtmp_url)
-
-        self._create_audio_fifo()
-        self._spawn_ffmpeg(rtmp_url)
-
-        # Start feeder threads
-        self._frame_thread = threading.Thread(
-            target=self._frame_feeder_loop, name="frame-feeder", daemon=True
-        )
-        self._audio_thread = threading.Thread(
-            target=self._audio_fifo_writer, name="audio-fifo", daemon=True
-        )
-        self._monitor_thread = threading.Thread(
-            target=self._monitor_loop, name="ffmpeg-monitor", daemon=True
-        )
-
-        self._frame_thread.start()
-        self._audio_thread.start()
-        self._monitor_thread.start()
+        self._rtmp_url = rtmp_url.strip()
 
         logger.info(
-            "MediaMixer started — PID: %s | RTMP: %s | %dx%d %dfps",
-            self._ffmpeg_proc.pid if self._ffmpeg_proc else "?",
-            rtmp_url[:80], self._width, self._height, self._fps,
+            "MediaMixer started — PID: %s | RTMP: %.60s | %dx%d %dfps",
+            self._ffmpeg_proc.pid if self._ffmpeg_proc else "N/A",
+            self._rtmp_url[:80], self._width, self._height, self._fps,
         )
 
     async def stop(self) -> None:
@@ -209,6 +185,7 @@ class MediaMixer:
         import socket as sock_mod
         import subprocess as sp_mod
 
+        rtmp_url = rtmp_url.strip()
         match = re.match(r"rtmp://([^:/]+)(?::(\d+))?/", rtmp_url)
         if not match:
             logger.warning("RTMP pre-flight: could not parse URL: %s", rtmp_url)

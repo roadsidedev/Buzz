@@ -57,19 +57,21 @@ export class TTSService {
 
   constructor() {
     // MiMo TTS configuration (primary)
-    this.mimoApiKey = process.env.MIMO_API_KEY || "";
-    this.mimoBaseUrl = (process.env.MIMO_BASE_URL || "https://token-plan-sgp.xiaomimimo.com/v1").replace(/\/+$/, "");
+    // Priority: OPENGATEWAY_API_KEY > MIMO_API_KEY
+    this.mimoApiKey = process.env.OPENGATEWAY_API_KEY || process.env.MIMO_API_KEY || "";
+    this.mimoBaseUrl = (process.env.OPENGATEWAY_BASE_URL || process.env.MIMO_BASE_URL || "https://token-plan-sgp.xiaomimimo.com/v1").replace(/\/+$/, "");
     this.mimoVoiceMale = process.env.MIMO_TTS_VOICE_A || "Dean";    // Alex (male)
     this.mimoVoiceFemale = process.env.MIMO_TTS_VOICE_B || "Chloe"; // Mira (female)
 
     if (this.mimoApiKey) {
-      logger.info("MiMo TTS Service initialized (primary)", {
+      const provider = process.env.OPENGATEWAY_API_KEY ? "OpenGateway" : "MiMo";
+      logger.info(`${provider} TTS Service initialized (primary)`, {
         baseUrl: this.mimoBaseUrl,
         voiceMale: this.mimoVoiceMale,
         voiceFemale: this.mimoVoiceFemale,
       });
     } else {
-      logger.warn("MiMo TTS Service disabled: MIMO_API_KEY not found");
+      logger.warn("MiMo TTS Service disabled: neither OPENGATEWAY_API_KEY nor MIMO_API_KEY set");
     }
 
     // ElevenLabs configuration (fallback)
