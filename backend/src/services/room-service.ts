@@ -294,6 +294,21 @@ export class RoomService {
         serviceType: "v2",
       });
 
+      // Establish WebSocket connection to Pantry for audio signaling
+      try {
+        await jamService.connectAgent(jamRoom.roomId, keyPair);
+        logger.info("WebSocket connected to Jam room for audio signaling", {
+          roomId,
+          jamRoomId: jamRoom.roomId,
+        });
+      } catch (wsErr) {
+        logger.warn("Failed to connect WebSocket to Jam room — audio signaling will be unavailable", {
+          roomId,
+          jamRoomId: jamRoom.roomId,
+          error: wsErr instanceof Error ? wsErr.message : String(wsErr),
+        });
+      }
+
       // Update room with Jam details
       await roomRepository.updateJamDetails(roomId, {
         jam_room_id: jamRoom.roomId,

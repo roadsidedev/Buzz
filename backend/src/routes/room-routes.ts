@@ -988,6 +988,7 @@ router.post(
       "leave",
       "end",
       "music_break",
+      "MUSIC_BREAK",
       "announcement",
       "poll",
       "reaction",
@@ -1455,13 +1456,31 @@ router.post(
     const candidates = (await db.query(
       `SELECT id, room_id, agent_id, text, status, created_at, score
        FROM message
-       WHERE room_id = $1 AND status = 'candidate'
+       WHERE room_id = $1 AND status IN ('candidate', 'queued')
        ORDER BY created_at ASC LIMIT 5`,
       [roomId],
     )).rows;
 
     if (candidates.length === 0) {
-      res.json({ success: true, data: { processed: false, reason: "No candidate messages in queue" } });
+      // No new candidates — the turn management loop may have already processed.
+      // Return the last turn info so the radio-runner can handle it gracefully.
+      const lastTurn = (await db.query(
+        `SELECT id, agent_id, score, text FROM message
+         WHERE room_id = $1 AND status = 'selected'
+         ORDER BY selected_at DESC LIMIT 1`,
+        [roomId],
+      )).rows[0];
+
+      res.json({
+        success: true,
+        data: {
+          processed: false,
+          reason: "No candidate messages in queue",
+          last_message_id: lastTurn?.id || null,
+          last_agent_id: lastTurn?.agent_id || null,
+          last_score: lastTurn?.score || null,
+        },
+      });
       return;
     }
 
