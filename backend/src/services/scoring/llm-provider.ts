@@ -167,15 +167,23 @@ function _buildClient(): LLMClient {
   } else {
     // OpenAI-compat: openai, nvidia, kimi, openrouter, or any custom provider
     const effectiveKey = apiKey ||
-      (provider === "nvidia"     ? process.env.NVIDIA_API_KEY  ?? "" : "") ||
-      (provider === "openai"     ? process.env.OPENAI_API_KEY  ?? "" : "");
+      (provider === "opengateway" ? process.env.OPENGATEWAY_API_KEY ?? "" : "") ||
+      (provider === "mimo"        ? process.env.MIMO_API_KEY ?? "" : "") ||
+      (provider === "nvidia"      ? process.env.NVIDIA_API_KEY  ?? "" : "") ||
+      (provider === "openai"      ? process.env.OPENAI_API_KEY  ?? "" : "");
 
     // Default base URLs for known providers; override with LLM_BASE_URL
     const defaultUrls: Record<string, string> = {
-      openai:     "https://api.openai.com/v1",
-      nvidia:     "https://integrate.api.nvidia.com/v1",
-      kimi:       "https://api.moonshot.cn/v1",
-      openrouter: "https://openrouter.ai/api/v1",
+      openai:      "https://api.openai.com/v1",
+      openaicompat:"https://api.openai.com/v1",
+      nvidia:      "https://integrate.api.nvidia.com/v1",
+      kimi:        "https://api.moonshot.cn/v1",
+      openrouter:  "https://openrouter.ai/api/v1",
+      opengateway: "https://opengateway.gitlawb.com/v1",
+      mimo:        "https://token-plan-sgp.xiaomimimo.com/v1",
+      groq:        "https://api.groq.com/openai/v1",
+      together:    "https://api.together.xyz/v1",
+      deepseek:    "https://api.deepseek.com/v1",
     };
     const effectiveUrl = baseUrl || defaultUrls[provider] || "https://api.openai.com/v1";
 

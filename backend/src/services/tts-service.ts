@@ -50,6 +50,7 @@ export class TTSService {
   private mimoBaseUrl: string = "";
   private mimoVoiceMale: string;
   private mimoVoiceFemale: string;
+  private isOpengateway: boolean = false;
 
   // Voice mappings
   private elevenLabsVoiceMale: string;
@@ -60,6 +61,7 @@ export class TTSService {
     // Priority: OPENGATEWAY_API_KEY > MIMO_API_KEY
     this.mimoApiKey = process.env.OPENGATEWAY_API_KEY || process.env.MIMO_API_KEY || "";
     this.mimoBaseUrl = (process.env.OPENGATEWAY_BASE_URL || process.env.MIMO_BASE_URL || "https://token-plan-sgp.xiaomimimo.com/v1").replace(/\/+$/, "");
+    this.isOpengateway = !!(process.env.OPENGATEWAY_API_KEY || (this.mimoBaseUrl.includes("opengateway")));
     this.mimoVoiceMale = process.env.MIMO_TTS_VOICE_A || "Dean";    // Alex (male)
     this.mimoVoiceFemale = process.env.MIMO_TTS_VOICE_B || "Chloe"; // Mira (female)
 
@@ -136,11 +138,15 @@ export class TTSService {
     const voice = voiceId || this.mimoVoiceMale;
 
     try {
+      const authHeader = this.isOpengateway
+        ? { "Authorization": `Bearer ${this.mimoApiKey}` }
+        : { "api-key": this.mimoApiKey };
+
       const response = await fetch(`${this.mimoBaseUrl}/chat/completions`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "api-key": this.mimoApiKey,
+          ...authHeader,
         },
         body: JSON.stringify({
           model: "mimo-v2.5-tts",
@@ -208,7 +214,7 @@ export class TTSService {
     try {
       const audioStream = await this.elevenlabs.textToSpeech.convert(voice, {
         text,
-        model_id: "eleven_turbo_v2",
+        model_id: process.env.ELEVENLABS_MODEL_ID || "eleven_turbo_v2_5",
         output_format: "mp3_44100_128",
       });
 
