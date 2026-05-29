@@ -1455,7 +1455,7 @@ router.post(
     const candidates = (await db.query(
       `SELECT id, room_id, agent_id, text, status, created_at, score
        FROM message
-       WHERE room_id = $1 AND status IN ('candidate', 'queued')
+       WHERE room_id = $1 AND status = 'candidate'
        ORDER BY created_at ASC LIMIT 5`,
       [roomId],
     )).rows;

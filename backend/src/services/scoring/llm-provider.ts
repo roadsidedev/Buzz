@@ -86,6 +86,7 @@ class OpenAICompatClient implements LLMClient {
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${this.apiKey}`,
+        "Accept-Encoding": "identity",
       },
       body: JSON.stringify({
         model: params.model,

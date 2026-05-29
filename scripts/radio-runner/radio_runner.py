@@ -360,9 +360,9 @@ class RadioRunner:
 
                 # Generate dialogue — with circuit breaker fallback
                 if self._check_circuit_breaker():
-                    # Circuit is open — use pre-written fallback dialogue
-                    turn = self._get_fallback_dialogue(seg_id, agent_key)
-                    logger.info("Using fallback dialogue (LLM circuit breaker open)")
+                    logger.warning("LLM circuit open — entering music break mode")
+                    self._run_llm_outage_music_break()
+                    continue
                 else:
                     try:
                         turn = self._engine.generate_turn(
@@ -379,8 +379,9 @@ class RadioRunner:
                         self._record_llm_success()
                     except Exception as llm_exc:
                         self._record_llm_failure()
-                        logger.error("LLM dialogue generation failed: %s", llm_exc)
-                        turn = self._get_fallback_dialogue(seg_id, agent_key)
+                        logger.warning("LLM failed (%s) — entering music break mode", llm_exc)
+                        self._run_llm_outage_music_break()
+                        continue
 
                 logger.info(f"  ALEX: {turn.host_text[:80]}...")
                 logger.info(f"  MIRA: {turn.cohost_text[:80]}...")
@@ -474,6 +475,70 @@ class RadioRunner:
             priority=5,
             payload={"break_number": music_break.break_number},
         )
+
+    def _run_llm_outage_music_break(self) -> None:
+        """Play music tracks until the LLM comes back online."""
+        max_tracks = 5
+        for track_num in range(max_tracks):
+            music_break = self._scheduler.start_break()
+            payload = self._scheduler.build_event_payload(music_break)
+
+            logger.info(
+                f"♪ LLM OUTAGE — MUSIC BREAK #{music_break.break_number} — "
+                f"{music_break.duration_seconds}s from {music_break.source[:40]}"
+            )
+
+            self._bridge.emit_room_event(
+                room_id=self._room_id,
+                event_type="MUSIC_BREAK",
+                payload=payload,
+                auth_key=self._host.api_key if self._host else "",
+            )
+
+            # Wait for the track to finish
+            self._interruptible_sleep(music_break.duration_seconds)
+            self._scheduler.end_break()
+
+            # Check if LLM is back
+            if self._check_llm_health():
+                logger.info("LLM recovered after music break — resuming normal programming")
+                self._llm_consecutive_failures = 0
+                self._llm_circuit_open = False
+                return
+
+            logger.warning("LLM still down after track %d — playing next track", track_num + 1)
+
+        logger.warning("Max music tracks reached — attempting recovery dialogue")
+        turn = self._get_fallback_dialogue(SegmentID.BANTER, "host")
+        try:
+            self._bridge.submit_and_process(
+                room_id=self._room_id,
+                host_agent_id=self._host.id,
+                host_text=turn.host_text,
+                cohost_agent_id=self._cohost.id,
+                cohost_text=turn.cohost_text,
+                host_api_key=self._host.api_key,
+            )
+        except Exception as exc:
+            logger.error("Recovery dialogue also failed: %s", exc)
+
+    def _check_llm_health(self) -> bool:
+        """Quick health check: can the LLM respond to a trivial prompt?"""
+        try:
+            turn = self._engine.generate_turn(
+                editorial=self._editorial_context,
+                headlines=self._cached_headlines,
+                history=[],
+                events=[],
+                segment_id=SegmentID.BANTER,
+                turn_number=1,
+                total_turns=2,
+                agent_key="host",
+                session_memory=self._session_memory,
+            )
+            return bool(turn.host_text and len(turn.host_text) > 10)
+        except Exception:
+            return False
 
     # ── Audio Playback Helpers ──────────────────────────────────────────────
 

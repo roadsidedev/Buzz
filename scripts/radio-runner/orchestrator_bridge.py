@@ -269,7 +269,7 @@ class OrchestratorBridge:
         resp = self._backend.post(
             "/api/v1/agents/register",
             json=payload,
-            headers={"Content-Type": "application/json"},
+            headers={"Content-Type": "application/json", "Accept-Encoding": "identity"},
         )
         self._assert_ok(resp, "register_agent")
         data = resp.json()
@@ -665,7 +665,7 @@ class OrchestratorBridge:
         Returns:
             True if event was accepted
         """
-        headers = self._auth_headers(auth_key) if auth_key else {"Content-Type": "application/json"}
+        headers = self._auth_headers(auth_key) if auth_key else {"Content-Type": "application/json", "Accept-Encoding": "identity"}
         try:
             resp = self._backend.post(
                 f"/api/v1/rooms/{room_id}/events",
@@ -724,6 +724,7 @@ class OrchestratorBridge:
         headers = {
             "Content-Type": "application/json",
             "Authorization": f"Bearer {api_key}",
+            "Accept-Encoding": "identity",
         }
         if self.system_secret:
             headers["X-Buzz-System-Secret"] = self.system_secret
@@ -777,7 +778,7 @@ class OrchestratorBridge:
         headers: Optional[dict[str, str]] = None,
     ) -> httpx.Response:
         """POST with retry logic for transient failures."""
-        default_headers = {"Content-Type": "application/json"}
+        default_headers = {"Content-Type": "application/json", "Accept-Encoding": "identity"}
         if headers:
             default_headers.update(headers)
         last_exc: Optional[Exception] = None

@@ -192,6 +192,10 @@ export async function runStartupMigrations(): Promise<void> {
         ADD COLUMN IF NOT EXISTS verification_status      VARCHAR(50) DEFAULT 'unverified'
     `);
 
+    await runSafely("agent add display_name", `
+      ALTER TABLE agent ADD COLUMN IF NOT EXISTS display_name VARCHAR(255)
+    `);
+
     await runSafely("agent relax NOT NULL", `
       ALTER TABLE agent
         ALTER COLUMN llm_provider DROP NOT NULL,
@@ -378,11 +382,18 @@ export async function runStartupMigrations(): Promise<void> {
         ADD COLUMN IF NOT EXISTS completion_percentage INTEGER NOT NULL DEFAULT 0
     `);
 
-    // ── room_status ENUM: add 'ended' and 'closed' ─────────────────────────
-    // Code references status='ended' (room-repository.ts:664, room-orchestration-service.ts:318)
-    // and status='closed' (setRecordingAvailable, /discover/recently-ended).
-    // Original ENUM only has: pending, live, paused, completed, cancelled.
-    // Migration 009 adds: scheduled, failed.
+    // ── room_status ENUM: create if missing, then add 'ended' and 'closed' ──
+    await runSafely("room_status create type if missing", `
+      DO $$ BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'room_status') THEN
+          CREATE TYPE room_status AS ENUM (
+            'pending', 'live', 'paused', 'completed', 'cancelled',
+            'scheduled', 'failed', 'ended', 'closed'
+          );
+        END IF;
+      END $$
+    `);
+
     await runSafely("room_status add ended", `
       DO $$ BEGIN
         IF NOT EXISTS (

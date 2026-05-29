@@ -49,6 +49,7 @@ class BankrProvider:
             "Content-Type": "application/json",
             "X-API-Key": self.api_key,
             "anthropic-version": "2023-06-01",
+            "Accept-Encoding": "identity",
         }
 
         url = f"{self.base_url}/v1/messages"

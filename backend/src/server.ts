@@ -96,6 +96,17 @@ try {
     }
   }
 
+  // Initialize JamServiceFactory eagerly so TTS can signal audio to rooms
+  try {
+    const { initializeJamServiceFactory } = await import("./services/jam-service-factory.js");
+    initializeJamServiceFactory();
+    logger.info("JamServiceFactory initialized at startup");
+  } catch (jamFactoryErr) {
+    logger.warn("JamServiceFactory initialization failed — audio signaling will be unavailable", {
+      error: jamFactoryErr instanceof Error ? jamFactoryErr.message : String(jamFactoryErr),
+    });
+  }
+
   try {
     validateTTSConfig();
   } catch (ttsError) {

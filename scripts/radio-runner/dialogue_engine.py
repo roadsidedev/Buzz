@@ -102,7 +102,11 @@ def _build_openai_compat_provider(provider_name: str, api_key: str, base_url: st
             for attempt in range(max_retries):
                 resp = self.client.post(
                     self.url,
-                    headers={"Authorization": f"Bearer {self.key}", "Content-Type": "application/json"},
+                    headers={
+                        "Authorization": f"Bearer {self.key}",
+                        "Content-Type": "application/json",
+                        "Accept-Encoding": "identity",
+                    },
                     json=payload,
                 )
                 if resp.status_code == 429:
@@ -132,7 +136,11 @@ def _build_openai_compat_provider(provider_name: str, api_key: str, base_url: st
                 "max_tokens": max_tokens,
                 "temperature": 0.7,
             })
-            data = resp.json()
+            try:
+                data = resp.json()
+            except Exception:
+                import json as _json
+                data = _json.loads(resp.content.decode("utf-8"))
             TextObj = namedtuple("TextObj", ["text"])
             ContentObj = namedtuple("ContentObj", ["content"])
             return ContentObj(content=[TextObj(text=data["choices"][0]["message"]["content"])])
@@ -155,6 +163,7 @@ def _build_anthropic_provider(api_key: str) -> Any:
                     "x-api-key": self.key,
                     "anthropic-version": "2023-06-01",
                     "content-type": "application/json",
+                    "Accept-Encoding": "identity",
                 },
                 json={
                     "model": model,

@@ -39,7 +39,7 @@ class GenericHTTPProvider:
         # Use kwargs directly to be flexible
         payload.update(kwargs)
 
-        headers = {"Content-Type": "application/json"}
+        headers = {"Content-Type": "application/json", "Accept-Encoding": "identity"}
         if self.api_key:
             headers["Authorization"] = f"Bearer {self.api_key}"
 
