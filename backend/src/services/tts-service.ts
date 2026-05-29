@@ -1,89 +1,37 @@
-// @ts-nocheck
 /**
  * Text-to-Speech Service
  *
- * Integrates with MiMo TTS (primary) and ElevenLabs (fallback).
- * Google TTS has been removed (suspended API key).
- *
- * Features:
- * - Voice synthesis via Xiaomi MiMo V2.5 TTS (primary, currently free)
- * - Voice synthesis via ElevenLabs API (fallback)
- * - Automatic provider detection and fallback
- * - Voice mapping: Alex (male), Mira (female)
+ * Uses ElevenLabs for all TTS. MiMo TTS has been removed.
  *
  * Env vars:
- *   MIMO_API_KEY         - MiMo API key (primary TTS)
- *   MIMO_TTS_VOICE_A     - Voice for Alex (male, default: Dean)
- *   MIMO_TTS_VOICE_B     - Voice for Mira (female, default: Chloe)
- *   MIMO_BASE_URL        - MiMo API base URL (optional, defaults to global)
- *   ELEVENLABS_API_KEY   - ElevenLabs API key (fallback)
- *   ELEVENLABS_VOICE_A   - Voice ID for Alex (male)
- *   ELEVENLABS_VOICE_B   - Voice ID for Mira (female)
+ *   ELEVENLABS_API_KEY   - ElevenLabs API key
+ *   ELEVENLABS_VOICE_A   - Voice ID for Alex (male, default: pNInz6obpgDQGcFmaJcg)
+ *   ELEVENLABS_VOICE_B   - Voice ID for Mira (female, default: EXAVITQu4vr4xnSDxMaL)
+ *   ELEVENLABS_MODEL_ID  - Model ID (default: eleven_turbo_v2_5)
+ *   ELEVENLABS_OUTPUT_FORMAT - Output format (default: mp3_44100_128)
  */
 
-import { ElevenLabsClient } from "elevenlabs";
+import { ElevenLabsClient } from "@elevenlabs/elevenlabs-js";
 import { logger } from "../utils/logger.js";
 import { ValidationError, ServiceUnavailableError } from "../utils/errors.js";
 import { getJam } from "./jam-service-factory.js";
 
-// Buffer concatenation helper for ElevenLabs stream
-async function streamToBuffer(stream: AsyncIterable<Buffer>): Promise<Buffer> {
-  const chunks: Buffer[] = [];
-  for await (const chunk of stream) {
-    chunks.push(chunk);
-  }
-  return Buffer.concat(chunks);
-}
-
 export type VoiceGender = "male" | "female";
-
-export interface TTSProvider {
-  name: string;
-  synthesize(text: string, voiceId?: string): Promise<{ audioBuffer: Buffer; durationMs: number }>;
-}
 
 export class TTSService {
   private elevenlabs: ElevenLabsClient | null = null;
 
-  // MiMo TTS config
-  private mimoApiKey: string = "";
-  private mimoBaseUrl: string = "";
-  private mimoVoiceMale: string;
-  private mimoVoiceFemale: string;
-  private isOpengateway: boolean = false;
-
-  // Voice mappings
   private elevenLabsVoiceMale: string;
   private elevenLabsVoiceFemale: string;
 
   constructor() {
-    // MiMo TTS configuration (primary)
-    // Priority: OPENGATEWAY_API_KEY > MIMO_API_KEY
-    this.mimoApiKey = process.env.OPENGATEWAY_API_KEY || process.env.MIMO_API_KEY || "";
-    this.mimoBaseUrl = (process.env.OPENGATEWAY_BASE_URL || process.env.MIMO_BASE_URL || "https://token-plan-sgp.xiaomimimo.com/v1").replace(/\/+$/, "");
-    this.isOpengateway = !!(process.env.OPENGATEWAY_API_KEY || (this.mimoBaseUrl.includes("opengateway")));
-    this.mimoVoiceMale = process.env.MIMO_TTS_VOICE_A || "Dean";    // Alex (male)
-    this.mimoVoiceFemale = process.env.MIMO_TTS_VOICE_B || "Chloe"; // Mira (female)
-
-    if (this.mimoApiKey) {
-      const provider = process.env.OPENGATEWAY_API_KEY ? "OpenGateway" : "MiMo";
-      logger.info(`${provider} TTS Service initialized (primary)`, {
-        baseUrl: this.mimoBaseUrl,
-        voiceMale: this.mimoVoiceMale,
-        voiceFemale: this.mimoVoiceFemale,
-      });
-    } else {
-      logger.warn("MiMo TTS Service disabled: neither OPENGATEWAY_API_KEY nor MIMO_API_KEY set");
-    }
-
-    // ElevenLabs configuration (fallback)
     const elevenLabsKey = process.env.ELEVENLABS_API_KEY || "";
-    this.elevenLabsVoiceMale = process.env.ELEVENLABS_VOICE_A || "pNInz6obpgDQGcFmaJcg"; // Adam (male)
-    this.elevenLabsVoiceFemale = process.env.ELEVENLABS_VOICE_B || "EXAVITQu4vr4xnSDxMaL"; // Rachel (female)
+    this.elevenLabsVoiceMale = process.env.ELEVENLABS_VOICE_A || "pNInz6obpgDQGcFmaJcg";
+    this.elevenLabsVoiceFemale = process.env.ELEVENLABS_VOICE_B || "EXAVITQu4vr4xnSDxMaL";
 
     if (elevenLabsKey) {
       this.elevenlabs = new ElevenLabsClient({ apiKey: elevenLabsKey });
-      logger.info("ElevenLabs TTS Service initialized (fallback)", {
+      logger.info("ElevenLabs TTS Service initialized", {
         voiceMale: this.elevenLabsVoiceMale,
         voiceFemale: this.elevenLabsVoiceFemale,
       });
@@ -93,114 +41,50 @@ export class TTSService {
   }
 
   isEnabled(): boolean {
-    return this.mimoApiKey !== "" || this.elevenlabs !== null;
+    return this.elevenlabs !== null;
   }
 
-  /**
-   * Get voice ID for a given gender
-   */
-  getVoiceForGender(gender: VoiceGender, provider: "mimo" | "elevenlabs"): string {
-    if (provider === "mimo") {
-      return gender === "male" ? this.mimoVoiceMale : this.mimoVoiceFemale;
-    }
+  getVoiceForGender(gender: VoiceGender): string {
     return gender === "male" ? this.elevenLabsVoiceMale : this.elevenLabsVoiceFemale;
   }
 
-  /**
-   * Detect if we should use male or female voice based on agent name
-   */
   detectGender(agentName: string): VoiceGender {
     const name = (agentName || "").toLowerCase();
-    // Mira is female, Alex is male by default
     if (name.includes("mira") || name.includes("female")) {
       return "female";
     }
     return "male";
   }
 
-  /**
-   * Synthesize text to speech using Xiaomi MiMo V2.5 TTS (primary)
-   *
-   * Uses the OpenAI-compatible chat/completions endpoint with audio output.
-   * MiMo TTS currently free for a limited time.
-   */
-  async synthesizeWithMiMo(
-    text: string,
-    voiceId?: string
-  ): Promise<{ audioBuffer: Buffer; durationMs: number }> {
-    if (!this.mimoApiKey) {
-      throw new ServiceUnavailableError("MiMo TTS not configured");
-    }
+  async synthesize(request: { text: string; voiceId?: string; agentName?: string }): Promise<{ audioBuffer: Buffer; durationMs: number; format: string; provider: string }> {
+    const { text, voiceId, agentName } = request;
+
     if (!text) {
       throw new ValidationError("Text is required");
     }
 
-    const voice = voiceId || this.mimoVoiceMale;
+    const gender = this.detectGender(agentName || "");
+
+    if (!this.elevenlabs) {
+      throw new ServiceUnavailableError("ElevenLabs TTS not configured");
+    }
 
     try {
-      const authHeader = this.isOpengateway
-        ? { "Authorization": `Bearer ${this.mimoApiKey}` }
-        : { "api-key": this.mimoApiKey };
-
-      const response = await fetch(`${this.mimoBaseUrl}/chat/completions`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...authHeader,
-        },
-        body: JSON.stringify({
-          model: "mimo-v2.5-tts",
-          messages: [
-            { role: "user", content: "" },
-            { role: "assistant", content: text },
-          ],
-          audio: {
-            format: "wav",
-            voice: voice,
-          },
-        }),
-      });
-
-      if (!response.ok) {
-        const errBody = await response.text().catch(() => "");
-        throw new Error(`MiMo TTS HTTP ${response.status}: ${errBody.slice(0, 200)}`);
-      }
-
-      const data = await response.json();
-
-      // Extract audio from response
-      const audioData = data.choices?.[0]?.message?.audio?.data;
-      if (!audioData) {
-        throw new Error("No audio data in MiMo TTS response");
-      }
-
-      const audioBuffer = Buffer.from(audioData, "base64");
-      const wordCount = text.split(/\s+/).length;
-      const durationMs = Math.round((wordCount / 150) * 60 * 1000);
-
-      logger.info("MiMo TTS synthesis successful", {
-        voice,
-        textLength: text.length,
-        audioSize: audioBuffer.length,
-        durationMs,
-      });
-
-      return { audioBuffer, durationMs };
+      const voice = voiceId || this.getVoiceForGender(gender);
+      const result = await this._synthesizeWithElevenLabs(text, voice);
+      return { ...result, format: "mp3", provider: "elevenlabs" };
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : String(err);
-      logger.error("MiMo TTS synthesis failed", { error: errorMsg });
-      throw new Error(`MiMo TTS failed: ${errorMsg}`);
+      logger.error("ElevenLabs TTS synthesis failed", {
+        error: errorMsg,
+      });
+      throw new ServiceUnavailableError("No TTS provider available");
     }
   }
 
-  /**
-   * Synthesize text to speech using ElevenLabs (fallback)
-   *
-   * Uses the REST API directly for maximum compatibility.
-   */
-  async synthesizeWithElevenLabs(
+  private async _synthesizeWithElevenLabs(
     text: string,
-    voiceId?: string
+    voice: string,
   ): Promise<{ audioBuffer: Buffer; durationMs: number }> {
     if (!this.elevenlabs) {
       throw new ServiceUnavailableError("ElevenLabs TTS not configured");
@@ -209,83 +93,147 @@ export class TTSService {
       throw new ValidationError("Text is required");
     }
 
-    const voice = voiceId || this.elevenLabsVoiceMale;
-
     try {
-      const audioStream = await this.elevenlabs.textToSpeech.convert(voice, {
-        text,
-        model_id: process.env.ELEVENLABS_MODEL_ID || "eleven_turbo_v2_5",
-        output_format: "mp3_44100_128",
-      });
-
-      const audioBuffer = await streamToBuffer(audioStream);
-      const wordCount = text.split(/\s+/).length;
-      const durationMs = Math.round((wordCount / 150) * 60 * 1000);
-
+      const { audioBuffer, durationMs } = await this._synthesizeWithElevenLabsSDK(voice, text);
       logger.info("ElevenLabs synthesis successful", {
         voiceId: voice,
         textLength: text.length,
         audioSize: audioBuffer.length,
       });
-
       return { audioBuffer, durationMs };
-    } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : String(err);
-      logger.error("ElevenLabs TTS synthesis failed", {
-        error: errorMsg,
-        voiceId: voice,
-        apiKeySet: !!process.env.ELEVENLABS_API_KEY,
-        apiKeyPrefix: (process.env.ELEVENLABS_API_KEY || "").slice(0, 4),
+    } catch (sdkErr) {
+      const sdkMsg = sdkErr instanceof Error ? sdkErr.message : String(sdkErr);
+      logger.warn("ElevenLabs SDK failed, trying direct REST API", {
+        error: sdkMsg,
       });
-      throw new Error(`ElevenLabs failed: ${errorMsg}`);
+
+      try {
+        return await this._synthesizeWithElevenLabsREST(text, voice);
+      } catch (restErr) {
+        const restMsg = restErr instanceof Error ? restErr.message : String(restErr);
+        logger.error("ElevenLabs TTS synthesis failed", {
+          error: restMsg,
+          voiceId: voice,
+          apiKeySet: !!process.env.ELEVENLABS_API_KEY,
+          apiKeyPrefix: (process.env.ELEVENLABS_API_KEY || "").slice(0, 4),
+        });
+        throw new Error(`ElevenLabs failed: ${restMsg}`);
+      }
     }
   }
 
-  /**
-   * Synthesize text - tries MiMo first, falls back to ElevenLabs
-   */
-  async synthesize(request: { text: string; voiceId?: string; agentName?: string }): Promise<{ audioBuffer: Buffer; durationMs: number; format: string; provider: string }> {
-    const { text, voiceId, agentName } = request;
+  private async _synthesizeWithElevenLabsSDK(
+    voice: string,
+    text: string,
+  ): Promise<{ audioBuffer: Buffer; durationMs: number }> {
+    const modelId = process.env.ELEVENLABS_MODEL_ID || "eleven_turbo_v2_5";
 
-    if (!text) {
-      throw new ValidationError("Text is required");
+    const result = await this.elevenlabs!.textToSpeech.convert(voice, {
+      text,
+      modelId,
+    });
+
+    let audioBuffer: Buffer;
+
+    if (typeof result === "object" && result !== null) {
+      if (typeof (result as any).arrayBuffer === "function") {
+        const ab = await (result as any).arrayBuffer();
+        audioBuffer = Buffer.from(ab);
+      } else if ((result as any).body) {
+        const reader = (result as any).body.getReader();
+        const chunks: Uint8Array[] = [];
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          chunks.push(value);
+        }
+        const totalLen = chunks.reduce((a, c) => a + c.length, 0);
+        audioBuffer = Buffer.concat(chunks.map(c => Buffer.from(c)), totalLen);
+      } else if (typeof (result as any).pipe === "function") {
+        const chunks: Buffer[] = [];
+        for await (const chunk of result as any) {
+          chunks.push(Buffer.from(chunk));
+        }
+        audioBuffer = Buffer.concat(chunks);
+      } else {
+        audioBuffer = Buffer.from(result as any);
+      }
+    } else {
+      audioBuffer = Buffer.from(result as any);
     }
 
-    // Detect gender based on agent name
-    const gender = this.detectGender(agentName || "");
+    const wordCount = text.split(/\s+/).length;
+    const durationMs = Math.round((wordCount / 150) * 60 * 1000);
 
-    // 1. Try MiMo TTS first (primary, currently free)
-    if (this.mimoApiKey) {
+    logger.info("ElevenLabs SDK v2 synthesis successful", {
+      voiceId: voice,
+      modelId,
+      textLength: text.length,
+      audioSize: audioBuffer.length,
+    });
+
+    return { audioBuffer, durationMs };
+  }
+
+  private async _synthesizeWithElevenLabsREST(
+    text: string,
+    voice: string,
+  ): Promise<{ audioBuffer: Buffer; durationMs: number }> {
+    const apiKey = process.env.ELEVENLABS_API_KEY || "";
+    const modelId = process.env.ELEVENLABS_MODEL_ID || "eleven_turbo_v2_5";
+
+    // Try different auth header formats
+    const authConfigs = [
+      { name: "xi-api-key", headers: { "xi-api-key": apiKey } },
+      { name: "Bearer", headers: { "Authorization": `Bearer ${apiKey}` } },
+    ];
+
+    for (const auth of authConfigs) {
       try {
-        const voice = voiceId || this.getVoiceForGender(gender, "mimo");
-        const result = await this.synthesizeWithMiMo(text, voice);
-        return { ...result, format: "wav", provider: "mimo" };
-      } catch (err) {
-        logger.warn("MiMo TTS synthesis failed, attempting ElevenLabs fallback", {
-          error: err instanceof Error ? err.message : String(err),
+        const response = await fetch(
+          `https://api.elevenlabs.io/v1/text-to-speech/${voice}`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Accept: "audio/mpeg",
+              ...auth.headers,
+            },
+            body: JSON.stringify({ text, model_id: modelId }),
+          },
+        );
+
+        if (!response.ok) {
+          const errBody = await response.text().catch(() => "");
+          logger.warn(`ElevenLabs REST (${auth.name}) failed`, {
+            status: response.status,
+            body: errBody.slice(0, 200),
+          });
+          continue;
+        }
+
+        const audioBuffer = Buffer.from(await response.arrayBuffer());
+        const wordCount = text.split(/\s+/).length;
+        const durationMs = Math.round((wordCount / 150) * 60 * 1000);
+
+        logger.info("ElevenLabs REST synthesis successful", {
+          voiceId: voice,
+          authMethod: auth.name,
+          textLength: text.length,
+          audioSize: audioBuffer.length,
+        });
+
+        return { audioBuffer, durationMs };
+      } catch (fetchErr) {
+        logger.warn(`ElevenLabs REST (${auth.name}) fetch error`, {
+          error: fetchErr instanceof Error ? fetchErr.message : String(fetchErr),
         });
       }
     }
 
-    // 2. Fallback to ElevenLabs
-    if (this.elevenlabs) {
-      try {
-        const voice = voiceId || this.getVoiceForGender(gender, "elevenlabs");
-        const result = await this.synthesizeWithElevenLabs(text, voice);
-        return { ...result, format: "mp3", provider: "elevenlabs" };
-      } catch (err) {
-        logger.warn("ElevenLabs synthesis failed — no more providers available", {
-          error: err instanceof Error ? err.message : String(err),
-        });
-      }
-    }
-
-    throw new ServiceUnavailableError("No TTS provider available");
+    throw new Error(`ElevenLabs REST failed after all auth attempts for voice ${voice}`);
   }
 
-  /**
-   * Synthesize and stream to Jam audio room.
-   */
   async synthesizeAndStream(
     jamRoomId: string,
     text: string,
@@ -293,10 +241,8 @@ export class TTSService {
     voiceId?: string,
     agentName?: string
   ): Promise<{ audioBuffer: Buffer; durationMs: number; provider: string }> {
-    // Generate audio with fallback
     const result = await this.synthesize({ text, voiceId, agentName });
 
-    // Signal audio start/end via pantry Buzz routes
     try {
       const { getJam } = await import("./jam-service-factory.js");
       const jamService = getJam();
@@ -329,18 +275,13 @@ export class TTSService {
     };
   }
 
-  /**
-   * Health check
-   */
-  async healthCheck(): Promise<{ mimo: boolean; elevenlabs: boolean }> {
+  async healthCheck(): Promise<{ elevenlabs: boolean }> {
     return {
-      mimo: this.mimoApiKey !== "",
       elevenlabs: this.elevenlabs !== null,
     };
   }
 }
 
-// Singleton instance
 let ttsServiceInstance: TTSService | null = null;
 export function getTTSService(): TTSService {
   if (!ttsServiceInstance) {
