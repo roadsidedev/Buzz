@@ -1,14 +1,16 @@
 /**
  * Text-to-Speech Service
  *
- * Uses ElevenLabs for all TTS. MiMo TTS has been removed.
+ * Uses Kokoro TTS API (primary) with ElevenLabs fallback.
  *
  * Env vars:
- *   ELEVENLABS_API_KEY   - ElevenLabs API key
- *   ELEVENLABS_VOICE_A   - Voice ID for Alex (male, default: pNInz6obpgDQGcFmaJcg)
- *   ELEVENLABS_VOICE_B   - Voice ID for Mira (female, default: EXAVITQu4vr4xnSDxMaL)
+ *   KOKORO_API_URL       - Kokoro TTS API base URL (e.g. https://kokoro-api.up.railway.app)
+ *   KOKORO_VOICE_A       - Voice for Alex / male (default: am_adam)
+ *   KOKORO_VOICE_B       - Voice for Mira / female (default: af_bella)
+ *   ELEVENLABS_API_KEY   - ElevenLabs API key (fallback)
+ *   ELEVENLABS_VOICE_A   - Voice ID for Alex (male)
+ *   ELEVENLABS_VOICE_B   - Voice ID for Mira (female)
  *   ELEVENLABS_MODEL_ID  - Model ID (default: eleven_turbo_v2_5)
- *   ELEVENLABS_OUTPUT_FORMAT - Output format (default: mp3_44100_128)
  */
 
 import { ElevenLabsClient } from "@elevenlabs/elevenlabs-js";
@@ -20,31 +22,51 @@ export type VoiceGender = "male" | "female";
 
 export class TTSService {
   private elevenlabs: ElevenLabsClient | null = null;
-
   private elevenLabsVoiceMale: string;
   private elevenLabsVoiceFemale: string;
 
+  private kokoroApiUrl: string;
+  private kokoroVoiceMale: string;
+  private kokoroVoiceFemale: string;
+
   constructor() {
+    // Kokoro config (primary)
+    this.kokoroApiUrl = (process.env.KOKORO_API_URL || "http://kokoro-api-production-eb62.up.railway.app").replace(/\/+$/, "");
+    this.kokoroVoiceMale = process.env.KOKORO_VOICE_A || "am_adam";
+    this.kokoroVoiceFemale = process.env.KOKORO_VOICE_B || "af_bella";
+
+    if (this.kokoroApiUrl) {
+      logger.info("Kokoro TTS configured (primary)", {
+        apiUrl: this.kokoroApiUrl,
+        voiceMale: this.kokoroVoiceMale,
+        voiceFemale: this.kokoroVoiceFemale,
+      });
+    }
+
+    // ElevenLabs config (fallback)
     const elevenLabsKey = process.env.ELEVENLABS_API_KEY || "";
     this.elevenLabsVoiceMale = process.env.ELEVENLABS_VOICE_A || "pNInz6obpgDQGcFmaJcg";
     this.elevenLabsVoiceFemale = process.env.ELEVENLABS_VOICE_B || "EXAVITQu4vr4xnSDxMaL";
 
     if (elevenLabsKey) {
       this.elevenlabs = new ElevenLabsClient({ apiKey: elevenLabsKey });
-      logger.info("ElevenLabs TTS Service initialized", {
+      logger.info("ElevenLabs TTS configured (fallback)", {
         voiceMale: this.elevenLabsVoiceMale,
         voiceFemale: this.elevenLabsVoiceFemale,
       });
     } else {
-      logger.warn("ElevenLabs TTS Service disabled: ELEVENLABS_API_KEY not found");
+      logger.warn("ElevenLabs TTS disabled: ELEVENLABS_API_KEY not set");
     }
   }
 
   isEnabled(): boolean {
-    return this.elevenlabs !== null;
+    return !!(this.kokoroApiUrl || this.elevenlabs);
   }
 
-  getVoiceForGender(gender: VoiceGender): string {
+  getVoiceForGender(gender: VoiceGender, provider: "kokoro" | "elevenlabs"): string {
+    if (provider === "kokoro") {
+      return gender === "male" ? this.kokoroVoiceMale : this.kokoroVoiceFemale;
+    }
     return gender === "male" ? this.elevenLabsVoiceMale : this.elevenLabsVoiceFemale;
   }
 
@@ -65,22 +87,74 @@ export class TTSService {
 
     const gender = this.detectGender(agentName || "");
 
-    if (!this.elevenlabs) {
-      throw new ServiceUnavailableError("ElevenLabs TTS not configured");
+    // 1. Try Kokoro (primary)
+    if (this.kokoroApiUrl) {
+      try {
+        const voice = voiceId || this.getVoiceForGender(gender, "kokoro");
+        const result = await this._synthesizeWithKokoro(text, voice);
+        return { ...result, format: "mp3", provider: "kokoro" };
+      } catch (err) {
+        logger.warn("Kokoro TTS failed, trying ElevenLabs fallback", {
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
     }
 
-    try {
-      const voice = voiceId || this.getVoiceForGender(gender);
-      const result = await this._synthesizeWithElevenLabs(text, voice);
-      return { ...result, format: "mp3", provider: "elevenlabs" };
-    } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : String(err);
-      logger.error("ElevenLabs TTS synthesis failed", {
-        error: errorMsg,
-      });
-      throw new ServiceUnavailableError("No TTS provider available");
+    // 2. Fallback to ElevenLabs
+    if (this.elevenlabs) {
+      try {
+        const voice = voiceId || this.getVoiceForGender(gender, "elevenlabs");
+        const result = await this._synthesizeWithElevenLabs(text, voice);
+        return { ...result, format: "mp3", provider: "elevenlabs" };
+      } catch (err) {
+        const errorMsg = err instanceof Error ? err.message : String(err);
+        logger.error("ElevenLabs TTS synthesis failed", { error: errorMsg });
+      }
     }
+
+    throw new ServiceUnavailableError("No TTS provider available");
   }
+
+  // ── Kokoro TTS ──────────────────────────────────────────────────────────────
+
+  private async _synthesizeWithKokoro(
+    text: string,
+    voice: string,
+  ): Promise<{ audioBuffer: Buffer; durationMs: number }> {
+    const response = await fetch(`${this.kokoroApiUrl}/v1/audio/speech`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "kokoro",
+        voice,
+        input: text,
+        response_format: "mp3",
+      }),
+    });
+
+    if (!response.ok) {
+      const errBody = await response.text().catch(() => "");
+      throw new Error(`Kokoro TTS HTTP ${response.status}: ${errBody.slice(0, 200)}`);
+    }
+
+    const audioBuffer = Buffer.from(await response.arrayBuffer());
+    if (audioBuffer.length === 0) {
+      throw new Error("Kokoro TTS returned empty audio");
+    }
+
+    const wordCount = text.split(/\s+/).length;
+    const durationMs = Math.round((wordCount / 150) * 60 * 1000);
+
+    logger.info("Kokoro TTS synthesis successful", {
+      voice,
+      textLength: text.length,
+      audioSize: audioBuffer.length,
+    });
+
+    return { audioBuffer, durationMs };
+  }
+
+  // ── ElevenLabs (fallback) ───────────────────────────────────────────────────
 
   private async _synthesizeWithElevenLabs(
     text: string,
@@ -88,9 +162,6 @@ export class TTSService {
   ): Promise<{ audioBuffer: Buffer; durationMs: number }> {
     if (!this.elevenlabs) {
       throw new ServiceUnavailableError("ElevenLabs TTS not configured");
-    }
-    if (!text) {
-      throw new ValidationError("Text is required");
     }
 
     try {
@@ -103,9 +174,7 @@ export class TTSService {
       return { audioBuffer, durationMs };
     } catch (sdkErr) {
       const sdkMsg = sdkErr instanceof Error ? sdkErr.message : String(sdkErr);
-      logger.warn("ElevenLabs SDK failed, trying direct REST API", {
-        error: sdkMsg,
-      });
+      logger.warn("ElevenLabs SDK failed, trying direct REST API", { error: sdkMsg });
 
       try {
         return await this._synthesizeWithElevenLabsREST(text, voice);
@@ -165,13 +234,6 @@ export class TTSService {
     const wordCount = text.split(/\s+/).length;
     const durationMs = Math.round((wordCount / 150) * 60 * 1000);
 
-    logger.info("ElevenLabs SDK v2 synthesis successful", {
-      voiceId: voice,
-      modelId,
-      textLength: text.length,
-      audioSize: audioBuffer.length,
-    });
-
     return { audioBuffer, durationMs };
   }
 
@@ -182,7 +244,6 @@ export class TTSService {
     const apiKey = process.env.ELEVENLABS_API_KEY || "";
     const modelId = process.env.ELEVENLABS_MODEL_ID || "eleven_turbo_v2_5";
 
-    // Try different auth header formats
     const authConfigs = [
       { name: "xi-api-key", headers: { "xi-api-key": apiKey } },
       { name: "Bearer", headers: { "Authorization": `Bearer ${apiKey}` } },
@@ -234,6 +295,8 @@ export class TTSService {
     throw new Error(`ElevenLabs REST failed after all auth attempts for voice ${voice}`);
   }
 
+  // ── Streaming ───────────────────────────────────────────────────────────────
+
   async synthesizeAndStream(
     jamRoomId: string,
     text: string,
@@ -275,8 +338,9 @@ export class TTSService {
     };
   }
 
-  async healthCheck(): Promise<{ elevenlabs: boolean }> {
+  async healthCheck(): Promise<{ kokoro: boolean; elevenlabs: boolean }> {
     return {
+      kokoro: !!this.kokoroApiUrl,
       elevenlabs: this.elevenlabs !== null,
     };
   }

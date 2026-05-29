@@ -74,12 +74,18 @@ export function validateTTSConfig(): void {
     return;
   }
 
-  if (TTS_CONFIG.apiKey) {
-    logger.info("ElevenLabs TTS configured", {
-      defaultVoiceId: TTS_CONFIG.defaultVoiceId,
+  if (process.env.KOKORO_API_URL) {
+    logger.info("Kokoro TTS configured (primary)", {
+      apiUrl: process.env.KOKORO_API_URL,
     });
   } else {
-    logger.warn("No TTS API keys configured (set ELEVENLABS_API_KEY)");
+    logger.warn("Kokoro TTS not configured (set KOKORO_API_URL)");
+  }
+
+  if (TTS_CONFIG.apiKey) {
+    logger.info("ElevenLabs TTS configured (fallback)", {
+      defaultVoiceId: TTS_CONFIG.defaultVoiceId,
+    });
   }
 }
 
@@ -89,7 +95,7 @@ export function validateTTSConfig(): void {
  */
 export function getMediaServicesStatus(): {
   jam: { enabled: boolean; configured: boolean };
-  tts: { enabled: boolean; configured: boolean; elevenlabs: boolean };
+  tts: { enabled: boolean; configured: boolean; kokoro: boolean; elevenlabs: boolean };
 } {
   return {
     jam: {
@@ -98,7 +104,8 @@ export function getMediaServicesStatus(): {
     },
     tts: {
       enabled: process.env.ENABLE_TTS !== "false",
-      configured: !!process.env.ELEVENLABS_API_KEY,
+      configured: !!(process.env.KOKORO_API_URL || process.env.ELEVENLABS_API_KEY),
+      kokoro: !!process.env.KOKORO_API_URL,
       elevenlabs: !!process.env.ELEVENLABS_API_KEY,
     },
   };

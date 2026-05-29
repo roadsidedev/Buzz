@@ -19,7 +19,7 @@ import { logger } from "../../utils/logger.js";
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 // All tuning constants are encoded here — not in environment variables.
-const SCORING_TIMEOUT_MS = 10_000;   // 10 seconds per LLM call
+const SCORING_TIMEOUT_MS = parseInt(process.env.SCORING_TIMEOUT_MS || "30000");   // 30 seconds per LLM call
 const SCORING_RETRY_ATTEMPTS = 3;
 const SCORING_RETRY_DELAY_MS = 1_000;
 const FALLBACK_SCORE = 50;
