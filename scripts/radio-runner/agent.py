@@ -138,7 +138,10 @@ class RadioAgent:
             system=system_instruction,
             messages=messages,
         )
-        text = resp.content[0].text.strip()
+        raw_text = resp.content[0].text if resp.content and resp.content[0] else None
+        if not raw_text or not raw_text.strip():
+            raise ValueError(f"LLM returned empty content for {self.name}")
+        text = raw_text.strip()
         # Agent remembers its own thought/action
         self.perceive_dialogue(self.name, text)
         return text

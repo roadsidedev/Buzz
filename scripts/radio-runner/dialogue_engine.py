@@ -130,20 +130,28 @@ def _build_openai_compat_provider(provider_name: str, api_key: str, base_url: st
 
         def messages_create(self, model: str, max_tokens: int, system: str, messages: list):
             logger.debug(f"[{self.name}] chat/completions call — model={model}")
-            resp = self._post_with_retry({
-                "model": model,
-                "messages": [{"role": "system", "content": system}] + messages,
-                "max_tokens": max_tokens,
-                "temperature": 0.7,
-            })
-            try:
-                data = resp.json()
-            except Exception:
-                import json as _json
-                data = _json.loads(resp.content.decode("utf-8"))
-            TextObj = namedtuple("TextObj", ["text"])
-            ContentObj = namedtuple("ContentObj", ["content"])
-            return ContentObj(content=[TextObj(text=data["choices"][0]["message"]["content"])])
+            max_content_retries = 3
+            for content_attempt in range(max_content_retries):
+                resp = self._post_with_retry({
+                    "model": model,
+                    "messages": [{"role": "system", "content": system}] + messages,
+                    "max_tokens": max_tokens,
+                    "temperature": 0.7,
+                })
+                try:
+                    data = resp.json()
+                except Exception:
+                    import json as _json
+                    data = _json.loads(resp.content.decode("utf-8"))
+                content = data.get("choices", [{}])[0].get("message", {}).get("content")
+                if content and content.strip():
+                    TextObj = namedtuple("TextObj", ["text"])
+                    ContentObj = namedtuple("ContentObj", ["content"])
+                    return ContentObj(content=[TextObj(text=content)])
+                logger.warning(f"[{self.name}] LLM returned null/empty content (attempt {content_attempt + 1}/{max_content_retries})")
+                if content_attempt < max_content_retries - 1:
+                    time.sleep(1.0)
+            raise ValueError(f"LLM returned empty content after {max_content_retries} retries for {self.name}")
 
     return OpenAICompatProvider(provider_name, api_key, base_url)
 

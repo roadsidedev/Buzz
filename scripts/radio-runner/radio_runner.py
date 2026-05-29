@@ -127,6 +127,11 @@ class RadioRunner:
         self._LLM_CIRCUIT_THRESHOLD: int = 5  # failures before opening
         self._LLM_CIRCUIT_COOLDOWN: float = 60.0  # seconds to wait before retry
 
+        # ── LLM outage tracking for seamless recovery ───────────────────────
+        self._llm_outage: bool = False
+        self._segment_changed_during_outage: bool = False
+        self._outage_segment: Optional[SegmentID] = None
+
         # ── Initialize modules ───────────────────────────────────────────────
         self._poller = NewsPoller()
         self._engine = DialogueEngine()
@@ -323,22 +328,31 @@ class RadioRunner:
 
                 # Check if segment changed
                 if seg_id != self._current_segment:
-                    self._state_manager.transition_to(BroadcastState.TRANSITION)
-                    prev_seg = self._current_segment
-                    self._current_segment = seg_id
-                    self._current_turn_idx = 0
-                    self._segment_turns = get_segment_turns(seg_id, block)
+                    if self._llm_outage:
+                        # During LLM outage: track segment change but skip transition
+                        self._segment_changed_during_outage = True
+                        self._outage_segment = seg_id
+                        self._current_segment = seg_id
+                        self._current_turn_idx = 0
+                        self._segment_turns = get_segment_turns(seg_id, block)
+                        logger.info("Segment changed during LLM outage — deferring transition to %s", seg_id.value)
+                    else:
+                        self._state_manager.transition_to(BroadcastState.TRANSITION)
+                        prev_seg = self._current_segment
+                        self._current_segment = seg_id
+                        self._current_turn_idx = 0
+                        self._segment_turns = get_segment_turns(seg_id, block)
 
-                    # Check energy reset requirement
-                    if require_energy_reset(prev_seg, seg_id):
-                        self._run_micro_banter()
+                        # Check energy reset requirement
+                        if require_energy_reset(prev_seg, seg_id):
+                            self._run_micro_banter()
 
-                    # Transition pattern
-                    transition = get_transition_pattern(prev_seg, seg_id)
-                    self._run_transition(prev_seg, seg_id, transition)
+                        # Transition pattern
+                        transition = get_transition_pattern(prev_seg, seg_id)
+                        self._run_transition(prev_seg, seg_id, transition)
 
-                    self._state_manager.transition_to(BroadcastState.LIVE)
-                    logger.info("Segment: %s → %s (%s)", prev_seg.value, seg_id.value, block.value)
+                        self._state_manager.transition_to(BroadcastState.LIVE)
+                        logger.info("Segment: %s → %s (%s)", prev_seg.value, seg_id.value, block.value)
 
                 # ── Process Turn ───────────────────────────────────────────
                 if self._current_turn_idx >= len(self._segment_turns):
@@ -361,6 +375,7 @@ class RadioRunner:
                 # Generate dialogue — with circuit breaker fallback
                 if self._check_circuit_breaker():
                     logger.warning("LLM circuit open — entering music break mode")
+                    self._llm_outage = True
                     self._run_llm_outage_music_break()
                     continue
                 else:
@@ -380,6 +395,7 @@ class RadioRunner:
                     except Exception as llm_exc:
                         self._record_llm_failure()
                         logger.warning("LLM failed (%s) — entering music break mode", llm_exc)
+                        self._llm_outage = True
                         self._run_llm_outage_music_break()
                         continue
 
@@ -504,11 +520,15 @@ class RadioRunner:
                 logger.info("LLM recovered after music break — resuming normal programming")
                 self._llm_consecutive_failures = 0
                 self._llm_circuit_open = False
+                self._llm_outage = False
+                # Play welcome-back and introduce current segment
+                self._play_welcome_back()
                 return
 
             logger.warning("LLM still down after track %d — playing next track", track_num + 1)
 
         logger.warning("Max music tracks reached — attempting recovery dialogue")
+        self._llm_outage = False
         turn = self._get_fallback_dialogue(SegmentID.BANTER, "host")
         try:
             self._bridge.submit_and_process(
@@ -539,6 +559,65 @@ class RadioRunner:
             return bool(turn.host_text and len(turn.host_text) > 10)
         except Exception:
             return False
+
+    def _play_welcome_back(self) -> None:
+        """Generate and play a welcome-back message after LLM recovery."""
+        try:
+            seg_id = self._current_segment
+            block = get_current_block()
+
+            # Build a welcome-back intent
+            if self._segment_changed_during_outage and self._outage_segment:
+                intent = (
+                    f"We just came back from a music break. The show has moved to a new segment: "
+                    f"{self._outage_segment.value}. Welcome listeners back warmly, acknowledge the break, "
+                    f"then introduce what's coming up next in this segment. Keep it natural and energetic."
+                )
+            else:
+                intent = (
+                    f"We just came back from a music break. Welcome listeners back warmly, "
+                    f"acknowledge you were away for a moment, then smoothly continue with the "
+                    f"current segment: {seg_id.value}. Keep it natural and energetic."
+                )
+
+            physics_context = (
+                f"\n\n=== RADIO PHYSICS ===\n"
+                f"Time block: {getattr(block, 'value', 'midday')}\n"
+                f"Segment: {seg_id.value}\n"
+                f"This is a welcome-back message — be warm, brief, and transition smoothly."
+            )
+
+            self._engine.alex.load_skill("skill_news_banter.md")
+            self._engine.mira.load_skill("skill_news_banter.md")
+
+            alex_text = self._engine.alex.think_and_act(intent + physics_context)
+            alex_text = enforce_turn_anatomy(alex_text)
+            self._engine.mira.perceive_dialogue(self._engine.alex.name, alex_text)
+
+            mira_text = self._engine.mira.think_and_act(
+                f"Alex just welcomed listeners back. Respond warmly and help transition into {seg_id.value}."
+            )
+            mira_text = enforce_turn_anatomy(mira_text)
+            self._engine.alex.perceive_dialogue(self._engine.mira.name, mira_text)
+
+            self._bridge.submit_and_process(
+                room_id=self._room_id,
+                host_agent_id=self._host.id,
+                host_text=alex_text,
+                cohost_agent_id=self._cohost.id,
+                cohost_text=mira_text,
+                host_api_key=self._host.api_key,
+            )
+
+            self._segment_changed_during_outage = False
+            self._outage_segment = None
+
+            logger.info("Welcome-back dialogue played for segment %s", seg_id.value)
+
+        except Exception as exc:
+            logger.error("Welcome-back dialogue failed: %s", exc)
+            self._segment_changed_during_outage = False
+            self._outage_segment = None
 
     # ── Audio Playback Helpers ──────────────────────────────────────────────
 
@@ -684,6 +763,7 @@ class RadioRunner:
         """Record an LLM success — reset failure counter."""
         self._llm_consecutive_failures = 0
         self._llm_circuit_open = False
+        self._llm_outage = False
 
     def _get_fallback_dialogue(self, seg_id, agent_key: str) -> DialogueTurn:
         """Generate pre-written fallback dialogue when LLM is unavailable."""

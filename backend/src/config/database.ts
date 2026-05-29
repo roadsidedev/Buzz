@@ -227,6 +227,21 @@ export async function runStartupMigrations(): Promise<void> {
     await runSafely("room managed_externally",
       `ALTER TABLE room ADD COLUMN IF NOT EXISTS managed_externally BOOLEAN NOT NULL DEFAULT FALSE`);
 
+    // ── room_event table for persistent event storage ────────────────────────
+    await runSafely("room_event table", `
+      CREATE TABLE IF NOT EXISTS room_event (
+        id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        room_id       UUID NOT NULL,
+        type          VARCHAR(100) NOT NULL,
+        payload       JSONB DEFAULT '{}',
+        created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (room_id) REFERENCES room(id) ON DELETE CASCADE
+      )
+    `);
+
+    await runSafely("idx_room_event_room_id",
+      `CREATE INDEX IF NOT EXISTS idx_room_event_room_id ON room_event(room_id, created_at DESC)`);
+
     // ── Notification tables ─────────────────────────────────────────────────
     await runSafely("room_notification table", `
       CREATE TABLE IF NOT EXISTS room_notification (
