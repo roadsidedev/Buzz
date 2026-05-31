@@ -949,6 +949,112 @@ router.post(
       textLength: trimmed.length,
     });
 
+    // Auto-trigger turn processing if enough candidates are queued.
+    // This runs asynchronously — the response is sent immediately so the
+    // caller is not blocked by scoring/TTS latency. External skills can
+    // also call POST /rooms/:id/process-turn as a fallback.
+    const autoTurn = req.query.autoTurn !== "false"; // default: on
+    if (autoTurn) {
+      setImmediate(async () => {
+        try {
+          const { pool: db } = await import("../config/database.js");
+          const candidateCount = (await db.query(
+            `SELECT COUNT(*) as cnt FROM message WHERE room_id = $1 AND status IN ('candidate', 'queued')`,
+            [roomId],
+          )).rows[0]?.cnt ?? 0;
+
+          if (candidateCount >= 2) {
+            logger.info("Auto-triggering turn processing", { roomId, candidateCount });
+            const { ScoringEngine } = await import("../services/scoring/scoring-engine.js");
+            const engine = new ScoringEngine();
+            const candidates = (await db.query(
+              `SELECT id, room_id, agent_id, text FROM message WHERE room_id = $1 AND status IN ('candidate', 'queued') ORDER BY created_at ASC LIMIT 5`,
+              [roomId],
+            )).rows;
+
+            if (candidates.length < 2) return;
+
+            const scoringCtx = {
+              roomId,
+              roomType: room.type || "debate",
+              objective: room.objective || "",
+              transcript: [],
+              weights: undefined,
+            };
+            const scoringMsgs = candidates.map((m: any) => ({
+              id: m.id,
+              roomId: m.room_id,
+              agentId: m.agent_id,
+              text: m.text,
+            }));
+            const results = await engine.scoreBatch(scoringMsgs, scoringCtx);
+            let bestIdx = 0;
+            let bestScore = -1;
+            for (let i = 0; i < results.length; i++) {
+              const s = results[i].overallScore ?? 50;
+              if (s > bestScore) { bestScore = s; bestIdx = i; }
+            }
+            const winner = candidates[bestIdx];
+            await db.query(
+              `UPDATE message SET status = 'selected', score = $1, selected_at = NOW() WHERE id = $2`,
+              [bestScore, winner.id],
+            );
+            for (let i = 0; i < candidates.length; i++) {
+              if (i !== bestIdx) {
+                await db.query(
+                  `UPDATE message SET status = 'played' WHERE id = $1 AND status IN ('candidate', 'queued')`,
+                  [candidates[i].id],
+                );
+              }
+            }
+
+            // Synthesize audio for the winning message
+            try {
+              const { getTTSService } = await import("../services/tts-service.js");
+              const tts = getTTSService();
+              const audioResult = await tts.synthesize(winner.text, {
+                agentId: winner.agent_id,
+              });
+              if (audioResult.audioBuffer) {
+                const { getAudioStorageService } = await import("../services/audio-storage-service.js");
+                const audioUrl = await getAudioStorageService().upload(audioResult.audioBuffer, winner.id);
+                const { getIO } = await import("../server.js");
+                const io = getIO();
+                io.to(`room:${roomId}`).emit("tts:audio", {
+                  roomId,
+                  messageId: winner.id,
+                  agentId: winner.agent_id,
+                  text: winner.text,
+                  audioUrl,
+                  audioBase64: audioResult.audioBuffer.toString("base64"),
+                  durationMs: audioResult.durationMs,
+                  provider: audioResult.provider,
+                  timestamp: new Date().toISOString(),
+                });
+                logger.info("Auto-turn: audio synthesized and emitted", {
+                  roomId,
+                  messageId: winner.id,
+                  score: bestScore,
+                  durationMs: audioResult.durationMs,
+                });
+              }
+            } catch (ttsErr) {
+              logger.warn("Auto-turn: TTS synthesis failed (message still selected)", {
+                roomId,
+                messageId: winner.id,
+                error: ttsErr instanceof Error ? ttsErr.message : String(ttsErr),
+              });
+            }
+          }
+        } catch (autoErr) {
+          logger.warn("Auto-turn processing failed (non-fatal)", {
+            roomId,
+            error: autoErr instanceof Error ? autoErr.message : String(autoErr),
+          });
+        }
+      });
+    }
+
     res.status(201).json({
       success: true,
       data: {

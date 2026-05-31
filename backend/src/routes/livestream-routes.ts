@@ -614,4 +614,597 @@ router.post(
   }),
 );
 
+// ═══════════════════════════════════════════════════════════════════════════
+// VIDEO LIVESTREAM CONTROL ENDPOINTS
+// Event-forwarding endpoints for external skills (buzz-tv, etc.)
+// Events are persisted to stream_event table and emitted via WebSocket.
+// ═══════════════════════════════════════════════════════════════════════════
+
+const STREAM_EVENT_TYPES = new Set([
+  "scene_change",
+  "camera_change",
+  "overlay_update",
+  "overlay_remove",
+  "ticker_update",
+  "ticker_remove",
+  "breaking_news",
+  "weather_update",
+  "sports_score",
+  "crypto_update",
+  "audience_interaction",
+]);
+
+/**
+ * POST /api/v1/livestreams/:id/events
+ * Generic event endpoint — stores and forwards any stream event.
+ */
+router.post(
+  "/:id/events",
+  requireApiKey,
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const { id } = req.params;
+    const { type, payload } = req.body;
+
+    if (!type || typeof type !== "string") {
+      res.status(400).json({
+        success: false,
+        error: { code: "VALIDATION_ERROR", message: "type is required", statusCode: 400 },
+      });
+      return;
+    }
+
+    // Verify ownership
+    const streamResult = await pool.query(
+      "SELECT id, host_agent_id FROM livestream WHERE id = $1",
+      [id],
+    );
+    if (streamResult.rows.length === 0) {
+      res.status(404).json({
+        success: false,
+        error: { code: "NOT_FOUND", message: "Livestream not found", statusCode: 404 },
+      });
+      return;
+    }
+    if (streamResult.rows[0].host_agent_id !== req.agent!.id) {
+      res.status(403).json({
+        success: false,
+        error: { code: "UNAUTHORIZED", message: "Only the stream host can emit events", statusCode: 403 },
+      });
+      return;
+    }
+
+    const eventId = crypto.randomUUID();
+    await pool.query(
+      `INSERT INTO stream_event (id, livestream_id, type, payload, created_at)
+       VALUES ($1, $2, $3, $4, NOW())`,
+      [eventId, id, type, JSON.stringify(payload || {})],
+    );
+
+    // Emit via WebSocket to frontend clients
+    try {
+      const { getIO } = await import("../server.js");
+      const io = getIO();
+      io.to(`livestream:${id}`).emit(`stream:${type}`, {
+        eventId,
+        livestreamId: id,
+        type,
+        payload: payload || {},
+        timestamp: new Date().toISOString(),
+      });
+    } catch (wsErr) {
+      logger.warn("Failed to emit stream event via WebSocket", {
+        streamId: id,
+        type,
+        error: wsErr instanceof Error ? wsErr.message : String(wsErr),
+      });
+    }
+
+    logger.info("Stream event emitted", { streamId: id, type, eventId });
+
+    res.status(201).json({
+      success: true,
+      data: { eventId, type, livestreamId: id },
+    });
+  }),
+);
+
+/**
+ * POST /api/v1/livestreams/:id/scene
+ * Scene transition — tells the frontend which scene to render.
+ * Body: { scene: "news_desk" | "market_board" | "interview" | "breaking" | ...,
+ *          transition: "cut" | "fade" | "wipe", duration?: number }
+ */
+router.post(
+  "/:id/scene",
+  requireApiKey,
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const { id } = req.params;
+    const { scene, transition = "cut", duration } = req.body;
+
+    if (!scene) {
+      res.status(400).json({
+        success: false,
+        error: { code: "VALIDATION_ERROR", message: "scene is required", statusCode: 400 },
+      });
+      return;
+    }
+
+    // Verify ownership
+    const streamResult = await pool.query(
+      "SELECT id, host_agent_id FROM livestream WHERE id = $1",
+      [id],
+    );
+    if (streamResult.rows.length === 0 || streamResult.rows[0].host_agent_id !== req.agent!.id) {
+      res.status(streamResult.rows.length === 0 ? 404 : 403).json({
+        success: false,
+        error: {
+          code: streamResult.rows.length === 0 ? "NOT_FOUND" : "UNAUTHORIZED",
+          message: streamResult.rows.length === 0 ? "Livestream not found" : "Only the stream host can change scenes",
+          statusCode: streamResult.rows.length === 0 ? 404 : 403,
+        },
+      });
+      return;
+    }
+
+    const payload = { scene, transition, duration: duration || null };
+    const eventId = crypto.randomUUID();
+    await pool.query(
+      `INSERT INTO stream_event (id, livestream_id, type, payload, created_at)
+       VALUES ($1, $2, 'scene_change', $3, NOW())`,
+      [eventId, id, JSON.stringify(payload)],
+    );
+
+    try {
+      const { getIO } = await import("../server.js");
+      const io = getIO();
+      io.to(`livestream:${id}`).emit("stream:scene_change", {
+        eventId,
+        livestreamId: id,
+        ...payload,
+        timestamp: new Date().toISOString(),
+      });
+    } catch {}
+
+    logger.info("Scene transition", { streamId: id, scene, transition });
+
+    res.json({ success: true, data: { eventId, scene, transition } });
+  }),
+);
+
+/**
+ * POST /api/v1/livestreams/:id/camera
+ * Camera/framing call — tells the frontend how to frame the current shot.
+ * Body: { shot: "wide" | "medium" | "close_up" | "two_shot" | "over_shoulder",
+ *          subject: "anchor_a" | "anchor_b" | "both", duration?: number }
+ */
+router.post(
+  "/:id/camera",
+  requireApiKey,
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const { id } = req.params;
+    const { shot, subject, duration } = req.body;
+
+    if (!shot) {
+      res.status(400).json({
+        success: false,
+        error: { code: "VALIDATION_ERROR", message: "shot is required", statusCode: 400 },
+      });
+      return;
+    }
+
+    const streamResult = await pool.query(
+      "SELECT id, host_agent_id FROM livestream WHERE id = $1",
+      [id],
+    );
+    if (streamResult.rows.length === 0 || streamResult.rows[0].host_agent_id !== req.agent!.id) {
+      res.status(streamResult.rows.length === 0 ? 404 : 403).json({
+        success: false,
+        error: {
+          code: streamResult.rows.length === 0 ? "NOT_FOUND" : "UNAUTHORIZED",
+          message: streamResult.rows.length === 0 ? "Livestream not found" : "Only the host can change camera",
+          statusCode: streamResult.rows.length === 0 ? 404 : 403,
+        },
+      });
+      return;
+    }
+
+    const payload = { shot, subject: subject || "both", duration: duration || null };
+    const eventId = crypto.randomUUID();
+    await pool.query(
+      `INSERT INTO stream_event (id, livestream_id, type, payload, created_at)
+       VALUES ($1, $2, 'camera_change', $3, NOW())`,
+      [eventId, id, JSON.stringify(payload)],
+    );
+
+    try {
+      const { getIO } = await import("../server.js");
+      const io = getIO();
+      io.to(`livestream:${id}`).emit("stream:camera_change", {
+        eventId,
+        livestreamId: id,
+        ...payload,
+        timestamp: new Date().toISOString(),
+      });
+    } catch {}
+
+    logger.info("Camera change", { streamId: id, shot, subject });
+
+    res.json({ success: true, data: { eventId, shot, subject } });
+  }),
+);
+
+/**
+ * POST /api/v1/livestreams/:id/overlay
+ * Deploy a graphic overlay (lower-third, banner, bug, etc.)
+ * Body: { overlayType: "lower_third" | "banner" | "bug" | "full_screen",
+ *          content: { title?, subtitle?, image?, color? },
+ *          position?: "top" | "bottom" | "center",
+ *          durationMs?: number, overlayId?: string }
+ */
+router.post(
+  "/:id/overlay",
+  requireApiKey,
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const { id } = req.params;
+    const { overlayType, content, position, durationMs, overlayId } = req.body;
+
+    if (!overlayType || !content) {
+      res.status(400).json({
+        success: false,
+        error: { code: "VALIDATION_ERROR", message: "overlayType and content are required", statusCode: 400 },
+      });
+      return;
+    }
+
+    const streamResult = await pool.query(
+      "SELECT id, host_agent_id FROM livestream WHERE id = $1",
+      [id],
+    );
+    if (streamResult.rows.length === 0 || streamResult.rows[0].host_agent_id !== req.agent!.id) {
+      res.status(streamResult.rows.length === 0 ? 404 : 403).json({
+        success: false,
+        error: {
+          code: streamResult.rows.length === 0 ? "NOT_FOUND" : "UNAUTHORIZED",
+          message: streamResult.rows.length === 0 ? "Livestream not found" : "Only the host can deploy overlays",
+          statusCode: streamResult.rows.length === 0 ? 404 : 403,
+        },
+      });
+      return;
+    }
+
+    const payload = {
+      overlayType,
+      content,
+      position: position || "bottom",
+      durationMs: durationMs || null,
+      overlayId: overlayId || crypto.randomUUID(),
+    };
+    const eventId = crypto.randomUUID();
+    await pool.query(
+      `INSERT INTO stream_event (id, livestream_id, type, payload, created_at)
+       VALUES ($1, $2, 'overlay_update', $3, NOW())`,
+      [eventId, id, JSON.stringify(payload)],
+    );
+
+    try {
+      const { getIO } = await import("../server.js");
+      const io = getIO();
+      io.to(`livestream:${id}`).emit("stream:overlay_update", {
+        eventId,
+        livestreamId: id,
+        ...payload,
+        timestamp: new Date().toISOString(),
+      });
+    } catch {}
+
+    logger.info("Overlay deployed", { streamId: id, overlayType, overlayId: payload.overlayId });
+
+    res.json({ success: true, data: { eventId, overlayId: payload.overlayId } });
+  }),
+);
+
+/**
+ * DELETE /api/v1/livestreams/:id/overlay/:overlayId
+ * Remove a specific overlay by ID.
+ */
+router.delete(
+  "/:id/overlay/:overlayId",
+  requireApiKey,
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const { id, overlayId } = req.params;
+
+    const streamResult = await pool.query(
+      "SELECT id, host_agent_id FROM livestream WHERE id = $1",
+      [id],
+    );
+    if (streamResult.rows.length === 0 || streamResult.rows[0].host_agent_id !== req.agent!.id) {
+      res.status(403).json({
+        success: false,
+        error: { code: "UNAUTHORIZED", message: "Only the host can remove overlays", statusCode: 403 },
+      });
+      return;
+    }
+
+    const payload = { overlayId, removed: true };
+    const eventId = crypto.randomUUID();
+    await pool.query(
+      `INSERT INTO stream_event (id, livestream_id, type, payload, created_at)
+       VALUES ($1, $2, 'overlay_remove', $3, NOW())`,
+      [eventId, id, JSON.stringify(payload)],
+    );
+
+    try {
+      const { getIO } = await import("../server.js");
+      const io = getIO();
+      io.to(`livestream:${id}`).emit("stream:overlay_remove", {
+        eventId,
+        livestreamId: id,
+        overlayId,
+        timestamp: new Date().toISOString(),
+      });
+    } catch {}
+
+    res.json({ success: true, data: { eventId, overlayId, removed: true } });
+  }),
+);
+
+/**
+ * POST /api/v1/livestreams/:id/ticker
+ * Update the news ticker / crawl bar.
+ * Body: { items: [{ text, category?, priority? }], speed?: number }
+ */
+router.post(
+  "/:id/ticker",
+  requireApiKey,
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const { id } = req.params;
+    const { items, speed } = req.body;
+
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      res.status(400).json({
+        success: false,
+        error: { code: "VALIDATION_ERROR", message: "items array is required", statusCode: 400 },
+      });
+      return;
+    }
+
+    const streamResult = await pool.query(
+      "SELECT id, host_agent_id FROM livestream WHERE id = $1",
+      [id],
+    );
+    if (streamResult.rows.length === 0 || streamResult.rows[0].host_agent_id !== req.agent!.id) {
+      res.status(streamResult.rows.length === 0 ? 404 : 403).json({
+        success: false,
+        error: {
+          code: streamResult.rows.length === 0 ? "NOT_FOUND" : "UNAUTHORIZED",
+          message: streamResult.rows.length === 0 ? "Livestream not found" : "Only the host can update ticker",
+          statusCode: streamResult.rows.length === 0 ? 404 : 403,
+        },
+      });
+      return;
+    }
+
+    const payload = { items, speed: speed || 50 };
+    const eventId = crypto.randomUUID();
+    await pool.query(
+      `INSERT INTO stream_event (id, livestream_id, type, payload, created_at)
+       VALUES ($1, $2, 'ticker_update', $3, NOW())`,
+      [eventId, id, JSON.stringify(payload)],
+    );
+
+    try {
+      const { getIO } = await import("../server.js");
+      const io = getIO();
+      io.to(`livestream:${id}`).emit("stream:ticker_update", {
+        eventId,
+        livestreamId: id,
+        ...payload,
+        timestamp: new Date().toISOString(),
+      });
+    } catch {}
+
+    logger.info("Ticker updated", { streamId: id, itemCount: items.length });
+
+    res.json({ success: true, data: { eventId, itemCount: items.length } });
+  }),
+);
+
+/**
+ * POST /api/v1/livestreams/:id/crew
+ * Register a production crew member (non-visible agent).
+ * Body: { agentId, role?: "producer" | "researcher" | "graphics" | "moderator" }
+ */
+router.post(
+  "/:id/crew",
+  requireApiKey,
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const { id } = req.params;
+    const { agentId, role = "producer" } = req.body;
+
+    if (!agentId) {
+      res.status(400).json({
+        success: false,
+        error: { code: "VALIDATION_ERROR", message: "agentId is required", statusCode: 400 },
+      });
+      return;
+    }
+
+    const streamResult = await pool.query(
+      "SELECT id, host_agent_id FROM livestream WHERE id = $1",
+      [id],
+    );
+    if (streamResult.rows.length === 0 || streamResult.rows[0].host_agent_id !== req.agent!.id) {
+      res.status(streamResult.rows.length === 0 ? 404 : 403).json({
+        success: false,
+        error: {
+          code: streamResult.rows.length === 0 ? "NOT_FOUND" : "UNAUTHORIZED",
+          message: streamResult.rows.length === 0 ? "Livestream not found" : "Only the host can add crew",
+          statusCode: streamResult.rows.length === 0 ? 404 : 403,
+        },
+      });
+      return;
+    }
+
+    await pool.query(
+      `INSERT INTO stream_crew (id, livestream_id, agent_id, role, joined_at)
+       VALUES ($1, $2, $3, $4, NOW())
+       ON CONFLICT (livestream_id, agent_id) DO UPDATE SET role = $4`,
+      [crypto.randomUUID(), id, agentId, role],
+    );
+
+    logger.info("Crew member added", { streamId: id, agentId, role });
+
+    res.json({ success: true, data: { agentId, role, livestreamId: id } });
+  }),
+);
+
+/**
+ * GET /api/v1/livestreams/:id/viewers
+ * Get current viewers for a livestream.
+ */
+router.get(
+  "/:id/viewers",
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const { id } = req.params;
+
+    const viewersResult = await pool.query(
+      `SELECT agent_id as "agentId", user_id as "userId", joined_at as "joinedAt"
+       FROM stream_viewer
+       WHERE livestream_id = $1 AND left_at IS NULL
+       ORDER BY joined_at ASC`,
+      [id],
+    );
+
+    const crewResult = await pool.query(
+      `SELECT agent_id as "agentId", role, joined_at as "joinedAt"
+       FROM stream_crew
+       WHERE livestream_id = $1
+       ORDER BY joined_at ASC`,
+      [id],
+    );
+
+    res.json({
+      success: true,
+      data: {
+        viewers: viewersResult.rows,
+        crew: crewResult.rows,
+        totalViewers: viewersResult.rows.length,
+      },
+    });
+  }),
+);
+
+/**
+ * POST /api/v1/livestreams/:id/viewers
+ * Register a viewer joining the stream (persistent tracking).
+ */
+router.post(
+  "/:id/viewers",
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const { id } = req.params;
+    const agentId = req.agent?.id || req.body.agentId || null;
+    const userId = req.body.userId || null;
+
+    if (!agentId && !userId) {
+      res.status(400).json({
+        success: false,
+        error: { code: "VALIDATION_ERROR", message: "agentId or userId is required", statusCode: 400 },
+      });
+      return;
+    }
+
+    // Upsert viewer record
+    await pool.query(
+      `INSERT INTO stream_viewer (id, livestream_id, agent_id, user_id, joined_at)
+       VALUES ($1, $2, $3, $4, NOW())
+       ON CONFLICT (livestream_id, agent_id)
+       DO UPDATE SET left_at = NULL, joined_at = NOW()
+       WHERE stream_viewer.left_at IS NOT NULL`,
+      [crypto.randomUUID(), id, agentId, userId],
+    );
+
+    // Increment viewer count
+    await pool.query(
+      `UPDATE livestream SET viewer_count = viewer_count + 1, updated_at = NOW() WHERE id = $1`,
+      [id],
+    );
+
+    res.json({ success: true, data: { joined: true } });
+  }),
+);
+
+/**
+ * POST /api/v1/livestreams/:id/viewers/leave
+ * Register a viewer leaving the stream.
+ */
+router.post(
+  "/:id/viewers/leave",
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const { id } = req.params;
+    const agentId = req.agent?.id || req.body.agentId || null;
+
+    if (!agentId) {
+      res.status(400).json({
+        success: false,
+        error: { code: "VALIDATION_ERROR", message: "agentId is required", statusCode: 400 },
+      });
+      return;
+    }
+
+    await pool.query(
+      `UPDATE stream_viewer SET left_at = NOW()
+       WHERE livestream_id = $1 AND agent_id = $2 AND left_at IS NULL`,
+      [id, agentId],
+    );
+
+    await pool.query(
+      `UPDATE livestream SET viewer_count = GREATEST(viewer_count - 1, 0), updated_at = NOW() WHERE id = $1`,
+      [id],
+    );
+
+    res.json({ success: true, data: { left: true } });
+  }),
+);
+
+/**
+ * GET /api/v1/livestreams/:id/events
+ * Retrieve recent events for a livestream (paginated, newest first).
+ */
+router.get(
+  "/:id/events",
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const { id } = req.params;
+    const limit = Math.min(parseInt(req.query.limit as string) || 50, 200);
+    const after = req.query.after as string || null;
+
+    try {
+      const query = after
+        ? `SELECT id, type, payload, created_at FROM stream_event
+           WHERE livestream_id = $1 AND created_at > $2
+           ORDER BY created_at DESC LIMIT $3`
+        : `SELECT id, type, payload, created_at FROM stream_event
+           WHERE livestream_id = $1
+           ORDER BY created_at DESC LIMIT $2`;
+
+      const params = after ? [id, after, limit] : [id, limit];
+      const { rows } = await pool.query(query, params);
+
+      res.json({
+        success: true,
+        data: {
+          events: rows.map((e: any) => ({
+            id: e.id,
+            type: e.type,
+            payload: e.payload,
+            createdAt: e.created_at,
+          })),
+          count: rows.length,
+        },
+      });
+    } catch {
+      res.json({ success: true, data: { events: [], count: 0 } });
+    }
+  }),
+);
+
 export default router;
