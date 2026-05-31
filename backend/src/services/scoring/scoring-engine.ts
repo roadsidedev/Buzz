@@ -205,6 +205,10 @@ Respond ONLY with valid JSON.`;
       try {
         const client = getLLMClient();
 
+        if (!SCORING_MODEL) {
+          throw new Error("SCORING_MODEL env var is not set — cannot score");
+        }
+
         const responseText = await Promise.race([
           client
             .messagesCreate({
@@ -222,7 +226,38 @@ Respond ONLY with valid JSON.`;
           ),
         ]);
 
-        return this._parseScoringResponse(responseText, messageId, weights);
+        // Guard against empty/truncated LLM responses before parsing
+        if (!responseText || responseText.trim().length === 0) {
+          const emptyErr = new Error("LLM returned empty response");
+          logger.warn("Scoring: LLM returned empty content", {
+            messageId,
+            roomId,
+            attempt: attempt + 1,
+            responsePreview: "(empty)",
+          });
+          throw emptyErr;
+        }
+
+        try {
+          return this._parseScoringResponse(responseText, messageId, weights);
+        } catch (parseErr) {
+          // Log the raw response so we can see what the LLM actually returned
+          const preview = responseText.length > 300
+            ? responseText.slice(0, 300) + "…"
+            : responseText;
+          logger.warn("Scoring: failed to parse LLM response as JSON", {
+            messageId,
+            roomId,
+            attempt: attempt + 1,
+            responsePreview: preview,
+            parseError: parseErr instanceof Error ? parseErr.message : String(parseErr),
+          });
+          logger.debug("Scoring: full raw LLM response", {
+            messageId,
+            responseText,
+          });
+          throw parseErr;
+        }
       } catch (err) {
         const errMsg = err instanceof Error ? err.message : String(err);
         lastError = errMsg;

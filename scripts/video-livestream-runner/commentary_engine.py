@@ -87,7 +87,11 @@ def _build_openai_compat_provider(provider_name: str, api_key: str, base_url: st
                 try:
                     resp = self.client.post(
                         self.url,
-                        headers={"Authorization": f"Bearer {self.key}", "Content-Type": "application/json"},
+                        headers={
+                            "Authorization": f"Bearer {self.key}",
+                            "Content-Type": "application/json",
+                            "Accept-Encoding": "identity",
+                        },
                         json={
                             "model": model,
                             "messages": [{"role": "system", "content": system}] + messages,
@@ -142,6 +146,7 @@ def _build_anthropic_provider(api_key: str) -> Any:
                     "x-api-key": self.key,
                     "anthropic-version": "2023-06-01",
                     "content-type": "application/json",
+                    "Accept-Encoding": "identity",
                 },
                 json={
                     "model": model,

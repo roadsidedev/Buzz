@@ -2,16 +2,13 @@
  * LLM Provider
  *
  * Provider-agnostic LLM client for message scoring and moderation.
- * Supports Anthropic (primary), OpenAI-compatible providers (OpenAI, NVIDIA NIM,
- * Kimi, OpenRouter), and Bankr gateway fallback.
+ * Supports Anthropic and OpenAI-compatible providers (OpenAI, NVIDIA NIM,
+ * Kimi, OpenRouter, OpenGateway, etc.).
  *
  * Configuration (3 env vars, all you need):
- *   LLM_PROVIDER=anthropic|openai|nvidia|kimi|openrouter|none  (default: anthropic)
+ *   LLM_PROVIDER=anthropic|openai|nvidia|kimi|openrouter|opengateway|none  (default: anthropic)
  *   LLM_API_KEY=<your provider key>
  *   LLM_BASE_URL=<base URL for OpenAI-compat providers, optional>
- *
- * Optional Bankr fallback:
- *   BANKR_API_KEY=<bankr key>
  *
  * Usage:
  *   const client = getLLMClient();
@@ -57,10 +54,17 @@ class AnthropicClient implements LLMClient {
       messages: params.messages,
     });
 
+    const texts = response.content
+      .filter((block) => block.type === "text")
+      .map((block) => (block.type === "text" ? block.text : ""));
+
+    const combined = texts.join("").trim();
+    if (combined.length === 0) {
+      throw new Error("Anthropic returned empty content");
+    }
+
     return {
-      content: response.content.map((block) => ({
-        text: block.type === "text" ? block.text : "",
-      })),
+      content: texts.map((text) => ({ text })),
     };
   }
 }
@@ -104,37 +108,16 @@ class OpenAICompatClient implements LLMClient {
       choices: Array<{ message: { content: string } }>;
     };
 
-    return {
-      content: [{ text: data.choices[0]?.message?.content ?? "" }],
-    };
-  }
-}
-
-// ─── Bankr gateway wrapper ────────────────────────────────────────────────────
-
-const BANKR_DEFAULT_URL = "https://llm.bankr.bot";
-
-class BankrClient implements LLMClient {
-  private inner: LLMClient;
-  private bankrKey: string;
-  private bankrUrl: string;
-
-  constructor(inner: LLMClient, bankrKey: string, bankrUrl: string = BANKR_DEFAULT_URL) {
-    this.inner = inner;
-    this.bankrKey = bankrKey;
-    this.bankrUrl = bankrUrl;
-  }
-
-  async messagesCreate(params: LLMCreateParams): Promise<LLMMessage> {
-    try {
-      return await this.inner.messagesCreate(params);
-    } catch (primaryErr) {
-      logger.warn("Primary LLM failed, falling back to Bankr gateway", {
-        error: primaryErr instanceof Error ? primaryErr.message : String(primaryErr),
-      });
-      const bankr = new OpenAICompatClient(this.bankrUrl, this.bankrKey);
-      return bankr.messagesCreate(params);
+    const content = data.choices[0]?.message?.content;
+    if (!content || content.trim().length === 0) {
+      throw new Error(
+        `OpenAI-compat returned empty content from ${this.baseUrl} (status ${response.status})`,
+      );
     }
+
+    return {
+      content: [{ text: content }],
+    };
   }
 }
 
@@ -146,10 +129,6 @@ function _buildClient(): LLMClient {
   const provider = (process.env.LLM_PROVIDER ?? "anthropic").toLowerCase();
   const apiKey   = process.env.LLM_API_KEY ?? "";
   const baseUrl  = process.env.LLM_BASE_URL ?? "";
-  const bankrKey = process.env.BANKR_API_KEY ?? "";
-  const bankrUrl = process.env.BANKR_BASE_URL ?? BANKR_DEFAULT_URL;
-
-  let primary: LLMClient;
 
   if (provider === "anthropic") {
     // Fall back to common Anthropic key names if LLM_API_KEY is not set
@@ -157,46 +136,41 @@ function _buildClient(): LLMClient {
     if (!key) {
       logger.warn("No API key found for Anthropic provider. Set LLM_API_KEY. Scoring will use fallback scores.");
     }
-    primary = new AnthropicClient(key);
-  } else if (provider === "none") {
+    return new AnthropicClient(key);
+  }
+
+  if (provider === "none") {
     logger.warn("LLM_PROVIDER=none — all scoring calls will use fallback scores.");
-    primary = {
+    return {
       async messagesCreate(): Promise<LLMMessage> {
         throw new Error("LLM provider disabled (LLM_PROVIDER=none)");
       },
     };
-  } else {
-    // OpenAI-compat: openai, nvidia, kimi, openrouter, or any custom provider
-    const effectiveKey = apiKey ||
-      (provider === "opengateway" ? process.env.OPENGATEWAY_API_KEY ?? "" : "") ||
-      (provider === "mimo"        ? process.env.MIMO_API_KEY ?? "" : "") ||
-      (provider === "nvidia"      ? process.env.NVIDIA_API_KEY  ?? "" : "") ||
-      (provider === "openai"      ? process.env.OPENAI_API_KEY  ?? "" : "");
-
-    // Default base URLs for known providers; override with LLM_BASE_URL
-    const defaultUrls: Record<string, string> = {
-      openai:      "https://api.openai.com/v1",
-      openaicompat:"https://api.openai.com/v1",
-      nvidia:      "https://integrate.api.nvidia.com/v1",
-      kimi:        "https://api.moonshot.cn/v1",
-      openrouter:  "https://openrouter.ai/api/v1",
-      opengateway: "https://opengateway.gitlawb.com/v1",
-      mimo:        "https://token-plan-sgp.xiaomimimo.com/v1",
-      groq:        "https://api.groq.com/openai/v1",
-      together:    "https://api.together.xyz/v1",
-      deepseek:    "https://api.deepseek.com/v1",
-    };
-    const effectiveUrl = baseUrl || defaultUrls[provider] || "https://api.openai.com/v1";
-
-    primary = new OpenAICompatClient(effectiveUrl, effectiveKey);
   }
 
-  // Wrap with Bankr fallback if a Bankr key is configured
-  if (bankrKey) {
-    return new BankrClient(primary, bankrKey, bankrUrl);
-  }
+  // OpenAI-compat: openai, nvidia, kimi, openrouter, opengateway, or any custom provider
+  const effectiveKey = apiKey ||
+    (provider === "opengateway" ? process.env.OPENGATEWAY_API_KEY ?? "" : "") ||
+    (provider === "mimo"        ? process.env.MIMO_API_KEY ?? "" : "") ||
+    (provider === "nvidia"      ? process.env.NVIDIA_API_KEY  ?? "" : "") ||
+    (provider === "openai"      ? process.env.OPENAI_API_KEY  ?? "" : "");
 
-  return primary;
+  // Default base URLs for known providers; override with LLM_BASE_URL
+  const defaultUrls: Record<string, string> = {
+    openai:      "https://api.openai.com/v1",
+    openaicompat:"https://api.openai.com/v1",
+    nvidia:      "https://integrate.api.nvidia.com/v1",
+    kimi:        "https://api.moonshot.cn/v1",
+    openrouter:  "https://openrouter.ai/api/v1",
+    opengateway: "https://opengateway.gitlawb.com/v1",
+    mimo:        "https://token-plan-sgp.xiaomimimo.com/v1",
+    groq:        "https://api.groq.com/openai/v1",
+    together:    "https://api.together.xyz/v1",
+    deepseek:    "https://api.deepseek.com/v1",
+  };
+  const effectiveUrl = baseUrl || defaultUrls[provider] || "https://api.openai.com/v1";
+
+  return new OpenAICompatClient(effectiveUrl, effectiveKey);
 }
 
 export function getLLMClient(): LLMClient {
@@ -213,7 +187,14 @@ export function resetLLMClient(): void {
 
 // ─── Shared scoring config ────────────────────────────────────────────────────
 
-export const SCORING_MODEL = process.env.SCORING_MODEL ?? "claude-3-5-sonnet-20241022";
+if (!process.env.SCORING_MODEL) {
+  logger.warn(
+    "SCORING_MODEL env var is not set — scoring calls will fail. " +
+    "Set SCORING_MODEL to a model your LLM provider supports.",
+  );
+}
+
+export const SCORING_MODEL = process.env.SCORING_MODEL ?? "";
 
 /**
  * Strip markdown code fences from LLM responses before JSON.parse.

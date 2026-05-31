@@ -1023,7 +1023,7 @@ router.post(
 
     // Store the event
     const { pool } = await import("../config/database.js");
-    const eventId = require("crypto").randomUUID();
+    const eventId = crypto.randomUUID();
     await pool.query(
       `INSERT INTO room_event (id, room_id, type, payload, created_at)
        VALUES ($1, $2, $3, $4, NOW())

@@ -8,6 +8,7 @@
  * Phase 2 (Day 8): Complete x402 integration with database persistence
  */
 
+import crypto from "crypto";
 import { v4 as uuidv4 } from "uuid";
 import {
   X402_CONFIG,
@@ -545,8 +546,6 @@ export class X402PaymentService {
    */
   verifyWebhookSignature(body: string, signature: string): boolean {
     try {
-      const crypto = require("crypto");
-
       const hash = crypto
         .createHmac("sha256", X402_CONFIG.webhookSecret)
         .update(body)

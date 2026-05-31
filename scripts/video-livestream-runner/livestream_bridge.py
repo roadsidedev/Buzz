@@ -68,6 +68,7 @@ class LivestreamBridge:
         self._client = httpx.Client(
             base_url=self.backend_url,
             timeout=timeout,
+            headers={"Accept-Encoding": "identity"},
         )
 
     def close(self) -> None:

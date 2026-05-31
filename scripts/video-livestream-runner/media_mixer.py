@@ -122,6 +122,25 @@ class MediaMixer:
         self._frame_queue = frame_queue
         self._rtmp_url = rtmp_url.strip()
 
+        await self._preflight_rtmp_test(self._rtmp_url)
+
+        self._create_audio_fifo()
+        self._spawn_ffmpeg(self._rtmp_url)
+
+        self._frame_thread = threading.Thread(
+            target=self._frame_feeder_loop, name="frame-feeder", daemon=True,
+        )
+        self._audio_thread = threading.Thread(
+            target=self._audio_fifo_writer_with_watchdog, name="audio-writer", daemon=True,
+        )
+        self._monitor_thread = threading.Thread(
+            target=self._monitor_loop, name="ffmpeg-monitor", daemon=True,
+        )
+
+        self._frame_thread.start()
+        self._audio_thread.start()
+        self._monitor_thread.start()
+
         logger.info(
             "MediaMixer started — PID: %s | RTMP: %.60s | %dx%d %dfps",
             self._ffmpeg_proc.pid if self._ffmpeg_proc else "N/A",
@@ -175,6 +194,14 @@ class MediaMixer:
 
     async def queue_audio(self, mp3_bytes: bytes) -> None:
         """Queue commentary MP3 bytes for mixing into the stream."""
+        if self._audio_queue.full():
+            # Queue is jammed — drain oldest item to make room.
+            # This prevents permanent lockout when the consumer stalls.
+            try:
+                self._audio_queue.get_nowait()
+                logger.warning("Audio queue full — dropped oldest frame to make room")
+            except queue_mod.Empty:
+                pass
         self._audio_queue.put_nowait(mp3_bytes)
 
     # ── Pre-flight RTMP Smoke Test ──────────────────────────────────────────
@@ -412,6 +439,17 @@ class MediaMixer:
 
     # ── Audio FIFO Writer Thread ────────────────────────────────────────────
 
+    def _audio_fifo_writer_with_watchdog(self) -> None:
+        """Watchdog wrapper: restarts the audio consumer on crash."""
+        while not self._stop_event.is_set():
+            try:
+                logger.info("Audio consumer started")
+                self._audio_fifo_writer()
+            except Exception as exc:
+                logger.error("Audio consumer crashed, restarting in 1s: %s", exc)
+                self._stop_event.wait(1.0)
+        logger.info("Audio consumer watchdog exiting (stop event set)")
+
     def _audio_fifo_writer(self) -> None:
         """
         Writes queued TTS MP3 bytes (or silence filler) to the audio FIFO.
@@ -420,6 +458,17 @@ class MediaMixer:
         When no TTS audio is available in the queue, writes 1s silence MP3
         frames to keep the stream alive and prevent FFmpeg from terminating.
         """
+        # Drain stale audio from previous consumer run
+        drained = 0
+        while not self._audio_queue.empty():
+            try:
+                self._audio_queue.get_nowait()
+                drained += 1
+            except queue_mod.Empty:
+                break
+        if drained > 0:
+            logger.info("Audio consumer: drained %d stale frames on startup", drained)
+
         silence_bytes: Optional[bytes] = None
         if self._silence_mp3_path and self._silence_mp3_path.exists():
             silence_bytes = self._silence_mp3_path.read_bytes()
