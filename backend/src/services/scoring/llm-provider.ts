@@ -151,6 +151,7 @@ function _buildClient(): LLMClient {
   // OpenAI-compat: openai, nvidia, kimi, openrouter, opengateway, or any custom provider
   const effectiveKey = apiKey ||
     (provider === "opengateway" ? process.env.OPENGATEWAY_API_KEY ?? "" : "") ||
+    (provider === "openrouter"  ? process.env.OPENROUTER_API_KEY ?? "" : "") ||
     (provider === "mimo"        ? process.env.MIMO_API_KEY ?? "" : "") ||
     (provider === "nvidia"      ? process.env.NVIDIA_API_KEY  ?? "" : "") ||
     (provider === "openai"      ? process.env.OPENAI_API_KEY  ?? "" : "");

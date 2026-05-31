@@ -256,6 +256,14 @@ def _resolve_provider() -> Any:
             "mimo", mimo_key, _PROVIDER_BASE_URLS["mimo"]
         )
 
+    # 3b. OpenRouter auto-detect
+    openrouter_key = os.getenv("OPENROUTER_API_KEY")
+    if openrouter_key:
+        logger.info("Using OpenRouter provider (auto-detected OPENROUTER_API_KEY)")
+        return _build_openai_compat_provider(
+            "openrouter", openrouter_key, _PROVIDER_BASE_URLS["openrouter"]
+        )
+
     # 4. Legacy env var fallbacks
     anthropic_key = os.getenv("ANTHROPIC_API_KEY")
     nvidia_key = os.getenv("NVIDIA_API_KEY")
@@ -310,6 +318,10 @@ def _resolve_model(provider: Any) -> str:
 
     if os.getenv("NVIDIA_API_KEY") and not os.getenv("LLM_PROVIDER"):
         logger.warning("NVIDIA_API_KEY set but no LLM_MODEL — set LLM_MODEL env var")
+        return ""
+
+    if os.getenv("OPENROUTER_API_KEY") and not os.getenv("LLM_PROVIDER"):
+        logger.warning("OPENROUTER_API_KEY set but no LLM_MODEL — set LLM_MODEL env var")
         return ""
 
     logger.error(
