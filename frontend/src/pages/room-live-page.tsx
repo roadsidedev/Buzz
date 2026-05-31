@@ -345,6 +345,57 @@ export function RoomLivePage() {
     return () => wsService.off('tts:audio', handleTtsAudio)
   }, [streamId, soundMuted])
 
+  // ── Music Break Playback ────────────────────────────────────────────────────
+  // When the radio-runner triggers a MUSIC_BREAK, the backend emits
+  // music_break:start via Socket.IO. The frontend relays the icecast stream
+  // through the backend proxy (avoids CORS) and plays it on the shared audio
+  // element. music_break:end stops playback and clears the source.
+  useEffect(() => {
+    const handleMusicBreakStart = (data: any) => {
+      if (data.roomId !== streamId) return
+
+      console.log('[Music] Break started:', {
+        breakNumber: data.breakNumber,
+        durationSeconds: data.durationSeconds,
+        streamUrl: data.streamUrl?.slice(0, 60),
+      })
+
+      const player = audioPlayerRef.current
+      if (!player) return
+
+      // Revoke previous blob URL if any
+      if (player.src?.startsWith('blob:')) URL.revokeObjectURL(player.src)
+
+      // Use backend proxy to avoid CORS on external streams (SomaFM etc.)
+      player.src = `${apiUrl}/rooms/${streamId}/music-stream`
+      player.muted = soundMuted
+      player.play().catch(err => {
+        console.warn('[Music] Autoplay blocked:', err.message)
+        setAudioBlocked(true)
+      })
+    }
+
+    const handleMusicBreakEnd = (data: any) => {
+      if (data.roomId !== streamId) return
+
+      console.log('[Music] Break ended:', { breakNumber: data.breakNumber })
+
+      const player = audioPlayerRef.current
+      if (player && player.src?.includes('music-stream')) {
+        player.pause()
+        if (player.src?.startsWith('blob:')) URL.revokeObjectURL(player.src)
+        player.src = ''
+      }
+    }
+
+    wsService.on('music_break:start', handleMusicBreakStart)
+    wsService.on('music_break:end', handleMusicBreakEnd)
+    return () => {
+      wsService.off('music_break:start', handleMusicBreakStart)
+      wsService.off('music_break:end', handleMusicBreakEnd)
+    }
+  }, [streamId, soundMuted, apiUrl])
+
   // ── Fallback: Play audio from turn:completed events (URL-only, no base64) ────
   useEffect(() => {
     const handleTurnCompleted = async (data: any) => {

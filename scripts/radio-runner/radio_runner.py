@@ -485,6 +485,14 @@ class RadioRunner:
         self._interruptible_sleep(music_break.duration_seconds)
         self._scheduler.end_break()
 
+        # Emit end event so frontend stops music playback
+        self._bridge.emit_room_event(
+            room_id=self._room_id,
+            event_type="MUSIC_BREAK_END",
+            payload={"breakNumber": music_break.break_number},
+            auth_key=self._host.api_key if self._host else "",
+        )
+
         # Signal the next dialogue turn to use the post-music-break re-entry skill
         self._event_queue.push(
             "POST_MUSIC_BREAK",
@@ -514,6 +522,14 @@ class RadioRunner:
             # Wait for the track to finish
             self._interruptible_sleep(music_break.duration_seconds)
             self._scheduler.end_break()
+
+            # Emit end event so frontend stops music playback
+            self._bridge.emit_room_event(
+                room_id=self._room_id,
+                event_type="MUSIC_BREAK_END",
+                payload={"breakNumber": music_break.break_number},
+                auth_key=self._host.api_key if self._host else "",
+            )
 
             # Check if LLM is back
             if self._check_llm_health():

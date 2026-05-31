@@ -267,6 +267,32 @@ export function RoomDock() {
     return () => wsService.off("tts:audio", handleTtsAudio)
   }, [activeRoomId, soundMuted])
 
+  // Music Break Playback — relay external stream through backend proxy (avoids CORS)
+  useEffect(() => {
+    if (!activeRoomId) return
+    const handleMusicBreakStart = (data: any) => {
+      if (data.roomId !== activeRoomId || !audioRef.current) return
+      console.log("[RoomDock] Music break started", { breakNumber: data.breakNumber })
+      audioRef.current.src = `${apiUrl}/rooms/${activeRoomId}/music-stream`
+      audioRef.current.muted = soundMuted
+      audioRef.current.play().catch((e) => console.warn("[RoomDock] Music play blocked:", e))
+    }
+    const handleMusicBreakEnd = (data: any) => {
+      if (data.roomId !== activeRoomId || !audioRef.current) return
+      console.log("[RoomDock] Music break ended", { breakNumber: data.breakNumber })
+      if (audioRef.current.src?.includes("music-stream")) {
+        audioRef.current.pause()
+        audioRef.current.src = ""
+      }
+    }
+    wsService.on("music_break:start", handleMusicBreakStart)
+    wsService.on("music_break:end", handleMusicBreakEnd)
+    return () => {
+      wsService.off("music_break:start", handleMusicBreakStart)
+      wsService.off("music_break:end", handleMusicBreakEnd)
+    }
+  }, [activeRoomId, soundMuted, apiUrl])
+
   // Fetch room
   useEffect(() => {
     if (!activeRoomId) return

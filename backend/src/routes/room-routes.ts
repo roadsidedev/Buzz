@@ -989,6 +989,7 @@ router.post(
       "end",
       "music_break",
       "MUSIC_BREAK",
+      "MUSIC_BREAK_END",
       "announcement",
       "poll",
       "reaction",
@@ -1044,6 +1045,35 @@ router.post(
       type,
       eventId,
     });
+
+    // Emit real-time WebSocket events for music breaks so the frontend can play/stop audio
+    try {
+      const { getIO } = await import("../server.js");
+      const io = getIO();
+      if (type === "MUSIC_BREAK" || type === "music_break") {
+        io.to(`room:${id}`).emit("music_break:start", {
+          roomId: id,
+          streamUrl: payload?.streamUrl || null,
+          durationSeconds: payload?.durationSeconds || 120,
+          breakNumber: payload?.breakNumber || 0,
+          timestamp: new Date().toISOString(),
+        });
+        logger.info("Emitted music_break:start WebSocket event", { roomId: id, breakNumber: payload?.breakNumber });
+      } else if (type === "MUSIC_BREAK_END") {
+        io.to(`room:${id}`).emit("music_break:end", {
+          roomId: id,
+          breakNumber: payload?.breakNumber || 0,
+          timestamp: new Date().toISOString(),
+        });
+        logger.info("Emitted music_break:end WebSocket event", { roomId: id, breakNumber: payload?.breakNumber });
+      }
+    } catch (wsErr) {
+      logger.warn("Failed to emit music_break WebSocket event", {
+        roomId: id,
+        type,
+        error: wsErr instanceof Error ? wsErr.message : String(wsErr),
+      });
+    }
 
     res.json({
       success: true,
@@ -1106,6 +1136,102 @@ router.get(
         success: true,
         data: { events: [], count: 0 },
       });
+    }
+  })
+);
+
+/**
+ * GET /rooms/:id/music-stream
+ * Proxy the music stream for an active music break.
+ *
+ * The frontend cannot fetch cross-origin audio streams (e.g. SomaFM) directly
+ * due to CORS. This endpoint acts as a server-side relay: it reads the latest
+ * MUSIC_BREAK event to get the stream URL, then pipes the audio bytes to the
+ * client with proper Content-Type headers.
+ *
+ * The stream stops when the music break ends (MUSIC_BREAK_END event is emitted)
+ * or when the client disconnects.
+ */
+router.get(
+  "/:id/music-stream",
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const { id } = req.params;
+
+    const { pool } = await import("../config/database.js");
+
+    // Find the most recent MUSIC_BREAK that hasn't been ended
+    let streamUrl: string | null = null;
+    try {
+      const { rows } = await pool.query(
+        `SELECT payload FROM room_event
+         WHERE room_id = $1 AND type IN ('MUSIC_BREAK', 'music_break')
+         ORDER BY created_at DESC LIMIT 1`,
+        [id],
+      );
+      streamUrl = rows[0]?.payload?.streamUrl || null;
+    } catch {
+      // Table may not exist
+    }
+
+    if (!streamUrl) {
+      res.status(404).json({ success: false, error: { code: "NO_ACTIVE_BREAK", message: "No active music break" } });
+      return;
+    }
+
+    logger.info("Music stream proxy started", { roomId: id, streamUrl: streamUrl.slice(0, 60) });
+
+    try {
+      const upstream = await fetch(streamUrl, {
+        headers: { "User-Agent": "BuzzRadio/1.0" },
+      });
+
+      if (!upstream.ok || !upstream.body) {
+        logger.warn("Music stream upstream failed", { roomId: id, status: upstream.status });
+        res.status(502).json({ success: false, error: { code: "STREAM_FAILED", message: "Failed to fetch music stream" } });
+        return;
+      }
+
+      res.setHeader("Content-Type", "audio/mpeg");
+      res.setHeader("Cache-Control", "no-cache, no-store");
+      res.setHeader("X-Content-Type-Options", "nosniff");
+      res.setHeader("Transfer-Encoding", "chunked");
+
+      // Pipe the upstream audio stream to the client
+      const reader = upstream.body.getReader();
+      const decoder = new TextDecoder(); // not used for binary but needed for type
+      let closed = false;
+
+      const cleanup = () => {
+        if (!closed) {
+          closed = true;
+          reader.cancel().catch(() => {});
+          res.end();
+        }
+      };
+
+      req.on("close", cleanup);
+      req.on("aborted", cleanup);
+
+      // Stream loop
+      try {
+        while (!closed) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          if (!res.write(value)) {
+            // Backpressure: wait for drain
+            await new Promise<void>((resolve) => res.once("drain", resolve));
+          }
+        }
+      } catch (streamErr) {
+        logger.debug("Music stream proxy interrupted", { roomId: id, error: String(streamErr) });
+      } finally {
+        cleanup();
+      }
+    } catch (fetchErr) {
+      logger.error("Music stream proxy error", { roomId: id, error: fetchErr instanceof Error ? fetchErr.message : String(fetchErr) });
+      if (!res.headersSent) {
+        res.status(502).json({ success: false, error: { code: "STREAM_ERROR", message: "Music stream proxy failed" } });
+      }
     }
   })
 );
