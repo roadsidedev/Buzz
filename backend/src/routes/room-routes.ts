@@ -977,15 +977,18 @@ router.post(
             const scoringCtx = {
               roomId,
               roomType: room.type || "debate",
-              objective: room.objective || "",
-              transcript: [],
-              weights: undefined,
+              roomObjective: room.objective || "",
+              transcriptHistory: [],
+              participationHistory: {},
+              weights: undefined as any,
             };
             const scoringMsgs = candidates.map((m: any) => ({
               id: m.id,
               roomId: m.room_id,
               agentId: m.agent_id,
               text: m.text,
+              status: m.status || "candidate",
+              createdAt: m.created_at ? new Date(m.created_at) : new Date(),
             }));
             const results = await engine.scoreBatch(scoringMsgs, scoringCtx);
             let bestIdx = 0;
@@ -1012,8 +1015,8 @@ router.post(
             try {
               const { getTTSService } = await import("../services/tts-service.js");
               const tts = getTTSService();
-              const audioResult = await tts.synthesize(winner.text, {
-                agentId: winner.agent_id,
+              const audioResult = await tts.synthesize({
+                text: winner.text,
               });
               if (audioResult.audioBuffer) {
                 const { getAudioStorageService } = await import("../services/audio-storage-service.js");
